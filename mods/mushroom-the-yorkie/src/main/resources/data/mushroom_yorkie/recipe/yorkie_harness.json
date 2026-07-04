@@ -1,0 +1,18 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "equipment",
+	"key": {
+		"B": "minecraft:black_dye",
+		"L": "minecraft:leather",
+		"S": "minecraft:string"
+	},
+	"pattern": [
+		"S S",
+		"LBL",
+		" S "
+	],
+	"result": {
+		"count": 1,
+		"id": "mushroom_yorkie:yorkie_harness"
+	}
+}

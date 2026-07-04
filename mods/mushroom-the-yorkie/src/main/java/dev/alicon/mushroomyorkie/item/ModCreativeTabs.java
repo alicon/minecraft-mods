@@ -31,6 +31,7 @@ public final class ModCreativeTabs {
 				.displayItems((parameters, output) -> {
 					output.accept(ModItems.MUSHROOM_YORKIE_SPAWN_EGG);
 					output.accept(ModItems.YORKIE_TREAT);
+					output.accept(ModItems.YORKIE_HARNESS);
 				})
 				.build());
 
@@ -38,5 +39,7 @@ public final class ModCreativeTabs {
 				entries.accept(ModItems.MUSHROOM_YORKIE_SPAWN_EGG));
 		ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.FOOD_AND_DRINKS).register(entries ->
 				entries.accept(ModItems.YORKIE_TREAT));
+		ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.TOOLS_AND_UTILITIES).register(entries ->
+				entries.accept(ModItems.YORKIE_HARNESS));
 	}
 }

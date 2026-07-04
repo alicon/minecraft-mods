@@ -10,8 +10,8 @@ import net.minecraft.world.phys.Vec3;
 final class IndoorPottyWarningGoal extends Goal {
 	private final MushroomYorkieEntity yorkie;
 	private BlockPos doorPos;
-	private boolean movingToDoor;
 	private int nextMoveTick;
+	private int circleStep;
 
 	IndoorPottyWarningGoal(MushroomYorkieEntity yorkie) {
 		this.yorkie = yorkie;
@@ -31,8 +31,8 @@ final class IndoorPottyWarningGoal extends Goal {
 	@Override
 	public void start() {
 		this.doorPos = this.findNearestDoor();
-		this.movingToDoor = this.doorPos != null;
 		this.nextMoveTick = 0;
+		this.circleStep = 0;
 	}
 
 	@Override
@@ -71,12 +71,10 @@ final class IndoorPottyWarningGoal extends Goal {
 			return center.add(Math.cos(angle) * 1.8D, 0.0D, Math.sin(angle) * 1.8D);
 		}
 
-		this.movingToDoor = !this.movingToDoor;
-		if (this.movingToDoor || owner == null) {
-			return Vec3.atBottomCenterOf(this.doorPos);
-		}
-
-		return owner.position().add(this.yorkie.getRandom().nextDouble() - 0.5D, 0.0D, this.yorkie.getRandom().nextDouble() - 0.5D);
+		this.circleStep++;
+		Vec3 center = Vec3.atBottomCenterOf(this.doorPos);
+		double angle = this.circleStep * (Math.PI / 3.0D);
+		return center.add(Math.cos(angle) * 1.8D, 0.0D, Math.sin(angle) * 1.8D);
 	}
 
 	private BlockPos findNearestDoor() {

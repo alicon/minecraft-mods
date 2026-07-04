@@ -24,6 +24,7 @@ public final class MushroomYorkieModel extends EntityModel<MushroomYorkieRenderS
 	private final ModelPart rightEye;
 	private final ModelPart leftEar;
 	private final ModelPart rightEar;
+	private final ModelPart harness;
 	private final ModelPart tail;
 	private final ModelPart frontLeftLeg;
 	private final ModelPart frontRightLeg;
@@ -43,6 +44,7 @@ public final class MushroomYorkieModel extends EntityModel<MushroomYorkieRenderS
 		this.rightEye = this.head.getChild("right_eye");
 		this.leftEar = this.head.getChild("left_ear");
 		this.rightEar = this.head.getChild("right_ear");
+		this.harness = this.body.getChild("harness");
 		this.tail = this.body.getChild("tail");
 		this.frontLeftLeg = this.body.getChild("front_left_leg");
 		this.frontRightLeg = this.body.getChild("front_right_leg");
@@ -95,6 +97,13 @@ public final class MushroomYorkieModel extends EntityModel<MushroomYorkieRenderS
 		body.addOrReplaceChild("tail", CubeListBuilder.create()
 				.texOffs(24, 0)
 				.addBox(-0.5F, -0.5F, 0.0F, 1.0F, 1.0F, 2.0F), PartPose.offsetAndRotation(0.0F, -2.0F, 5.0F, -0.25F, 0.0F, 0.0F));
+		body.addOrReplaceChild("harness", CubeListBuilder.create()
+				.texOffs(48, 4)
+				.addBox(-2.75F, -4.35F, -2.7F, 5.5F, 0.55F, 1.0F)
+				.texOffs(48, 4)
+				.addBox(-2.75F, -4.35F, 1.5F, 5.5F, 0.55F, 1.0F)
+				.texOffs(48, 4)
+				.addBox(-0.35F, -4.45F, -2.5F, 0.7F, 0.65F, 5.0F), PartPose.ZERO);
 		body.addOrReplaceChild("front_left_leg", legBuilder(), PartPose.offset(1.8F, 1.0F, -3.2F));
 		body.addOrReplaceChild("front_right_leg", legBuilder(), PartPose.offset(-1.8F, 1.0F, -3.2F));
 		body.addOrReplaceChild("back_left_leg", legBuilder(), PartPose.offset(1.8F, 1.0F, 3.4F));
@@ -121,6 +130,7 @@ public final class MushroomYorkieModel extends EntityModel<MushroomYorkieRenderS
 		this.body.xRot = 0.0F;
 		this.body.zRot = 0.0F;
 		this.tail.xRot = -0.25F;
+		this.harness.visible = state.harness;
 		this.leftEye.visible = true;
 		this.rightEye.visible = true;
 		this.leftEar.zRot = 0.28F + Mth.sin(state.ageInTicks * 0.15F) * 0.04F;

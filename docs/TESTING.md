@@ -2,6 +2,24 @@
 
 Use automated CLI checks first, then do a short manual pass for visuals, feel, and multiplayer behavior that cannot be proven cheaply from tests.
 
+## Hardening Workflow
+
+For engineering hardening, start with fast tests and only move outward when the behavior needs more Minecraft runtime.
+
+1. Extract pure Java rules for decisions, ordering, cooldowns, clamps, permissions, and save/load adapters.
+2. Cover those rules with JVM tests, using parameterized tests for boundary values and gameplay matrices.
+3. Add focused GameTests for behavior that needs a registered entity, item interaction, world state, or tick loop.
+4. Add local iteration commands only when they remove repeated manual steps.
+5. Add logging or opt-in in-game diagnostics for rare state transitions and hard-to-see gameplay decisions.
+
+When auditing a mod, record work as:
+
+- Now: high-value fixes or tests that fit in the current slice.
+- Next: follow-up tests, fixtures, or refactors that are clearly useful but not required now.
+- Later: broader harnesses, playtest tools, or GameTests that need more setup.
+
+Prefer the narrowest useful command while iterating, then run broader checks before release.
+
 ## Automated CLI Checks
 
 Run all verification:
@@ -26,6 +44,7 @@ Run one mod's tests:
 ```shell
 ./gradlew :narwhal-together:test
 ./gradlew :mushroom-the-yorkie:test
+./gradlew :cops-and-robbers:test
 ```
 
 Run a supported NARwhal Minecraft-version variant:
@@ -79,6 +98,14 @@ Mushroom the Yorkie:
 - spawn-mode config parsing defaults
 - headless GameTest verifies Mushroom's custom entity can spawn in a Minecraft test world
 
+Cops and Robbers:
+
+- cruiser flight lift input clamps to the server-authoritative control range
+- non-finite cruiser lift input becomes neutral before it can affect motion
+- cruiser reverse and strafe controls use reduced handling multipliers
+- captured robber counts clamp to the cruiser capacity
+- capture/release count transitions do not overflow or go negative
+
 Root layout validation:
 
 - root `src/` does not exist
@@ -107,6 +134,10 @@ Good future GameTests:
 - owner can toggle sit/follow
 - non-owner cannot command Mushroom
 - NARwhal payload registration does not fail on startup
+- Cops and Robbers spawn eggs create custom entities
+- police station and bank kits place expected structures
+- cruiser driver controls mutate only the currently controlled cruiser
+- bank robbery/capture/recovery flow works in a real server world
 
 ## Manual Acceptance Checks
 
@@ -133,3 +164,14 @@ Mushroom the Yorkie:
 - [ ] Empty-hand owner interaction toggles sit/follow.
 - [ ] Mushroom follows closely enough to feel like a tiny companion.
 - [ ] No errors attributed to `mushroom_yorkie` appear in the latest log.
+
+Cops and Robbers:
+
+- [ ] Minecraft 1.21.11 launches with Fabric API and Cops and Robbers.
+- [ ] Creative inventory has Cops and Robbers items and spawn eggs.
+- [ ] Police cruiser can be driven and responds to lights and siren controls.
+- [ ] Creative-only cruiser flight and tricks are unavailable to non-creative players.
+- [ ] Bank and police station kits place their expected structures.
+- [ ] Robber capture, jail release, and gold recovery messages are understandable.
+- [ ] Fire truck and fire response behavior do not spam logs or chat.
+- [ ] No errors attributed to `cops_robbers` appear in the latest log.

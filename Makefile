@@ -7,14 +7,17 @@ MOD_VERSION := $(shell awk -F"'" '/mod_version =/{print $$2; exit}' mods/$(MOD)/
 MOD_JAR := build/mods/$(MOD)/$(MC_VERSION)/libs/$(MOD)-$(MOD_VERSION).jar
 MODRINTH_PROFILE ?= $(HOME)/Library/Application Support/ModrinthApp/profiles/Dad’s Minecraft
 LIVE_TEST_MODS_DIR ?= $(or $(MODRINTH_LIVE_TEST_MODS_DIR),$(MODRINTH_PROFILE)/mods)
+LIVE_TEST_BACKUP_SUFFIX := codexbak-$(shell date +%Y%m%d%H%M%S)
 MODRINTH_VERSION_TYPE ?= alpha
 
-.PHONY: help build build-all check test validate quick-validate api-docs format-check clean live-test preview-structures publish-modrinth deploy-modrinth sync-modrinth print-vars
+.PHONY: help build build-all check test validate quick-validate api-docs format-check clean live-test live-test-mushroom live-test-cops preview-structures publish-modrinth deploy-modrinth sync-modrinth print-vars
 
 help:
 	@printf '%s\n' \
 		'Common targets:' \
 		'  make live-test                         Build MOD and copy its jar to Dad’s Minecraft.' \
+		'  make live-test-mushroom                Build Mushroom and copy its jar to Dad’s Minecraft.' \
+		'  make live-test-cops                    Build Cops and Robbers and copy its jar to Dad’s Minecraft.' \
 		'  make preview-structures                Generate HTML previews for Cops and Robbers buildings.' \
 		'  make build                             Build one mod. Default MOD=cops-and-robbers.' \
 		'  make test                              Run tests for one mod.' \
@@ -62,10 +65,20 @@ clean:
 
 live-test: build
 	mkdir -p "$(LIVE_TEST_MODS_DIR)"
+	for jar in "$(LIVE_TEST_MODS_DIR)"/$(MOD)-*.jar(N); do \
+		[[ "$$jar" == "$(LIVE_TEST_MODS_DIR)/$(notdir $(MOD_JAR))" ]] && continue; \
+		mv "$$jar" "$$jar.$(LIVE_TEST_BACKUP_SUFFIX)"; \
+	done
 	tmp="$(LIVE_TEST_MODS_DIR)/.$(notdir $(MOD_JAR)).tmp"; \
 	cp "$(MOD_JAR)" "$$tmp"; \
 	mv -f "$$tmp" "$(LIVE_TEST_MODS_DIR)/$(notdir $(MOD_JAR))"
 	@printf 'Copied %s to %s\n' "$(MOD_JAR)" "$(LIVE_TEST_MODS_DIR)"
+
+live-test-mushroom:
+	$(MAKE) live-test MOD=mushroom-the-yorkie MC_VERSION=$(MC_VERSION)
+
+live-test-cops:
+	$(MAKE) live-test MOD=cops-and-robbers MC_VERSION=$(MC_VERSION)
 
 preview-structures:
 	python3 scripts/preview_cops_robbers_structures.py

@@ -1,0 +1,38 @@
+{
+	"parent": "minecraft:recipes/root",
+	"criteria": {
+		"has_harness_materials": {
+			"trigger": "minecraft:inventory_changed",
+			"conditions": {
+				"items": [
+					{
+						"items": "minecraft:leather"
+					},
+					{
+						"items": "minecraft:string"
+					},
+					{
+						"items": "minecraft:black_dye"
+					}
+				]
+			}
+		},
+		"has_the_recipe": {
+			"trigger": "minecraft:recipe_unlocked",
+			"conditions": {
+				"recipe": "mushroom_yorkie:yorkie_harness"
+			}
+		}
+	},
+	"requirements": [
+		[
+			"has_harness_materials",
+			"has_the_recipe"
+		]
+	],
+	"rewards": {
+		"recipes": [
+			"mushroom_yorkie:yorkie_harness"
+		]
+	}
+}

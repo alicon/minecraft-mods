@@ -77,11 +77,11 @@ final class HesitantHostileMobGoal extends Goal {
 			this.yorkie.bark();
 		}
 
-			if (this.yorkie.distanceToSqr(this.target) <= 2.2D) {
-				this.yorkie.swing(InteractionHand.MAIN_HAND);
-				this.yorkie.doHurtTarget(this.target);
-				this.yorkie.playSound(SoundEvents.WOLF_GROWL, 0.45F, 1.6F);
-				this.retreatTicks = 45 + this.yorkie.getRandom().nextInt(25);
+		if (this.yorkie.distanceToSqr(this.target) <= 2.2D) {
+			this.yorkie.swing(InteractionHand.MAIN_HAND);
+			this.yorkie.doHurtTarget(this.target);
+			this.yorkie.playSound(SoundEvents.WOLF_GROWL, 0.45F, 1.6F);
+			this.retreatTicks = 45 + this.yorkie.getRandom().nextInt(25);
 			this.nextMoveTick = 0;
 		}
 	}

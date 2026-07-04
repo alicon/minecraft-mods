@@ -35,6 +35,13 @@ Good examples:
 - Give each mod only the configuration that is truly unique: mod id, display name, archive name, Modrinth project id, optional dependencies.
 - Do not hard-code repeated Minecraft, Fabric Loader, Fabric API, Java, or JUnit versions in subprojects.
 - Keep output paths symmetric across mods.
+- Separate configuration by purpose:
+  - **Build/release configuration** lives in Gradle files, workflow files, release scripts, and release docs.
+  - **Runtime user configuration** lives in explicit config loader classes and generated config files.
+  - **Gameplay tuning configuration** lives in domain-specific `*GameplayConfig` classes or value objects near the behavior it tunes.
+- Document gameplay tuning values with their unit and gameplay effect, especially when changing speed, radius, damage, cooldown, capacity, spawn, or probability.
+- Keep non-gameplay constants such as save-data keys, translation keys, asset paths, and logger names close to the adapter that uses them.
+- Do not hide gameplay-affecting values inside entity plumbing, renderers, Gradle properties, or scripts.
 - For mods with multiple Minecraft targets, declare the version matrix in the mod's `build.gradle`
   and keep version-specific Minecraft/Fabric integration under `src/versions/<minecraft-version>/`.
   Keep shared pure Java behavior in the normal source roots so tests run across every target.
@@ -120,6 +127,47 @@ Use manual testing for:
 - pathfinding quality
 
 Every bug fix should include a regression test unless the behavior is only visual/manual.
+
+## Engineering Hardening
+
+A hardening pass in this repository means improving engineering resilience, not only security.
+Use it to make the mods easier to change, easier to test, faster to iterate on, and easier to
+observe while developing or playtesting.
+
+Start a hardening pass by reading this file, [Testing](TESTING.md), the relevant mod's
+`build.gradle`, existing tests, and the code around the target behavior. Then write down a short
+Now / Next / Later audit before editing when the scope is not obvious.
+
+Prioritize:
+
+- untested gameplay rules with user-visible behavior
+- entity classes that mix Minecraft plumbing with reusable domain rules
+- repeated setup that slows local development or makes manual playtesting error-prone
+- missing logs around rare but important state transitions
+- behavior that is hard to debug in-game without temporarily editing code
+
+When implementing hardening changes:
+
+- Prefer small vertical slices that leave gameplay unchanged unless a bug is clear.
+- Extract pure Java policies, selectors, state transitions, and value objects when that unlocks fast tests.
+- Use Minecraft GameTests only for behavior that needs registries, entities, world state, or tick loops.
+- Add JUnit parameterized tests for rule matrices and boundary values.
+- Add shared test fixtures only after repetition appears across tests.
+- Keep server-authoritative behavior in common/server code and keep client code as an input/display adapter.
+- Update docs when commands, workflows, coverage, or acceptance checks change.
+
+## Observability
+
+Logs and in-game diagnostics should make development clearer without spamming normal play.
+
+- Use existing SLF4J mod loggers.
+- Use `debug` for high-frequency diagnostics, decisions, and state that is useful during development.
+- Use `info` for startup, rare lifecycle events, and notable state transitions.
+- Use `warn` for recoverable invalid state, missing optional data, or ignored impossible requests.
+- Avoid logging every tick unless the log is behind a debug toggle and rate-limited.
+- Use parameterized log messages instead of string concatenation.
+- Prefer opt-in debug commands, config flags, or actionbar messages for gameplay diagnostics.
+- Do not replace player-facing feedback with logs; use both when the information serves different audiences.
 
 ## Automated Quality Gates
 

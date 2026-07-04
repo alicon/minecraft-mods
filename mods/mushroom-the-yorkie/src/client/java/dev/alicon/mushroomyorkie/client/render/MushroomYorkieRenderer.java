@@ -29,6 +29,7 @@ public final class MushroomYorkieRenderer extends MobRenderer<MushroomYorkieEnti
 		super.extractRenderState(entity, state, partialTick);
 		state.sleeping = entity.isCurledUpSleeping();
 		state.sitting = entity.isInSittingPose() || entity.isOrderedToSit();
+		state.harness = entity.hasHarness();
 		state.flyingWithOwner = entity.isNoGravity() && !entity.onGround();
 		state.verticalSpeed = (float) entity.getDeltaMovement().y;
 		state.flightTrickType = entity.getFlightTrickType();

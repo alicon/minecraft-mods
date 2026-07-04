@@ -57,7 +57,7 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 
 		LivingEntity owner = this.yorkie.getOwner();
 		if (owner != null && owner.isHolding(ModItems.YORKIE_TREAT)) {
-			this.yorkie.peacefulMobBarkMutedDay = MushroomYorkieEntity.currentDay((ServerLevel) this.yorkie.level());
+			this.yorkie.mutePeacefulMobBarking((ServerLevel) this.yorkie.level());
 			this.yorkie.getNavigation().moveTo(owner, 1.25D);
 			return;
 		}
@@ -75,7 +75,7 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 				&& !this.yorkie.isOrderedToSit()
 				&& !this.yorkie.isMushroomSleeping()
 				&& !this.yorkie.shouldAskToGoOutside(level)
-				&& !this.yorkie.peacefulMobBarkingMutedToday(level)
+				&& !this.yorkie.peacefulMobBarkingMuted(level)
 				&& (owner == null || !owner.isHolding(ModItems.YORKIE_TREAT));
 	}
 

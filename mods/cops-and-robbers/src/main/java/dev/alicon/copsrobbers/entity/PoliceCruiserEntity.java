@@ -1,5 +1,6 @@
 package dev.alicon.copsrobbers.entity;
 
+import dev.alicon.copsrobbers.CopsAndRobbers;
 import dev.alicon.copsrobbers.capture.PoliceCaptureHandler;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -30,15 +31,7 @@ public class PoliceCruiserEntity extends Mob {
 	public static final int TRICK_NONE = 0;
 	public static final int TRICK_BARREL_ROLL = 1;
 	public static final int TRICK_LOOP = 2;
-	public static final int TRICK_DURATION_TICKS = 36;
-	private static final float RIDDEN_SPEED = 0.34F;
-	private static final float REVERSE_MULTIPLIER = 0.45F;
-	private static final float STRAFE_MULTIPLIER = 0.35F;
-	private static final double CREATIVE_FLIGHT_SPEED = 0.62D;
-	private static final double IMPACT_MIN_SPEED = 0.06D;
-	private static final float IMPACT_DAMAGE = 6.0F;
-	private static final float CRASH_SELF_DAMAGE = 2.0F;
-	private static final float CRASH_TRUCK_DAMAGE = 3.0F;
+	public static final int TRICK_DURATION_TICKS = PoliceCruiserGameplayConfig.TRICK_DURATION_TICKS;
 	private static final String LIGHTS_ENABLED_TAG = "lights_enabled";
 	private static final String SIREN_ENABLED_TAG = "siren_enabled";
 	private static final String CAPTURED_ROBBERS_TAG = "captured_robbers";
@@ -65,7 +58,7 @@ public class PoliceCruiserEntity extends Mob {
 	public static AttributeSupplier.Builder createAttributes() {
 		return Mob.createMobAttributes()
 				.add(Attributes.MAX_HEALTH, 42.0D)
-				.add(Attributes.MOVEMENT_SPEED, RIDDEN_SPEED)
+				.add(Attributes.MOVEMENT_SPEED, PoliceCruiserGameplayConfig.RIDDEN_SPEED)
 				.add(Attributes.KNOCKBACK_RESISTANCE, 0.85D)
 				.add(Attributes.STEP_HEIGHT, 1.0D)
 				.add(Attributes.SAFE_FALL_DISTANCE, 6.0D);
@@ -98,7 +91,7 @@ public class PoliceCruiserEntity extends Mob {
 		super.readAdditionalSaveData(input);
 		this.setLightsEnabled(input.getBooleanOr(LIGHTS_ENABLED_TAG, true));
 		this.setSirenEnabled(input.getBooleanOr(SIREN_ENABLED_TAG, false));
-		this.entityData.set(CAPTURED_ROBBERS, input.getIntOr(CAPTURED_ROBBERS_TAG, 0));
+		this.setCapturedRobbers(input.getIntOr(CAPTURED_ROBBERS_TAG, 0));
 	}
 
 	@Override
@@ -165,11 +158,11 @@ public class PoliceCruiserEntity extends Mob {
 	}
 
 	public void addCapturedRobber() {
-		this.entityData.set(CAPTURED_ROBBERS, Math.min(this.capturedRobbers() + 1, 12));
+		this.setCapturedRobbers(PoliceCruiserControlPolicy.afterCapture(this.capturedRobbers()));
 	}
 
 	public void removeCapturedRobbers(int count) {
-		this.entityData.set(CAPTURED_ROBBERS, Math.max(0, this.capturedRobbers() - count));
+		this.setCapturedRobbers(PoliceCruiserControlPolicy.afterRelease(this.capturedRobbers(), count));
 	}
 
 	public static void toggleLightsForDriver(ServerPlayer player) {
@@ -203,7 +196,11 @@ public class PoliceCruiserEntity extends Mob {
 
 	public static void updateFlightInputForDriver(ServerPlayer player, float lift) {
 		if (player.isCreative() && player.getVehicle() instanceof PoliceCruiserEntity cruiser && cruiser.getControllingPassenger() == player) {
-			cruiser.creativeFlightLiftInput = Math.clamp(lift, -1.0F, 1.0F);
+			float safeLift = PoliceCruiserControlPolicy.liftInput(lift);
+			if (safeLift != lift) {
+				CopsAndRobbers.LOGGER.debug("Sanitized cruiser flight lift from {} to {} for {}", lift, safeLift, player.getName().getString());
+			}
+			cruiser.creativeFlightLiftInput = safeLift;
 		}
 	}
 
@@ -225,6 +222,10 @@ public class PoliceCruiserEntity extends Mob {
 
 	private void setSirenEnabled(boolean enabled) {
 		this.entityData.set(SIREN_ENABLED, enabled);
+	}
+
+	private void setCapturedRobbers(int count) {
+		this.entityData.set(CAPTURED_ROBBERS, PoliceCruiserControlPolicy.clampCapturedRobbers(count));
 	}
 
 	private void startTrick(int trickType) {
@@ -299,11 +300,8 @@ public class PoliceCruiserEntity extends Mob {
 	}
 
 	private void travelGround(Player driver, Vec3 travelVector) {
-		float strafe = driver.xxa * STRAFE_MULTIPLIER;
-		float forward = driver.zza;
-		if (forward < 0.0F) {
-			forward *= REVERSE_MULTIPLIER;
-		}
+		float strafe = PoliceCruiserControlPolicy.strafeInput(driver.xxa);
+		float forward = PoliceCruiserControlPolicy.forwardInput(driver.zza);
 		this.forwardInput = forward;
 
 		this.setSpeed((float) this.getAttributeValue(Attributes.MOVEMENT_SPEED));
@@ -315,11 +313,8 @@ public class PoliceCruiserEntity extends Mob {
 			return;
 		}
 		this.setNoGravity(true);
-		float forwardInput = driver.zza;
-		float strafeInput = driver.xxa * STRAFE_MULTIPLIER;
-		if (forwardInput < 0.0F) {
-			forwardInput *= REVERSE_MULTIPLIER;
-		}
+		float forwardInput = PoliceCruiserControlPolicy.forwardInput(driver.zza);
+		float strafeInput = PoliceCruiserControlPolicy.strafeInput(driver.xxa);
 		this.forwardInput = forwardInput;
 
 		Vec3 look = driver.getLookAngle();
@@ -328,7 +323,7 @@ public class PoliceCruiserEntity extends Mob {
 		Vec3 forward = forwardInput > 0.0F ? look : horizontalForward;
 		Vec3 desired = forward.scale(forwardInput).add(right.scale(strafeInput)).add(0.0D, this.creativeFlightLiftInput * 0.75D, 0.0D);
 		if (desired.lengthSqr() > 1.0E-4D) {
-			desired = desired.normalize().scale(CREATIVE_FLIGHT_SPEED);
+			desired = desired.normalize().scale(PoliceCruiserGameplayConfig.CREATIVE_FLIGHT_SPEED);
 		}
 
 		Vec3 motion = this.getDeltaMovement().scale(0.62D).add(desired);
@@ -345,7 +340,7 @@ public class PoliceCruiserEntity extends Mob {
 		}
 
 		double horizontalSpeed = this.getDeltaMovement().multiply(1.0D, 0.0D, 1.0D).length();
-		if (horizontalSpeed < IMPACT_MIN_SPEED && Math.abs(this.forwardInput) <= 0.05F) {
+		if (horizontalSpeed < PoliceCruiserGameplayConfig.IMPACT_MIN_SPEED && Math.abs(this.forwardInput) <= 0.05F) {
 			return;
 		}
 
@@ -374,7 +369,7 @@ public class PoliceCruiserEntity extends Mob {
 				if (target.invulnerableTime > 0) {
 					continue;
 				}
-				target.hurtServer(level, this.damageSources().generic(), IMPACT_DAMAGE);
+				target.hurtServer(level, this.damageSources().generic(), PoliceCruiserGameplayConfig.IMPACT_DAMAGE);
 				target.push(this.impactForwardVector().scale(0.95D).add(0.0D, 0.25D, 0.0D));
 				hitMob = true;
 			}
@@ -417,9 +412,9 @@ public class PoliceCruiserEntity extends Mob {
 		}
 
 		this.crashCooldownTicks = 12;
-		super.hurtServer(level, this.damageSources().flyIntoWall(), CRASH_TRUCK_DAMAGE);
+		super.hurtServer(level, this.damageSources().flyIntoWall(), PoliceCruiserGameplayConfig.CRASH_TRUCK_DAMAGE);
 		if (this.getControllingPassenger() instanceof Player driver && !driver.isCreative()) {
-			driver.hurtServer(level, this.damageSources().flyIntoWall(), CRASH_SELF_DAMAGE);
+			driver.hurtServer(level, this.damageSources().flyIntoWall(), PoliceCruiserGameplayConfig.CRASH_SELF_DAMAGE);
 		}
 	}
 
