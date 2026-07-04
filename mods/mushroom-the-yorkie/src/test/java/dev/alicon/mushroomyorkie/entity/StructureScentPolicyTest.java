@@ -28,6 +28,15 @@ final class StructureScentPolicyTest {
 	}
 
 	@Test
+	void circleBackPointStaysNearOwnerTowardTarget() {
+		Vec3 point = StructureScentPolicy.circleBackPoint(new Vec3(0.5D, 64.0D, 0.5D), new BlockPos(100, 64, 0), 4);
+
+		assertEquals(4.5D, point.x, 0.001D);
+		assertEquals(64.0D, point.y, 0.001D);
+		assertEquals(0.5D, point.z, 0.001D);
+	}
+
+	@Test
 	void foundDistanceUsesBlockRadiusAroundTarget() {
 		BlockPos target = new BlockPos(100, 64, 100);
 

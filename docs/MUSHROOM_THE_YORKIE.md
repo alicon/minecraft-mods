@@ -8,11 +8,15 @@ Structure scenting lets a tamed, following Mushroom occasionally catch a strong 
 
 - `structureScentingEnabled`: turns the behavior on or off.
 - `structureScentMessages`: shows actionbar prompts such as `Follow Mushroom!`; keep this on for younger players.
+- `structureScentDebugMessages`: shows actionbar state messages such as leading, circling back, waiting, recovering, and giving up. Use this during playtesting, then turn it off for quieter play.
 - `structureScentCanLoseTrail`: allows water, steep terrain, and failed paths to interrupt the scent.
 - `structureScentMinDistanceBlocks`: prevents Mushroom from scenting things already close enough to stumble into.
 - `structureScentMaxDistanceBlocks`: caps how far structure lookup searches; higher values find rarer structures but make searches heavier.
 - `structureScentCooldownTicks`: delay between structure searches per Mushroom; this protects normal server ticks from repeated locate-style work.
 - `structureScentLeadAheadBlocks`: how far Mushroom runs ahead before waiting for the player; keep this short because Mushroom is tiny and easy to lose visually.
+- `structureScentCircleBackIntervalTicks`: how often Mushroom breaks from leading and returns near the player so he stays visible.
+- `structureScentCircleBackTicks`: how long Mushroom spends circling back before leading again.
+- `structureScentCircleBackDistanceBlocks`: how close Mushroom comes back toward the player before heading off again.
 - `structureScentFoundDistanceBlocks`: how close Mushroom must get before celebrating and ending the behavior.
 - `structureScentBarkIntervalTicks`: bark cadence while leading, waiting, or recovering the scent.
 - `structureScentRecoveryTicks`: how long Mushroom sniffs around before giving up after losing a trail.

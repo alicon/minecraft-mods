@@ -9,11 +9,15 @@ import java.util.Set;
 public record MushroomStructureScentConfig(
 		boolean enabled,
 		boolean messages,
+		boolean debugMessages,
 		boolean canLoseTrail,
 		int minDistanceBlocks,
 		int maxDistanceBlocks,
 		int cooldownTicks,
 		int leadAheadBlocks,
+		int circleBackIntervalTicks,
+		int circleBackTicks,
+		int circleBackDistanceBlocks,
 		int foundDistanceBlocks,
 		int barkIntervalTicks,
 		int recoveryTicks,
@@ -34,15 +38,18 @@ public record MushroomStructureScentConfig(
 		maxDistanceBlocks = Math.max(minDistanceBlocks, maxDistanceBlocks);
 		cooldownTicks = Math.max(200, cooldownTicks);
 		leadAheadBlocks = Math.max(6, leadAheadBlocks);
+		circleBackIntervalTicks = Math.max(40, circleBackIntervalTicks);
+		circleBackTicks = Math.max(20, circleBackTicks);
+		circleBackDistanceBlocks = Math.max(2, circleBackDistanceBlocks);
 		foundDistanceBlocks = Math.max(16, foundDistanceBlocks);
 		barkIntervalTicks = Math.max(20, barkIntervalTicks);
-		recoveryTicks = Math.max(40, recoveryTicks);
+		recoveryTicks = Math.max(120, recoveryTicks);
 		maxTrailRiseBlocks = Math.max(4, maxTrailRiseBlocks);
 		targets = supportedTargets(targets);
 	}
 
 	static MushroomStructureScentConfig defaults() {
-		return new MushroomStructureScentConfig(true, true, true, 128, 4096, 6_000, 10, 48, 80, 240, 10, DEFAULT_TARGETS);
+		return new MushroomStructureScentConfig(true, true, false, true, 128, 4096, 6_000, 10, 120, 45, 4, 48, 80, 600, 10, DEFAULT_TARGETS);
 	}
 
 	private static List<String> supportedTargets(List<String> targets) {

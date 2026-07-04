@@ -85,11 +85,15 @@ final class MushroomYorkieConfig {
 		return new MushroomStructureScentConfig(
 				file.structureScentingEnabled == null ? defaults.enabled() : file.structureScentingEnabled,
 				file.structureScentMessages == null ? defaults.messages() : file.structureScentMessages,
+				file.structureScentDebugMessages == null ? defaults.debugMessages() : file.structureScentDebugMessages,
 				file.structureScentCanLoseTrail == null ? defaults.canLoseTrail() : file.structureScentCanLoseTrail,
 				file.structureScentMinDistanceBlocks == null ? defaults.minDistanceBlocks() : file.structureScentMinDistanceBlocks,
 				file.structureScentMaxDistanceBlocks == null ? defaults.maxDistanceBlocks() : file.structureScentMaxDistanceBlocks,
 				file.structureScentCooldownTicks == null ? defaults.cooldownTicks() : file.structureScentCooldownTicks,
 				file.structureScentLeadAheadBlocks == null ? defaults.leadAheadBlocks() : file.structureScentLeadAheadBlocks,
+				file.structureScentCircleBackIntervalTicks == null ? defaults.circleBackIntervalTicks() : file.structureScentCircleBackIntervalTicks,
+				file.structureScentCircleBackTicks == null ? defaults.circleBackTicks() : file.structureScentCircleBackTicks,
+				file.structureScentCircleBackDistanceBlocks == null ? defaults.circleBackDistanceBlocks() : file.structureScentCircleBackDistanceBlocks,
 				file.structureScentFoundDistanceBlocks == null ? defaults.foundDistanceBlocks() : file.structureScentFoundDistanceBlocks,
 				file.structureScentBarkIntervalTicks == null ? defaults.barkIntervalTicks() : file.structureScentBarkIntervalTicks,
 				file.structureScentRecoveryTicks == null ? defaults.recoveryTicks() : file.structureScentRecoveryTicks,
@@ -115,14 +119,18 @@ final class MushroomYorkieConfig {
 		Boolean oneMushroomPerPlayer = true;
 		Boolean structureScentingEnabled = true;
 		Boolean structureScentMessages = true;
+		Boolean structureScentDebugMessages = false;
 		Boolean structureScentCanLoseTrail = true;
 		Integer structureScentMinDistanceBlocks = 128;
 		Integer structureScentMaxDistanceBlocks = 4096;
 		Integer structureScentCooldownTicks = 6_000;
 		Integer structureScentLeadAheadBlocks = 10;
+		Integer structureScentCircleBackIntervalTicks = 120;
+		Integer structureScentCircleBackTicks = 45;
+		Integer structureScentCircleBackDistanceBlocks = 4;
 		Integer structureScentFoundDistanceBlocks = 48;
 		Integer structureScentBarkIntervalTicks = 80;
-		Integer structureScentRecoveryTicks = 240;
+		Integer structureScentRecoveryTicks = 600;
 		Integer structureScentMaxTrailRiseBlocks = 10;
 		List<String> structureScentTargets = MushroomStructureScentConfig.DEFAULT_TARGETS;
 
@@ -133,11 +141,15 @@ final class MushroomYorkieConfig {
 			file.oneMushroomPerPlayer = config.oneMushroomPerPlayer;
 			file.structureScentingEnabled = config.structureScent.enabled();
 			file.structureScentMessages = config.structureScent.messages();
+			file.structureScentDebugMessages = config.structureScent.debugMessages();
 			file.structureScentCanLoseTrail = config.structureScent.canLoseTrail();
 			file.structureScentMinDistanceBlocks = config.structureScent.minDistanceBlocks();
 			file.structureScentMaxDistanceBlocks = config.structureScent.maxDistanceBlocks();
 			file.structureScentCooldownTicks = config.structureScent.cooldownTicks();
 			file.structureScentLeadAheadBlocks = config.structureScent.leadAheadBlocks();
+			file.structureScentCircleBackIntervalTicks = config.structureScent.circleBackIntervalTicks();
+			file.structureScentCircleBackTicks = config.structureScent.circleBackTicks();
+			file.structureScentCircleBackDistanceBlocks = config.structureScent.circleBackDistanceBlocks();
 			file.structureScentFoundDistanceBlocks = config.structureScent.foundDistanceBlocks();
 			file.structureScentBarkIntervalTicks = config.structureScent.barkIntervalTicks();
 			file.structureScentRecoveryTicks = config.structureScent.recoveryTicks();

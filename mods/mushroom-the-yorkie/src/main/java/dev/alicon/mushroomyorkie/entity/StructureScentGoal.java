@@ -16,10 +16,11 @@ import net.minecraft.world.phys.Vec3;
 
 final class StructureScentGoal extends Goal {
 	private static final int FOLLOW_MESSAGE_TICKS = 120;
+	private static final int DEBUG_MESSAGE_TICKS = 40;
 	private static final int MOVE_RETRY_TICKS = 28;
 	private static final int RECOVER_CLEAR_TICKS = 40;
 	private static final int CELEBRATE_TICKS = 80;
-	private static final int LOST_BLOCKED_TICKS = 16;
+	private static final int LOST_BLOCKED_TICKS = 60;
 
 	private final MushroomYorkieEntity yorkie;
 	private MushroomStructureScentConfig config;
@@ -27,6 +28,9 @@ final class StructureScentGoal extends Goal {
 	private long nextSearchGameTime;
 	private int nextMoveTick;
 	private int nextMessageTick;
+	private int nextDebugMessageTick;
+	private int nextCircleBackTick;
+	private int circleBackTicks;
 	private int blockedTicks;
 	private int clearTicks;
 	private int recoveryTicks;
@@ -73,6 +77,9 @@ final class StructureScentGoal extends Goal {
 	public void start() {
 		this.nextMoveTick = 0;
 		this.nextMessageTick = FOLLOW_MESSAGE_TICKS;
+		this.nextDebugMessageTick = 0;
+		this.nextCircleBackTick = this.config.circleBackIntervalTicks();
+		this.circleBackTicks = 0;
 		this.blockedTicks = 0;
 		this.clearTicks = 0;
 		this.recoveryTicks = 0;
@@ -81,6 +88,7 @@ final class StructureScentGoal extends Goal {
 		this.recovering = false;
 		this.completed = false;
 		this.message("message.mushroom_yorkie.scent_start", true);
+		this.debugState("start", "message.mushroom_yorkie.scent_debug_start", true);
 		this.yorkie.bark();
 	}
 
@@ -100,6 +108,7 @@ final class StructureScentGoal extends Goal {
 		}
 
 		if (this.celebrateTicks > 0) {
+			this.debugState("celebrating", "message.mushroom_yorkie.scent_debug_celebrating", false);
 			this.tickCelebration(level);
 			return;
 		}
@@ -112,15 +121,29 @@ final class StructureScentGoal extends Goal {
 		}
 
 		if (this.tickTrailConfidence(level, owner)) {
+			this.debugState("recovering", "message.mushroom_yorkie.scent_debug_recovering", false);
 			this.tickRecovery(owner);
 			return;
 		}
 
 		if (StructureScentPolicy.shouldWaitForOwner(this.yorkie.distanceToSqr(owner), this.config.leadAheadBlocks())) {
+			this.debugState("waiting", "message.mushroom_yorkie.scent_debug_waiting", false);
 			this.waitForOwner(owner);
 			return;
 		}
 
+		if (this.shouldCircleBack(owner)) {
+			this.circleBackTicks = this.config.circleBackTicks();
+			this.nextCircleBackTick = this.config.circleBackIntervalTicks();
+		}
+
+		if (this.circleBackTicks > 0) {
+			this.debugState("circling_back", "message.mushroom_yorkie.scent_debug_circling_back", false);
+			this.circleBackToOwner(level, owner);
+			return;
+		}
+
+		this.debugState("leading", "message.mushroom_yorkie.scent_debug_leading", false);
 		this.leadOwner(level, owner);
 	}
 
@@ -167,6 +190,7 @@ final class StructureScentGoal extends Goal {
 
 		this.recoveryTicks--;
 		if (this.recoveryTicks <= 0) {
+			this.debugState("giving_up", "message.mushroom_yorkie.scent_debug_giving_up", true);
 			this.completed = true;
 		}
 		return true;
@@ -228,9 +252,39 @@ final class StructureScentGoal extends Goal {
 		BlockPos ground = this.groundPos(level, lead);
 		boolean moving = this.yorkie.getNavigation().moveTo(ground.getX() + 0.5D, ground.getY(), ground.getZ() + 0.5D, 1.2D);
 		if (!moving && this.config.canLoseTrail()) {
-			this.blockedTicks += LOST_BLOCKED_TICKS;
+			this.blockedTicks += 10;
 		}
 		this.nextMoveTick = MOVE_RETRY_TICKS;
+	}
+
+	private boolean shouldCircleBack(Player owner) {
+		if (this.circleBackTicks > 0 || this.nextCircleBackTick-- > 0) {
+			return false;
+		}
+
+		double closeEnough = this.config.circleBackDistanceBlocks() + 2.0D;
+		return this.yorkie.distanceToSqr(owner) > closeEnough * closeEnough;
+	}
+
+	private void circleBackToOwner(ServerLevel level, Player owner) {
+		this.circleBackTicks--;
+		this.yorkie.getLookControl().setLookAt(owner, 10.0F, this.yorkie.getMaxHeadXRot());
+		if (this.yorkie.tickCount % this.config.barkIntervalTicks() == 0) {
+			this.yorkie.bark();
+		}
+
+		if (this.nextMoveTick-- > 0 && !this.yorkie.getNavigation().isDone()) {
+			return;
+		}
+
+		Vec3 target = StructureScentPolicy.circleBackPoint(owner.position(), this.scent.pos(), this.config.circleBackDistanceBlocks());
+		BlockPos ground = this.groundPos(level, target);
+		this.yorkie.getNavigation().moveTo(ground.getX() + 0.5D, ground.getY(), ground.getZ() + 0.5D, 1.3D);
+		this.nextMoveTick = 16;
+		if (this.circleBackTicks <= 0 || this.yorkie.distanceToSqr(owner) <= square(this.config.circleBackDistanceBlocks() + 2.0D)) {
+			this.circleBackTicks = 0;
+			this.nextMoveTick = 0;
+		}
 	}
 
 	private void tickCelebration(ServerLevel level) {
@@ -282,5 +336,30 @@ final class StructureScentGoal extends Goal {
 		} else {
 			owner.displayClientMessage(Component.translatable(key), true);
 		}
+	}
+
+	private void debugState(String state, String key, boolean immediate) {
+		if (!this.config.debugMessages() || !(this.yorkie.getOwner() instanceof Player owner)) {
+			return;
+		}
+		if (!immediate && this.nextDebugMessageTick-- > 0) {
+			return;
+		}
+
+		this.nextDebugMessageTick = DEBUG_MESSAGE_TICKS;
+		owner.displayClientMessage(Component.translatable(key, Component.translatable(this.scent.target().descriptionKey())), true);
+		MushroomTheYorkie.LOGGER.info(
+				"Mushroom scent debug: state={} target={} distanceToOwner={} blockedTicks={} recoveryTicks={} circleBackTicks={}",
+				state,
+				this.scent.target(),
+				this.yorkie.getOwner() == null ? -1.0D : Math.sqrt(this.yorkie.distanceToSqr(this.yorkie.getOwner())),
+				this.blockedTicks,
+				this.recoveryTicks,
+				this.circleBackTicks
+		);
+	}
+
+	private static double square(double value) {
+		return value * value;
 	}
 }

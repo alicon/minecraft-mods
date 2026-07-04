@@ -13,6 +13,12 @@ final class StructureScentPolicy {
 		return ownerPos.add(horizontal.scale(leadAheadBlocks));
 	}
 
+	static Vec3 circleBackPoint(Vec3 ownerPos, BlockPos targetPos, int distanceBlocks) {
+		Vec3 direction = Vec3.atCenterOf(targetPos).subtract(ownerPos);
+		Vec3 horizontal = normalizedHorizontal(direction);
+		return ownerPos.add(horizontal.scale(distanceBlocks));
+	}
+
 	static boolean withinDistance(Vec3 pos, BlockPos targetPos, int distanceBlocks) {
 		return pos.distanceToSqr(Vec3.atCenterOf(targetPos)) <= (double) distanceBlocks * distanceBlocks;
 	}

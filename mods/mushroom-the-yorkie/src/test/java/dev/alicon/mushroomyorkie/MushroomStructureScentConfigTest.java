@@ -12,14 +12,18 @@ final class MushroomStructureScentConfigTest {
 		MushroomStructureScentConfig config = new MushroomStructureScentConfig(
 				true,
 				true,
+				false,
 				true,
 				128,
 				4096,
 				6_000,
 				10,
+				120,
+				45,
+				4,
 				48,
 				80,
-				240,
+				600,
 				10,
 				List.of("village", "trial_chambers")
 		);
