@@ -96,6 +96,7 @@ Mushroom the Yorkie:
 - indoor potty warning mood penalty
 - wake-up spawn policy for respawn and extreme modes
 - spawn-mode config parsing defaults
+- structure scent lead-point, found-distance, and wait-for-owner policy
 - headless GameTest verifies Mushroom's custom entity can spawn in a Minecraft test world
 
 Cops and Robbers:
@@ -163,6 +164,7 @@ Mushroom the Yorkie:
 - [ ] After a successful night in a bed, Mushroom appears near the bed already tamed.
 - [ ] Empty-hand owner interaction toggles sit/follow.
 - [ ] Mushroom follows closely enough to feel like a tiny companion.
+- [ ] A tamed, following Mushroom can catch a structure scent, show kid-readable follow/lost/found messages, lead ahead, and celebrate at the destination.
 - [ ] No errors attributed to `mushroom_yorkie` appear in the latest log.
 
 Cops and Robbers:

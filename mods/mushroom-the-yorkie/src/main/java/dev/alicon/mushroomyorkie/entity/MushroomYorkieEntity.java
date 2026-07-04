@@ -122,14 +122,15 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		this.goalSelector.addGoal(1, new SleepAtNightGoal(this));
 		this.goalSelector.addGoal(2, new NightStirGoal(this));
 		this.goalSelector.addGoal(3, new IndoorPottyWarningGoal(this));
-		this.goalSelector.addGoal(4, new BarkAtPeacefulMobsGoal(this));
-		this.goalSelector.addGoal(5, new HesitantHostileMobGoal(this));
-		this.goalSelector.addGoal(6, new UntamedStayNearPlayerGoal(this));
-		this.goalSelector.addGoal(7, new SitWhenOrderedToGoal(this));
-		this.goalSelector.addGoal(8, new FollowOwnerGoal(this, 1.25D, 2.0F, 1.0F));
-		this.goalSelector.addGoal(9, new RandomStrollGoal(this, 0.9D, 80));
-		this.goalSelector.addGoal(10, new LookAtPlayerGoal(this, Player.class, 8.0F));
-		this.goalSelector.addGoal(11, new RandomLookAroundGoal(this));
+		this.goalSelector.addGoal(4, new StructureScentGoal(this));
+		this.goalSelector.addGoal(5, new BarkAtPeacefulMobsGoal(this));
+		this.goalSelector.addGoal(6, new HesitantHostileMobGoal(this));
+		this.goalSelector.addGoal(7, new UntamedStayNearPlayerGoal(this));
+		this.goalSelector.addGoal(8, new SitWhenOrderedToGoal(this));
+		this.goalSelector.addGoal(9, new FollowOwnerGoal(this, 1.25D, 2.0F, 1.0F));
+		this.goalSelector.addGoal(10, new RandomStrollGoal(this, 0.9D, 80));
+		this.goalSelector.addGoal(11, new LookAtPlayerGoal(this, Player.class, 8.0F));
+		this.goalSelector.addGoal(12, new RandomLookAroundGoal(this));
 	}
 
 	@Override

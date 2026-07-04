@@ -45,4 +45,9 @@ public final class MushroomTheYorkie implements ModInitializer {
 	public static boolean oneMushroomPerPlayer() {
 		return config == null || config.oneMushroomPerPlayer();
 	}
+
+	/** Gameplay tuning for structure scenting; defaults keep the feature active if config loading fails. */
+	public static MushroomStructureScentConfig structureScentConfig() {
+		return config == null ? MushroomStructureScentConfig.defaults() : config.structureScent();
+	}
 }
