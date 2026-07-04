@@ -12,9 +12,9 @@ Structure scenting lets a tamed, following Mushroom occasionally catch a strong 
 - `structureScentMinDistanceBlocks`: prevents Mushroom from scenting things already close enough to stumble into.
 - `structureScentMaxDistanceBlocks`: caps how far structure lookup searches; higher values find rarer structures but make searches heavier.
 - `structureScentCooldownTicks`: delay between structure searches per Mushroom; this protects normal server ticks from repeated locate-style work.
-- `structureScentLeadAheadBlocks`: how far Mushroom runs ahead before waiting for the player.
+- `structureScentLeadAheadBlocks`: how far Mushroom runs ahead before waiting for the player; keep this short because Mushroom is tiny and easy to lose visually.
 - `structureScentFoundDistanceBlocks`: how close Mushroom must get before celebrating and ending the behavior.
 - `structureScentBarkIntervalTicks`: bark cadence while leading, waiting, or recovering the scent.
 - `structureScentRecoveryTicks`: how long Mushroom sniffs around before giving up after losing a trail.
 - `structureScentMaxTrailRiseBlocks`: vertical terrain change that can break the scent, used to make mountains feel like real obstacles.
-- `structureScentTargets`: enabled target ids. Defaults are `village`, `woodland_mansion`, `pillager_outpost`, `swamp_hut`, `trial_chambers`, and `ruined_portal`.
+- `structureScentTargets`: enabled target ids. Defaults are `village`, `woodland_mansion`, `pillager_outpost`, `swamp_hut`, and `ruined_portal`. Underground-only structures such as `trial_chambers` are intentionally disabled by default because they do not fit the surface scent fantasy.

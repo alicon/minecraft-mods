@@ -164,7 +164,8 @@ Mushroom the Yorkie:
 - [ ] After a successful night in a bed, Mushroom appears near the bed already tamed.
 - [ ] Empty-hand owner interaction toggles sit/follow.
 - [ ] Mushroom follows closely enough to feel like a tiny companion.
-- [ ] A tamed, following Mushroom can catch a structure scent, show kid-readable follow/lost/found messages, lead ahead, and celebrate at the destination.
+- [ ] Yorkie Harness can be put on and removed by the owner without losing the item.
+- [ ] A tamed, following Mushroom can catch a surface structure scent, show kid-readable follow/lost/found messages, lead close enough to stay visible, and celebrate at the destination.
 - [ ] No errors attributed to `mushroom_yorkie` appear in the latest log.
 
 Cops and Robbers:

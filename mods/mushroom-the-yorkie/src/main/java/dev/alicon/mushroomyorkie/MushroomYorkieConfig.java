@@ -119,7 +119,7 @@ final class MushroomYorkieConfig {
 		Integer structureScentMinDistanceBlocks = 128;
 		Integer structureScentMaxDistanceBlocks = 4096;
 		Integer structureScentCooldownTicks = 6_000;
-		Integer structureScentLeadAheadBlocks = 18;
+		Integer structureScentLeadAheadBlocks = 10;
 		Integer structureScentFoundDistanceBlocks = 48;
 		Integer structureScentBarkIntervalTicks = 80;
 		Integer structureScentRecoveryTicks = 240;

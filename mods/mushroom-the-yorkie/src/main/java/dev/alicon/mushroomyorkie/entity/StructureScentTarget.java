@@ -12,7 +12,6 @@ enum StructureScentTarget {
 	WOODLAND_MANSION("woodland_mansion", "structure.mushroom_yorkie.woodland_mansion", StructureTags.ON_WOODLAND_EXPLORER_MAPS),
 	PILLAGER_OUTPOST("pillager_outpost", "structure.mushroom_yorkie.pillager_outpost", BuiltinStructures.PILLAGER_OUTPOST),
 	SWAMP_HUT("swamp_hut", "structure.mushroom_yorkie.swamp_hut", BuiltinStructures.SWAMP_HUT),
-	TRIAL_CHAMBERS("trial_chambers", "structure.mushroom_yorkie.trial_chambers", StructureTags.ON_TRIAL_CHAMBERS_MAPS),
 	RUINED_PORTAL("ruined_portal", "structure.mushroom_yorkie.ruined_portal", StructureTags.RUINED_PORTAL);
 
 	private final String configName;

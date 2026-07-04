@@ -38,11 +38,21 @@ final class MushroomYorkieInteractions {
 		}
 
 		if (stack.is(ModItems.YORKIE_HARNESS) && yorkie.isTame() && yorkie.isOwnedBy(player)) {
-			if (!yorkie.level().isClientSide() && !yorkie.hasHarness()) {
-				yorkie.setHarness(true);
-				yorkie.useInteractionItem(player, hand, stack);
-				yorkie.playSound(SoundEvents.ARMOR_EQUIP_LEATHER.value(), 0.45F, 1.35F);
-				player.displayClientMessage(Component.translatable("message.mushroom_yorkie.harness_on"), true);
+			if (!yorkie.level().isClientSide()) {
+				if (yorkie.hasHarness()) {
+					yorkie.setHarness(false);
+					ItemStack removedHarness = new ItemStack(ModItems.YORKIE_HARNESS);
+					if (!player.addItem(removedHarness)) {
+						player.drop(removedHarness, false);
+					}
+					yorkie.playSound(SoundEvents.ARMOR_EQUIP_LEATHER.value(), 0.45F, 0.85F);
+					player.displayClientMessage(Component.translatable("message.mushroom_yorkie.harness_off"), true);
+				} else {
+					yorkie.setHarness(true);
+					yorkie.useInteractionItem(player, hand, stack);
+					yorkie.playSound(SoundEvents.ARMOR_EQUIP_LEATHER.value(), 0.45F, 1.35F);
+					player.displayClientMessage(Component.translatable("message.mushroom_yorkie.harness_on"), true);
+				}
 			}
 
 			return InteractionResult.SUCCESS;

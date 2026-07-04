@@ -1,6 +1,7 @@
 package dev.alicon.mushroomyorkie;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Gameplay tuning for Mushroom's structure-scent behavior; distances are blocks and timers are ticks.
@@ -24,9 +25,9 @@ public record MushroomStructureScentConfig(
 			"woodland_mansion",
 			"pillager_outpost",
 			"swamp_hut",
-			"trial_chambers",
 			"ruined_portal"
 	);
+	private static final Set<String> SUPPORTED_TARGETS = Set.copyOf(DEFAULT_TARGETS);
 
 	public MushroomStructureScentConfig {
 		minDistanceBlocks = Math.max(32, minDistanceBlocks);
@@ -37,10 +38,21 @@ public record MushroomStructureScentConfig(
 		barkIntervalTicks = Math.max(20, barkIntervalTicks);
 		recoveryTicks = Math.max(40, recoveryTicks);
 		maxTrailRiseBlocks = Math.max(4, maxTrailRiseBlocks);
-		targets = targets == null || targets.isEmpty() ? DEFAULT_TARGETS : List.copyOf(targets);
+		targets = supportedTargets(targets);
 	}
 
 	static MushroomStructureScentConfig defaults() {
-		return new MushroomStructureScentConfig(true, true, true, 128, 4096, 6_000, 18, 48, 80, 240, 10, DEFAULT_TARGETS);
+		return new MushroomStructureScentConfig(true, true, true, 128, 4096, 6_000, 10, 48, 80, 240, 10, DEFAULT_TARGETS);
+	}
+
+	private static List<String> supportedTargets(List<String> targets) {
+		if (targets == null || targets.isEmpty()) {
+			return DEFAULT_TARGETS;
+		}
+
+		List<String> filtered = targets.stream()
+				.filter(SUPPORTED_TARGETS::contains)
+				.toList();
+		return filtered.isEmpty() ? DEFAULT_TARGETS : filtered;
 	}
 }
