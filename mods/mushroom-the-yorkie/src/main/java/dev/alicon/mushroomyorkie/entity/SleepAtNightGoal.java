@@ -26,11 +26,13 @@ final class SleepAtNightGoal extends Goal {
 
 	@Override
 	public void start() {
+		MushroomBehaviorDebugger.debug(this.yorkie, "sleep_start", "sleep: curling up because it is night inside", true);
 		this.yorkie.setSleeping(true);
 	}
 
 	@Override
 	public void tick() {
+		MushroomBehaviorDebugger.debug(this.yorkie, "sleeping", "sleep: staying still until morning or wake-up", false);
 		this.yorkie.getNavigation().stop();
 		this.yorkie.setDeltaMovement(this.yorkie.getDeltaMovement().scale(0.3D));
 	}

@@ -15,6 +15,7 @@ final class MushroomFlightController {
 		if (!followingFlyingOwner) {
 			return;
 		}
+		MushroomBehaviorDebugger.debug(yorkie, "creative_flight", "creative flight: following flying owner", false);
 
 		LivingEntity owner = yorkie.getOwner();
 		if (owner == null || owner.level() != yorkie.level()) {
@@ -29,6 +30,7 @@ final class MushroomFlightController {
 		faceFlightTarget(yorkie, delta);
 		if (delta.lengthSqr() <= MushroomYorkieEntity.CREATIVE_FLIGHT_FOLLOW_DISTANCE_SQ) {
 			yorkie.setDeltaMovement(yorkie.getDeltaMovement().scale(0.6D));
+			MushroomBehaviorDebugger.debug(yorkie, "creative_flight_hover", "creative flight: hovering near owner", false);
 			return;
 		}
 
@@ -36,6 +38,7 @@ final class MushroomFlightController {
 		Vec3 movement = delta.normalize().scale(MushroomYorkieEntity.CREATIVE_FLIGHT_SPEED);
 		yorkie.setDeltaMovement(movement);
 		yorkie.hurtMarked = true;
+		MushroomBehaviorDebugger.debug(yorkie, "creative_flight_move", "creative flight: closing distance to owner", false);
 	}
 
 	private static void faceFlightTarget(MushroomYorkieEntity yorkie, Vec3 delta) {
@@ -67,6 +70,7 @@ final class MushroomFlightController {
 		if (yorkie.getRandom().nextDouble() < FlightTrickPolicy.trickChance(yorkie.needs, recentlyWalked)) {
 			int trickType = yorkie.getRandom().nextBoolean() ? MushroomYorkieEntity.FLIGHT_TRICK_BARREL_ROLL : MushroomYorkieEntity.FLIGHT_TRICK_LOOP;
 			yorkie.setFlightTrick(trickType, MushroomYorkieEntity.FLIGHT_TRICK_DURATION_TICKS);
+			MushroomBehaviorDebugger.debug(yorkie, "creative_flight_trick", "creative flight: starting trick " + trickType, true);
 		}
 	}
 }

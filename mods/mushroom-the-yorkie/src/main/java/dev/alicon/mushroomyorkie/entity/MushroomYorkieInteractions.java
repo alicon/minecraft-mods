@@ -23,15 +23,18 @@ final class MushroomYorkieInteractions {
 				if (!yorkie.isTame()) {
 					if (MushroomTheYorkie.oneMushroomPerPlayer() && hasOtherLoadedMushroomOwnedBy((ServerLevel) yorkie.level(), player, yorkie)) {
 						player.displayClientMessage(Component.translatable("message.mushroom_yorkie.one_only"), true);
+						MushroomBehaviorDebugger.debug(yorkie, "claim_blocked", "claim blocked: player already has a loaded Mushroom", true);
 						return InteractionResult.SUCCESS;
 					}
 
 					yorkie.claimFor(player);
 					yorkie.level().broadcastEntityEvent(yorkie, (byte) 7);
 					player.displayClientMessage(Component.translatable("message.mushroom_yorkie.tamed"), true);
+					MushroomBehaviorDebugger.debug(yorkie, "tamed", "tamed: claimed by " + player.getName().getString(), true);
 				}
 
 				yorkie.feedTreat(player, hand, stack);
+				MushroomBehaviorDebugger.debug(yorkie, "fed_treat", "fed treat: needs refreshed and peaceful barking muted", true);
 			}
 
 			return InteractionResult.SUCCESS;
@@ -47,11 +50,13 @@ final class MushroomYorkieInteractions {
 					}
 					yorkie.playSound(SoundEvents.ARMOR_EQUIP_LEATHER.value(), 0.45F, 0.85F);
 					player.displayClientMessage(Component.translatable("message.mushroom_yorkie.harness_off"), true);
+					MushroomBehaviorDebugger.debug(yorkie, "harness_off", "harness: removed", true);
 				} else {
 					yorkie.setHarness(true);
 					yorkie.useInteractionItem(player, hand, stack);
 					yorkie.playSound(SoundEvents.ARMOR_EQUIP_LEATHER.value(), 0.45F, 1.35F);
 					player.displayClientMessage(Component.translatable("message.mushroom_yorkie.harness_on"), true);
+					MushroomBehaviorDebugger.debug(yorkie, "harness_on", "harness: equipped", true);
 				}
 			}
 
@@ -61,6 +66,7 @@ final class MushroomYorkieInteractions {
 		if (stack.is(net.minecraft.world.item.Items.LEAD) && !yorkie.hasHarness()) {
 			if (!yorkie.level().isClientSide()) {
 				player.displayClientMessage(Component.translatable("message.mushroom_yorkie.needs_harness"), true);
+				MushroomBehaviorDebugger.debug(yorkie, "lead_blocked", "lead blocked: Mushroom needs his harness first", true);
 			}
 
 			return InteractionResult.SUCCESS;
@@ -69,11 +75,23 @@ final class MushroomYorkieInteractions {
 		if (yorkie.isTame() && yorkie.isOwnedBy(player) && stack.isEmpty()) {
 			if (!yorkie.level().isClientSide()) {
 				if (yorkie.isMushroomSleeping()) {
-					yorkie.handleSleepingInteract(player);
+					boolean woke = yorkie.handleSleepingInteract(player);
+					MushroomBehaviorDebugger.debug(
+							yorkie,
+							woke ? "sleep_wake" : "sleep_interact",
+							woke ? "sleep interact: double-click woke Mushroom" : "sleep interact: first poke while sleeping",
+							true
+					);
 					return InteractionResult.SUCCESS;
 				}
 
 				yorkie.setMushroomOrderedToSit(!yorkie.isOrderedToSit());
+				MushroomBehaviorDebugger.debug(
+						yorkie,
+						yorkie.isOrderedToSit() ? "ordered_sit" : "ordered_follow",
+						yorkie.isOrderedToSit() ? "ordered: sit" : "ordered: follow",
+						true
+				);
 				player.displayClientMessage(
 						Component.translatable(yorkie.isOrderedToSit()
 								? "message.mushroom_yorkie.sit"

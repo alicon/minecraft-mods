@@ -44,7 +44,13 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 	}
 
 	@Override
+	public void start() {
+		MushroomBehaviorDebugger.debug(this.yorkie, "peaceful_mob_start", "peaceful mob: found " + this.targetName(), true);
+	}
+
+	@Override
 	public void stop() {
+		MushroomBehaviorDebugger.debug(this.yorkie, "peaceful_mob_stop", "peaceful mob: stopped barking", true);
 		this.target = null;
 		this.yorkie.getNavigation().stop();
 	}
@@ -59,11 +65,13 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 		if (owner != null && owner.isHolding(ModItems.YORKIE_TREAT)) {
 			this.yorkie.mutePeacefulMobBarking((ServerLevel) this.yorkie.level());
 			this.yorkie.getNavigation().moveTo(owner, 1.25D);
+			MushroomBehaviorDebugger.debug(this.yorkie, "peaceful_mob_treat", "peaceful mob: returning because owner has treat", false);
 			return;
 		}
 
 		this.yorkie.getLookControl().setLookAt(this.target, 10.0F, this.yorkie.getMaxHeadXRot());
 		this.yorkie.getNavigation().moveTo(this.target, 1.15D);
+		MushroomBehaviorDebugger.debug(this.yorkie, "peaceful_mob_bark", "peaceful mob: barking at " + this.targetName(), false);
 		if (this.yorkie.tickCount % MushroomYorkieEntity.BARK_INTERVAL_TICKS == 0) {
 			this.yorkie.bark();
 		}
@@ -98,5 +106,9 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 		}
 
 		return closest;
+	}
+
+	private String targetName() {
+		return this.target == null ? "nothing" : this.target.getName().getString();
 	}
 }

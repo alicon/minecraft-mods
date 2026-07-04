@@ -4,12 +4,14 @@
 
 `mushroom_yorkie.json` is generated in the Fabric config directory. Values that change gameplay are centralized in `MushroomYorkieConfig` and exposed through small value objects so entity code reads tuning, not raw JSON fields.
 
-Structure scenting lets a tamed, following Mushroom occasionally catch a strong scent from nearby generated structures. It is intentionally a kid-readable guide, not a compass UI: Mushroom barks, leads, waits when the player falls behind, can lose the trail around water or steep terrain, and celebrates at the destination.
+`debugMessages` is the broad playtest diagnostic switch. When enabled, Mushroom reports custom behavior states through actionbar messages and matching log lines: scenting, potty warnings, sleep/night stir, peaceful mob barking, hostile hesitation, untamed spacing, creative flight, treats, harness, sitting/following, and baseline state. Leave it off for normal play.
+
+Structure scenting lets a tamed, following Mushroom occasionally catch a strong scent from nearby generated structures. It is intentionally a kid-readable guide, not a compass UI: Mushroom barks, leads, waits when the player falls behind, can optionally lose the trail around water or steep terrain, and celebrates at the destination.
 
 - `structureScentingEnabled`: turns the behavior on or off.
 - `structureScentMessages`: shows actionbar prompts such as `Follow Mushroom!`; keep this on for younger players.
-- `structureScentDebugMessages`: shows actionbar state messages such as leading, circling back, waiting, recovering, and giving up. Use this during playtesting, then turn it off for quieter play.
-- `structureScentCanLoseTrail`: allows water, steep terrain, and failed paths to interrupt the scent.
+- `structureScentDebugMessages`: legacy scent-only debug flag. New configs should use top-level `debugMessages`; this field is still read for compatibility.
+- `structureScentCanLoseTrail`: allows water, steep terrain, and failed paths to interrupt the scent. This currently defaults off because losing the trail was too frustrating during kid playtests.
 - `structureScentMinDistanceBlocks`: prevents Mushroom from scenting things already close enough to stumble into.
 - `structureScentMaxDistanceBlocks`: caps how far structure lookup searches; higher values find rarer structures but make searches heavier.
 - `structureScentCooldownTicks`: delay between structure searches per Mushroom; this protects normal server ticks from repeated locate-style work.

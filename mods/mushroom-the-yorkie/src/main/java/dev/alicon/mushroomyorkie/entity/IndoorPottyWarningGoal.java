@@ -33,6 +33,7 @@ final class IndoorPottyWarningGoal extends Goal {
 		this.doorPos = this.findNearestDoor();
 		this.nextMoveTick = 0;
 		this.circleStep = 0;
+		MushroomBehaviorDebugger.debug(this.yorkie, "potty_warning_start", "potty warning: needs outside", true);
 	}
 
 	@Override
@@ -50,6 +51,12 @@ final class IndoorPottyWarningGoal extends Goal {
 		if (this.yorkie.tickCount % MushroomYorkieEntity.BARK_INTERVAL_TICKS == 0) {
 			this.yorkie.bark();
 		}
+		MushroomBehaviorDebugger.debug(
+				this.yorkie,
+				this.doorPos == null ? "potty_warning_owner" : "potty_warning_door",
+				this.doorPos == null ? "potty warning: circling owner, no nearby door" : "potty warning: circling nearest door",
+				false
+		);
 
 		if (this.nextMoveTick-- > 0 && !this.yorkie.getNavigation().isDone()) {
 			return;

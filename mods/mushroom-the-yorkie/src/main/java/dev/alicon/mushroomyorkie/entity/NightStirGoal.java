@@ -31,6 +31,7 @@ final class NightStirGoal extends Goal {
 	public void start() {
 		this.nextMoveTick = 0;
 		this.yorkie.setSleeping(false);
+		MushroomBehaviorDebugger.debug(this.yorkie, "night_stir_start", "night stir: awake for a short nighttime visit", true);
 	}
 
 	@Override
@@ -44,6 +45,7 @@ final class NightStirGoal extends Goal {
 		if (owner != null) {
 			this.yorkie.getLookControl().setLookAt(owner, 10.0F, this.yorkie.getMaxHeadXRot());
 		}
+		MushroomBehaviorDebugger.debug(this.yorkie, "night_stir", "night stir: orbiting near owner before sleeping again", false);
 
 		if (this.nextMoveTick-- > 0 && !this.yorkie.getNavigation().isDone()) {
 			return;

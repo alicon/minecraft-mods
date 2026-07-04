@@ -47,7 +47,13 @@ final class HesitantHostileMobGoal extends Goal {
 	}
 
 	@Override
+	public void start() {
+		MushroomBehaviorDebugger.debug(this.yorkie, "hostile_start", "hostile: noticed " + this.targetName(), true);
+	}
+
+	@Override
 	public void stop() {
+		MushroomBehaviorDebugger.debug(this.yorkie, "hostile_stop", "hostile: stopped tracking threat", true);
 		this.target = null;
 		this.retreatTicks = 0;
 		this.yorkie.getNavigation().stop();
@@ -63,6 +69,7 @@ final class HesitantHostileMobGoal extends Goal {
 		this.yorkie.getLookControl().setLookAt(this.target, 10.0F, this.yorkie.getMaxHeadXRot());
 		if (this.retreatTicks > 0) {
 			this.retreatTicks--;
+			MushroomBehaviorDebugger.debug(this.yorkie, "hostile_retreat", "hostile: retreating after a tiny attack", false);
 			this.moveBehindPlayer(player);
 			return;
 		}
@@ -71,6 +78,7 @@ final class HesitantHostileMobGoal extends Goal {
 			this.yorkie.getNavigation().moveTo(this.target, 1.15D);
 			this.nextMoveTick = 12;
 		}
+		MushroomBehaviorDebugger.debug(this.yorkie, "hostile_approach", "hostile: approaching " + this.targetName(), false);
 
 		if (this.yorkie.tickCount % 45 == 0) {
 			this.yorkie.bark();
@@ -80,6 +88,7 @@ final class HesitantHostileMobGoal extends Goal {
 			this.yorkie.swing(InteractionHand.MAIN_HAND);
 			this.yorkie.doHurtTarget(level, this.target);
 			this.yorkie.playSound(MushroomYorkieEntity.cuteWolfSounds().growlSound().value(), 0.45F, 1.6F);
+			MushroomBehaviorDebugger.debug(this.yorkie, "hostile_attack", "hostile: nipped " + this.targetName(), true);
 			this.retreatTicks = 45 + this.yorkie.getRandom().nextInt(25);
 			this.nextMoveTick = 0;
 		}
@@ -135,5 +144,9 @@ final class HesitantHostileMobGoal extends Goal {
 
 		this.yorkie.getNavigation().moveTo(target.x, target.y, target.z, speed);
 		this.nextMoveTick = 18;
+	}
+
+	private String targetName() {
+		return this.target == null ? "nothing" : this.target.getName().getString();
 	}
 }

@@ -49,7 +49,7 @@ public record MushroomStructureScentConfig(
 	}
 
 	static MushroomStructureScentConfig defaults() {
-		return new MushroomStructureScentConfig(true, true, false, true, 128, 4096, 6_000, 10, 120, 45, 4, 48, 80, 600, 10, DEFAULT_TARGETS);
+		return new MushroomStructureScentConfig(true, true, false, false, 128, 4096, 6_000, 10, 120, 45, 4, 48, 80, 600, 10, DEFAULT_TARGETS);
 	}
 
 	private static List<String> supportedTargets(List<String> targets) {

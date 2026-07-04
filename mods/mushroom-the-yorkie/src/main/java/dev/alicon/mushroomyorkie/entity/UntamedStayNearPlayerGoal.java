@@ -47,6 +47,7 @@ final class UntamedStayNearPlayerGoal extends Goal {
 	@Override
 	public void start() {
 		this.nextMoveTick = 0;
+		MushroomBehaviorDebugger.debug(this.yorkie, "untamed_start", "untamed: choosing distance from player", true);
 	}
 
 	@Override
@@ -56,6 +57,7 @@ final class UntamedStayNearPlayerGoal extends Goal {
 		}
 
 		this.yorkie.getLookControl().setLookAt(this.player, 8.0F, this.yorkie.getMaxHeadXRot());
+		MushroomBehaviorDebugger.debug(this.yorkie, this.debugState(level), this.debugDetail(level), false);
 		if (this.nextMoveTick-- > 0 && !this.yorkie.getNavigation().isDone()) {
 			return;
 		}
@@ -79,5 +81,30 @@ final class UntamedStayNearPlayerGoal extends Goal {
 		double angle = this.yorkie.getRandom().nextDouble() * Math.PI * 2.0D;
 		double radius = 5.0D + this.yorkie.getRandom().nextDouble() * 3.0D;
 		return this.player.position().add(Math.cos(angle) * radius, 0.0D, Math.sin(angle) * radius);
+	}
+
+	private String debugState(ServerLevel level) {
+		if (this.yorkie.scaredRunTicks > 0 || this.yorkie.wasScoldedToday(level)) {
+			return "untamed_scared";
+		}
+
+		return this.playerTooClose()
+				? "untamed_too_close"
+				: "untamed_curious";
+	}
+
+	private String debugDetail(ServerLevel level) {
+		if (this.yorkie.scaredRunTicks > 0 || this.yorkie.wasScoldedToday(level)) {
+			return "untamed: keeping extra distance after being scared";
+		}
+
+		return this.playerTooClose()
+				? "untamed: player is too close, backing up"
+				: "untamed: drifting near player";
+	}
+
+	private boolean playerTooClose() {
+		double tooClose = MushroomYorkieEntity.UNTAMED_PLAYER_TOO_CLOSE_RADIUS;
+		return this.yorkie.distanceToSqr(this.player) < tooClose * tooClose;
 	}
 }

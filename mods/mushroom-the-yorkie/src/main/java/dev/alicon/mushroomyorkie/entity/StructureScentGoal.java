@@ -339,7 +339,8 @@ final class StructureScentGoal extends Goal {
 	}
 
 	private void debugState(String state, String key, boolean immediate) {
-		if (!this.config.debugMessages() || !(this.yorkie.getOwner() instanceof Player owner)) {
+		boolean debugEnabled = this.config.debugMessages() || MushroomTheYorkie.debugMessages();
+		if (!debugEnabled || !(this.yorkie.getOwner() instanceof Player owner)) {
 			return;
 		}
 		if (!immediate && this.nextDebugMessageTick-- > 0) {

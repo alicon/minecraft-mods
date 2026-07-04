@@ -19,17 +19,20 @@ final class MushroomYorkieConfig {
 	private final YorkieSpawnMode spawnMode;
 	private final boolean spawnAfterSuccessfulSleep;
 	private final boolean oneMushroomPerPlayer;
+	private final boolean debugMessages;
 	private final MushroomStructureScentConfig structureScent;
 
 	private MushroomYorkieConfig(
 			YorkieSpawnMode spawnMode,
 			boolean spawnAfterSuccessfulSleep,
 			boolean oneMushroomPerPlayer,
+			boolean debugMessages,
 			MushroomStructureScentConfig structureScent
 	) {
 		this.spawnMode = spawnMode;
 		this.spawnAfterSuccessfulSleep = spawnAfterSuccessfulSleep;
 		this.oneMushroomPerPlayer = oneMushroomPerPlayer;
+		this.debugMessages = debugMessages;
 		this.structureScent = structureScent;
 	}
 
@@ -50,6 +53,7 @@ final class MushroomYorkieConfig {
 					YorkieSpawnMode.fromConfigValue(file.wakeUpSpawnMode),
 					file.spawnAfterSuccessfulSleep,
 					file.oneMushroomPerPlayer == null || file.oneMushroomPerPlayer,
+					debugMessagesFrom(file),
 					structureScentFrom(file)
 			);
 			config.save();
@@ -72,12 +76,24 @@ final class MushroomYorkieConfig {
 		return this.oneMushroomPerPlayer;
 	}
 
+	boolean debugMessages() {
+		return this.debugMessages;
+	}
+
 	MushroomStructureScentConfig structureScent() {
 		return this.structureScent;
 	}
 
 	private static MushroomYorkieConfig defaults() {
-		return new MushroomYorkieConfig(YorkieSpawnMode.RESPAWN, true, true, MushroomStructureScentConfig.defaults());
+		return new MushroomYorkieConfig(YorkieSpawnMode.RESPAWN, true, true, false, MushroomStructureScentConfig.defaults());
+	}
+
+	private static boolean debugMessagesFrom(ConfigFile file) {
+		if (file.debugMessages != null) {
+			return file.debugMessages;
+		}
+
+		return file.structureScentDebugMessages != null && file.structureScentDebugMessages;
 	}
 
 	private static MushroomStructureScentConfig structureScentFrom(ConfigFile file) {
@@ -117,10 +133,11 @@ final class MushroomYorkieConfig {
 		String wakeUpSpawnMode = YorkieSpawnMode.RESPAWN.configValue();
 		boolean spawnAfterSuccessfulSleep = true;
 		Boolean oneMushroomPerPlayer = true;
+		Boolean debugMessages;
 		Boolean structureScentingEnabled = true;
 		Boolean structureScentMessages = true;
 		Boolean structureScentDebugMessages = false;
-		Boolean structureScentCanLoseTrail = true;
+		Boolean structureScentCanLoseTrail = false;
 		Integer structureScentMinDistanceBlocks = 128;
 		Integer structureScentMaxDistanceBlocks = 4096;
 		Integer structureScentCooldownTicks = 6_000;
@@ -139,6 +156,7 @@ final class MushroomYorkieConfig {
 			file.wakeUpSpawnMode = config.spawnMode.configValue();
 			file.spawnAfterSuccessfulSleep = config.spawnAfterSuccessfulSleep;
 			file.oneMushroomPerPlayer = config.oneMushroomPerPlayer;
+			file.debugMessages = config.debugMessages;
 			file.structureScentingEnabled = config.structureScent.enabled();
 			file.structureScentMessages = config.structureScent.messages();
 			file.structureScentDebugMessages = config.structureScent.debugMessages();

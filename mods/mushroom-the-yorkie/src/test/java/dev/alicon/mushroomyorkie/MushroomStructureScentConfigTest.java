@@ -8,6 +8,11 @@ import org.junit.jupiter.api.Test;
 
 final class MushroomStructureScentConfigTest {
 	@Test
+	void defaultsKeepTrailLossDisabledForKidPlaytesting() {
+		assertFalse(MushroomStructureScentConfig.defaults().canLoseTrail());
+	}
+
+	@Test
 	void filtersUnsupportedUndergroundTargetsFromExistingConfigs() {
 		MushroomStructureScentConfig config = new MushroomStructureScentConfig(
 				true,

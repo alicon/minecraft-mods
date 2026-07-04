@@ -179,7 +179,7 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		}
 	}
 
-	void handleSleepingInteract(Player player) {
+	boolean handleSleepingInteract(Player player) {
 		boolean doubleClick = this.lastInteractPlayer != null
 				&& this.lastInteractPlayer.equals(player.getUUID())
 				&& this.tickCount - this.lastInteractTick <= DOUBLE_CLICK_TICKS;
@@ -191,6 +191,7 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 			this.setSleeping(false);
 			this.playSound(SoundEvents.WOLF_PANT, 0.35F, 1.45F);
 		}
+		return doubleClick;
 	}
 
 	@Override
@@ -200,6 +201,7 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		MushroomFlightController.followFlyingOwner(this);
 		this.tickNightBehavior(level);
 		this.tickTreatBark();
+		MushroomBehaviorDebugger.baseline(this, level);
 		if (this.scaredRunTicks > 0) {
 			this.scaredRunTicks--;
 		}
@@ -240,6 +242,7 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		LivingEntity owner = this.getOwner();
 		boolean ownerHasTreat = this.isTame() && owner != null && owner.isHolding(ModItems.YORKIE_TREAT);
 		if (ownerHasTreat && !this.isMushroomSleeping() && this.tickCount % BARK_INTERVAL_TICKS == 0) {
+			MushroomBehaviorDebugger.debug(this, "treat_attention", "treat attention: owner is holding a Yorkie treat", false);
 			this.bark();
 		}
 	}
@@ -438,6 +441,7 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		}
 
 		this.scaredRunTicks = SCARED_RUN_TICKS;
+		MushroomBehaviorDebugger.debug(this, "scolded", "scolded: trusted player hit Mushroom, backing away", true);
 		this.setMushroomOrderedToSit(false);
 		this.setSleeping(false);
 		this.setOwnerUUID(null);
