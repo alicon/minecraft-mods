@@ -13,6 +13,7 @@ import net.minecraft.world.level.Level;
 
 /** Foot patrol cop that chases robbers but is just too slow to catch them. */
 public final class CopEntity extends PathfinderMob {
+	/** Lightweight patrol NPC; heist behavior is delegated to BankHeistHandler during server AI ticks. */
 	public CopEntity(EntityType<? extends CopEntity> entityType, Level level) {
 		super(entityType, level);
 	}

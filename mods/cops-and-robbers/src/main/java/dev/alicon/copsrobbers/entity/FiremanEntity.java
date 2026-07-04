@@ -14,6 +14,7 @@ import net.minecraft.world.level.Level;
 
 /** Friendly firefighter NPC that prioritizes putting out fires. */
 public final class FiremanEntity extends PathfinderMob {
+	/** Persistent responder NPC; fire-search behavior is intentionally centralized in FireResponseHandler. */
 	public FiremanEntity(EntityType<? extends FiremanEntity> entityType, Level level) {
 		super(entityType, level);
 		this.setPersistenceRequired();

@@ -1,6 +1,5 @@
 package dev.alicon.mushroomyorkie.entity;
 
-import dev.alicon.mushroomyorkie.MushroomTheYorkie;
 import dev.alicon.mushroomyorkie.item.ModItems;
 import dev.alicon.mushroomyorkie.pet.PetNeeds;
 import java.util.UUID;
@@ -10,7 +9,6 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.InteractionHand;
@@ -50,9 +48,13 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	static final double UNTAMED_PLAYER_TOO_CLOSE_RADIUS = 3.0D;
 	private static final int SCARED_RUN_TICKS = 20 * 12;
 
+	/** Synced/rendered flight-trick sentinel; keep ids stable across Minecraft target source sets. */
 	public static final int FLIGHT_TRICK_NONE = 0;
+	/** Synced/rendered barrel-roll id used by MushroomFlightController and client render state. */
 	public static final int FLIGHT_TRICK_BARREL_ROLL = 1;
+	/** Synced/rendered loop id used by MushroomFlightController and client render state. */
 	public static final int FLIGHT_TRICK_LOOP = 2;
+	/** Flight trick duration consumed by movement and animation interpolation. */
 	public static final int FLIGHT_TRICK_DURATION_TICKS = 36;
 
 	private static final EntityDataAccessor<Integer> DATA_FLIGHT_TRICK_TYPE = SynchedEntityData.defineId(MushroomYorkieEntity.class, EntityDataSerializers.INT);
@@ -134,71 +136,11 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 
 	@Override
 	public InteractionResult mobInteract(Player player, InteractionHand hand) {
-		ItemStack stack = player.getItemInHand(hand);
-
-		if (this.isFood(stack)) {
-			if (!this.level().isClientSide()) {
-				if (!this.isTame()) {
-					if (MushroomTheYorkie.oneMushroomPerPlayer() && hasOtherLoadedMushroomOwnedBy((ServerLevel) this.level(), player, this)) {
-						player.displayClientMessage(Component.translatable("message.mushroom_yorkie.one_only"), true);
-						return InteractionResult.SUCCESS;
-					}
-
-					this.claimFor(player);
-					this.level().broadcastEntityEvent(this, (byte) 7);
-					player.displayClientMessage(Component.translatable("message.mushroom_yorkie.tamed"), true);
-				}
-
-				this.feedTreat(player, hand, stack);
-			}
-
-			return InteractionResult.SUCCESS;
-		}
-
-		if (stack.is(ModItems.YORKIE_HARNESS) && this.isTame() && this.isOwnedBy(player)) {
-			if (!this.level().isClientSide()) {
-				if (!this.hasHarness()) {
-					this.setHarness(true);
-					this.usePlayerItem(player, hand, stack);
-					this.playSound(SoundEvents.ARMOR_EQUIP_LEATHER.value(), 0.45F, 1.35F);
-					player.displayClientMessage(Component.translatable("message.mushroom_yorkie.harness_on"), true);
-				}
-			}
-
-			return InteractionResult.SUCCESS;
-		}
-
-		if (stack.is(net.minecraft.world.item.Items.LEAD) && !this.hasHarness()) {
-			if (!this.level().isClientSide()) {
-				player.displayClientMessage(Component.translatable("message.mushroom_yorkie.needs_harness"), true);
-			}
-
-			return InteractionResult.SUCCESS;
-		}
-
-		if (this.isTame() && this.isOwnedBy(player) && stack.isEmpty()) {
-			if (!this.level().isClientSide()) {
-				if (this.isMushroomSleeping()) {
-					this.handleSleepingInteract(player);
-					return InteractionResult.SUCCESS;
-				}
-
-				this.setMushroomOrderedToSit(!this.isOrderedToSit());
-				player.displayClientMessage(
-						Component.translatable(this.isOrderedToSit()
-								? "message.mushroom_yorkie.sit"
-								: "message.mushroom_yorkie.follow"),
-						true
-				);
-			}
-
-			return InteractionResult.SUCCESS;
-		}
-
-		return super.mobInteract(player, hand);
+		InteractionResult handled = MushroomYorkieInteractions.handle(this, player, hand);
+		return handled != null ? handled : super.mobInteract(player, hand);
 	}
 
-	private void feedTreat(Player player, InteractionHand hand, ItemStack stack) {
+	void feedTreat(Player player, InteractionHand hand, ItemStack stack) {
 		this.usePlayerItem(player, hand, stack);
 		this.needs.feedTreat();
 		if (this.level() instanceof ServerLevel level) {
@@ -209,6 +151,11 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		this.performTreatTrick();
 	}
 
+	void useInteractionItem(Player player, InteractionHand hand, ItemStack stack) {
+		this.usePlayerItem(player, hand, stack);
+	}
+
+	/** Claims trust and vanilla taming together; use this path so one-owner checks and AI state stay aligned. */
 	public void claimFor(Player player) {
 		this.trust.claim(player);
 		this.scaredRunTicks = 0;
@@ -231,7 +178,7 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		}
 	}
 
-	private void handleSleepingInteract(Player player) {
+	void handleSleepingInteract(Player player) {
 		boolean doubleClick = this.lastInteractPlayer != null
 				&& this.lastInteractPlayer.equals(player.getUUID())
 				&& this.tickCount - this.lastInteractTick <= DOUBLE_CLICK_TICKS;
@@ -331,19 +278,21 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		}
 	}
 
+	/** Public render/query hook for the custom sleep pose; vanilla sitting may also be true while sleeping. */
 	public boolean isCurledUpSleeping() {
 		return this.isMushroomSleeping();
 	}
 
+	/** Harness gate for leash behavior; interactions should mutate harness through MushroomYorkieInteractions. */
 	public boolean hasHarness() {
 		return this.entityData.get(DATA_HARNESS);
 	}
 
-	private void setHarness(boolean harness) {
+	void setHarness(boolean harness) {
 		this.entityData.set(DATA_HARNESS, harness);
 	}
 
-	private void setMushroomOrderedToSit(boolean sitting) {
+	void setMushroomOrderedToSit(boolean sitting) {
 		this.setOrderedToSit(sitting);
 		this.updateSittingPose();
 	}
@@ -352,6 +301,7 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		this.setInSittingPose(this.isMushroomSleeping() || this.isOrderedToSit());
 	}
 
+	/** Loaded-world owner lookup for the one-Mushroom-per-player rule; unloaded chunks are intentionally ignored. */
 	public static boolean hasLoadedMushroomOwnedBy(ServerLevel level, Player player) {
 		return !level.getEntities(
 				EntityTypeTest.forClass(MushroomYorkieEntity.class),
@@ -359,13 +309,7 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		).isEmpty();
 	}
 
-	private static boolean hasOtherLoadedMushroomOwnedBy(ServerLevel level, Player player, MushroomYorkieEntity ignoredYorkie) {
-		return !level.getEntities(
-				EntityTypeTest.forClass(MushroomYorkieEntity.class),
-				yorkie -> yorkie != ignoredYorkie && yorkie.belongsTo(player)
-		).isEmpty();
-	}
-
+	/** Ownership predicate shared by trust logic and config-gated duplicate-claim checks. */
 	public boolean belongsTo(Player player) {
 		return this.trust.belongsTo(this, player);
 	}

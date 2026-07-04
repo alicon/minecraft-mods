@@ -1,13 +1,11 @@
 package dev.alicon.copsrobbers.entity;
 
-import dev.alicon.copsrobbers.CopsAndRobbers;
 import dev.alicon.copsrobbers.capture.PoliceCaptureHandler;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
-import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
@@ -27,10 +25,15 @@ import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
+/** Server-authoritative rideable cruiser; client payload handlers enter through the static driver methods below. */
 public class PoliceCruiserEntity extends Mob {
+	/** Synced/rendered trick sentinel; keep numeric values stable for packet/render compatibility. */
 	public static final int TRICK_NONE = 0;
+	/** Synced/rendered barrel-roll trick id; only creative driver controls should trigger it. */
 	public static final int TRICK_BARREL_ROLL = 1;
+	/** Synced/rendered loop trick id; only creative driver controls should trigger it. */
 	public static final int TRICK_LOOP = 2;
+	/** Gameplay-tuned trick duration shared with render interpolation. */
 	public static final int TRICK_DURATION_TICKS = PoliceCruiserGameplayConfig.TRICK_DURATION_TICKS;
 	private static final String LIGHTS_ENABLED_TAG = "lights_enabled";
 	private static final String SIREN_ENABLED_TAG = "siren_enabled";
@@ -47,14 +50,16 @@ public class PoliceCruiserEntity extends Mob {
 			SynchedEntityData.defineId(PoliceCruiserEntity.class, EntityDataSerializers.INT);
 	private float forwardInput;
 	private int crashCooldownTicks;
-	private boolean creativeFlightEnabled;
-	private float creativeFlightLiftInput;
+	boolean creativeFlightEnabled;
+	float creativeFlightLiftInput;
 
+	/** Keeps placed cruisers persistent so structure kits and captured-robber state survive normal despawn rules. */
 	public PoliceCruiserEntity(EntityType<? extends PoliceCruiserEntity> entityType, Level level) {
 		super(entityType, level);
 		this.setPersistenceRequired();
 	}
 
+	/** Uses gameplay-tuned movement values; change cruiser feel in PoliceCruiserGameplayConfig, not inline here. */
 	public static AttributeSupplier.Builder createAttributes() {
 		return Mob.createMobAttributes()
 				.add(Attributes.MAX_HEALTH, 42.0D)
@@ -137,90 +142,76 @@ public class PoliceCruiserEntity extends Mob {
 		PoliceCaptureHandler.releaseAtNearbyJail(this);
 	}
 
+	/** Synced visual state read by renderers and toggled through the server-side driver payload handler. */
 	public boolean lightsEnabled() {
 		return this.entityData.get(LIGHTS_ENABLED);
 	}
 
+	/** Synced audio/visual state; the server owns toggling so clients cannot desync sirens. */
 	public boolean sirenEnabled() {
 		return this.entityData.get(SIREN_ENABLED);
 	}
 
+	/** Current creative-only trick id used by client render interpolation. */
 	public int trickType() {
 		return this.entityData.get(TRICK_TYPE);
 	}
 
+	/** Remaining trick ticks; renderers combine this with the stable trick duration constant. */
 	public int trickTicks() {
 		return this.entityData.get(TRICK_TICKS);
 	}
 
+	/** Captured-robber cargo count, clamped by PoliceCruiserControlPolicy before it reaches synced data. */
 	public int capturedRobbers() {
 		return this.entityData.get(CAPTURED_ROBBERS);
 	}
 
+	/** Capture handler entrypoint; policy owns capacity so future storage changes stay testable. */
 	public void addCapturedRobber() {
 		this.setCapturedRobbers(PoliceCruiserControlPolicy.afterCapture(this.capturedRobbers()));
 	}
 
+	/** Jail drop-off entrypoint; delegates bounds and partial-release rules to the pure policy class. */
 	public void removeCapturedRobbers(int count) {
 		this.setCapturedRobbers(PoliceCruiserControlPolicy.afterRelease(this.capturedRobbers(), count));
 	}
 
+	/** C2S lights payload boundary; ignores requests unless the sender is the controlling passenger. */
 	public static void toggleLightsForDriver(ServerPlayer player) {
-		if (player.getVehicle() instanceof PoliceCruiserEntity cruiser && cruiser.getControllingPassenger() == player) {
-			boolean enabled = !cruiser.lightsEnabled();
-			cruiser.setLightsEnabled(enabled);
-			player.displayClientMessage(Component.literal(enabled ? "Cruiser lights on" : "Cruiser lights off"), true);
-			cruiser.level().playSound(null, cruiser.blockPosition(), SoundEvents.LEVER_CLICK, SoundSource.PLAYERS, 0.8F, enabled ? 1.4F : 0.8F);
-		}
+		PoliceCruiserDriverControls.toggleLights(player);
 	}
 
+	/** C2S siren payload boundary; keeps siren state server-owned and tied to the active driver. */
 	public static void toggleSirenForDriver(ServerPlayer player) {
-		if (player.getVehicle() instanceof PoliceCruiserEntity cruiser && cruiser.getControllingPassenger() == player) {
-			boolean enabled = !cruiser.sirenEnabled();
-			cruiser.setSirenEnabled(enabled);
-			player.displayClientMessage(Component.literal(enabled ? "Cruiser siren on" : "Cruiser siren off"), true);
-			cruiser.level().playSound(null, cruiser.blockPosition(), SoundEvents.NOTE_BLOCK_BELL.value(), SoundSource.PLAYERS, 1.1F, enabled ? 1.8F : 0.7F);
-		}
+		PoliceCruiserDriverControls.toggleSiren(player);
 	}
 
+	/** Creative-only flight toggle used for playtesting and stunt controls; survival drivers are ignored. */
 	public static void toggleFlightForDriver(ServerPlayer player) {
-		if (player.isCreative() && player.getVehicle() instanceof PoliceCruiserEntity cruiser && cruiser.getControllingPassenger() == player) {
-			cruiser.creativeFlightEnabled = !cruiser.creativeFlightEnabled;
-			if (!cruiser.creativeFlightEnabled) {
-				cruiser.setNoGravity(false);
-				cruiser.creativeFlightLiftInput = 0.0F;
-			}
-			player.displayClientMessage(Component.literal(cruiser.creativeFlightEnabled ? "Cruiser flight enabled" : "Cruiser flight disabled"), true);
-		}
+		PoliceCruiserDriverControls.toggleFlight(player);
 	}
 
+	/** C2S flight input boundary; sanitize here before per-tick movement consumes the lift value. */
 	public static void updateFlightInputForDriver(ServerPlayer player, float lift) {
-		if (player.isCreative() && player.getVehicle() instanceof PoliceCruiserEntity cruiser && cruiser.getControllingPassenger() == player) {
-			float safeLift = PoliceCruiserControlPolicy.liftInput(lift);
-			if (safeLift != lift) {
-				CopsAndRobbers.LOGGER.debug("Sanitized cruiser flight lift from {} to {} for {}", lift, safeLift, player.getName().getString());
-			}
-			cruiser.creativeFlightLiftInput = safeLift;
-		}
+		PoliceCruiserDriverControls.updateFlightInput(player, lift);
 	}
 
+	/** Creative-only stunt payload boundary for the renderer-visible barrel-roll state. */
 	public static void triggerBarrelRollForDriver(ServerPlayer player) {
-		if (player.isCreative() && player.getVehicle() instanceof PoliceCruiserEntity cruiser && cruiser.getControllingPassenger() == player) {
-			cruiser.startTrick(TRICK_BARREL_ROLL);
-		}
+		PoliceCruiserDriverControls.triggerBarrelRoll(player);
 	}
 
+	/** Creative-only stunt payload boundary for the renderer-visible loop state. */
 	public static void triggerLoopForDriver(ServerPlayer player) {
-		if (player.isCreative() && player.getVehicle() instanceof PoliceCruiserEntity cruiser && cruiser.getControllingPassenger() == player) {
-			cruiser.startTrick(TRICK_LOOP);
-		}
+		PoliceCruiserDriverControls.triggerLoop(player);
 	}
 
-	private void setLightsEnabled(boolean enabled) {
+	void setLightsEnabled(boolean enabled) {
 		this.entityData.set(LIGHTS_ENABLED, enabled);
 	}
 
-	private void setSirenEnabled(boolean enabled) {
+	void setSirenEnabled(boolean enabled) {
 		this.entityData.set(SIREN_ENABLED, enabled);
 	}
 
@@ -228,7 +219,7 @@ public class PoliceCruiserEntity extends Mob {
 		this.entityData.set(CAPTURED_ROBBERS, PoliceCruiserControlPolicy.clampCapturedRobbers(count));
 	}
 
-	private void startTrick(int trickType) {
+	void startTrick(int trickType) {
 		if (this.trickTicks() <= 0) {
 			this.entityData.set(TRICK_TYPE, trickType);
 			this.entityData.set(TRICK_TICKS, TRICK_DURATION_TICKS);

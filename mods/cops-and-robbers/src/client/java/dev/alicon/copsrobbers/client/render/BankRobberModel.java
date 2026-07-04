@@ -23,6 +23,7 @@ public final class BankRobberModel extends EntityModel<BankRobberRenderState> {
 	private final ModelPart rightLeg;
 	private final ModelPart stolenGold;
 
+	/** Binds baked part names; update this constructor and createBodyLayer together when renaming geometry. */
 	public BankRobberModel(ModelPart root) {
 		super(root);
 		this.head = root.getChild("head");

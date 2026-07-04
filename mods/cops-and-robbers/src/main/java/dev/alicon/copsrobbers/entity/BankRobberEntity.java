@@ -62,6 +62,7 @@ public final class BankRobberEntity extends Monster {
 	private long lastRobberyDay = -1L;
 	private long chillUntilTick;
 
+	/** Keeps robber persistence and jail/gold state owned by the entity while heist rules live in handlers. */
 	public BankRobberEntity(EntityType<? extends BankRobberEntity> entityType, Level level) {
 		super(entityType, level);
 		this.setPersistenceRequired();

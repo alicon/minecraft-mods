@@ -14,6 +14,7 @@ import net.minecraft.world.phys.Vec3;
 
 /** Rideable fire truck with an automatic water cannon. */
 public final class FireTruckEntity extends PoliceCruiserEntity {
+	/** Fire truck variant of cruiser controls; job handling is replaced with water-spray behavior. */
 	public FireTruckEntity(EntityType<? extends FireTruckEntity> entityType, Level level) {
 		super(entityType, level);
 	}

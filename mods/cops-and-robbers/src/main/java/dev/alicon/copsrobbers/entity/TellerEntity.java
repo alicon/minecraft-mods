@@ -22,6 +22,7 @@ public final class TellerEntity extends PathfinderMob {
 	private BlockPos counterPos;
 	private int panicTicks;
 
+	/** Persistent bank NPC; counter position is saved so generated banks recover after world reloads. */
 	public TellerEntity(EntityType<? extends TellerEntity> entityType, Level level) {
 		super(entityType, level);
 		this.setPersistenceRequired();

@@ -22,6 +22,7 @@ public final class PatrolNeighborhoodData extends SavedData {
 	private boolean generated;
 	private BlockPos stationSpawn = BlockPos.ZERO;
 
+	/** Default constructor used by SavedDataType; generated state must stay false until markGenerated runs. */
 	public PatrolNeighborhoodData() {
 	}
 

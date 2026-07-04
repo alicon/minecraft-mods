@@ -41,6 +41,7 @@ public final class MushroomTheYorkie implements ModInitializer {
 		return ResourceLocation.fromNamespaceAndPath(MOD_ID, path);
 	}
 
+	/** Runtime gameplay toggle read by interaction code; default true keeps duplicate claims blocked if config load fails. */
 	public static boolean oneMushroomPerPlayer() {
 		return config == null || config.oneMushroomPerPlayer();
 	}

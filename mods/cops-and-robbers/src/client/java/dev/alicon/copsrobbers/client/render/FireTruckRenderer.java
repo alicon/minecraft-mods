@@ -11,6 +11,7 @@ import net.minecraft.resources.Identifier;
 public final class FireTruckRenderer extends MobRenderer<FireTruckEntity, PoliceCruiserRenderState, PoliceCruiserModel> {
 	private static final Identifier TEXTURE = CopsAndRobbers.id("textures/entity/fire_truck.png");
 
+	/** Reuses PoliceCruiserModel with fire-truck texture/state; avoid a second truck model unless geometry diverges. */
 	public FireTruckRenderer(EntityRendererProvider.Context context) {
 		super(context, new PoliceCruiserModel(context.bakeLayer(PoliceCruiserModel.LAYER_LOCATION)), 0.75F);
 	}

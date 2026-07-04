@@ -9,6 +9,7 @@ import net.minecraft.world.entity.Mob;
 public final class PoliceNpcRenderer<T extends Mob> extends MobRenderer<T, BankRobberRenderState, BankRobberModel> {
 	private final Identifier texture;
 
+	/** Shared renderer for NPCs using the robber geometry; texture is the only intended variation point. */
 	public PoliceNpcRenderer(EntityRendererProvider.Context context, Identifier texture) {
 		super(context, new BankRobberModel(context.bakeLayer(BankRobberModel.LAYER_LOCATION)), 0.5F);
 		this.texture = texture;

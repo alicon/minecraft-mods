@@ -10,6 +10,7 @@ import net.minecraft.resources.Identifier;
 public final class BankRobberRenderer extends MobRenderer<BankRobberEntity, BankRobberRenderState, BankRobberModel> {
 	private static final Identifier TEXTURE = CopsAndRobbers.id("textures/entity/bank_robber.png");
 
+	/** Binds the robber model layer; keep layer registration and BankRobberModel.LAYER_LOCATION in sync. */
 	public BankRobberRenderer(EntityRendererProvider.Context context) {
 		super(context, new BankRobberModel(context.bakeLayer(BankRobberModel.LAYER_LOCATION)), 0.5F);
 	}

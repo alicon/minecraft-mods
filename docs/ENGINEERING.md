@@ -68,6 +68,11 @@ Entity classes should mostly adapt Minecraft events to domain logic. If an entit
 
 Document public APIs when they are intended for reuse outside their immediate class or package.
 
+Documentation and comments in this repo are primarily for future LLM sessions working in the codebase.
+They should reduce rediscovery cost: explain intent, invariants, ownership, version traps, gameplay
+constraints, and coupling that is not obvious from a quick read. Avoid comments that merely narrate
+the implementation, because an LLM can already read the code.
+
 Use Javadoc for:
 
 - public classes that represent reusable concepts
@@ -76,7 +81,13 @@ Use Javadoc for:
 - public methods where order, bounds, side effects, or threading matter
 - public constants whose values affect gameplay or compatibility
 
-Javadoc should explain the contract and reason, not restate the method name.
+Javadoc should explain the contract and reason, not restate the method name. Useful comments answer:
+
+- Why does this abstraction exist instead of living inline?
+- What game behavior, compatibility concern, or validation gate depends on it?
+- Which values are gameplay tuning versus persistence keys or integration glue?
+- What must remain stable across Minecraft versions?
+- What should the next agent avoid changing casually?
 
 Do not add noisy comments for obvious code. Prefer clear names and small methods.
 

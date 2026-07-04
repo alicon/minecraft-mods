@@ -20,6 +20,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 /** Places a small police station with a jail cell and truck garage. */
 public final class PoliceStationKitItem extends Item {
+	/** Registry constructor; generated jail/drop-off layout must stay aligned with robber release logic. */
 	public PoliceStationKitItem(Properties properties) {
 		super(properties);
 	}

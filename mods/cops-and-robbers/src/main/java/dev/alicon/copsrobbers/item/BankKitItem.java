@@ -27,6 +27,7 @@ import net.minecraft.network.chat.Component;
 
 /** Places a burnable bank with a teller counter and gold vault. */
 public final class BankKitItem extends Item {
+	/** Registry constructor; gameplay structure contents are encoded in this item rather than config. */
 	public BankKitItem(Properties properties) {
 		super(properties);
 	}
