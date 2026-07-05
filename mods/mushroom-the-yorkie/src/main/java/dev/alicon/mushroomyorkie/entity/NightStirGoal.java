@@ -19,7 +19,8 @@ final class NightStirGoal extends Goal {
 	public boolean canUse() {
 		return this.yorkie.level() instanceof ServerLevel level
 				&& this.yorkie.shouldSleepAtNight(level)
-				&& this.yorkie.nightWakeTicks > 0;
+				&& this.yorkie.nightWakeTicks > 0
+				&& !this.yorkie.isOrderedToSit();
 	}
 
 	@Override
@@ -32,6 +33,11 @@ final class NightStirGoal extends Goal {
 		this.nextMoveTick = 0;
 		this.yorkie.setSleeping(false);
 		MushroomBehaviorDebugger.debug(this.yorkie, "night_stir_start", "night stir: awake for a short nighttime visit", true);
+	}
+
+	@Override
+	public void stop() {
+		this.yorkie.getNavigation().stop();
 	}
 
 	@Override

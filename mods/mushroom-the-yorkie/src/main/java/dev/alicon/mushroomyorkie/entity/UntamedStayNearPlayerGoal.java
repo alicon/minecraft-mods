@@ -70,12 +70,12 @@ final class UntamedStayNearPlayerGoal extends Goal {
 	private Vec3 nextTarget(ServerLevel level) {
 		Vec3 fromPlayer = this.yorkie.position().subtract(this.player.position());
 		if (this.yorkie.wasScoldedToday(level)) {
-			return this.player.position().add(MushroomYorkieEntity.normalizedHorizontal(fromPlayer).scale(MushroomYorkieEntity.UNTAMED_PLAYER_STICK_RADIUS));
+			return this.player.position().add(MushroomMovementPolicy.normalizedHorizontal(fromPlayer).scale(MushroomYorkieEntity.UNTAMED_PLAYER_STICK_RADIUS));
 		}
 
 		double distance = this.yorkie.distanceToSqr(this.player);
 		if (distance < MushroomYorkieEntity.UNTAMED_PLAYER_TOO_CLOSE_RADIUS * MushroomYorkieEntity.UNTAMED_PLAYER_TOO_CLOSE_RADIUS) {
-			return this.player.position().add(MushroomYorkieEntity.normalizedHorizontal(fromPlayer).scale(MushroomYorkieEntity.UNTAMED_PLAYER_RETURN_RADIUS));
+			return this.player.position().add(MushroomMovementPolicy.normalizedHorizontal(fromPlayer).scale(MushroomYorkieEntity.UNTAMED_PLAYER_RETURN_RADIUS));
 		}
 
 		double angle = this.yorkie.getRandom().nextDouble() * Math.PI * 2.0D;

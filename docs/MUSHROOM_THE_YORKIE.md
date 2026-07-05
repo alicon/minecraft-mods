@@ -4,22 +4,26 @@
 
 `mushroom_yorkie.json` is generated in the Fabric config directory. Values that change gameplay are centralized in `MushroomYorkieConfig` and exposed through small value objects so entity code reads tuning, not raw JSON fields.
 
-`debugMessages` is the broad playtest diagnostic switch. When enabled, Mushroom reports custom behavior states through actionbar messages and matching log lines: scenting, potty warnings, sleep/night stir, peaceful mob barking, hostile hesitation, untamed spacing, creative flight, treats, harness, sitting/following, and baseline state. Leave it off for normal play.
+`debugMessages` is the broad playtest diagnostic switch. When enabled, Mushroom reports custom behavior states through throttled, separately wrapped chat lines and matching log lines: scenting, potty warnings, sleep/night stir, peaceful mob barking, hostile hesitation, untamed spacing, creative flight, treats, harness, sitting/following, and baseline state. Leave it off for normal play.
 
-Structure scenting lets a tamed, following Mushroom occasionally catch a strong scent from nearby generated structures. It is intentionally a kid-readable guide, not a compass UI: Mushroom barks, leads, waits when the player falls behind, can optionally lose the trail around water or steep terrain, and celebrates at the destination.
+Structure scenting lets a tamed, following Mushroom occasionally catch a strong scent from nearby generated structures. It is intentionally a kid-readable guide, not a compass UI: Mushroom barks, leads, waits when the player falls behind, comes back if the player loses him, can optionally lose the trail around water or steep terrain, and celebrates at the destination. The default range is intentionally short, from 80 to 192 blocks, so Mushroom only nudges players toward discoveries that are just out of sight. Scenting automatically pauses for creative-mode owners so kids can build without being pulled away; an empty-hand click to make Mushroom sit still also blocks scenting.
+
+Domestic care adds a few home objects without turning Mushroom into a chore machine. A copper ingot crafts an empty dog bowl. Food bowls are made from a dog bowl plus a Yorkie Treat, and water bowls from a dog bowl plus a water bucket. Mushroom can eat one food bowl and drink one water bowl per Minecraft day; each filled bowl turns back into an empty bowl when used. Owners can also feed him normal edible player food in an emergency. His visible food bar counts down like the player hunger bar when he is following and much more slowly when he is sitting or sleeping. Starvation damage only applies when the owner is nearby enough to care for him; if he has been lost from his owner for a full Minecraft day and is not already near the bed/spawn area, the next successful sleep brings him back to the bed. He only whines about food after a bowl exists nearby, so new worlds do not start with surprise hunger nags. A dog bed gives him a nighttime place to curl up. Wool-and-dye toys include a right-click throwable ball and chew toy; vanilla bones can also be right-click thrown, and dropped balls, chew toys, or bones are fetch targets. Mushroom can fetch toys from open water, but skips submerged or covered water toys that do not leave air for him to surface.
+
+Potty warnings happen at most until one outdoor relief per Minecraft day. If Mushroom is indoors and needs outside, he first looks for a reachable sky-visible outdoor block; a closed cave door naturally leaves him circling the door, while an open path lets him keep searching toward outside. After a few seconds under the sky he resets his potty need and emits a debug `potty_relieved` state when diagnostics are enabled. Calming peaceful-mob barking with a treat remembers nearby passive animals so Mushroom does not immediately restart barking at the same axolotls, sheep, cows, or other friends.
 
 - `structureScentingEnabled`: turns the behavior on or off.
 - `structureScentMessages`: shows actionbar prompts such as `Follow Mushroom!`; keep this on for younger players.
 - `structureScentDebugMessages`: legacy scent-only debug flag. New configs should use top-level `debugMessages`; this field is still read for compatibility.
 - `structureScentCanLoseTrail`: allows water, steep terrain, and failed paths to interrupt the scent. This currently defaults off because losing the trail was too frustrating during kid playtests.
-- `structureScentMinDistanceBlocks`: prevents Mushroom from scenting things already close enough to stumble into.
-- `structureScentMaxDistanceBlocks`: caps how far structure lookup searches; higher values find rarer structures but make searches heavier.
+- `structureScentMinDistanceBlocks`: prevents Mushroom from scenting things already close enough to stumble into. Defaults to 80.
+- `structureScentMaxDistanceBlocks`: caps how far structure lookup searches; higher values find rarer structures but make searches heavier. Defaults to 192.
 - `structureScentCooldownTicks`: delay between structure searches per Mushroom; this protects normal server ticks from repeated locate-style work.
 - `structureScentLeadAheadBlocks`: how far Mushroom runs ahead before waiting for the player; keep this short because Mushroom is tiny and easy to lose visually.
 - `structureScentCircleBackIntervalTicks`: how often Mushroom breaks from leading and returns near the player so he stays visible.
 - `structureScentCircleBackTicks`: how long Mushroom spends circling back before leading again.
 - `structureScentCircleBackDistanceBlocks`: how close Mushroom comes back toward the player before heading off again.
-- `structureScentFoundDistanceBlocks`: how close Mushroom must get before celebrating and ending the behavior.
+- `structureScentFoundDistanceBlocks`: how close Mushroom must get before celebrating and ending the behavior. Defaults to 32.
 - `structureScentBarkIntervalTicks`: bark cadence while leading, waiting, or recovering the scent.
 - `structureScentRecoveryTicks`: how long Mushroom sniffs around before giving up after losing a trail.
 - `structureScentMaxTrailRiseBlocks`: vertical terrain change that can break the scent, used to make mountains feel like real obstacles.

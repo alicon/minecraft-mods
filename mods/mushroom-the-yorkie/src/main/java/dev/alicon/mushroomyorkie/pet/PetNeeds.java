@@ -50,6 +50,35 @@ public final class PetNeeds {
 		this.energy = clamp(this.energy + 8);
 	}
 
+	/** Applies one proper bowl meal. */
+	public void eatMeal() {
+		this.hunger = clamp(this.hunger - 65);
+		this.potty = clamp(this.potty + 25);
+		this.mood = clamp(this.mood + 10);
+		this.energy = clamp(this.energy + 6);
+	}
+
+	/** Applies one normal player food item. */
+	public void eatPlayerFood(int nutrition) {
+		int foodValue = Math.max(1, nutrition);
+		this.hunger = clamp(this.hunger - Math.max(8, foodValue * 8));
+		this.potty = clamp(this.potty + Math.max(2, foodValue * 2));
+		this.mood = clamp(this.mood + 6);
+		this.energy = clamp(this.energy + Math.min(8, foodValue));
+	}
+
+	/** Applies one drink from a water bowl. */
+	public void drinkWater() {
+		this.potty = clamp(this.potty + 8);
+		this.mood = clamp(this.mood + 4);
+	}
+
+	/** Applies a short play interaction with a toy. */
+	public void playWithToy() {
+		this.mood = clamp(this.mood + 14);
+		this.energy = clamp(this.energy - 4);
+	}
+
 	/**
 	 * Advances slow-changing needs by one server-side needs interval.
 	 *
@@ -57,7 +86,20 @@ public final class PetNeeds {
 	 * @param sitting whether Mushroom is ordered to sit
 	 */
 	public void tickNeeds(boolean outside, boolean sitting) {
-		this.hunger = clamp(this.hunger + 1);
+		this.tickNeeds(outside, sitting, true);
+	}
+
+	/**
+	 * Advances slow-changing needs by one server-side needs interval.
+	 *
+	 * @param outside whether Mushroom currently has sky access
+	 * @param sitting whether Mushroom is ordered to sit
+	 * @param spendHunger whether this interval should drain his food bar
+	 */
+	public void tickNeeds(boolean outside, boolean sitting, boolean spendHunger) {
+		if (spendHunger) {
+			this.hunger = clamp(this.hunger + 1);
+		}
 		this.potty = clamp(this.potty + (this.hunger > 65 ? 2 : 1));
 		this.energy = clamp(this.energy - (sitting ? 0 : 1));
 
@@ -69,6 +111,12 @@ public final class PetNeeds {
 		}
 	}
 
+	/** Resets potty need after Mushroom has spent a few seconds outside. */
+	public void relieveOutside() {
+		this.potty = MIN_VALUE;
+		this.mood = clamp(this.mood + 4);
+	}
+
 	/**
 	 * Reports whether potty need is high enough to warn the owner.
 	 *
@@ -76,6 +124,22 @@ public final class PetNeeds {
 	 */
 	public boolean shouldWarnPotty() {
 		return this.potty > POTTY_WARNING_THRESHOLD;
+	}
+
+	/** Reports whether Mushroom's food bar is empty enough to take starvation damage. */
+	public boolean isStarving() {
+		return this.hunger >= MAX_VALUE;
+	}
+
+	/** Current visible food pips, matching a ten-slot Minecraft-style food bar. */
+	public int foodPips() {
+		return clamp((MAX_VALUE - this.hunger + 9) / 10, 0, 10);
+	}
+
+	/** Simple ASCII food bar for chat/actionbar messages. */
+	public String foodBar() {
+		int pips = this.foodPips();
+		return "[" + "#".repeat(pips) + ".".repeat(10 - pips) + "] " + pips + "/10";
 	}
 
 	/**
@@ -116,5 +180,9 @@ public final class PetNeeds {
 
 	private static int clamp(int value) {
 		return Math.max(MIN_VALUE, Math.min(MAX_VALUE, value));
+	}
+
+	private static int clamp(int value, int min, int max) {
+		return Math.max(min, Math.min(max, value));
 	}
 }

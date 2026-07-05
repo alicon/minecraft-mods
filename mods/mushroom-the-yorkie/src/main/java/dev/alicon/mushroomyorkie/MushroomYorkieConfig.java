@@ -15,6 +15,9 @@ import java.util.List;
 final class MushroomYorkieConfig {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static final Path CONFIG_PATH = FabricLoader.getInstance().getConfigDir().resolve("mushroom_yorkie.json");
+	private static final int LEGACY_STRUCTURE_SCENT_MIN_DISTANCE_BLOCKS = 128;
+	private static final int LEGACY_STRUCTURE_SCENT_MAX_DISTANCE_BLOCKS = 4096;
+	private static final int LEGACY_STRUCTURE_SCENT_FOUND_DISTANCE_BLOCKS = 48;
 
 	private final YorkieSpawnMode spawnMode;
 	private final boolean spawnAfterSuccessfulSleep;
@@ -98,24 +101,38 @@ final class MushroomYorkieConfig {
 
 	private static MushroomStructureScentConfig structureScentFrom(ConfigFile file) {
 		MushroomStructureScentConfig defaults = MushroomStructureScentConfig.defaults();
+		boolean migrateLegacyGeneratedRange = usesLegacyGeneratedScentRange(file);
 		return new MushroomStructureScentConfig(
 				file.structureScentingEnabled == null ? defaults.enabled() : file.structureScentingEnabled,
 				file.structureScentMessages == null ? defaults.messages() : file.structureScentMessages,
 				file.structureScentDebugMessages == null ? defaults.debugMessages() : file.structureScentDebugMessages,
 				file.structureScentCanLoseTrail == null ? defaults.canLoseTrail() : file.structureScentCanLoseTrail,
-				file.structureScentMinDistanceBlocks == null ? defaults.minDistanceBlocks() : file.structureScentMinDistanceBlocks,
-				file.structureScentMaxDistanceBlocks == null ? defaults.maxDistanceBlocks() : file.structureScentMaxDistanceBlocks,
+				migratedLegacyInt(file.structureScentMinDistanceBlocks, LEGACY_STRUCTURE_SCENT_MIN_DISTANCE_BLOCKS, defaults.minDistanceBlocks(), migrateLegacyGeneratedRange),
+				migratedLegacyInt(file.structureScentMaxDistanceBlocks, LEGACY_STRUCTURE_SCENT_MAX_DISTANCE_BLOCKS, defaults.maxDistanceBlocks(), migrateLegacyGeneratedRange),
 				file.structureScentCooldownTicks == null ? defaults.cooldownTicks() : file.structureScentCooldownTicks,
 				file.structureScentLeadAheadBlocks == null ? defaults.leadAheadBlocks() : file.structureScentLeadAheadBlocks,
 				file.structureScentCircleBackIntervalTicks == null ? defaults.circleBackIntervalTicks() : file.structureScentCircleBackIntervalTicks,
 				file.structureScentCircleBackTicks == null ? defaults.circleBackTicks() : file.structureScentCircleBackTicks,
 				file.structureScentCircleBackDistanceBlocks == null ? defaults.circleBackDistanceBlocks() : file.structureScentCircleBackDistanceBlocks,
-				file.structureScentFoundDistanceBlocks == null ? defaults.foundDistanceBlocks() : file.structureScentFoundDistanceBlocks,
+				migratedLegacyInt(file.structureScentFoundDistanceBlocks, LEGACY_STRUCTURE_SCENT_FOUND_DISTANCE_BLOCKS, defaults.foundDistanceBlocks(), migrateLegacyGeneratedRange),
 				file.structureScentBarkIntervalTicks == null ? defaults.barkIntervalTicks() : file.structureScentBarkIntervalTicks,
 				file.structureScentRecoveryTicks == null ? defaults.recoveryTicks() : file.structureScentRecoveryTicks,
 				file.structureScentMaxTrailRiseBlocks == null ? defaults.maxTrailRiseBlocks() : file.structureScentMaxTrailRiseBlocks,
 				file.structureScentTargets == null ? defaults.targets() : file.structureScentTargets
 		);
+	}
+
+	private static boolean usesLegacyGeneratedScentRange(ConfigFile file) {
+		return Integer.valueOf(LEGACY_STRUCTURE_SCENT_MIN_DISTANCE_BLOCKS).equals(file.structureScentMinDistanceBlocks)
+				&& Integer.valueOf(LEGACY_STRUCTURE_SCENT_MAX_DISTANCE_BLOCKS).equals(file.structureScentMaxDistanceBlocks);
+	}
+
+	private static int migratedLegacyInt(Integer value, int legacyDefault, int newDefault, boolean migrateLegacyGeneratedRange) {
+		if (value == null) {
+			return newDefault;
+		}
+
+		return migrateLegacyGeneratedRange && value == legacyDefault ? newDefault : value;
 	}
 
 	private void save() {
@@ -138,14 +155,14 @@ final class MushroomYorkieConfig {
 		Boolean structureScentMessages = true;
 		Boolean structureScentDebugMessages = false;
 		Boolean structureScentCanLoseTrail = false;
-		Integer structureScentMinDistanceBlocks = 128;
-		Integer structureScentMaxDistanceBlocks = 4096;
+		Integer structureScentMinDistanceBlocks = MushroomStructureScentConfig.DEFAULT_MIN_DISTANCE_BLOCKS;
+		Integer structureScentMaxDistanceBlocks = MushroomStructureScentConfig.DEFAULT_MAX_DISTANCE_BLOCKS;
 		Integer structureScentCooldownTicks = 6_000;
 		Integer structureScentLeadAheadBlocks = 10;
 		Integer structureScentCircleBackIntervalTicks = 120;
 		Integer structureScentCircleBackTicks = 45;
 		Integer structureScentCircleBackDistanceBlocks = 4;
-		Integer structureScentFoundDistanceBlocks = 48;
+		Integer structureScentFoundDistanceBlocks = MushroomStructureScentConfig.DEFAULT_FOUND_DISTANCE_BLOCKS;
 		Integer structureScentBarkIntervalTicks = 80;
 		Integer structureScentRecoveryTicks = 600;
 		Integer structureScentMaxTrailRiseBlocks = 10;

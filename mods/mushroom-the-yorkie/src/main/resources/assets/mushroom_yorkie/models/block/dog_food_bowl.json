@@ -1,0 +1,34 @@
+{
+	"ambientocclusion": false,
+	"textures": {
+		"particle": "minecraft:block/copper_block",
+		"copper": "minecraft:block/copper_block",
+		"inside": "minecraft:block/cut_copper",
+		"food": "minecraft:block/brown_wool"
+	},
+	"elements": [
+		{
+			"from": [3, 0, 3],
+			"to": [13, 2, 13],
+			"faces": {
+				"down": {"texture": "#copper"},
+				"up": {"texture": "#inside"},
+				"north": {"texture": "#copper"},
+				"south": {"texture": "#copper"},
+				"west": {"texture": "#copper"},
+				"east": {"texture": "#copper"}
+			}
+		},
+		{
+			"from": [4, 2, 4],
+			"to": [12, 3, 12],
+			"faces": {
+				"up": {"texture": "#food"},
+				"north": {"texture": "#food"},
+				"south": {"texture": "#food"},
+				"west": {"texture": "#food"},
+				"east": {"texture": "#food"}
+			}
+		}
+	]
+}

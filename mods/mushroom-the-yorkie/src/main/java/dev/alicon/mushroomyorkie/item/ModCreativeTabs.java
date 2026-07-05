@@ -32,6 +32,12 @@ public final class ModCreativeTabs {
 					output.accept(ModItems.MUSHROOM_YORKIE_SPAWN_EGG);
 					output.accept(ModItems.YORKIE_TREAT);
 					output.accept(ModItems.YORKIE_HARNESS);
+					output.accept(ModItems.DOG_BOWL);
+					output.accept(ModItems.DOG_FOOD_BOWL);
+					output.accept(ModItems.DOG_WATER_BOWL);
+					output.accept(ModItems.DOG_BED);
+					output.accept(ModItems.YORKIE_BALL);
+					output.accept(ModItems.YORKIE_CHEW_TOY);
 				})
 				.build());
 
@@ -41,5 +47,15 @@ public final class ModCreativeTabs {
 				entries.accept(ModItems.YORKIE_TREAT));
 		ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.TOOLS_AND_UTILITIES).register(entries ->
 				entries.accept(ModItems.YORKIE_HARNESS));
+		ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.FUNCTIONAL_BLOCKS).register(entries -> {
+			entries.accept(ModItems.DOG_BOWL);
+			entries.accept(ModItems.DOG_FOOD_BOWL);
+			entries.accept(ModItems.DOG_WATER_BOWL);
+			entries.accept(ModItems.DOG_BED);
+		});
+		ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.TOOLS_AND_UTILITIES).register(entries -> {
+			entries.accept(ModItems.YORKIE_BALL);
+			entries.accept(ModItems.YORKIE_CHEW_TOY);
+		});
 	}
 }

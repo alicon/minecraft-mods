@@ -8,9 +8,13 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.phys.Vec3;
 
 final class IndoorPottyWarningGoal extends Goal {
+	private static final int TARGET_REFRESH_TICKS = 60;
+
 	private final MushroomYorkieEntity yorkie;
+	private BlockPos outdoorPos;
 	private BlockPos doorPos;
 	private int nextMoveTick;
+	private int nextTargetSearchTick;
 	private int circleStep;
 
 	IndoorPottyWarningGoal(MushroomYorkieEntity yorkie) {
@@ -30,8 +34,9 @@ final class IndoorPottyWarningGoal extends Goal {
 
 	@Override
 	public void start() {
-		this.doorPos = this.findNearestDoor();
+		this.refreshTargets();
 		this.nextMoveTick = 0;
+		this.nextTargetSearchTick = this.yorkie.tickCount + TARGET_REFRESH_TICKS;
 		this.circleStep = 0;
 		MushroomBehaviorDebugger.debug(this.yorkie, "potty_warning_start", "potty warning: needs outside", true);
 	}
@@ -51,19 +56,15 @@ final class IndoorPottyWarningGoal extends Goal {
 		if (this.yorkie.tickCount % MushroomYorkieEntity.BARK_INTERVAL_TICKS == 0) {
 			this.yorkie.bark();
 		}
-		MushroomBehaviorDebugger.debug(
-				this.yorkie,
-				this.doorPos == null ? "potty_warning_owner" : "potty_warning_door",
-				this.doorPos == null ? "potty warning: circling owner, no nearby door" : "potty warning: circling nearest door",
-				false
-		);
+		this.debugTarget();
 
 		if (this.nextMoveTick-- > 0 && !this.yorkie.getNavigation().isDone()) {
 			return;
 		}
 
-		if (this.doorPos == null || this.yorkie.tickCount % (MushroomYorkieEntity.NEEDS_INTERVAL_TICKS * 3) == 0) {
-			this.doorPos = this.findNearestDoor();
+		if (this.outdoorPos == null || this.yorkie.tickCount >= this.nextTargetSearchTick) {
+			this.refreshTargets();
+			this.nextTargetSearchTick = this.yorkie.tickCount + TARGET_REFRESH_TICKS;
 		}
 
 		Vec3 target = this.nextTarget(owner);
@@ -72,6 +73,10 @@ final class IndoorPottyWarningGoal extends Goal {
 	}
 
 	private Vec3 nextTarget(LivingEntity owner) {
+		if (this.outdoorPos != null) {
+			return Vec3.atBottomCenterOf(this.outdoorPos);
+		}
+
 		if (this.doorPos == null) {
 			Vec3 center = owner == null ? this.yorkie.position() : owner.position();
 			double angle = (this.yorkie.tickCount % 100) * (Math.PI * 2.0D / 100.0D);
@@ -84,11 +89,30 @@ final class IndoorPottyWarningGoal extends Goal {
 		return center.add(Math.cos(angle) * 1.8D, 0.0D, Math.sin(angle) * 1.8D);
 	}
 
-	private BlockPos findNearestDoor() {
+	private void refreshTargets() {
 		if (!(this.yorkie.level() instanceof ServerLevel level)) {
-			return null;
+			this.outdoorPos = null;
+			this.doorPos = null;
+			return;
 		}
 
-		return MushroomDoorLocator.findNearestDoor(level, this.yorkie.blockPosition());
+		BlockPos origin = this.yorkie.blockPosition();
+		this.outdoorPos = MushroomOutdoorLocator.findReachableOutdoor(this.yorkie, level, origin);
+		this.doorPos = this.outdoorPos == null ? MushroomDoorLocator.findNearestDoor(level, origin) : null;
+	}
+
+	private void debugTarget() {
+		if (this.outdoorPos != null) {
+			MushroomBehaviorDebugger.debug(this.yorkie, "potty_warning_outdoor", "potty warning: heading toward reachable outdoors", false);
+			return;
+		}
+
+		boolean foundDoor = this.doorPos != null;
+		MushroomBehaviorDebugger.debug(
+				this.yorkie,
+				foundDoor ? "potty_warning_door" : "potty_warning_owner",
+				foundDoor ? "potty warning: no reachable outdoor path, circling nearest door" : "potty warning: circling owner, no nearby door",
+				false
+		);
 	}
 }

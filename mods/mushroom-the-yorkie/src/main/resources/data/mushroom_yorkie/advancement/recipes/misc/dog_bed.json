@@ -1,0 +1,35 @@
+{
+	"parent": "minecraft:recipes/root",
+	"criteria": {
+		"has_bed_materials": {
+			"trigger": "minecraft:inventory_changed",
+			"conditions": {
+				"items": [
+					{
+						"items": "minecraft:white_wool"
+					},
+					{
+						"items": "minecraft:red_dye"
+					}
+				]
+			}
+		},
+		"has_the_recipe": {
+			"trigger": "minecraft:recipe_unlocked",
+			"conditions": {
+				"recipe": "mushroom_yorkie:dog_bed"
+			}
+		}
+	},
+	"requirements": [
+		[
+			"has_bed_materials",
+			"has_the_recipe"
+		]
+	],
+	"rewards": {
+		"recipes": [
+			"mushroom_yorkie:dog_bed"
+		]
+	}
+}

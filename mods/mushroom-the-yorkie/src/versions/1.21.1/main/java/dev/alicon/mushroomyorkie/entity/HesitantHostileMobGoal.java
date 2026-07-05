@@ -128,7 +128,7 @@ final class HesitantHostileMobGoal extends Goal {
 	private void moveBehindPlayer(Player player) {
 		if (player == null) {
 			Vec3 away = this.yorkie.position().subtract(this.target.position());
-			this.moveToward(this.yorkie.position().add(MushroomYorkieEntity.normalizedHorizontal(away).scale(4.0D)), 1.25D);
+			this.moveToward(this.yorkie.position().add(MushroomMovementPolicy.normalizedHorizontal(away).scale(4.0D)), 1.25D);
 			return;
 		}
 

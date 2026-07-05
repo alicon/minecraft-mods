@@ -16,8 +16,11 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.SpawnEggItem;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.entity.EntityTypeTest;
 
 final class MushroomYorkieSpawnEggItem extends SpawnEggItem {
+	private static final double NEARBY_UNOWNED_MUSHROOM_RADIUS_SQ = 64.0D * 64.0D;
+
 	MushroomYorkieSpawnEggItem(Item.Properties properties) {
 		super(ModEntities.MUSHROOM_YORKIE, 0x4B2E1F, 0xE7D8BA, properties);
 	}
@@ -38,8 +41,7 @@ final class MushroomYorkieSpawnEggItem extends SpawnEggItem {
 		MushroomYorkieEntity yorkie = ModEntities.MUSHROOM_YORKIE.spawn(
 				serverLevel,
 					entity -> {
-						entity.tame(player);
-						entity.setOrderedToSit(false);
+						entity.claimFor(player);
 						entity.setCustomName(Component.literal("Mushroom"));
 					},
 					spawnPos,
@@ -72,11 +74,18 @@ final class MushroomYorkieSpawnEggItem extends SpawnEggItem {
 			return false;
 		}
 
-		if (!MushroomYorkieEntity.hasLoadedMushroomOwnedBy(serverLevel, player)) {
+		if (!loadedMushroomBlocksSpawn(serverLevel, player)) {
 			return false;
 		}
 
 		player.displayClientMessage(Component.translatable("message.mushroom_yorkie.one_only"), true);
 		return true;
+	}
+
+	private static boolean loadedMushroomBlocksSpawn(ServerLevel level, Player player) {
+		return !level.getEntities(
+				EntityTypeTest.forClass(MushroomYorkieEntity.class),
+				yorkie -> yorkie.isAlive() && (yorkie.belongsTo(player) || (!yorkie.isTame() && yorkie.distanceToSqr(player) <= NEARBY_UNOWNED_MUSHROOM_RADIUS_SQ))
+		).isEmpty();
 	}
 }

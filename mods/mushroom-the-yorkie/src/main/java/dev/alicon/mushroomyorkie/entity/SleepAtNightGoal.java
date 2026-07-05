@@ -1,11 +1,21 @@
 package dev.alicon.mushroomyorkie.entity;
 
+import dev.alicon.mushroomyorkie.block.ModBlocks;
 import java.util.EnumSet;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.phys.Vec3;
 
 final class SleepAtNightGoal extends Goal {
+	private static final int MOVE_RETRY_TICKS = 40;
+	private static final double BED_REACHED_DISTANCE_SQR = 0.64D;
+	private static final double BED_TOP_Y_OFFSET = 0.25D;
+
 	private final MushroomYorkieEntity yorkie;
+	private BlockPos bedPos;
+	private Vec3 bedTarget;
+	private int nextMoveTick;
 
 	SleepAtNightGoal(MushroomYorkieEntity yorkie) {
 		this.yorkie = yorkie;
@@ -26,14 +36,55 @@ final class SleepAtNightGoal extends Goal {
 
 	@Override
 	public void start() {
-		MushroomBehaviorDebugger.debug(this.yorkie, "sleep_start", "sleep: curling up because it is night inside", true);
-		this.yorkie.setSleeping(true);
+		this.bedPos = this.findNearestBed();
+		this.bedTarget = this.bedPos == null ? null : bedCenter(this.bedPos);
+		this.nextMoveTick = 0;
+		MushroomBehaviorDebugger.debug(this.yorkie, "sleep_start", this.bedPos == null ? "sleep: curling up because it is night inside" : "sleep: heading to dog bed", true);
+		this.yorkie.setSleeping(this.bedPos == null);
 	}
 
 	@Override
 	public void tick() {
-		MushroomBehaviorDebugger.debug(this.yorkie, "sleeping", "sleep: staying still until morning or wake-up", false);
+		if (this.bedPos != null && this.yorkie.level() instanceof ServerLevel level && !level.getBlockState(this.bedPos).is(ModBlocks.DOG_BED)) {
+			this.bedPos = null;
+			this.bedTarget = null;
+		}
+
+		if (this.bedTarget != null && this.yorkie.distanceToSqr(this.bedTarget) > BED_REACHED_DISTANCE_SQR) {
+			this.moveToBed();
+			return;
+		}
+
+		MushroomBehaviorDebugger.debug(this.yorkie, "sleeping", this.bedPos == null ? "sleep: staying still until morning or wake-up" : "sleep: curled up on dog bed", false);
+		if (this.bedTarget != null) {
+			this.yorkie.setPos(this.bedTarget.x, this.bedTarget.y, this.bedTarget.z);
+		}
+		this.yorkie.setSleeping(true);
 		this.yorkie.getNavigation().stop();
 		this.yorkie.setDeltaMovement(this.yorkie.getDeltaMovement().scale(0.3D));
+	}
+
+	private void moveToBed() {
+		this.yorkie.setSleeping(false);
+		this.yorkie.getLookControl().setLookAt(this.bedTarget);
+		MushroomBehaviorDebugger.debug(this.yorkie, "sleep_bed", "sleep: walking to dog bed", false);
+		if (this.nextMoveTick-- > 0 && !this.yorkie.getNavigation().isDone()) {
+			return;
+		}
+
+		this.yorkie.getNavigation().moveTo(this.bedTarget.x, this.bedTarget.y, this.bedTarget.z, 0.7D);
+		this.nextMoveTick = MOVE_RETRY_TICKS;
+	}
+
+	private static Vec3 bedCenter(BlockPos pos) {
+		return Vec3.atBottomCenterOf(pos).add(0.0D, BED_TOP_Y_OFFSET, 0.0D);
+	}
+
+	private BlockPos findNearestBed() {
+		if (!(this.yorkie.level() instanceof ServerLevel level)) {
+			return null;
+		}
+
+		return MushroomDomesticLocator.findNearestDogBed(level, this.yorkie.blockPosition());
 	}
 }

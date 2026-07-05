@@ -1,0 +1,12 @@
+{
+	"type": "minecraft:crafting_shapeless",
+	"category": "misc",
+	"ingredients": [
+		"mushroom_yorkie:dog_bowl",
+		"mushroom_yorkie:yorkie_treat"
+	],
+	"result": {
+		"count": 1,
+		"id": "mushroom_yorkie:dog_food_bowl"
+	}
+}

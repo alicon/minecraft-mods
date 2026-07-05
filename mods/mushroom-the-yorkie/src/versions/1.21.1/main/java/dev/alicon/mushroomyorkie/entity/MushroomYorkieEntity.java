@@ -1,6 +1,5 @@
 package dev.alicon.mushroomyorkie.entity;
 
-import dev.alicon.mushroomyorkie.item.ModItems;
 import dev.alicon.mushroomyorkie.pet.PetNeeds;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -61,24 +60,28 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	private static final EntityDataAccessor<Integer> DATA_FLIGHT_TRICK_TICKS = SynchedEntityData.defineId(MushroomYorkieEntity.class, EntityDataSerializers.INT);
 	private static final EntityDataAccessor<Boolean> DATA_SLEEPING = SynchedEntityData.defineId(MushroomYorkieEntity.class, EntityDataSerializers.BOOLEAN);
 	private static final EntityDataAccessor<Boolean> DATA_HARNESS = SynchedEntityData.defineId(MushroomYorkieEntity.class, EntityDataSerializers.BOOLEAN);
-	private static final String HUNGER_KEY = "Hunger";
-	private static final String POTTY_KEY = "Potty";
-	private static final String MOOD_KEY = "Mood";
-	private static final String ENERGY_KEY = "Energy";
-	private static final String NIGHT_WAKE_TICKS_KEY = "NightWakeTicks";
-	private static final String HARNESS_KEY = "Harness";
+	private static final String HUNGER_KEY = "Hunger", POTTY_KEY = "Potty", MOOD_KEY = "Mood", ENERGY_KEY = "Energy";
+	private static final String NIGHT_WAKE_TICKS_KEY = "NightWakeTicks", HARNESS_KEY = "Harness";
 	private static final String PEACEFUL_MOB_BARK_MUTED_UNTIL_KEY = "PeacefulMobBarkMutedUntil";
+	private static final String LAST_FOOD_BOWL_DAY_KEY = "LastFoodBowlDay", LAST_WATER_BOWL_DAY_KEY = "LastWaterBowlDay";
+	private static final String LAST_OWNER_CONTACT_GAME_TIME_KEY = "LastOwnerContactGameTime";
+	private static final String LAST_RELIEF_DAY_KEY = "LastReliefDay", CALMED_PEACEFUL_MOBS_KEY = "CalmedPeacefulMobs";
 	private static final int PEACEFUL_MOB_BARK_MUTED_TICKS = 6_000;
 	static final double CREATIVE_FLIGHT_FOLLOW_DISTANCE_SQ = 6.25D;
 	static final double CREATIVE_FLIGHT_SPEED = 0.22D;
 
 	PetNeeds needs = new PetNeeds();
+	final MushroomDomesticState domestic = new MushroomDomesticState();
+	final MushroomReliefState relief = new MushroomReliefState();
+	final MushroomPeacefulMobMemory peacefulMobMemory = new MushroomPeacefulMobMemory();
 	private final MushroomTrustState trust = new MushroomTrustState();
 	int nightWakeTicks;
 	private int lastInteractTick = -DOUBLE_CLICK_TICKS;
 	private UUID lastInteractPlayer;
 	long peacefulMobBarkMutedUntil = -1L;
 	int scaredRunTicks;
+	int darkPanicTicks;
+	private long lastOwnerContactGameTime;
 
 	/**
 	 * Creates a Mushroom Yorkie entity instance.
@@ -99,11 +102,6 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		builder.define(DATA_HARNESS, false);
 	}
 
-	/**
-	 * Defines baseline attributes for the tiny companion entity.
-	 *
-	 * @return attribute builder registered during mod initialization
-	 */
 	public static AttributeSupplier.Builder createAttributes() {
 		return Animal.createMobAttributes()
 				.add(Attributes.MAX_HEALTH, 12.0D)
@@ -119,20 +117,23 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		this.goalSelector.addGoal(1, new SleepAtNightGoal(this));
 		this.goalSelector.addGoal(2, new NightStirGoal(this));
 		this.goalSelector.addGoal(3, new IndoorPottyWarningGoal(this));
-		this.goalSelector.addGoal(4, new StructureScentGoal(this));
-		this.goalSelector.addGoal(5, new BarkAtPeacefulMobsGoal(this));
-		this.goalSelector.addGoal(6, new HesitantHostileMobGoal(this));
-		this.goalSelector.addGoal(7, new UntamedStayNearPlayerGoal(this));
-		this.goalSelector.addGoal(8, new SitWhenOrderedToGoal(this));
-		this.goalSelector.addGoal(9, new FollowOwnerGoal(this, 1.25D, 2.0F, 1.0F));
-		this.goalSelector.addGoal(10, new RandomStrollGoal(this, 0.9D, 80));
-		this.goalSelector.addGoal(11, new LookAtPlayerGoal(this, Player.class, 8.0F));
-		this.goalSelector.addGoal(12, new RandomLookAroundGoal(this));
+		this.goalSelector.addGoal(4, new DomesticCareGoal(this));
+		this.goalSelector.addGoal(5, new FetchBallGoal(this));
+		this.goalSelector.addGoal(6, new StructureScentGoal(this));
+		this.goalSelector.addGoal(7, new BarkAtPeacefulMobsGoal(this));
+		this.goalSelector.addGoal(8, new HesitantHostileMobGoal(this));
+		this.goalSelector.addGoal(9, new UntamedStayNearPlayerGoal(this));
+		this.goalSelector.addGoal(10, new SitWhenOrderedToGoal(this));
+		this.goalSelector.addGoal(11, new FollowOwnerGoal(this, 1.25D, 2.0F, 1.0F));
+		this.goalSelector.addGoal(12, new DaytimeBumShuffleGoal(this));
+		this.goalSelector.addGoal(13, new RandomStrollGoal(this, 0.9D, 80));
+		this.goalSelector.addGoal(14, new LookAtPlayerGoal(this, Player.class, 8.0F));
+		this.goalSelector.addGoal(15, new RandomLookAroundGoal(this));
 	}
 
 	@Override
 	public boolean isFood(ItemStack stack) {
-		return stack.is(ModItems.YORKIE_TREAT);
+		return MushroomFoodPolicy.isYorkieTreat(stack);
 	}
 
 	@Override
@@ -199,19 +200,16 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		super.customServerAiStep();
 		ServerLevel level = (ServerLevel) this.level();
 		MushroomFlightController.followFlyingOwner(this);
+		MushroomOwnerContactHandler.tick(this, level);
 		this.tickNightBehavior(level);
-		this.tickTreatBark();
+		MushroomOwnerPromptHandler.tick(this, level);
+		MushroomDarknessPanicHandler.tick(this, level);
+		MushroomNeedDecayHandler.tick(this, level);
+		MushroomReliefHandler.tick(this, level);
 		MushroomBehaviorDebugger.baseline(this, level);
 		if (this.scaredRunTicks > 0) {
 			this.scaredRunTicks--;
 		}
-
-		if (this.tickCount % NEEDS_INTERVAL_TICKS != 0) {
-			return;
-		}
-
-		boolean outside = level.canSeeSky(this.blockPosition());
-		this.needs.tickNeeds(outside, this.isOrderedToSit());
 	}
 
 	@Override
@@ -234,17 +232,6 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 			this.setSleeping(false);
 			return;
 		}
-
-		this.setSleeping(true);
-	}
-
-	private void tickTreatBark() {
-		LivingEntity owner = this.getOwner();
-		boolean ownerHasTreat = this.isTame() && owner != null && owner.isHolding(ModItems.YORKIE_TREAT);
-		if (ownerHasTreat && !this.isMushroomSleeping() && this.tickCount % BARK_INTERVAL_TICKS == 0) {
-			MushroomBehaviorDebugger.debug(this, "treat_attention", "treat attention: owner is holding a Yorkie treat", false);
-			this.bark();
-		}
 	}
 
 	boolean shouldSleepAtNight(ServerLevel level) {
@@ -257,11 +244,11 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 				&& !this.ownerIsCreativeFlying()
 				&& !this.shouldSleepAtNight(level)
 				&& this.isInside(level)
-				&& this.needs.shouldWarnPotty();
+				&& this.relief.shouldAskToday(currentDay(level), this.needs.shouldWarnPotty());
 	}
 
 	private boolean isInside(ServerLevel level) {
-		return !level.canSeeSky(this.blockPosition());
+		return MushroomShelterDetector.isSheltered(level, this.blockPosition());
 	}
 
 	boolean isMushroomSleeping() {
@@ -329,10 +316,30 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 
 	void mutePeacefulMobBarking(ServerLevel level) {
 		this.peacefulMobBarkMutedUntil = level.getGameTime() + PEACEFUL_MOB_BARK_MUTED_TICKS;
+		this.peacefulMobMemory.rememberNearby(level, this);
 	}
 
 	boolean peacefulMobBarkingMuted(ServerLevel level) {
 		return level.getGameTime() < this.peacefulMobBarkMutedUntil;
+	}
+
+	void hurtFromNeglect(ServerLevel level, float amount) {
+		this.hurt(level.damageSources().starve(), amount);
+	}
+
+	void recordOwnerContact(ServerLevel level) {
+		this.lastOwnerContactGameTime = level.getGameTime();
+	}
+
+	public long lastOwnerContactGameTime() {
+		return this.lastOwnerContactGameTime;
+	}
+
+	public void recoverWithOwner(ServerLevel level) {
+		this.stopRiding();
+		this.setMushroomOrderedToSit(false);
+		this.setSleeping(false);
+		this.recordOwnerContact(level);
 	}
 
 	boolean wasScoldedToday(ServerLevel level) {
@@ -350,6 +357,14 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 
 	void bark() {
 		this.playSound(SoundEvents.WOLF_AMBIENT, 0.5F, 1.45F);
+	}
+
+	void whine() {
+		this.playSound(SoundEvents.WOLF_WHINE, 0.55F, 1.45F);
+	}
+
+	void playFoodSound() {
+		this.playSound(SoundEvents.GENERIC_EAT, 0.45F, 1.45F);
 	}
 
 	private void facePosition(Vec3 target) {
@@ -374,20 +389,10 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		this.entityData.set(DATA_FLIGHT_TRICK_TICKS, ticks);
 	}
 
-	/**
-	 * Current synced flight trick type.
-	 *
-	 * @return one of the `FLIGHT_TRICK_*` constants
-	 */
 	public int getFlightTrickType() {
 		return this.entityData.get(DATA_FLIGHT_TRICK_TYPE);
 	}
 
-	/**
-	 * Remaining synced ticks for the current flight trick.
-	 *
-	 * @return remaining trick ticks, or 0 when no trick is active
-	 */
 	public int getFlightTrickTicks() {
 		return this.entityData.get(DATA_FLIGHT_TRICK_TICKS);
 	}
@@ -407,6 +412,11 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		tag.putInt(NIGHT_WAKE_TICKS_KEY, this.nightWakeTicks);
 		tag.putBoolean(HARNESS_KEY, this.hasHarness());
 		tag.putLong(PEACEFUL_MOB_BARK_MUTED_UNTIL_KEY, this.peacefulMobBarkMutedUntil);
+		tag.putLong(LAST_FOOD_BOWL_DAY_KEY, this.domestic.lastFoodBowlDay());
+		tag.putLong(LAST_WATER_BOWL_DAY_KEY, this.domestic.lastWaterBowlDay());
+		tag.putLong(LAST_OWNER_CONTACT_GAME_TIME_KEY, this.lastOwnerContactGameTime);
+		tag.putLong(LAST_RELIEF_DAY_KEY, this.relief.lastReliefDay());
+		tag.putString(CALMED_PEACEFUL_MOBS_KEY, this.peacefulMobMemory.save());
 		this.trust.save(tag);
 	}
 
@@ -422,6 +432,11 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		this.nightWakeTicks = tag.contains(NIGHT_WAKE_TICKS_KEY) ? tag.getInt(NIGHT_WAKE_TICKS_KEY) : 0;
 		this.setHarness(tag.contains(HARNESS_KEY) && tag.getBoolean(HARNESS_KEY));
 		this.peacefulMobBarkMutedUntil = tag.contains(PEACEFUL_MOB_BARK_MUTED_UNTIL_KEY) ? tag.getLong(PEACEFUL_MOB_BARK_MUTED_UNTIL_KEY) : -1L;
+		this.domestic.setLastFoodBowlDay(tag.contains(LAST_FOOD_BOWL_DAY_KEY) ? tag.getLong(LAST_FOOD_BOWL_DAY_KEY) : DomesticCarePolicy.unloadedDay());
+		this.domestic.setLastWaterBowlDay(tag.contains(LAST_WATER_BOWL_DAY_KEY) ? tag.getLong(LAST_WATER_BOWL_DAY_KEY) : DomesticCarePolicy.unloadedDay());
+		this.lastOwnerContactGameTime = tag.contains(LAST_OWNER_CONTACT_GAME_TIME_KEY) ? tag.getLong(LAST_OWNER_CONTACT_GAME_TIME_KEY) : 0L;
+		this.relief.setLastReliefDay(tag.contains(LAST_RELIEF_DAY_KEY) ? tag.getLong(LAST_RELIEF_DAY_KEY) : MushroomReliefState.neverRelievedDay());
+		this.peacefulMobMemory.read(tag.contains(CALMED_PEACEFUL_MOBS_KEY) ? tag.getString(CALMED_PEACEFUL_MOBS_KEY) : "");
 		this.trust.read(tag);
 	}
 
@@ -472,14 +487,5 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	@Override
 	public AgeableMob getBreedOffspring(ServerLevel level, AgeableMob partner) {
 		return null;
-	}
-
-	static Vec3 normalizedHorizontal(Vec3 vector) {
-		Vec3 horizontal = new Vec3(vector.x, 0.0D, vector.z);
-		if (horizontal.lengthSqr() < 1.0E-4D) {
-			return new Vec3(1.0D, 0.0D, 0.0D);
-		}
-
-		return horizontal.normalize();
 	}
 }

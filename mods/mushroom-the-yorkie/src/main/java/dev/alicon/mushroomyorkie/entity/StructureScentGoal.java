@@ -127,6 +127,15 @@ final class StructureScentGoal extends Goal {
 		}
 
 		if (StructureScentPolicy.shouldWaitForOwner(this.yorkie.distanceToSqr(owner), this.config.leadAheadBlocks())) {
+			if (StructureScentPolicy.shouldReturnToOwner(this.yorkie.distanceToSqr(owner), this.config.leadAheadBlocks())) {
+				this.debugState("rejoining", "message.mushroom_yorkie.scent_debug_rejoining", false);
+				this.message("message.mushroom_yorkie.scent_rejoining", false);
+				this.circleBackTicks = Math.max(this.circleBackTicks, this.config.circleBackTicks());
+				this.nextCircleBackTick = this.config.circleBackIntervalTicks();
+				this.circleBackToOwner(level, owner);
+				return;
+			}
+
 			this.debugState("waiting", "message.mushroom_yorkie.scent_debug_waiting", false);
 			this.waitForOwner(owner);
 			return;
@@ -149,10 +158,14 @@ final class StructureScentGoal extends Goal {
 
 	private boolean canSniff(ServerLevel level) {
 		LivingEntity owner = this.yorkie.getOwner();
+		if (!(owner instanceof Player player)) {
+			return false;
+		}
+
 		return this.config.enabled()
 				&& this.yorkie.isTame()
-				&& owner instanceof Player
-				&& owner.level() == this.yorkie.level()
+				&& player.level() == this.yorkie.level()
+				&& !player.isCreative()
 				&& !this.yorkie.isOrderedToSit()
 				&& !this.yorkie.isMushroomSleeping()
 				&& !this.yorkie.shouldAskToGoOutside(level)

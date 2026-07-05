@@ -2,6 +2,7 @@ package dev.alicon.mushroomyorkie.entity;
 
 import dev.alicon.mushroomyorkie.MushroomTheYorkie;
 import dev.alicon.mushroomyorkie.item.ModItems;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
@@ -18,7 +19,7 @@ final class MushroomYorkieInteractions {
 	static InteractionResult handle(MushroomYorkieEntity yorkie, Player player, InteractionHand hand) {
 		ItemStack stack = player.getItemInHand(hand);
 
-		if (yorkie.isFood(stack)) {
+		if (MushroomFoodPolicy.isYorkieTreat(stack)) {
 			if (!yorkie.level().isClientSide()) {
 				if (!yorkie.isTame()) {
 					if (MushroomTheYorkie.oneMushroomPerPlayer() && hasOtherLoadedMushroomOwnedBy((ServerLevel) yorkie.level(), player, yorkie)) {
@@ -34,7 +35,25 @@ final class MushroomYorkieInteractions {
 				}
 
 				yorkie.feedTreat(player, hand, stack);
+				MushroomFoodStatus.show(player, yorkie);
 				MushroomBehaviorDebugger.debug(yorkie, "fed_treat", "fed treat: needs refreshed and peaceful barking muted", true);
+			}
+
+			return InteractionResult.SUCCESS;
+		}
+
+		if (MushroomFoodPolicy.isPlayerFood(stack) && yorkie.isTame() && yorkie.isOwnedBy(player)) {
+			if (!yorkie.level().isClientSide()) {
+				int nutrition = MushroomFoodPolicy.nutrition(stack);
+				yorkie.useInteractionItem(player, hand, stack);
+				yorkie.needs.eatPlayerFood(nutrition);
+				yorkie.heal(Math.max(1.0F, Math.min(4.0F, nutrition * 0.5F)));
+				yorkie.playFoodSound();
+				if (yorkie.level() instanceof ServerLevel level) {
+					level.sendParticles(ParticleTypes.HEART, yorkie.getX(), yorkie.getY() + 0.5D, yorkie.getZ(), 2, 0.2D, 0.15D, 0.2D, 0.0D);
+				}
+				MushroomFoodStatus.show(player, yorkie);
+				MushroomBehaviorDebugger.debug(yorkie, "fed_player_food", "fed food: nutrition=" + nutrition, true);
 			}
 
 			return InteractionResult.SUCCESS;
@@ -63,6 +82,22 @@ final class MushroomYorkieInteractions {
 			return InteractionResult.SUCCESS;
 		}
 
+		if ((stack.is(ModItems.YORKIE_BALL) || stack.is(ModItems.YORKIE_CHEW_TOY)) && yorkie.isTame() && yorkie.isOwnedBy(player)) {
+			if (!yorkie.level().isClientSide()) {
+				yorkie.needs.playWithToy();
+				yorkie.bark();
+				yorkie.setDeltaMovement(yorkie.getDeltaMovement().add(0.0D, 0.18D, 0.0D));
+				yorkie.playSound(SoundEvents.WOOL_HIT, 0.45F, 1.4F);
+				if (yorkie.level() instanceof ServerLevel level) {
+					level.sendParticles(ParticleTypes.HEART, yorkie.getX(), yorkie.getY() + 0.5D, yorkie.getZ(), 3, 0.25D, 0.2D, 0.25D, 0.0D);
+				}
+				player.displayClientMessage(Component.translatable("message.mushroom_yorkie.toy_play"), true);
+				MushroomBehaviorDebugger.debug(yorkie, "toy_play", "toy: played with " + stack.getHoverName().getString(), true);
+			}
+
+			return InteractionResult.SUCCESS;
+		}
+
 		if (stack.is(net.minecraft.world.item.Items.LEAD) && !yorkie.hasHarness()) {
 			if (!yorkie.level().isClientSide()) {
 				player.displayClientMessage(Component.translatable("message.mushroom_yorkie.needs_harness"), true);
@@ -74,6 +109,14 @@ final class MushroomYorkieInteractions {
 
 		if (yorkie.isTame() && yorkie.isOwnedBy(player) && stack.isEmpty()) {
 			if (!yorkie.level().isClientSide()) {
+				if (yorkie.isPassenger()) {
+					yorkie.stopRiding();
+					yorkie.bark();
+					player.displayClientMessage(Component.translatable("message.mushroom_yorkie.dismounted"), true);
+					MushroomBehaviorDebugger.debug(yorkie, "vehicle_dismount", "vehicle: owner helped Mushroom hop out", true);
+					return InteractionResult.SUCCESS;
+				}
+
 				if (yorkie.isMushroomSleeping()) {
 					boolean woke = yorkie.handleSleepingInteract(player);
 					MushroomBehaviorDebugger.debug(
@@ -93,9 +136,12 @@ final class MushroomYorkieInteractions {
 						true
 				);
 				player.displayClientMessage(
-						Component.translatable(yorkie.isOrderedToSit()
-								? "message.mushroom_yorkie.sit"
-								: "message.mushroom_yorkie.follow"),
+						Component.empty()
+								.append(Component.translatable(yorkie.isOrderedToSit()
+										? "message.mushroom_yorkie.sit"
+										: "message.mushroom_yorkie.follow"))
+								.append(" ")
+								.append(MushroomFoodStatus.inline(yorkie)),
 						true
 				);
 			}

@@ -1,0 +1,35 @@
+{
+	"parent": "minecraft:recipes/root",
+	"criteria": {
+		"has_water_bowl_materials": {
+			"trigger": "minecraft:inventory_changed",
+			"conditions": {
+				"items": [
+					{
+						"items": "mushroom_yorkie:dog_bowl"
+					},
+					{
+						"items": "minecraft:water_bucket"
+					}
+				]
+			}
+		},
+		"has_the_recipe": {
+			"trigger": "minecraft:recipe_unlocked",
+			"conditions": {
+				"recipe": "mushroom_yorkie:dog_water_bowl"
+			}
+		}
+	},
+	"requirements": [
+		[
+			"has_water_bowl_materials",
+			"has_the_recipe"
+		]
+	],
+	"rewards": {
+		"recipes": [
+			"mushroom_yorkie:dog_water_bowl"
+		]
+	}
+}

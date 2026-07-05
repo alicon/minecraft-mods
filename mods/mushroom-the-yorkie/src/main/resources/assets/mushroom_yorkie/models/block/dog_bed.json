@@ -1,0 +1,33 @@
+{
+	"ambientocclusion": false,
+	"textures": {
+		"particle": "minecraft:block/red_wool",
+		"bed": "minecraft:block/red_wool",
+		"pillow": "minecraft:block/white_wool"
+	},
+	"elements": [
+		{
+			"from": [1, 0, 1],
+			"to": [15, 3, 15],
+			"faces": {
+				"down": {"texture": "#bed"},
+				"up": {"texture": "#bed"},
+				"north": {"texture": "#bed"},
+				"south": {"texture": "#bed"},
+				"west": {"texture": "#bed"},
+				"east": {"texture": "#bed"}
+			}
+		},
+		{
+			"from": [2, 3, 2],
+			"to": [14, 4, 6],
+			"faces": {
+				"up": {"texture": "#pillow"},
+				"north": {"texture": "#pillow"},
+				"south": {"texture": "#pillow"},
+				"west": {"texture": "#pillow"},
+				"east": {"texture": "#pillow"}
+			}
+		}
+	]
+}

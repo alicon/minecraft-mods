@@ -1,5 +1,6 @@
 package dev.alicon.mushroomyorkie;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -10,6 +11,15 @@ final class MushroomStructureScentConfigTest {
 	@Test
 	void defaultsKeepTrailLossDisabledForKidPlaytesting() {
 		assertFalse(MushroomStructureScentConfig.defaults().canLoseTrail());
+	}
+
+	@Test
+	void defaultsOnlyScentNearbyDiscoveries() {
+		MushroomStructureScentConfig config = MushroomStructureScentConfig.defaults();
+
+		assertEquals(80, config.minDistanceBlocks());
+		assertEquals(192, config.maxDistanceBlocks());
+		assertEquals(32, config.foundDistanceBlocks());
 	}
 
 	@Test

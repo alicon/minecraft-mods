@@ -10,8 +10,10 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 
 final class MushroomBehaviorDebugger {
-	private static final int MESSAGE_TICKS = 40;
-	private static final int BASELINE_TICKS = 100;
+	private static final int MESSAGE_TICKS = 160;
+	private static final int IMMEDIATE_MESSAGE_TICKS = 80;
+	private static final int BASELINE_TICKS = 400;
+	private static final int WRAP_CHARS = 72;
 	private static final Map<MushroomYorkieEntity, Map<String, Integer>> NEXT_MESSAGE_TICKS = new WeakHashMap<>();
 
 	private MushroomBehaviorDebugger() {
@@ -27,7 +29,7 @@ final class MushroomBehaviorDebugger {
 			return;
 		}
 
-		player.displayClientMessage(Component.literal("Mushroom debug: " + detail), true);
+		sendWrapped(player, "Mushroom debug: " + detail);
 		MushroomTheYorkie.LOGGER.info(
 				"Mushroom behavior debug: state={} detail={} player={} distanceToPlayer={} pos={} tame={} sitting={} sleeping={} scaredTicks={} needs={}/{}/{}/{}",
 				state,
@@ -66,8 +68,41 @@ final class MushroomBehaviorDebugger {
 			return false;
 		}
 
-		ticksByState.put(state, yorkie.tickCount + MESSAGE_TICKS);
+		ticksByState.put(state, yorkie.tickCount + (immediate ? IMMEDIATE_MESSAGE_TICKS : MESSAGE_TICKS));
 		return true;
+	}
+
+	private static void sendWrapped(Player player, String text) {
+		for (String line : wrappedLines(text)) {
+			player.displayClientMessage(Component.literal(line), false);
+		}
+	}
+
+	private static java.util.List<String> wrappedLines(String text) {
+		java.util.List<String> lines = new java.util.ArrayList<>();
+		if (text.length() <= WRAP_CHARS) {
+			lines.add(text);
+			return lines;
+		}
+
+		StringBuilder line = new StringBuilder(WRAP_CHARS);
+		int lineLength = 0;
+		for (String word : text.split(" ")) {
+			if (lineLength > 0 && lineLength + 1 + word.length() > WRAP_CHARS) {
+				lines.add(line.toString());
+				line.setLength(0);
+				lineLength = 0;
+			} else if (lineLength > 0) {
+				line.append(' ');
+				lineLength++;
+			}
+			line.append(word);
+			lineLength += word.length();
+		}
+		if (line.length() > 0) {
+			lines.add(line.toString());
+		}
+		return lines;
 	}
 
 	private static Player debugPlayer(MushroomYorkieEntity yorkie) {

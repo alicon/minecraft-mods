@@ -49,4 +49,10 @@ final class StructureScentPolicyTest {
 		assertTrue(StructureScentPolicy.shouldWaitForOwner(30.0D * 30.0D, 18));
 		assertFalse(StructureScentPolicy.shouldWaitForOwner(12.0D * 12.0D, 18));
 	}
+
+	@Test
+	void returnsToOwnerWhenWaitingGapGetsTooLarge() {
+		assertTrue(StructureScentPolicy.shouldReturnToOwner(50.0D * 50.0D, 18));
+		assertFalse(StructureScentPolicy.shouldReturnToOwner(30.0D * 30.0D, 18));
+	}
 }

@@ -1,0 +1,16 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "building",
+	"key": {
+		"D": "minecraft:red_dye",
+		"W": "minecraft:white_wool"
+	},
+	"pattern": [
+		"WWW",
+		" D "
+	],
+	"result": {
+		"count": 1,
+		"id": "mushroom_yorkie:dog_bed"
+	}
+}

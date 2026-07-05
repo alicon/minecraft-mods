@@ -1,5 +1,6 @@
 package dev.alicon.mushroomyorkie;
 
+import dev.alicon.mushroomyorkie.block.ModBlocks;
 import dev.alicon.mushroomyorkie.entity.ModEntities;
 import dev.alicon.mushroomyorkie.entity.MushroomYorkieEntity;
 import dev.alicon.mushroomyorkie.item.ModCreativeTabs;
@@ -22,6 +23,7 @@ public final class MushroomTheYorkie implements ModInitializer {
 	public void onInitialize() {
 		config = MushroomYorkieConfig.load();
 		ModEntities.initialize();
+		ModBlocks.initialize();
 		ModItems.initialize();
 		ModCreativeTabs.initialize();
 		FabricDefaultAttributeRegistry.register(ModEntities.MUSHROOM_YORKIE, MushroomYorkieEntity.createAttributes());

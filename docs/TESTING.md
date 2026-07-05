@@ -96,7 +96,11 @@ Mushroom the Yorkie:
 - indoor potty warning mood penalty
 - wake-up spawn policy for respawn and extreme modes
 - spawn-mode config parsing defaults
-- structure scent lead-point, found-distance, and wait-for-owner policy
+- structure scent lead-point, found-distance, wait-for-owner/return-to-owner policy, and nearby default range
+- domestic care policy for one bowl meal per day and bowl-gated hunger prompts
+- pet-needs effects for bowl meals, normal player food, water, toy play, food bar display, and starvation state
+- lost-Mushroom recovery policy after a full Minecraft day away from the owner
+- daily outdoor relief state and saved passive-mob calm memory
 - headless GameTest verifies Mushroom's custom entity can spawn in a Minecraft test world
 
 Cops and Robbers:
@@ -157,15 +161,42 @@ Mushroom the Yorkie:
 
 - [ ] Minecraft 1.21.11 launches with Fabric API and Mushroom the Yorkie.
 - [ ] The Mushroom spawn egg creates a small Yorkie entity.
+- [ ] Repeated Mushroom spawn egg clicks do not create duplicate Mushrooms for the same player, including rapid creative clicks before interacting with the first one.
 - [ ] Mushroom renders with pointy ears and no missing texture.
 - [ ] Yorkie treats tame and feed Mushroom.
 - [ ] Mutton + two bones crafts 8 Yorkie Treats.
 - [ ] Creative inventory has a Mushroom the Yorkie tab.
 - [ ] After a successful night in a bed, Mushroom appears near the bed already tamed.
 - [ ] Empty-hand owner interaction toggles sit/follow.
+- [ ] Empty-hand owner interaction shows Mushroom's food bar.
 - [ ] Mushroom follows closely enough to feel like a tiny companion.
+- [ ] If Mushroom enters a boat, creative flight does not trap him; owner empty-hand interaction pops him out.
 - [ ] Yorkie Harness can be put on and removed by the owner without losing the item.
-- [ ] A tamed, following Mushroom can catch a surface structure scent, show kid-readable follow/lost/found messages, lead close enough to stay visible, and celebrate at the destination.
+- [ ] A tamed, following Mushroom can catch a nearby surface structure scent, show kid-readable follow/lost/found messages, come back when the player loses him, lead close enough to stay visible, and celebrate at the destination.
+- [ ] In creative mode, a tamed Mushroom does not start structure scenting, but still follows, sits, accepts treats, and uses creative flying support.
+- [ ] Copper can craft a Dog Bowl; Dog Bowl plus Yorkie Treat creates a Dog Food Bowl; Dog Bowl plus Water Bucket creates a Dog Water Bowl.
+- [ ] Mushroom eats one placed Dog Food Bowl per Minecraft day, drinks one placed Dog Water Bowl per Minecraft day, and each filled bowl becomes an empty Dog Bowl.
+- [ ] Owner can feed Mushroom normal edible player food, and his food bar improves.
+- [ ] Mushroom's food bar drains while following and drains much more slowly while sitting.
+- [ ] Mushroom can starve only while the owner is nearby enough to care for him.
+- [ ] A lost loaded Mushroom that has not been near the owner for a full Minecraft day returns to the player's bed after successful sleep when not already near the bed.
+- [ ] Mushroom only whines for food when at least one dog bowl has been placed nearby and no filled food bowl is available.
+- [ ] At night indoors, Mushroom walks to a nearby Dog Bed before curling up.
+- [ ] At night, waking Mushroom and then ordering him to sit leaves him seated without floor-shuffling.
+- [ ] During daytime, Mushroom can rarely do a short bum-shuffle while not ordered to sit.
+- [ ] When Mushroom needs outside, he relieves himself once per Minecraft day after a few seconds under open sky.
+- [ ] In a cave base with a closed door, Mushroom circles the door; with an open reachable path, he searches toward outside instead.
+- [ ] With debug messages enabled, the baseline state wraps into readable chat lines and outdoor relief emits `potty_relieved`.
+- [ ] Calming peaceful-mob barking with a treat makes nearby passive mobs stop triggering repeat barking.
+- [ ] Right-clicking with a Yorkie Ball, Yorkie Chew Toy, or vanilla Bone throws it like a soft snowball; Mushroom fetches it and returns it near the owner.
+- [ ] Mushroom starts chasing a thrown toy quickly, without a multi-second pause.
+- [ ] Dropped Yorkie Balls, Yorkie Chew Toys, and vanilla Bones are all fetch targets, even when dropped close to the owner.
+- [ ] Mushroom picks up one toy per fetch and does not immediately re-fetch the same toy he just returned.
+- [ ] Survival fetch returns one toy to the owner's inventory; creative fetch completes without spawning extra duplicate toys.
+- [ ] Mushroom fetches toys floating in open water, but ignores toys that are submerged or trapped in water under a low platform with no air block.
+- [ ] In survival, Mushroom barks and gives up instead of jumping off a high ledge for a toy; in creative, he can still use flight support to fetch it.
+- [ ] If Mushroom reaches an edge or ledge and cannot path to the toy, he barks briefly and gives up instead of staring indefinitely.
+- [ ] Using the Yorkie Ball or Yorkie Chew Toy on Mushroom plays a happy toy interaction without consuming the toy.
 - [ ] No errors attributed to `mushroom_yorkie` appear in the latest log.
 
 Cops and Robbers:

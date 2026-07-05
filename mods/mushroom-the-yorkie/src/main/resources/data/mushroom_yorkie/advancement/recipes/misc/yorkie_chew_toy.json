@@ -1,0 +1,35 @@
+{
+	"parent": "minecraft:recipes/root",
+	"criteria": {
+		"has_chew_toy_materials": {
+			"trigger": "minecraft:inventory_changed",
+			"conditions": {
+				"items": [
+					{
+						"items": "minecraft:white_wool"
+					},
+					{
+						"items": "minecraft:yellow_dye"
+					}
+				]
+			}
+		},
+		"has_the_recipe": {
+			"trigger": "minecraft:recipe_unlocked",
+			"conditions": {
+				"recipe": "mushroom_yorkie:yorkie_chew_toy"
+			}
+		}
+	},
+	"requirements": [
+		[
+			"has_chew_toy_materials",
+			"has_the_recipe"
+		]
+	],
+	"rewards": {
+		"recipes": [
+			"mushroom_yorkie:yorkie_chew_toy"
+		]
+	}
+}

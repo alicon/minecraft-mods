@@ -1,0 +1,22 @@
+{
+	"ambientocclusion": false,
+	"textures": {
+		"particle": "minecraft:block/copper_block",
+		"copper": "minecraft:block/copper_block",
+		"inside": "minecraft:block/cut_copper"
+	},
+	"elements": [
+		{
+			"from": [3, 0, 3],
+			"to": [13, 2, 13],
+			"faces": {
+				"down": {"texture": "#copper"},
+				"up": {"texture": "#inside"},
+				"north": {"texture": "#copper"},
+				"south": {"texture": "#copper"},
+				"west": {"texture": "#copper"},
+				"east": {"texture": "#copper"}
+			}
+		}
+	]
+}

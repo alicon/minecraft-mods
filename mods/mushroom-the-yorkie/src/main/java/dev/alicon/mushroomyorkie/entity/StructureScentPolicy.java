@@ -28,6 +28,11 @@ final class StructureScentPolicy {
 		return yorkieOwnerDistanceSqr > waitDistance * waitDistance;
 	}
 
+	static boolean shouldReturnToOwner(double yorkieOwnerDistanceSqr, int leadAheadBlocks) {
+		double returnDistance = leadAheadBlocks + 28.0D;
+		return yorkieOwnerDistanceSqr > returnDistance * returnDistance;
+	}
+
 	private static Vec3 normalizedHorizontal(Vec3 vector) {
 		Vec3 horizontal = new Vec3(vector.x, 0.0D, vector.z);
 		if (horizontal.lengthSqr() < 1.0E-4D) {

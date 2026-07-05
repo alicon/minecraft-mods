@@ -5,7 +5,7 @@ Fabric mod workspace for small Minecraft projects.
 ## Mods
 
 - **NARwhal Together**: family-focused multiplayer helpers. Current feature: press `G` to teleport to the next online player.
-- **Mushroom the Yorkie**: a tiny pointy-eared Yorkie companion with pet needs, treats, tame/follow/sit behavior, and early trick hooks.
+- **Mushroom the Yorkie**: a tiny pointy-eared Yorkie companion with pet needs, treats, bowls, a dog bed, toys, food-bar care, lost-dog recovery, tame/follow/sit behavior, and early trick hooks.
 - **Cops and Robbers**: police cruisers, fire trucks, cops, robbers, bank tellers, and placeable bank/police station kits.
 
 ## Layout
@@ -71,7 +71,7 @@ config/mushroom_yorkie.json
 
 The main option is `wakeUpSpawnMode`:
 
-- `respawn`: after a successful night in bed, a player gets Mushroom if they do not already have a loaded owned Mushroom.
+- `respawn`: after a successful night in bed, a player gets Mushroom if they do not already have a loaded owned Mushroom; a loaded Mushroom lost from his owner for a full Minecraft day can also return to the bed instead of staying missing.
 - `extreme`: each player gets Mushroom only once after sleeping; if he dies, that player does not get another one.
 
 ## Engineering Standards

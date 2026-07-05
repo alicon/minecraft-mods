@@ -94,7 +94,11 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 
 		this.nextSearchTick = 40;
 		AABB area = this.yorkie.getBoundingBox().inflate(MushroomYorkieEntity.PEACEFUL_MOB_SEARCH_RADIUS, 4.0D, MushroomYorkieEntity.PEACEFUL_MOB_SEARCH_RADIUS);
-		List<Animal> animals = level.getEntitiesOfClass(Animal.class, area, animal -> animal != this.yorkie && animal.isAlive());
+		List<Animal> animals = level.getEntitiesOfClass(
+				Animal.class,
+				area,
+				animal -> animal != this.yorkie && animal.isAlive() && !this.yorkie.peacefulMobMemory.remembers(animal)
+		);
 		Animal closest = null;
 		double closestDistance = Double.MAX_VALUE;
 		for (Animal animal : animals) {
