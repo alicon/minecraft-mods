@@ -32,6 +32,6 @@ jobs:
         with:
           name: minecraft-mods
           path: |
-            build/mods/*/libs/*.jar
-            !build/mods/*/libs/*-sources.jar
+            build/mods/*/*/libs/*.jar
+            !build/mods/*/*/libs/*-sources.jar
           if-no-files-found: error

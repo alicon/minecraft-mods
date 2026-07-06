@@ -64,6 +64,7 @@ Production jars are written to:
 ```text
 build/mods/narwhal-together/<minecraft-version>/libs/narwhal-together-<version>.jar
 build/mods/mushroom-the-yorkie/<minecraft-version>/libs/mushroom-the-yorkie-<version>.jar
+build/mods/cops-and-robbers/<minecraft-version>/libs/cops-and-robbers-<version>.jar
 ```
 
 Run Mushroom's headless Minecraft GameTests:

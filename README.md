@@ -40,9 +40,9 @@ Each mod has its own `fabric.mod.json`, Java package, assets, and jar. Shared Fa
 Distributable jars are written symmetrically:
 
 ```text
-build/mods/narwhal-together/libs/narwhal-together-<version>.jar
-build/mods/mushroom-the-yorkie/libs/mushroom-the-yorkie-<version>.jar
-build/mods/cops-and-robbers/libs/cops-and-robbers-<version>.jar
+build/mods/narwhal-together/<minecraft-version>/libs/narwhal-together-<version>.jar
+build/mods/mushroom-the-yorkie/<minecraft-version>/libs/mushroom-the-yorkie-<version>.jar
+build/mods/cops-and-robbers/<minecraft-version>/libs/cops-and-robbers-<version>.jar
 ```
 
 ## Verification
