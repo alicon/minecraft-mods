@@ -21,6 +21,8 @@ final class StructureScentGoal extends Goal {
 	private static final int RECOVER_CLEAR_TICKS = 40;
 	private static final int CELEBRATE_TICKS = 80;
 	private static final int LOST_BLOCKED_TICKS = 60;
+	private static final int VILLAGE_ARRIVAL_SCAN_RADIUS = 48;
+	private static final int VILLAGE_ARRIVAL_SCAN_STEP = 16;
 
 	private final MushroomYorkieEntity yorkie;
 	private MushroomStructureScentConfig config;
@@ -57,7 +59,7 @@ final class StructureScentGoal extends Goal {
 
 		this.nextSearchGameTime = level.getGameTime() + this.config.cooldownTicks();
 		this.scent = StructureScentLocator.findNearest(level, this.yorkie.blockPosition(), this.config).orElse(null);
-		return this.scent != null;
+		return this.scent != null && !(this.yorkie.getOwner() instanceof Player owner && this.hasArrived(level, owner));
 	}
 
 	@Override
@@ -113,7 +115,7 @@ final class StructureScentGoal extends Goal {
 			return;
 		}
 
-		if (StructureScentPolicy.withinDistance(this.yorkie.position(), this.scent.pos(), this.config.foundDistanceBlocks())) {
+		if (this.hasArrived(level, owner)) {
 			this.message("message.mushroom_yorkie.scent_arrived", true);
 			this.yorkie.getNavigation().stop();
 			this.celebrateTicks = CELEBRATE_TICKS;
@@ -170,6 +172,31 @@ final class StructureScentGoal extends Goal {
 				&& !this.yorkie.isMushroomSleeping()
 				&& !this.yorkie.shouldAskToGoOutside(level)
 				&& this.yorkie.scaredRunTicks <= 0;
+	}
+
+	private boolean hasArrived(ServerLevel level, Player owner) {
+		return StructureScentPolicy.withinDistance(this.yorkie.position(), this.scent.pos(), this.config.foundDistanceBlocks())
+				|| StructureScentPolicy.withinDistance(owner.position(), this.scent.pos(), this.config.foundDistanceBlocks())
+				|| this.scent.target() == StructureScentTarget.VILLAGE
+				&& (this.nearVillage(level, this.yorkie.blockPosition()) || this.nearVillage(level, owner.blockPosition()));
+	}
+
+	private boolean nearVillage(ServerLevel level, BlockPos origin) {
+		if (level.isVillage(origin)) {
+			return true;
+		}
+
+		for (int dx = -VILLAGE_ARRIVAL_SCAN_RADIUS; dx <= VILLAGE_ARRIVAL_SCAN_RADIUS; dx += VILLAGE_ARRIVAL_SCAN_STEP) {
+			for (int dz = -VILLAGE_ARRIVAL_SCAN_RADIUS; dz <= VILLAGE_ARRIVAL_SCAN_RADIUS; dz += VILLAGE_ARRIVAL_SCAN_STEP) {
+				for (int dy = -VILLAGE_ARRIVAL_SCAN_STEP; dy <= VILLAGE_ARRIVAL_SCAN_STEP; dy += VILLAGE_ARRIVAL_SCAN_STEP) {
+					BlockPos pos = origin.offset(dx, dy, dz);
+					if (level.hasChunk(pos.getX() >> 4, pos.getZ() >> 4) && level.isVillage(pos)) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
 	}
 
 	private boolean tickTrailConfidence(ServerLevel level, Player owner) {

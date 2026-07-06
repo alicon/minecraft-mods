@@ -45,15 +45,19 @@ final class MushroomYorkieInteractions {
 		if (MushroomFoodPolicy.isPlayerFood(stack) && yorkie.isTame() && yorkie.isOwnedBy(player)) {
 			if (!yorkie.level().isClientSide()) {
 				int nutrition = MushroomFoodPolicy.nutrition(stack);
+				boolean calmingFood = MushroomFoodPolicy.calmsPeacefulMobBarking(stack);
 				yorkie.useInteractionItem(player, hand, stack);
 				yorkie.needs.eatPlayerFood(nutrition);
 				yorkie.heal(Math.max(1.0F, Math.min(4.0F, nutrition * 0.5F)));
 				yorkie.playFoodSound();
 				if (yorkie.level() instanceof ServerLevel level) {
+					if (calmingFood) {
+						yorkie.mutePeacefulMobBarking(level);
+					}
 					level.sendParticles(ParticleTypes.HEART, yorkie.getX(), yorkie.getY() + 0.5D, yorkie.getZ(), 2, 0.2D, 0.15D, 0.2D, 0.0D);
 				}
 				MushroomFoodStatus.show(player, yorkie);
-				MushroomBehaviorDebugger.debug(yorkie, "fed_player_food", "fed food: nutrition=" + nutrition, true);
+				MushroomBehaviorDebugger.debug(yorkie, "fed_player_food", "fed food: nutrition=" + nutrition + ", calming=" + calmingFood, true);
 			}
 
 			return InteractionResult.SUCCESS;

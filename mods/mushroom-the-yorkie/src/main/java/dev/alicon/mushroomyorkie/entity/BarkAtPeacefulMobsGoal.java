@@ -1,6 +1,5 @@
 package dev.alicon.mushroomyorkie.entity;
 
-import dev.alicon.mushroomyorkie.item.ModItems;
 import java.util.EnumSet;
 import java.util.List;
 import net.minecraft.server.level.ServerLevel;
@@ -10,6 +9,8 @@ import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.phys.AABB;
 
 final class BarkAtPeacefulMobsGoal extends Goal {
+	private static final double OWNER_RECALL_DISTANCE_SQR = 24.0D * 24.0D;
+
 	private final MushroomYorkieEntity yorkie;
 	private Animal target;
 	private int nextSearchTick;
@@ -21,7 +22,7 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 
 	@Override
 	public boolean canUse() {
-		if (!(this.yorkie.level() instanceof ServerLevel level) || !this.canChase(level)) {
+		if (!(this.yorkie.level() instanceof ServerLevel level) || !this.canStartChase(level)) {
 			return false;
 		}
 
@@ -31,7 +32,7 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 
 	@Override
 	public boolean canContinueToUse() {
-		if (!(this.yorkie.level() instanceof ServerLevel level) || !this.canChase(level)) {
+		if (!(this.yorkie.level() instanceof ServerLevel level) || !this.canStayInGoal(level)) {
 			return false;
 		}
 
@@ -62,10 +63,23 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 		}
 
 		LivingEntity owner = this.yorkie.getOwner();
-		if (owner != null && owner.isHolding(ModItems.YORKIE_TREAT)) {
-			this.yorkie.mutePeacefulMobBarking((ServerLevel) this.yorkie.level());
+		if (owner == null) {
+			return;
+		}
+
+		if (this.yorkie.distanceToSqr(owner) > OWNER_RECALL_DISTANCE_SQR) {
+			this.yorkie.getLookControl().setLookAt(owner, 10.0F, this.yorkie.getMaxHeadXRot());
+			this.yorkie.getNavigation().moveTo(owner, 1.35D);
+			MushroomBehaviorDebugger.debug(this.yorkie, "peaceful_mob_owner_far", "peaceful mob: returning because owner walked away", false);
+			return;
+		}
+
+		if (MushroomFoodPolicy.isHoldingPeacefulMobRecallItem(owner)) {
+			if (MushroomFoodPolicy.isHoldingPeacefulMobCalmingItem(owner)) {
+				this.yorkie.mutePeacefulMobBarking((ServerLevel) this.yorkie.level());
+			}
 			this.yorkie.getNavigation().moveTo(owner, 1.25D);
-			MushroomBehaviorDebugger.debug(this.yorkie, "peaceful_mob_treat", "peaceful mob: returning because owner has treat", false);
+			MushroomBehaviorDebugger.debug(this.yorkie, "peaceful_mob_recall", "peaceful mob: returning because owner has a recall item", false);
 			return;
 		}
 
@@ -77,14 +91,21 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 		}
 	}
 
-	private boolean canChase(ServerLevel level) {
+	private boolean canStartChase(ServerLevel level) {
 		LivingEntity owner = this.yorkie.getOwner();
+		return this.canStayInGoal(level)
+				&& owner != null
+				&& this.yorkie.distanceToSqr(owner) <= OWNER_RECALL_DISTANCE_SQR
+				&& !MushroomFoodPolicy.isHoldingPeacefulMobRecallItem(owner);
+	}
+
+	private boolean canStayInGoal(ServerLevel level) {
 		return this.yorkie.isTame()
 				&& !this.yorkie.isOrderedToSit()
 				&& !this.yorkie.isMushroomSleeping()
 				&& !this.yorkie.shouldAskToGoOutside(level)
 				&& !this.yorkie.peacefulMobBarkingMuted(level)
-				&& (owner == null || !owner.isHolding(ModItems.YORKIE_TREAT));
+				&& this.yorkie.getOwner() != null;
 	}
 
 	private Animal findTarget(ServerLevel level) {
