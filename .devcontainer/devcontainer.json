@@ -1,0 +1,26 @@
+{
+  "name": "Minecraft Mods (Fabric)",
+  "image": "mcr.microsoft.com/devcontainers/java:1-21-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "redhat.java",
+        "vscjava.vscode-gradle",
+        "editorconfig.editorconfig"
+      ],
+      "settings": {
+        "java.configuration.updateBuildConfiguration": "automatic",
+        "java.import.gradle.enabled": true,
+        "java.import.gradle.wrapper.enabled": true,
+        "java.compile.nullAnalysis.mode": "automatic"
+      }
+    }
+  },
+  "postCreateCommand": "./gradlew --version && ./gradlew validateFormatting --no-daemon",
+  "remoteUser": "vscode"
+}

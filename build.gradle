@@ -24,22 +24,17 @@ tasks.register('validateModLayout') {
 			def modDir = modProject.projectDir
 			def minecraftVersion = activeMinecraftVersionFor(modProject)
 			def metadataFile = modDir.toPath().resolve('src/main/resources/fabric.mod.json').toFile()
-			def mainSourceDir = modDir.toPath().resolve('src/main/java').toFile()
-			def clientSourceDir = modDir.toPath().resolve('src/client/java').toFile()
-			def versionsDir = modDir.toPath().resolve('src/versions').toFile()
-			def activeVersionDir = modDir.toPath().resolve("src/versions/${minecraftVersion}").toFile()
+			def mainSourceRoots = sourceRootsFor(modDir, 'main', minecraftVersion)
+			def clientSourceRoots = sourceRootsFor(modDir, 'client', minecraftVersion)
 
 			if (!metadataFile.file) {
 				throw new GradleException("${modProject.path} is missing src/main/resources/fabric.mod.json")
 			}
-			if (!mainSourceDir.directory) {
-				throw new GradleException("${modProject.path} is missing src/main/java")
+			if (!mainSourceRoots.any { it.directory }) {
+				throw new GradleException("${modProject.path} is missing main Java sources for Minecraft ${minecraftVersion}")
 			}
-			if (!clientSourceDir.directory) {
-				throw new GradleException("${modProject.path} is missing src/client/java")
-			}
-			if (versionsDir.directory && !activeVersionDir.directory) {
-				throw new GradleException("${modProject.path} has versioned sources but no src/versions/${minecraftVersion}")
+			if (!clientSourceRoots.any { it.directory }) {
+				throw new GradleException("${modProject.path} is missing client Java sources for Minecraft ${minecraftVersion}")
 			}
 
 			def metadata = new groovy.json.JsonSlurper().parse(metadataFile)

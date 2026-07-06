@@ -80,6 +80,7 @@ This repo prioritizes maintainability: shared configuration, reusable domain log
 
 Helpful process docs:
 
+- [Development Environment](docs/DEVELOPMENT.md)
 - [Testing](docs/TESTING.md)
 - [Compatibility Policy](docs/COMPATIBILITY.md)
 - [Reference Codebases](docs/REFERENCE_CODEBASES.md)

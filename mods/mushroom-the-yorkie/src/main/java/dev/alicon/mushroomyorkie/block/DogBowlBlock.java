@@ -12,6 +12,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 public final class DogBowlBlock extends Block {
 	private static final VoxelShape SHAPE = Block.box(3.0D, 0.0D, 3.0D, 13.0D, 3.0D, 13.0D);
 
+	/** Creates the decorative low-profile bowl block using the shared registered block properties. */
 	public DogBowlBlock(BlockBehaviour.Properties properties) {
 		super(properties);
 	}

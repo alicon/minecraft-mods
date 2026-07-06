@@ -333,11 +333,11 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	void recordOwnerContact(ServerLevel level) {
 		this.lastOwnerContactGameTime = level.getGameTime();
 	}
-
+	/** Returns the game time of Mushroom's most recent trusted owner contact for lost-dog recovery. */
 	public long lastOwnerContactGameTime() {
 		return this.lastOwnerContactGameTime;
 	}
-
+	/** Resets transient lost or sleeping state after Mushroom returns to his owner. */
 	public void recoverWithOwner(ServerLevel level) {
 		this.stopRiding();
 		this.setMushroomOrderedToSit(false);
@@ -391,11 +391,11 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	void setFlightTrickTicks(int ticks) {
 		this.entityData.set(DATA_FLIGHT_TRICK_TICKS, ticks);
 	}
-
+	/** Returns the current client-rendered trick animation type for Mushroom's flight antics. */
 	public int getFlightTrickType() {
 		return this.entityData.get(DATA_FLIGHT_TRICK_TYPE);
 	}
-
+	/** Returns the remaining ticks for the active client-rendered flight trick animation. */
 	public int getFlightTrickTicks() {
 		return this.entityData.get(DATA_FLIGHT_TRICK_TICKS);
 	}
