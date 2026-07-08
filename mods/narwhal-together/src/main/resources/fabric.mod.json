@@ -8,9 +8,9 @@
 		"alicon"
 	],
 	"contact": {
-		"homepage": "https://github.com/alicon/narwhal-together",
-		"sources": "https://github.com/alicon/narwhal-together",
-		"issues": "https://github.com/alicon/narwhal-together/issues"
+		"homepage": "https://github.com/alicon/minecraft-mods",
+		"sources": "https://github.com/alicon/minecraft-mods",
+		"issues": "https://github.com/alicon/minecraft-mods/issues"
 	},
 	"license": "MIT",
 	"icon": "assets/narwhal_together/icon.png",

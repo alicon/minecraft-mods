@@ -119,6 +119,7 @@ tasks.register('validateFormatting') {
 
 	doLast {
 		def checkedExtensions = ['.gradle', '.java', '.json', '.md', '.properties', '.sh', '.yml', '.yaml']
+		def checkedFiles = ['.editorconfig', '.gitattributes', '.gitignore']
 		def ignoredDirs = ['.git', '.gradle', '.gradle-user-home', 'build']
 		def violations = []
 
@@ -131,7 +132,7 @@ tasks.register('validateFormatting') {
 			if (ignoredDirs.contains(firstPathPart) || relative.contains("${File.separator}build${File.separator}")) {
 				return
 			}
-			if (!checkedExtensions.any { relative.endsWith(it) }) {
+			if (!checkedExtensions.any { relative.endsWith(it) } && !checkedFiles.contains(relative)) {
 				return
 			}
 
