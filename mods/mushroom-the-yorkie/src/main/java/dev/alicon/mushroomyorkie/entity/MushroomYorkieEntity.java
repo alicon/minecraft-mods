@@ -73,6 +73,8 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	private static final int PEACEFUL_MOB_BARK_MUTED_TICKS = 6_000;
 	static final double CREATIVE_FLIGHT_FOLLOW_DISTANCE_SQ = 6.25D;
 	static final double CREATIVE_FLIGHT_SPEED = 0.22D;
+	private static final int CREATIVE_RECOVERY_HINT_TICKS = 4;
+	private static final int CREATIVE_RECOVERY_REQUEST_TICKS = 20 * 4;
 
 	PetNeeds needs = new PetNeeds();
 	final MushroomDomesticState domestic = new MushroomDomesticState();
@@ -86,6 +88,8 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	int scaredRunTicks;
 	int darkPanicTicks;
 	private long lastOwnerContactGameTime;
+	private int creativeRecoveryFlightBlockTicks;
+	private int creativeRecoveryFlightRequestTicks;
 
 	/**
 	 * Creates a Mushroom Yorkie entity instance.
@@ -206,6 +210,7 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		super.customServerAiStep(level);
 		this.preventWaterSitting();
 		MushroomFlightController.followFlyingOwner(this);
+		this.tickCreativeRecoveryFlightHints();
 		MushroomOwnerContactHandler.tick(this, level);
 		this.tickNightBehavior(level);
 		MushroomOwnerPromptHandler.tick(this, level);
@@ -430,6 +435,32 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 
 	boolean isWetForSitting() {
 		return this.isInWater() || this.level().getFluidState(this.blockPosition()).is(FluidTags.WATER);
+	}
+
+	void blockCreativeRecoveryFlight() {
+		this.creativeRecoveryFlightBlockTicks = CREATIVE_RECOVERY_HINT_TICKS;
+	}
+
+	boolean blocksCreativeRecoveryFlight() {
+		return this.creativeRecoveryFlightBlockTicks > 0;
+	}
+
+	void requestCreativeRecoveryFlight() {
+		this.creativeRecoveryFlightBlockTicks = 0;
+		this.creativeRecoveryFlightRequestTicks = CREATIVE_RECOVERY_REQUEST_TICKS;
+	}
+
+	boolean hasCreativeRecoveryFlightRequest() {
+		return this.creativeRecoveryFlightRequestTicks > 0;
+	}
+
+	private void tickCreativeRecoveryFlightHints() {
+		if (this.creativeRecoveryFlightBlockTicks > 0) {
+			this.creativeRecoveryFlightBlockTicks--;
+		}
+		if (this.creativeRecoveryFlightRequestTicks > 0) {
+			this.creativeRecoveryFlightRequestTicks--;
+		}
 	}
 
 	@Override

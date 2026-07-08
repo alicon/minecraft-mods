@@ -24,11 +24,11 @@ final class MushroomFlightController {
 
 		boolean flyingToOwner = shouldFlyToOwner(yorkie);
 		yorkie.setNoGravity(flyingToOwner);
-		updateFlightTrick(yorkie, flyingToOwner);
+		boolean ownerFlying = yorkie.ownerIsCreativeFlying();
+		updateFlightTrick(yorkie, flyingToOwner && ownerFlying);
 		if (!flyingToOwner) {
 			return;
 		}
-		boolean ownerFlying = yorkie.ownerIsCreativeFlying();
 		MushroomBehaviorDebugger.debug(
 				yorkie,
 				ownerFlying ? "creative_flight" : "creative_recovery_flight",
@@ -67,6 +67,9 @@ final class MushroomFlightController {
 		if (yorkie.ownerIsCreativeFlying()) {
 			return true;
 		}
+		if (yorkie.blocksCreativeRecoveryFlight()) {
+			return false;
+		}
 
 		LivingEntity owner = yorkie.getOwner();
 		if (owner == null || owner.level() != yorkie.level()) {
@@ -75,6 +78,9 @@ final class MushroomFlightController {
 
 		double distanceSqr = yorkie.distanceToSqr(owner);
 		if (yorkie.isUsingCreativeFlight()) {
+			return distanceSqr > MushroomYorkieEntity.CREATIVE_FLIGHT_FOLLOW_DISTANCE_SQ;
+		}
+		if (yorkie.hasCreativeRecoveryFlightRequest()) {
 			return distanceSqr > MushroomYorkieEntity.CREATIVE_FLIGHT_FOLLOW_DISTANCE_SQ;
 		}
 		if (yorkie.isWetForSitting()) {

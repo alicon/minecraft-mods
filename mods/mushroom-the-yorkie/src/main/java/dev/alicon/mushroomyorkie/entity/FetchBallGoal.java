@@ -20,6 +20,7 @@ final class FetchBallGoal extends Goal {
 	private static final int SEARCH_COOLDOWN_TICKS = 20;
 	private static final int RETURN_COOLDOWN_TICKS = 40;
 	private static final int MOVE_RETRY_TICKS = 22;
+	private static final int MAX_FETCH_CHASE_TICKS = 20 * 35;
 	private static final double SEARCH_RADIUS = 32.0D;
 	private static final double PICKUP_HORIZONTAL_DISTANCE_SQR = 3.24D;
 	private static final double PICKUP_VERTICAL_DISTANCE = 2.0D;
@@ -29,6 +30,7 @@ final class FetchBallGoal extends Goal {
 	private static final double RETURN_SPEED = 1.20D;
 	private static final int UNSAFE_FETCH_BARK_TICKS = 20 * 2;
 	private static final int UNREACHABLE_FETCH_TICKS = 20;
+	private static final int UNREACHABLE_RETURN_TICKS = 20;
 	private static final int WATER_SURFACE_SCAN_BLOCKS = 10;
 	private static final double MOVE_TARGET_REFRESH_DISTANCE_SQR = 4.0D;
 
@@ -36,10 +38,13 @@ final class FetchBallGoal extends Goal {
 	private ItemEntity toy;
 	private ItemStack carriedToy = ItemStack.EMPTY;
 	private UUID lastReturnedToy;
+	private UUID ignoredToy;
 	private long nextSearchGameTime;
 	private int nextMoveTick;
 	private int unsafeFetchBarkTicks;
 	private int unreachableTicks;
+	private int returnUnreachableTicks;
+	private int fetchChaseTicks;
 	private Vec3 lastMoveTarget;
 	private Vec3 unsafeFetchLookTarget;
 	private boolean carrying;
@@ -62,6 +67,9 @@ final class FetchBallGoal extends Goal {
 		this.nextSearchGameTime = level.getGameTime() + SEARCH_COOLDOWN_TICKS;
 
 		this.toy = this.findToy(level, owner);
+		if (this.toy != null) {
+			this.yorkie.blockCreativeRecoveryFlight();
+		}
 		return this.toy != null;
 	}
 
@@ -86,6 +94,9 @@ final class FetchBallGoal extends Goal {
 		this.carriedToy = ItemStack.EMPTY;
 		this.lastMoveTarget = null;
 		this.unreachableTicks = 0;
+		this.returnUnreachableTicks = 0;
+		this.fetchChaseTicks = 0;
+		this.yorkie.blockCreativeRecoveryFlight();
 		MushroomBehaviorDebugger.debug(this.yorkie, "fetch_start", "fetch: chasing a toy", true);
 	}
 
@@ -97,6 +108,8 @@ final class FetchBallGoal extends Goal {
 		this.completed = false;
 		this.lastMoveTarget = null;
 		this.unreachableTicks = 0;
+		this.returnUnreachableTicks = 0;
+		this.fetchChaseTicks = 0;
 	}
 
 	@Override
@@ -107,6 +120,7 @@ final class FetchBallGoal extends Goal {
 		}
 
 		if (this.unsafeFetchBarkTicks > 0) {
+			this.yorkie.blockCreativeRecoveryFlight();
 			this.tickUnsafeFetchBark();
 			return;
 		}
@@ -121,6 +135,13 @@ final class FetchBallGoal extends Goal {
 			return;
 		}
 
+		this.yorkie.blockCreativeRecoveryFlight();
+		this.fetchChaseTicks++;
+		if (this.fetchChaseTicks >= MAX_FETCH_CHASE_TICKS) {
+			this.abortTimedOutFetch(level, this.toy);
+			return;
+		}
+
 		if (!this.safeFetchPlacement(level, owner, this.toy)) {
 			this.abortUnsafeFetch(level, owner, this.toy);
 			return;
@@ -132,6 +153,7 @@ final class FetchBallGoal extends Goal {
 			this.toy = null;
 			this.carrying = true;
 			this.nextMoveTick = 0;
+			this.returnUnreachableTicks = 0;
 			this.yorkie.bark();
 			MushroomBehaviorDebugger.debug(this.yorkie, "fetch_pickup", "fetch: picked up the toy", true);
 			return;
@@ -156,7 +178,7 @@ final class FetchBallGoal extends Goal {
 		List<ItemEntity> toys = level.getEntities(
 				EntityTypeTest.forClass(ItemEntity.class),
 				area,
-				item -> MushroomFetchToyPolicy.isFetchToy(item.getItem()) && !this.isLastReturnedToy(item)
+				item -> MushroomFetchToyPolicy.isFetchToy(item.getItem()) && !this.isLastReturnedToy(item) && !this.isIgnoredToy(item)
 		);
 		return toys.stream()
 				.filter(item -> this.safeFetchPlacement(level, owner, item))
@@ -206,10 +228,19 @@ final class FetchBallGoal extends Goal {
 		return this.lastReturnedToy != null && this.lastReturnedToy.equals(item.getUUID());
 	}
 
+	private boolean isIgnoredToy(ItemEntity item) {
+		return this.ignoredToy != null && this.ignoredToy.equals(item.getUUID());
+	}
+
+	private void ignoreToy(ItemEntity item) {
+		this.ignoredToy = item.getUUID();
+	}
+
 	private void abortUnsafeFetch(ServerLevel level, Player owner, ItemEntity item) {
 		this.nextSearchGameTime = level.getGameTime() + RETURN_COOLDOWN_TICKS;
 		this.unsafeFetchBarkTicks = UNSAFE_FETCH_BARK_TICKS;
 		this.unsafeFetchLookTarget = item.position();
+		this.ignoreToy(item);
 		this.yorkie.getNavigation().stop();
 		if (!this.safeSurvivalDrop(owner, item)) {
 			MushroomBehaviorDebugger.debug(this.yorkie, "fetch_drop_unsafe", "fetch: toy is too far below for survival cliff safety", true);
@@ -224,9 +255,21 @@ final class FetchBallGoal extends Goal {
 		this.unsafeFetchBarkTicks = UNSAFE_FETCH_BARK_TICKS;
 		this.unsafeFetchLookTarget = item.position();
 		this.unreachableTicks = 0;
+		this.ignoreToy(item);
 		this.yorkie.getNavigation().stop();
 		MushroomOwnerNotice.send(this.yorkie, "message.mushroom_yorkie.notice_fetch_unreachable", MushroomOwnerNotice.SHORT_COOLDOWN_TICKS);
 		MushroomBehaviorDebugger.debug(this.yorkie, "fetch_unreachable", "fetch: toy is not reachable from this edge", true);
+	}
+
+	private void abortTimedOutFetch(ServerLevel level, ItemEntity item) {
+		this.nextSearchGameTime = level.getGameTime() + RETURN_COOLDOWN_TICKS;
+		this.unsafeFetchBarkTicks = UNSAFE_FETCH_BARK_TICKS;
+		this.unsafeFetchLookTarget = item.position();
+		this.unreachableTicks = 0;
+		this.ignoreToy(item);
+		this.yorkie.getNavigation().stop();
+		MushroomOwnerNotice.send(this.yorkie, "message.mushroom_yorkie.notice_fetch_unreachable", MushroomOwnerNotice.SHORT_COOLDOWN_TICKS);
+		MushroomBehaviorDebugger.debug(this.yorkie, "fetch_timeout", "fetch: gave up after chasing the toy too long", true);
 	}
 
 	private void tickUnsafeFetchBark() {
@@ -282,7 +325,28 @@ final class FetchBallGoal extends Goal {
 			return;
 		}
 
+		if (!this.yorkie.isUsingCreativeFlight() && !this.yorkie.hasCreativeRecoveryFlightRequest()) {
+			this.yorkie.blockCreativeRecoveryFlight();
+		}
 		this.moveToward(owner.position(), RETURN_SPEED);
+		if (this.returnLooksUnreachable(owner)) {
+			this.yorkie.requestCreativeRecoveryFlight();
+			MushroomBehaviorDebugger.debug(this.yorkie, "fetch_return_flight", "fetch: return path is stuck, using creative recovery flight", true);
+		}
+	}
+
+	private boolean returnLooksUnreachable(Player owner) {
+		if (this.yorkie.ownerIsCreativeFlying()
+				|| this.yorkie.isUsingCreativeFlight()
+				|| !this.yorkie.isWetForSitting()
+				|| this.yorkie.distanceToSqr(owner) <= RETURN_DISTANCE_SQR
+				|| !this.yorkie.getNavigation().isDone()) {
+			this.returnUnreachableTicks = 0;
+			return false;
+		}
+
+		this.returnUnreachableTicks++;
+		return this.returnUnreachableTicks >= UNREACHABLE_RETURN_TICKS;
 	}
 
 	private void returnToy(ServerLevel level, Player owner, ItemStack returnedStack) {
