@@ -30,7 +30,7 @@ help:
 		'' \
 		'Useful variables:' \
 		'  MOD=narwhal-together|mushroom-the-yorkie|cops-and-robbers' \
-		'  MC_VERSION=1.21.11' \
+		'  MC_VERSION=1.21.11|1.21.1' \
 		'  LIVE_TEST_MODS_DIR=/path/to/profile/mods' \
 		'  MODRINTH_LIVE_TEST_MODS_DIR=/path/to/profile/mods' \
 		'  MODRINTH_PROFILE="$(HOME)/Library/Application Support/ModrinthApp/profiles/Dad’s Minecraft"' \
@@ -49,7 +49,7 @@ test:
 	$(GRADLE) :$(MOD):test -Ptarget_minecraft_version=$(MC_VERSION) --no-daemon
 
 validate:
-	$(GRADLE) validateModLayout validateFormatting validateJavaFileSizes validateNoClientImportsInMain validatePublicApiDocs -Ptarget_minecraft_version=$(MC_VERSION) --no-daemon
+	$(GRADLE) validateModLayout validateFormatting validateJavaFileSizes validateNoClientImportsInMain validatePublicApiDocs validateReleaseNotes validateVersionedSourceLayout -Ptarget_minecraft_version=$(MC_VERSION) --no-daemon
 
 quick-validate:
 	$(GRADLE) validateFormatting validateJavaFileSizes validateNoClientImportsInMain -Ptarget_minecraft_version=$(MC_VERSION) --no-daemon

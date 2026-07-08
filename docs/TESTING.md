@@ -36,6 +36,8 @@ This runs:
 - root `validateJavaFileSizes`
 - root `validateNoClientImportsInMain`
 - root `validatePublicApiDocs`
+- root `validateReleaseNotes`
+- root `validateVersionedSourceLayout`
 - per-mod Javadoc generation
 - JVM unit tests for every mod subproject
 - normal Gradle/Fabric check tasks
