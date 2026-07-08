@@ -18,7 +18,7 @@ jobs:
           - minecraft-version: '1.21.11'
             gradle-tasks: build
           - minecraft-version: '1.21.1'
-            gradle-tasks: ':narwhal-together:build :mushroom-the-yorkie:build'
+            gradle-tasks: 'check :narwhal-together:build :mushroom-the-yorkie:build'
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
