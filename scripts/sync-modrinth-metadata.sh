@@ -30,8 +30,7 @@ require_file() {
 
 case "$mod" in
 	narwhal-together)
-		: "${MODRINTH_PROJECT_ID:?MODRINTH_PROJECT_ID is required for narwhal-together}"
-		project_id="$MODRINTH_PROJECT_ID"
+		project_id="${MODRINTH_PROJECT_ID:-narwhal-together}"
 		body_file="docs/MODRINTH.md"
 		icon_file="mods/narwhal-together/src/main/resources/assets/narwhal_together/icon.png"
 		title="NARwhal Together"

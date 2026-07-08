@@ -59,7 +59,7 @@ After the Modrinth project exists:
 1. Create a Modrinth personal access token with version publishing permission.
 2. In GitHub, open **Settings → Secrets and variables → Actions**.
 3. Add a repository secret named `MODRINTH_TOKEN`.
-4. Add a repository variable named `MODRINTH_PROJECT_ID` containing the NARwhal project ID or slug.
+4. Add a repository variable named `MODRINTH_PROJECT_ID` containing the NARwhal project ID or slug. If this is omitted, the workflows use the slug `narwhal-together`.
 5. Add a repository variable named `MUSHROOM_MODRINTH_PROJECT_ID` containing the Mushroom project ID or slug. If this is omitted, the workflows use the slug `mushroom-the-yorkie`.
 6. Add a repository variable named `COPS_ROBBERS_MODRINTH_PROJECT_ID` containing the Cops and Robbers project ID or slug. If this is omitted, the workflows use the slug `cops-and-robbers`.
 
