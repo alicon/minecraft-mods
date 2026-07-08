@@ -238,27 +238,27 @@ tasks.register('validatePublicApiDocs') {
 			def minecraftVersion = activeMinecraftVersionFor(modProject)
 			(['main', 'client'] as Set).each { environment ->
 				sourceRootsFor(modProject.projectDir, environment, minecraftVersion).each { sourceDir ->
-				if (!sourceDir.directory) {
-					return
-				}
-				sourceDir.eachFileRecurse { file ->
-					if (!file.file || !file.name.endsWith('.java')) {
+					if (!sourceDir.directory) {
 						return
 					}
-					def lines = file.readLines()
-					lines.eachWithIndex { line, index ->
-						if (!(line ==~ declaration)) {
+					sourceDir.eachFileRecurse { file ->
+						if (!file.file || !file.name.endsWith('.java')) {
 							return
 						}
-						if (hasPublicApiDoc(lines, index)) {
-							return
-						}
+						def lines = file.readLines()
+						lines.eachWithIndex { line, index ->
+							if (!(line ==~ declaration)) {
+								return
+							}
+							if (hasPublicApiDoc(lines, index)) {
+								return
+							}
 
-						def relative = rootProject.projectDir.toPath().relativize(file.toPath()).toString()
-						violations << "${relative}:${index + 1}: public declaration needs Javadoc or @Override"
+							def relative = rootProject.projectDir.toPath().relativize(file.toPath()).toString()
+							violations << "${relative}:${index + 1}: public declaration needs Javadoc or @Override"
+						}
 					}
 				}
-			}
 			}
 		}
 
