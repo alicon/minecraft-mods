@@ -19,7 +19,7 @@ final class MushroomNeedDecayHandler {
 				&& yorkie.needs.isStarving()
 				&& MushroomOwnerContactHandler.ownerIsCloseEnoughForNeglect(yorkie)
 				&& yorkie.tickCount % STARVING_DAMAGE_INTERVAL_TICKS == 0) {
-			yorkie.whine();
+			MushroomYorkieSounds.whine(yorkie);
 			MushroomOwnerNotice.send(yorkie, "message.mushroom_yorkie.notice_hungry_critical", STARVING_DAMAGE_INTERVAL_TICKS);
 			yorkie.hurtFromNeglect(level, 1.0F);
 			MushroomBehaviorDebugger.debug(yorkie, "starving", "needs: food bar is empty", true);

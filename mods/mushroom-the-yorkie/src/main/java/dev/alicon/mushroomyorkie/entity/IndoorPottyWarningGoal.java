@@ -25,7 +25,7 @@ final class IndoorPottyWarningGoal extends Goal {
 	@Override
 	public boolean canUse() {
 		return this.yorkie.level() instanceof ServerLevel level
-				&& this.yorkie.shouldAskToGoOutside(level)
+				&& MushroomNightBehavior.shouldAskToGoOutside(this.yorkie, level)
 				&& !MushroomBehaviorProfiles.keepsRoutineNeedsQuiet(this.yorkie, level);
 	}
 
@@ -57,7 +57,7 @@ final class IndoorPottyWarningGoal extends Goal {
 		}
 
 		if (this.yorkie.tickCount % MushroomYorkieEntity.BARK_INTERVAL_TICKS == 0) {
-			this.yorkie.bark();
+			MushroomYorkieSounds.bark(this.yorkie);
 		}
 		this.debugTarget();
 

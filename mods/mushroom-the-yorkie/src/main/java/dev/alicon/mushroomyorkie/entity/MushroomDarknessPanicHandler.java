@@ -21,7 +21,7 @@ final class MushroomDarknessPanicHandler {
 
 		yorkie.darkPanicTicks++;
 		if (yorkie.darkPanicTicks % BARK_INTERVAL_TICKS == 0) {
-			yorkie.bark();
+			MushroomYorkieSounds.bark(yorkie);
 		}
 
 		if (yorkie.darkPanicTicks % OWNER_MESSAGE_INTERVAL_TICKS == 0 && yorkie.getOwner() instanceof Player owner) {
@@ -35,7 +35,7 @@ final class MushroomDarknessPanicHandler {
 		if (!yorkie.isTame()
 				|| yorkie.isOrderedToSit()
 				|| yorkie.isMushroomSleeping()
-				|| yorkie.ownerIsCreativeFlying()
+				|| MushroomYorkieStateQueries.ownerIsCreativeFlying(yorkie)
 				|| !isDay(level)
 				|| level.canSeeSky(yorkie.blockPosition())
 				|| level.getRawBrightness(yorkie.blockPosition(), 0) > 0) {

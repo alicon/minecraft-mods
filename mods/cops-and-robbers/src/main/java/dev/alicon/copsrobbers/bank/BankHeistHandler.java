@@ -6,23 +6,17 @@ import dev.alicon.copsrobbers.entity.ModEntities;
 import dev.alicon.copsrobbers.entity.TellerEntity;
 import dev.alicon.copsrobbers.fire.FireResponseHandler;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /** Shared bank robbery behavior for robbers, tellers, and cops. */
 public final class BankHeistHandler {
-	private static final int BANK_RADIUS = 9;
 	private static final double TELLER_PANIC_RADIUS = 14.0D;
 	private static final double COP_CHASE_RADIUS = 32.0D;
 	private static final double HIDEOUT_SEARCH_RADIUS = 56.0D;
@@ -53,7 +47,7 @@ public final class BankHeistHandler {
 			return;
 		}
 
-		if (stealGoldFromVaultChest(level, robber.blockPosition())) {
+		if (BankVaults.stealGoldFromVaultChest(level, robber.blockPosition())) {
 			robber.stealGold();
 			alertPlayers(level, robber.blockPosition(), Component.literal("Bank alarm! A robber stole gold!"));
 			level.playSound(null, robber.blockPosition(), SoundEvents.BELL_BLOCK, SoundSource.HOSTILE, 1.0F, 1.7F);
@@ -114,34 +108,8 @@ public final class BankHeistHandler {
 		return nearest;
 	}
 
-	private static boolean stealGoldFromVaultChest(ServerLevel level, BlockPos center) {
-		for (BlockPos pos : BlockPos.betweenClosed(center.offset(-8, -2, -8), center.offset(8, 3, 8))) {
-			if (!level.getBlockState(pos).is(Blocks.CHEST) || !(level.getBlockEntity(pos) instanceof Container container)) {
-				continue;
-			}
-			for (int slot = 0; slot < container.getContainerSize(); slot++) {
-				ItemStack stack = container.getItem(slot);
-				if (!stack.isEmpty() && stack.is(Items.GOLD_INGOT)) {
-					stack.shrink(1);
-					container.setChanged();
-					return true;
-				}
-			}
-		}
-		return false;
-	}
-
-	private static boolean nearVaultChest(ServerLevel level, BlockPos center) {
-		for (BlockPos pos : BlockPos.betweenClosed(center.offset(-8, -2, -8), center.offset(8, 3, 8))) {
-			if (level.getBlockState(pos).is(Blocks.CHEST)) {
-				return true;
-			}
-		}
-		return false;
-	}
-
 	private static void moveToHideoutOrBurnBank(BankRobberEntity robber, ServerLevel level) {
-		BlockPos hideout = nearestHideout(level, robber.blockPosition(), HIDEOUT_SEARCH_RADIUS);
+		BlockPos hideout = BankHideoutLocator.nearestHideout(level, robber.blockPosition(), HIDEOUT_SEARCH_RADIUS);
 		if (hideout != null) {
 			if (robber.distanceToSqr(hideout.getCenter()) <= HIDEOUT_SETTLE_RADIUS * HIDEOUT_SETTLE_RADIUS) {
 				robber.chillAtHideout(level);
@@ -150,14 +118,14 @@ public final class BankHeistHandler {
 			}
 			robber.getNavigation().moveTo(hideout.getX() + 0.5D, hideout.getY(), hideout.getZ() + 0.5D, 1.05D);
 		}
-		if (!nearVaultChest(level, robber.blockPosition()) && !robber.hasLitBankFire()) {
+		if (!BankVaults.nearVaultChest(level, robber.blockPosition()) && !robber.hasLitBankFire()) {
 			robber.markBankFireLit();
-			lightBankFire(level, robber.blockPosition());
+			BankHeistFires.lightBankFire(level, robber.blockPosition());
 		}
 	}
 
 	private static void moveTowardHideout(BankRobberEntity robber, ServerLevel level, double speed) {
-		BlockPos hideout = nearestHideout(level, robber.blockPosition(), HIDEOUT_SEARCH_RADIUS);
+		BlockPos hideout = BankHideoutLocator.nearestHideout(level, robber.blockPosition(), HIDEOUT_SEARCH_RADIUS);
 		if (hideout == null) {
 			return;
 		}
@@ -168,62 +136,6 @@ public final class BankHeistHandler {
 		robber.getNavigation().moveTo(hideout.getX() + 0.5D, hideout.getY(), hideout.getZ() + 0.5D, speed);
 	}
 
-	private static BlockPos nearestHideout(ServerLevel level, BlockPos center, double radius) {
-		BlockPos nearest = null;
-		double nearestDistance = Double.MAX_VALUE;
-		int range = (int) radius;
-		for (BlockPos pos : BlockPos.betweenClosed(center.offset(-range, -3, -range), center.offset(range, 5, range))) {
-			if (!level.getBlockState(pos).is(Blocks.CHEST) || !isHideoutChest(level, pos)) {
-				continue;
-			}
-			BlockPos walkable = walkableHideoutSpot(level, pos);
-			if (walkable == null) {
-				continue;
-			}
-			double distance = walkable.distSqr(center);
-			if (distance < nearestDistance) {
-				nearest = walkable.immutable();
-				nearestDistance = distance;
-			}
-		}
-		return nearest;
-	}
-
-	private static boolean isHideoutChest(ServerLevel level, BlockPos chest) {
-		int mossyBlocks = 0;
-		for (BlockPos pos : BlockPos.betweenClosed(chest.offset(-5, -1, -5), chest.offset(5, 3, 5))) {
-			Block block = level.getBlockState(pos).getBlock();
-			if (block == Blocks.COBWEB) {
-				return true;
-			}
-			if (block == Blocks.MOSSY_COBBLESTONE) {
-				mossyBlocks++;
-			}
-		}
-		return mossyBlocks >= 4;
-	}
-
-	private static BlockPos walkableHideoutSpot(ServerLevel level, BlockPos chest) {
-		for (Direction direction : Direction.Plane.HORIZONTAL) {
-			BlockPos pos = chest.relative(direction);
-			if (isWalkableInterior(level, pos)) {
-				return pos.immutable();
-			}
-		}
-		for (BlockPos pos : BlockPos.betweenClosed(chest.offset(-2, 0, -2), chest.offset(2, 0, 2))) {
-			if (isWalkableInterior(level, pos)) {
-				return pos.immutable();
-			}
-		}
-		return null;
-	}
-
-	private static boolean isWalkableInterior(ServerLevel level, BlockPos pos) {
-		return level.isEmptyBlock(pos)
-				&& level.isEmptyBlock(pos.above())
-				&& !level.getBlockState(pos.below()).isAir();
-	}
-
 	private static boolean isBankRobberyTime(ServerLevel level) {
 		long dayTime = level.getDayTime() % 24000L;
 		return dayTime >= 1000L && dayTime <= 12000L;
@@ -232,21 +144,6 @@ public final class BankHeistHandler {
 	private static boolean isNight(ServerLevel level) {
 		long dayTime = level.getDayTime() % 24000L;
 		return dayTime >= 13000L && dayTime <= 23000L;
-	}
-
-
-	private static void lightBankFire(ServerLevel level, BlockPos center) {
-		for (BlockPos pos : BlockPos.betweenClosed(center.offset(-BANK_RADIUS, -1, -BANK_RADIUS), center.offset(BANK_RADIUS, 4, BANK_RADIUS))) {
-			Block block = level.getBlockState(pos).getBlock();
-				if (block == Blocks.OAK_PLANKS || block == Blocks.OAK_LOG || block == Blocks.WHITE_WOOL || block == Blocks.RED_CARPET) {
-				BlockPos fire = pos.above();
-				if (level.isEmptyBlock(fire) && Blocks.FIRE.defaultBlockState().canSurvive(level, fire)) {
-					level.setBlock(fire, Blocks.FIRE.defaultBlockState(), 3);
-					level.playSound(null, fire, SoundEvents.FLINTANDSTEEL_USE, SoundSource.HOSTILE, 0.8F, 0.8F);
-					return;
-				}
-			}
-		}
 	}
 
 	private static BlockPos nearestPoliceStation(ServerLevel level, BlockPos center) {

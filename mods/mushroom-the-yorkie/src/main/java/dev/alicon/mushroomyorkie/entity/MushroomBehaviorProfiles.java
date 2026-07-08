@@ -15,14 +15,8 @@ import net.minecraft.world.level.Level;
 
 /** Central behavior-profile switchboard for Mushroom's survival and creative moods. */
 public final class MushroomBehaviorProfiles {
-	private static final int BUILD_WINDOW_TICKS = 20 * 10;
-	private static final int BUILD_ACTIONS_TO_FOCUS = 3;
-	private static final int BUILD_FOCUS_TICKS = 20 * 90;
-	private static final int NAP_AFTER_QUIET_TICKS = 20 * 35;
-	private static final int CHECK_IN_AFTER_QUIET_TICKS = 20 * 9;
-	private static final int CHECK_IN_COOLDOWN_TICKS = 20 * 240;
 	private static final int CRITICAL_NEED_THRESHOLD = 95;
-	private static final Map<UUID, BuildActivity> BUILDERS = new HashMap<>();
+	private static final Map<UUID, CreativeBuildActivity> BUILDERS = new HashMap<>();
 	private static boolean registered;
 
 	private MushroomBehaviorProfiles() {
@@ -58,26 +52,18 @@ public final class MushroomBehaviorProfiles {
 	}
 
 	static boolean shouldNapDuringCreativeBuild(MushroomYorkieEntity yorkie, ServerLevel level) {
-		BuildActivity activity = activityFor(yorkie, level);
-		return activity != null && level.getGameTime() - activity.lastBuildAction >= NAP_AFTER_QUIET_TICKS;
+		CreativeBuildActivity activity = activityFor(yorkie, level);
+		return activity != null && activity.shouldNap(level.getGameTime());
 	}
 
 	static boolean buildActionJustHappened(MushroomYorkieEntity yorkie, ServerLevel level) {
-		BuildActivity activity = activityFor(yorkie, level);
-		return activity != null && level.getGameTime() - activity.lastBuildAction <= 20;
+		CreativeBuildActivity activity = activityFor(yorkie, level);
+		return activity != null && activity.actionJustHappened(level.getGameTime());
 	}
 
 	static boolean shouldStartCreativeCheckIn(MushroomYorkieEntity yorkie, ServerLevel level) {
-		BuildActivity activity = activityFor(yorkie, level);
-		if (activity == null || level.getGameTime() - activity.lastBuildAction < CHECK_IN_AFTER_QUIET_TICKS) {
-			return false;
-		}
-		if (level.getGameTime() < activity.nextCheckInGameTime || yorkie.getRandom().nextInt(80) != 0) {
-			return false;
-		}
-
-		activity.nextCheckInGameTime = level.getGameTime() + CHECK_IN_COOLDOWN_TICKS;
-		return true;
+		CreativeBuildActivity activity = activityFor(yorkie, level);
+		return activity != null && activity.shouldStartCheckIn(level.getGameTime(), () -> yorkie.getRandom().nextInt(80));
 	}
 
 	static boolean ownerHasDirectAttentionItem(LivingEntity owner) {
@@ -92,20 +78,20 @@ public final class MushroomBehaviorProfiles {
 		if (!(yorkie.getOwner() instanceof Player owner) || ownerHasDirectAttentionItem(owner)) {
 			return false;
 		}
-		BuildActivity activity = activityFor(owner, level);
-		return activity != null && level.getGameTime() < activity.focusUntilGameTime;
+		CreativeBuildActivity activity = activityFor(owner, level);
+		return activity != null && activity.isFocused(level.getGameTime());
 	}
 
-	private static BuildActivity activityFor(MushroomYorkieEntity yorkie, ServerLevel level) {
+	private static CreativeBuildActivity activityFor(MushroomYorkieEntity yorkie, ServerLevel level) {
 		if (!(yorkie.getOwner() instanceof Player owner) || ownerHasDirectAttentionItem(owner)) {
 			return null;
 		}
 		return activityFor(owner, level);
 	}
 
-	private static BuildActivity activityFor(Player owner, ServerLevel level) {
-		BuildActivity activity = BUILDERS.get(owner.getUUID());
-		if (activity != null && level.getGameTime() - activity.lastBuildAction > BUILD_FOCUS_TICKS * 2L) {
+	private static CreativeBuildActivity activityFor(Player owner, ServerLevel level) {
+		CreativeBuildActivity activity = BUILDERS.get(owner.getUUID());
+		if (activity != null && activity.isStale(level.getGameTime())) {
 			BUILDERS.remove(owner.getUUID());
 			return null;
 		}
@@ -118,7 +104,7 @@ public final class MushroomBehaviorProfiles {
 		}
 
 		long now = serverLevel.getGameTime();
-		BuildActivity activity = BUILDERS.computeIfAbsent(player.getUUID(), ignored -> new BuildActivity(now));
+		CreativeBuildActivity activity = BUILDERS.computeIfAbsent(player.getUUID(), ignored -> new CreativeBuildActivity(now));
 		activity.record(now);
 	}
 
@@ -129,30 +115,5 @@ public final class MushroomBehaviorProfiles {
 	private enum Profile {
 		SURVIVAL,
 		CREATIVE
-	}
-
-	private static final class BuildActivity {
-		private long windowStartGameTime;
-		private int buildActionsInWindow;
-		private long lastBuildAction;
-		private long focusUntilGameTime;
-		private long nextCheckInGameTime;
-
-		private BuildActivity(long now) {
-			this.windowStartGameTime = now;
-			this.lastBuildAction = now;
-		}
-
-		private void record(long now) {
-			if (now - this.windowStartGameTime > BUILD_WINDOW_TICKS) {
-				this.windowStartGameTime = now;
-				this.buildActionsInWindow = 0;
-			}
-			this.buildActionsInWindow++;
-			this.lastBuildAction = now;
-			if (this.buildActionsInWindow >= BUILD_ACTIONS_TO_FOCUS || now < this.focusUntilGameTime) {
-				this.focusUntilGameTime = now + BUILD_FOCUS_TICKS;
-			}
-		}
 	}
 }

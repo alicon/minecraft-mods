@@ -1,5 +1,10 @@
 package dev.alicon.copsrobbers.item;
 
+import static dev.alicon.copsrobbers.item.KitStructurePlacement.fill;
+import static dev.alicon.copsrobbers.item.KitStructurePlacement.placeOakDoor;
+import static dev.alicon.copsrobbers.item.KitStructurePlacement.placeWallSign;
+import static dev.alicon.copsrobbers.item.KitStructurePlacement.set;
+
 import dev.alicon.copsrobbers.entity.ModEntities;
 import dev.alicon.copsrobbers.entity.TellerEntity;
 import net.minecraft.core.BlockPos;
@@ -13,17 +18,10 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
-import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.LanternBlock;
-import net.minecraft.world.level.block.WallSignBlock;
-import net.minecraft.world.level.block.entity.SignBlockEntity;
-import net.minecraft.world.level.block.entity.SignText;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
-import net.minecraft.network.chat.Component;
 
 /** Places a burnable bank with a teller counter and gold vault. */
 public final class BankKitItem extends Item {
@@ -64,7 +62,7 @@ public final class BankKitItem extends Item {
 		fill(level, origin, front, right, -1, 1, -4, -1, 2, -4, Blocks.GLASS);
 		fill(level, origin, front, right, 1, 1, -4, 1, 2, -4, Blocks.GLASS);
 		set(level, origin, front, right, 0, 0, -5, Blocks.OAK_PLANKS.defaultBlockState());
-		placeDoor(level, origin, front, right, 0, 1, -4, front);
+		placeOakDoor(level, origin, front, right, 0, 1, -4, front);
 		set(level, origin, front, right, 0, 1, -5, Blocks.OAK_PRESSURE_PLATE.defaultBlockState());
 		fill(level, origin, front, right, -5, 2, -4, -3, 2, -4, Blocks.GLASS_PANE);
 		fill(level, origin, front, right, 3, 2, -4, 5, 2, -4, Blocks.GLASS_PANE);
@@ -90,7 +88,7 @@ public final class BankKitItem extends Item {
 		set(level, origin, front, right, -1, 5, -4, Blocks.GOLD_BLOCK.defaultBlockState());
 		set(level, origin, front, right, 0, 5, -4, Blocks.WHITE_WOOL.defaultBlockState());
 		set(level, origin, front, right, 1, 5, -4, Blocks.GOLD_BLOCK.defaultBlockState());
-		placeSign(level, origin, front, right, 0, 4, -5, front.getOpposite(), "Village", "Bank");
+		placeWallSign(level, origin, front, right, 0, 4, -5, front.getOpposite(), "Village", "Bank");
 
 		// Warm old-school lantern lighting.
 		BlockState lantern = Blocks.LANTERN.defaultBlockState().setValue(LanternBlock.HANGING, true);
@@ -147,41 +145,4 @@ public final class BankKitItem extends Item {
 		}
 	}
 
-	private static void fill(Level level, BlockPos origin, Direction front, Direction right, int minX, int minY, int minZ, int maxX, int maxY, int maxZ, Block block) {
-		BlockState state = block.defaultBlockState();
-		for (int x = minX; x <= maxX; x++) {
-			for (int y = minY; y <= maxY; y++) {
-				for (int z = minZ; z <= maxZ; z++) {
-					set(level, origin, front, right, x, y, z, state);
-				}
-			}
-		}
-	}
-
-	private static void placeDoor(Level level, BlockPos origin, Direction front, Direction right, int x, int y, int z, Direction facing) {
-		BlockState lower = Blocks.OAK_DOOR.defaultBlockState()
-				.setValue(DoorBlock.FACING, facing)
-				.setValue(DoorBlock.HALF, DoubleBlockHalf.LOWER)
-				.setValue(DoorBlock.OPEN, false);
-		BlockState upper = lower.setValue(DoorBlock.HALF, DoubleBlockHalf.UPPER);
-		set(level, origin, front, right, x, y, z, lower);
-		set(level, origin, front, right, x, y + 1, z, upper);
-	}
-
-	private static void placeSign(Level level, BlockPos origin, Direction front, Direction right, int x, int y, int z, Direction facing, String line0, String line1) {
-		BlockState state = Blocks.OAK_WALL_SIGN.defaultBlockState().setValue(WallSignBlock.FACING, facing);
-		BlockPos pos = origin.relative(right, x).relative(front, z).above(y);
-		level.setBlock(pos, state, 3);
-		if (level.getBlockEntity(pos) instanceof SignBlockEntity sign) {
-			SignText text = sign.getFrontText()
-					.setMessage(0, Component.literal(line0))
-					.setMessage(1, Component.literal(line1));
-			sign.setText(text, true);
-		}
-	}
-
-	private static void set(Level level, BlockPos origin, Direction front, Direction right, int x, int y, int z, BlockState state) {
-		BlockPos pos = origin.relative(right, x).relative(front, z).above(y);
-		level.setBlock(pos, state, 3);
-	}
 }

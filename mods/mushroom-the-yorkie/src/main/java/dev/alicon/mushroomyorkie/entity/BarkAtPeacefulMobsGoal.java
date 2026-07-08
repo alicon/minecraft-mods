@@ -92,7 +92,7 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 		this.yorkie.getNavigation().moveTo(this.target, 1.15D);
 		MushroomBehaviorDebugger.debug(this.yorkie, "peaceful_mob_bark", "peaceful mob: barking at " + this.targetName(), false);
 		if (this.yorkie.tickCount % MushroomYorkieEntity.BARK_INTERVAL_TICKS == 0) {
-			this.yorkie.bark();
+			MushroomYorkieSounds.bark(this.yorkie);
 		}
 	}
 
@@ -108,8 +108,8 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 		return this.yorkie.isTame()
 				&& !this.yorkie.isOrderedToSit()
 				&& !this.yorkie.isMushroomSleeping()
-				&& !this.yorkie.isUsingCreativeFlight()
-				&& !this.yorkie.shouldAskToGoOutside(level)
+				&& !this.yorkie.isNoGravity()
+				&& !MushroomNightBehavior.shouldAskToGoOutside(this.yorkie, level)
 				&& !MushroomBehaviorProfiles.keepsCreativeBuilderFocus(this.yorkie, level)
 				&& !this.yorkie.peacefulMobBarkingMuted(level)
 				&& this.yorkie.getOwner() != null;

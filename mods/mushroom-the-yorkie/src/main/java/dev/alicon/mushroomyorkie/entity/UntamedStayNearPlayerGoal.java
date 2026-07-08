@@ -22,14 +22,14 @@ final class UntamedStayNearPlayerGoal extends Goal {
 			return false;
 		}
 
-		this.player = this.yorkie.playerToStayNear(level);
+		this.player = this.yorkie.trust.playerToStayNear(this.yorkie, level);
 		if (this.player == null) {
 			return false;
 		}
 
 		double distance = this.yorkie.distanceToSqr(this.player);
 		return this.yorkie.scaredRunTicks > 0
-				|| this.yorkie.wasScoldedToday(level)
+				|| this.yorkie.trust.wasScoldedToday(level)
 				|| distance > MushroomYorkieEntity.UNTAMED_PLAYER_RETURN_RADIUS * MushroomYorkieEntity.UNTAMED_PLAYER_RETURN_RADIUS
 				|| distance < MushroomYorkieEntity.UNTAMED_PLAYER_TOO_CLOSE_RADIUS * MushroomYorkieEntity.UNTAMED_PLAYER_TOO_CLOSE_RADIUS;
 	}
@@ -63,13 +63,13 @@ final class UntamedStayNearPlayerGoal extends Goal {
 		}
 
 		Vec3 target = this.nextTarget(level);
-		this.yorkie.getNavigation().moveTo(target.x, target.y, target.z, this.yorkie.wasScoldedToday(level) ? 1.35D : 0.95D);
-		this.nextMoveTick = this.yorkie.wasScoldedToday(level) ? 16 : 45;
+		this.yorkie.getNavigation().moveTo(target.x, target.y, target.z, this.yorkie.trust.wasScoldedToday(level) ? 1.35D : 0.95D);
+		this.nextMoveTick = this.yorkie.trust.wasScoldedToday(level) ? 16 : 45;
 	}
 
 	private Vec3 nextTarget(ServerLevel level) {
 		Vec3 fromPlayer = this.yorkie.position().subtract(this.player.position());
-		if (this.yorkie.wasScoldedToday(level)) {
+		if (this.yorkie.trust.wasScoldedToday(level)) {
 			return this.player.position().add(MushroomMovementPolicy.normalizedHorizontal(fromPlayer).scale(MushroomYorkieEntity.UNTAMED_PLAYER_STICK_RADIUS));
 		}
 
@@ -84,7 +84,7 @@ final class UntamedStayNearPlayerGoal extends Goal {
 	}
 
 	private String debugState(ServerLevel level) {
-		if (this.yorkie.scaredRunTicks > 0 || this.yorkie.wasScoldedToday(level)) {
+		if (this.yorkie.scaredRunTicks > 0 || this.yorkie.trust.wasScoldedToday(level)) {
 			return "untamed_scared";
 		}
 
@@ -94,7 +94,7 @@ final class UntamedStayNearPlayerGoal extends Goal {
 	}
 
 	private String debugDetail(ServerLevel level) {
-		if (this.yorkie.scaredRunTicks > 0 || this.yorkie.wasScoldedToday(level)) {
+		if (this.yorkie.scaredRunTicks > 0 || this.yorkie.trust.wasScoldedToday(level)) {
 			return "untamed: keeping extra distance after being scared";
 		}
 

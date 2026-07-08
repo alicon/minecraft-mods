@@ -1,9 +1,9 @@
 package dev.alicon.mushroomyorkie;
 
-import dev.alicon.mushroomyorkie.entity.ModEntities;
 import dev.alicon.mushroomyorkie.entity.MushroomLostRecoveryPolicy;
 import dev.alicon.mushroomyorkie.entity.MushroomYorkieEntity;
 import dev.alicon.mushroomyorkie.spawn.YorkieSpawnPolicy;
+import java.util.List;
 import net.fabricmc.fabric.api.entity.event.v1.EntitySleepEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -11,12 +11,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Relative;
 import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.phys.AABB;
-import java.util.List;
-import java.util.Set;
 
 final class MushroomWakeUpSpawner {
 	private static final String RECEIVED_TAG = "mushroom_yorkie.received";
@@ -74,16 +71,7 @@ final class MushroomWakeUpSpawner {
 
 				BlockPos spawnPos = spawnPos(wakeLevel, bedPos);
 				yorkie.recoverWithOwner(wakeLevel);
-				yorkie.teleportTo(
-						wakeLevel,
-						spawnPos.getX() + 0.5D,
-						spawnPos.getY(),
-						spawnPos.getZ() + 0.5D,
-						Set.<Relative>of(),
-						player.getYRot(),
-						0.0F,
-						false
-				);
+				MushroomWakeUpPlatform.teleportRecovered(yorkie, wakeLevel, player, spawnPos);
 				player.displayClientMessage(Component.translatable("message.mushroom_yorkie.lost_recovered"), true);
 				return true;
 			}
@@ -109,13 +97,13 @@ final class MushroomWakeUpSpawner {
 	}
 
 	private static void spawnYorkie(ServerLevel level, ServerPlayer player, BlockPos bedPos) {
-		MushroomYorkieEntity yorkie = ModEntities.MUSHROOM_YORKIE.create(level, net.minecraft.world.entity.EntitySpawnReason.TRIGGERED);
+		MushroomYorkieEntity yorkie = MushroomWakeUpPlatform.createYorkie(level);
 		if (yorkie == null) {
 			return;
 		}
 
 		BlockPos spawnPos = spawnPos(level, bedPos);
-		yorkie.snapTo(spawnPos.getX() + 0.5D, spawnPos.getY(), spawnPos.getZ() + 0.5D, player.getYRot(), 0.0F);
+		MushroomWakeUpPlatform.placeNewYorkie(yorkie, spawnPos, player);
 		yorkie.claimFor(player);
 		yorkie.setCustomName(Component.literal("Mushroom"));
 		yorkie.setPersistenceRequired();

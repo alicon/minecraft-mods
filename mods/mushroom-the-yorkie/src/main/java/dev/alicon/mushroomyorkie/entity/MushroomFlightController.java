@@ -13,7 +13,7 @@ final class MushroomFlightController {
 
 	static void followFlyingOwner(MushroomYorkieEntity yorkie) {
 		if (yorkie.isPassenger()) {
-			if (yorkie.ownerIsCreativeFlying()) {
+			if (MushroomYorkieStateQueries.ownerIsCreativeFlying(yorkie)) {
 				yorkie.stopRiding();
 				MushroomBehaviorDebugger.debug(yorkie, "vehicle_dismount", "vehicle: hopped out before creative flight", true);
 			}
@@ -24,7 +24,7 @@ final class MushroomFlightController {
 
 		boolean flyingToOwner = shouldFlyToOwner(yorkie);
 		yorkie.setNoGravity(flyingToOwner);
-		boolean ownerFlying = yorkie.ownerIsCreativeFlying();
+		boolean ownerFlying = MushroomYorkieStateQueries.ownerIsCreativeFlying(yorkie);
 		updateFlightTrick(yorkie, flyingToOwner && ownerFlying);
 		if (!flyingToOwner) {
 			return;
@@ -61,13 +61,13 @@ final class MushroomFlightController {
 	}
 
 	private static boolean shouldFlyToOwner(MushroomYorkieEntity yorkie) {
-		if (yorkie.isOrderedToSit() || !yorkie.ownerIsCreative()) {
+		if (yorkie.isOrderedToSit() || !MushroomYorkieStateQueries.ownerIsCreative(yorkie)) {
 			return false;
 		}
-		if (yorkie.ownerIsCreativeFlying()) {
+		if (MushroomYorkieStateQueries.ownerIsCreativeFlying(yorkie)) {
 			return true;
 		}
-		if (yorkie.blocksCreativeRecoveryFlight()) {
+		if (yorkie.creativeRecoveryFlight.blocks()) {
 			return false;
 		}
 
@@ -77,13 +77,13 @@ final class MushroomFlightController {
 		}
 
 		double distanceSqr = yorkie.distanceToSqr(owner);
-		if (yorkie.isUsingCreativeFlight()) {
+		if (yorkie.isNoGravity()) {
 			return distanceSqr > MushroomYorkieEntity.CREATIVE_FLIGHT_FOLLOW_DISTANCE_SQ;
 		}
-		if (yorkie.hasCreativeRecoveryFlightRequest()) {
+		if (yorkie.creativeRecoveryFlight.hasRequest()) {
 			return distanceSqr > MushroomYorkieEntity.CREATIVE_FLIGHT_FOLLOW_DISTANCE_SQ;
 		}
-		if (yorkie.isWetForSitting()) {
+		if (MushroomYorkieStateQueries.isWetForSitting(yorkie)) {
 			return distanceSqr > CREATIVE_WATER_RECOVERY_DISTANCE_SQ;
 		}
 		return distanceSqr > CREATIVE_RECOVERY_FLIGHT_DISTANCE_SQ && yorkie.getNavigation().isDone();

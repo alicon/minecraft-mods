@@ -114,11 +114,11 @@ dependencies {
 }
 
 processResources {
-	inputs.property "version", project.version
+	inputs.property "version", modVersion
 	inputs.property "minecraft_dependency", "~${activeMinecraftVersion}"
 
 	filesMatching("fabric.mod.json") {
-		expand "version": project.version, "minecraft_dependency": "~${activeMinecraftVersion}"
+		expand "version": modVersion, "minecraft_dependency": "~${activeMinecraftVersion}"
 	}
 }
 

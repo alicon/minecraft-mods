@@ -26,8 +26,8 @@ final class DaytimeBumShuffleGoal extends Goal {
 		return this.yorkie.isTame()
 				&& !this.yorkie.isOrderedToSit()
 				&& !this.yorkie.isMushroomSleeping()
-				&& !this.yorkie.ownerIsCreativeFlying()
-				&& !this.yorkie.shouldAskToGoOutside(level)
+				&& !MushroomYorkieStateQueries.ownerIsCreativeFlying(this.yorkie)
+				&& !MushroomNightBehavior.shouldAskToGoOutside(this.yorkie, level)
 				&& this.yorkie.onGround()
 				&& isDay(level)
 				&& this.yorkie.getRandom().nextInt(CHANCE_PER_TICK) == 0;
@@ -39,7 +39,7 @@ final class DaytimeBumShuffleGoal extends Goal {
 				&& this.yorkie.level() instanceof ServerLevel level
 				&& !this.yorkie.isOrderedToSit()
 				&& !this.yorkie.isMushroomSleeping()
-				&& !this.yorkie.shouldAskToGoOutside(level);
+				&& !MushroomNightBehavior.shouldAskToGoOutside(this.yorkie, level);
 	}
 
 	@Override

@@ -36,7 +36,8 @@ final class MushroomShelterDetector {
 	private static boolean hasBarrier(ServerLevel level, BlockPos origin, Direction direction) {
 		for (int distance = 1; distance <= WALL_SCAN_DISTANCE; distance++) {
 			for (int y = 0; y < WALL_SCAN_HEIGHT; y++) {
-				if (isShelterBlock(level.getBlockState(origin.relative(direction, distance).above(y)))) {
+				BlockPos sample = origin.relative(direction, distance).above(y);
+				if (isShelterBlock(level, sample, direction.getOpposite())) {
 					return true;
 				}
 			}
@@ -49,7 +50,8 @@ final class MushroomShelterDetector {
 		for (Direction direction : HORIZONTAL_DIRECTIONS) {
 			for (int distance = 1; distance <= WALL_SCAN_DISTANCE; distance++) {
 				for (int y = 0; y < WALL_SCAN_HEIGHT; y++) {
-					if (isShelterBlock(level.getBlockState(origin.relative(direction, distance).above(y)))) {
+					BlockPos sample = origin.relative(direction, distance).above(y);
+					if (isShelterBlock(level, sample, direction.getOpposite())) {
 						samples++;
 					}
 				}
@@ -67,7 +69,8 @@ final class MushroomShelterDetector {
 		return count;
 	}
 
-	private static boolean isShelterBlock(BlockState state) {
-		return !state.isAir() && !state.is(BlockTags.LEAVES) && state.blocksMotion();
+	private static boolean isShelterBlock(ServerLevel level, BlockPos pos, Direction faceTowardOrigin) {
+		BlockState state = level.getBlockState(pos);
+		return !state.isAir() && !state.is(BlockTags.LEAVES) && state.isFaceSturdy(level, pos, faceTowardOrigin);
 	}
 }

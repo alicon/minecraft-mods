@@ -1,11 +1,8 @@
 package dev.alicon.mushroomyorkie.entity;
 
-import dev.alicon.mushroomyorkie.block.ModBlocks;
 import java.util.EnumSet;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.player.Player;
@@ -39,22 +36,15 @@ final class DomesticCareGoal extends Goal {
 		}
 		this.nextSearchGameTime = level.getGameTime() + SEARCH_COOLDOWN_TICKS;
 
-		long day = MushroomYorkieEntity.currentDay(level);
-		if (this.yorkie.domestic.canEatFoodBowl(day, this.yorkie.needs.hunger())) {
-			BlockPos foodBowl = MushroomDomesticLocator.findNearestFoodBowl(level, this.yorkie.blockPosition());
-			if (foodBowl != null) {
-				this.targetPos = foodBowl;
-				this.targetUse = BowlUse.FOOD;
-				return true;
-			}
-		}
-
-		if (this.yorkie.domestic.canDrinkWaterBowl(day)) {
-			BlockPos waterBowl = MushroomDomesticLocator.findNearestWaterBowl(level, this.yorkie.blockPosition());
-			if (waterBowl != null) {
-				this.targetPos = waterBowl;
-				this.targetUse = BowlUse.WATER;
-				return true;
+		long day = MushroomNightBehavior.currentDay(level);
+		for (BowlUse use : BowlUse.values()) {
+			if (use.isNeededBy(this.yorkie, day)) {
+				BlockPos bowl = use.findNearest(level, this.yorkie.blockPosition());
+				if (bowl != null) {
+					this.targetPos = bowl;
+					this.targetUse = use;
+					return true;
+				}
 			}
 		}
 
@@ -80,7 +70,7 @@ final class DomesticCareGoal extends Goal {
 	public void start() {
 		this.nextMoveTick = 0;
 		this.completed = false;
-		MushroomBehaviorDebugger.debug(this.yorkie, "domestic_bowl_start", "domestic care: heading to " + this.targetUse.debugName, true);
+		MushroomBehaviorDebugger.debug(this.yorkie, "domestic_bowl_start", "domestic care: heading to " + this.targetUse.debugName(), true);
 	}
 
 	@Override
@@ -100,7 +90,7 @@ final class DomesticCareGoal extends Goal {
 		Vec3 target = Vec3.atBottomCenterOf(this.targetPos);
 		this.yorkie.getLookControl().setLookAt(target.x, target.y, target.z);
 		if (this.yorkie.distanceToSqr(target) <= USE_DISTANCE_SQR) {
-			this.consumeBowl(level);
+			this.targetUse.consume(level, this.yorkie, this.targetPos);
 			this.completed = true;
 			return;
 		}
@@ -122,41 +112,6 @@ final class DomesticCareGoal extends Goal {
 				&& !this.yorkie.isMushroomSleeping()
 				&& this.yorkie.scaredRunTicks <= 0
 				&& !MushroomBehaviorProfiles.keepsRoutineNeedsQuiet(this.yorkie, level)
-				&& !this.yorkie.wasScoldedToday(level);
-	}
-
-	private void consumeBowl(ServerLevel level) {
-		long day = MushroomYorkieEntity.currentDay(level);
-		level.setBlockAndUpdate(this.targetPos, ModBlocks.DOG_BOWL.defaultBlockState());
-		if (this.targetUse == BowlUse.FOOD) {
-			this.yorkie.domestic.recordFoodBowl(day);
-			this.yorkie.needs.eatMeal();
-			this.yorkie.heal(2.0F);
-			this.yorkie.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 0.5F, 1.2F);
-		} else {
-			this.yorkie.domestic.recordWaterBowl(day);
-			this.yorkie.needs.drinkWater();
-			this.yorkie.playSound(SoundEvents.BUCKET_EMPTY, 0.35F, 1.7F);
-		}
-
-		level.sendParticles(ParticleTypes.HEART, this.yorkie.getX(), this.yorkie.getY() + 0.5D, this.yorkie.getZ(), 3, 0.2D, 0.15D, 0.2D, 0.0D);
-		MushroomBehaviorDebugger.debug(this.yorkie, "domestic_bowl_used", "domestic care: finished " + this.targetUse.debugName, true);
-	}
-
-	private enum BowlUse {
-		FOOD("food", ModBlocks.DOG_FOOD_BOWL),
-		WATER("water", ModBlocks.DOG_WATER_BOWL);
-
-		private final String debugName;
-		private final net.minecraft.world.level.block.Block block;
-
-		BowlUse(String debugName, net.minecraft.world.level.block.Block block) {
-			this.debugName = debugName;
-			this.block = block;
-		}
-
-		private boolean isStillAvailable(ServerLevel level, BlockPos pos) {
-			return level.getBlockState(pos).is(this.block);
-		}
+				&& !this.yorkie.trust.wasScoldedToday(level);
 	}
 }

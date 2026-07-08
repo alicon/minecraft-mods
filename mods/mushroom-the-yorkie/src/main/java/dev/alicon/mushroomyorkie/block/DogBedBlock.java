@@ -12,6 +12,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 public final class DogBedBlock extends Block {
 	private static final VoxelShape SHAPE = Block.box(1.0D, 0.0D, 1.0D, 15.0D, 4.0D, 15.0D);
 
+	/** Creates a bed block with the supplied registry-configured block properties. */
 	public DogBedBlock(BlockBehaviour.Properties properties) {
 		super(properties);
 	}

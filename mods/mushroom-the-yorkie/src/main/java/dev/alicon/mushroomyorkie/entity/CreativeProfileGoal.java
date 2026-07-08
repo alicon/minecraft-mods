@@ -31,7 +31,7 @@ final class CreativeProfileGoal extends Goal {
 	public boolean canUse() {
 		return this.yorkie.level() instanceof ServerLevel level
 				&& !this.yorkie.isOrderedToSit()
-				&& !this.yorkie.shouldSleepAtNight(level)
+				&& !MushroomNightBehavior.shouldSleepAtNight(this.yorkie, level)
 				&& MushroomBehaviorProfiles.keepsCreativeBuilderFocus(this.yorkie, level);
 	}
 
@@ -53,7 +53,7 @@ final class CreativeProfileGoal extends Goal {
 
 	@Override
 	public void stop() {
-		if (this.yorkie.level() instanceof ServerLevel level && !this.yorkie.shouldSleepAtNight(level)) {
+		if (this.yorkie.level() instanceof ServerLevel level && !MushroomNightBehavior.shouldSleepAtNight(this.yorkie, level)) {
 			this.yorkie.setSleeping(false);
 		}
 		this.bedPos = null;
@@ -78,7 +78,7 @@ final class CreativeProfileGoal extends Goal {
 			this.checkInTicks = 0;
 		} else if (this.checkInTicks <= 0 && MushroomBehaviorProfiles.shouldStartCreativeCheckIn(this.yorkie, level)) {
 			this.checkInTicks = CHECK_IN_TICKS;
-			this.yorkie.bark();
+			MushroomYorkieSounds.bark(this.yorkie);
 			MushroomOwnerNotice.send(this.yorkie, "message.mushroom_yorkie.notice_creative_checkin", MushroomOwnerNotice.LONG_COOLDOWN_TICKS);
 			MushroomBehaviorDebugger.debug(this.yorkie, "creative_profile_checkin", "creative profile: checking if owner is done building", true);
 		}

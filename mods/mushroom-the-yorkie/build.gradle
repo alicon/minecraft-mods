@@ -19,16 +19,10 @@ ext {
 	]
 	versioned_common_excludes = [
 			'1.21.1': [
-					'dev/alicon/mushroomyorkie/MushroomOwnerTravelHandler.java',
 					'dev/alicon/mushroomyorkie/MushroomTheYorkie.java',
-					'dev/alicon/mushroomyorkie/MushroomWakeUpSpawner.java',
-					'dev/alicon/mushroomyorkie/block/ModBlocks.java',
-					'dev/alicon/mushroomyorkie/entity/HesitantHostileMobGoal.java',
-					'dev/alicon/mushroomyorkie/entity/ModEntities.java',
 					'dev/alicon/mushroomyorkie/entity/MushroomTrustState.java',
 					'dev/alicon/mushroomyorkie/entity/MushroomYorkieEntity.java',
 					'dev/alicon/mushroomyorkie/gametest/MushroomYorkieGameTests.java',
-					'dev/alicon/mushroomyorkie/item/ModItems.java',
 					'dev/alicon/mushroomyorkie/item/MushroomYorkieSpawnEggItem.java',
 					'dev/alicon/mushroomyorkie/item/YorkieBallItem.java',
 					'dev/alicon/mushroomyorkie/item/YorkieChewToyItem.java',
@@ -39,7 +33,8 @@ ext {
 			'1.21.1': [
 					'dev/alicon/mushroomyorkie/client/render/MushroomYorkieModel.java',
 					'dev/alicon/mushroomyorkie/client/render/MushroomYorkieRenderer.java',
-					'dev/alicon/mushroomyorkie/client/render/MushroomYorkieRenderState.java'
+					'dev/alicon/mushroomyorkie/client/render/MushroomYorkieRenderState.java',
+					'dev/alicon/mushroomyorkie/client/MushroomEntityRendererRegistration.java'
 			]
 	]
 }

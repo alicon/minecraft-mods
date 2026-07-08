@@ -18,7 +18,7 @@ final class NightStirGoal extends Goal {
 	@Override
 	public boolean canUse() {
 		return this.yorkie.level() instanceof ServerLevel level
-				&& this.yorkie.shouldSleepAtNight(level)
+				&& MushroomNightBehavior.shouldSleepAtNight(this.yorkie, level)
 				&& this.yorkie.nightWakeTicks > 0
 				&& !this.yorkie.isOrderedToSit();
 	}

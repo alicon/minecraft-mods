@@ -44,39 +44,28 @@ public final class PetNeeds {
 
 	/** Applies the gameplay effects of giving Mushroom a Yorkie treat. */
 	public void feedTreat() {
-		this.hunger = clamp(this.hunger - 35);
-		this.potty = clamp(this.potty + 20);
-		this.mood = clamp(this.mood + 18);
-		this.energy = clamp(this.energy + 8);
+		this.adjust(-35, 20, 18, 8);
 	}
 
 	/** Applies one proper bowl meal. */
 	public void eatMeal() {
-		this.hunger = clamp(this.hunger - 65);
-		this.potty = clamp(this.potty + 25);
-		this.mood = clamp(this.mood + 10);
-		this.energy = clamp(this.energy + 6);
+		this.adjust(-65, 25, 10, 6);
 	}
 
 	/** Applies one normal player food item. */
 	public void eatPlayerFood(int nutrition) {
 		int foodValue = Math.max(1, nutrition);
-		this.hunger = clamp(this.hunger - Math.max(8, foodValue * 8));
-		this.potty = clamp(this.potty + Math.max(2, foodValue * 2));
-		this.mood = clamp(this.mood + 6);
-		this.energy = clamp(this.energy + Math.min(8, foodValue));
+		this.adjust(-Math.max(8, foodValue * 8), Math.max(2, foodValue * 2), 6, Math.min(8, foodValue));
 	}
 
 	/** Applies one drink from a water bowl. */
 	public void drinkWater() {
-		this.potty = clamp(this.potty + 8);
-		this.mood = clamp(this.mood + 4);
+		this.adjust(0, 8, 4, 0);
 	}
 
 	/** Applies a short play interaction with a toy. */
 	public void playWithToy() {
-		this.mood = clamp(this.mood + 14);
-		this.energy = clamp(this.energy - 4);
+		this.adjust(0, 0, 14, -4);
 	}
 
 	/**
@@ -184,5 +173,12 @@ public final class PetNeeds {
 
 	private static int clamp(int value, int min, int max) {
 		return Math.max(min, Math.min(max, value));
+	}
+
+	private void adjust(int hungerDelta, int pottyDelta, int moodDelta, int energyDelta) {
+		this.hunger = clamp(this.hunger + hungerDelta);
+		this.potty = clamp(this.potty + pottyDelta);
+		this.mood = clamp(this.mood + moodDelta);
+		this.energy = clamp(this.energy + energyDelta);
 	}
 }

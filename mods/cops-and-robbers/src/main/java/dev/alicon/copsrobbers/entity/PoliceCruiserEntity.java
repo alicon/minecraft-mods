@@ -6,8 +6,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
@@ -15,14 +13,12 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /** Server-authoritative rideable cruiser; client payload handlers enter through the static driver methods below. */
@@ -35,9 +31,6 @@ public class PoliceCruiserEntity extends Mob {
 	public static final int TRICK_LOOP = 2;
 	/** Gameplay-tuned trick duration shared with render interpolation. */
 	public static final int TRICK_DURATION_TICKS = PoliceCruiserGameplayConfig.TRICK_DURATION_TICKS;
-	private static final String LIGHTS_ENABLED_TAG = "lights_enabled";
-	private static final String SIREN_ENABLED_TAG = "siren_enabled";
-	private static final String CAPTURED_ROBBERS_TAG = "captured_robbers";
 	private static final EntityDataAccessor<Boolean> LIGHTS_ENABLED =
 			SynchedEntityData.defineId(PoliceCruiserEntity.class, EntityDataSerializers.BOOLEAN);
 	private static final EntityDataAccessor<Boolean> SIREN_ENABLED =
@@ -48,8 +41,8 @@ public class PoliceCruiserEntity extends Mob {
 			SynchedEntityData.defineId(PoliceCruiserEntity.class, EntityDataSerializers.INT);
 	private static final EntityDataAccessor<Integer> CAPTURED_ROBBERS =
 			SynchedEntityData.defineId(PoliceCruiserEntity.class, EntityDataSerializers.INT);
-	private float forwardInput;
-	private int crashCooldownTicks;
+	float forwardInput;
+	int crashCooldownTicks;
 	boolean creativeFlightEnabled;
 	float creativeFlightLiftInput;
 
@@ -86,42 +79,20 @@ public class PoliceCruiserEntity extends Mob {
 	@Override
 	protected void addAdditionalSaveData(ValueOutput output) {
 		super.addAdditionalSaveData(output);
-		output.putBoolean(LIGHTS_ENABLED_TAG, this.lightsEnabled());
-		output.putBoolean(SIREN_ENABLED_TAG, this.sirenEnabled());
-		output.putInt(CAPTURED_ROBBERS_TAG, this.capturedRobbers());
+		PoliceCruiserPersistence.write(this, output);
 	}
 
 	@Override
 	protected void readAdditionalSaveData(ValueInput input) {
 		super.readAdditionalSaveData(input);
-		this.setLightsEnabled(input.getBooleanOr(LIGHTS_ENABLED_TAG, true));
-		this.setSirenEnabled(input.getBooleanOr(SIREN_ENABLED_TAG, false));
-		this.setCapturedRobbers(input.getIntOr(CAPTURED_ROBBERS_TAG, 0));
+		PoliceCruiserPersistence.read(this, input);
 	}
 
 	@Override
 	public void tick() {
 		super.tick();
 		if (!this.level().isClientSide()) {
-			if (!(this.getControllingPassenger() instanceof Player driver) || !driver.isCreative()) {
-				this.creativeFlightEnabled = false;
-				this.creativeFlightLiftInput = 0.0F;
-				this.setNoGravity(false);
-			}
-			if (!(this.getControllingPassenger() instanceof Player)) {
-				this.forwardInput = 0.0F;
-			}
-			if (this.crashCooldownTicks > 0) {
-				this.crashCooldownTicks--;
-			}
-			this.tickCreativeFlightLift();
-			this.playDrivenEngineSound();
-			this.tickTrick();
-			this.handleFrontImpact();
-			this.tickJobHandlers();
-			if (this.sirenEnabled() && this.isVehicle() && this.tickCount % 8 == 0) {
-				this.playSirenPulse();
-			}
+			PoliceCruiserServerTick.tick(this);
 		}
 	}
 
@@ -215,7 +186,7 @@ public class PoliceCruiserEntity extends Mob {
 		this.entityData.set(SIREN_ENABLED, enabled);
 	}
 
-	private void setCapturedRobbers(int count) {
+	void setCapturedRobbers(int count) {
 		this.entityData.set(CAPTURED_ROBBERS, PoliceCruiserControlPolicy.clampCapturedRobbers(count));
 	}
 
@@ -226,71 +197,24 @@ public class PoliceCruiserEntity extends Mob {
 		}
 	}
 
-	private void tickTrick() {
-		int ticks = this.trickTicks();
-		if (ticks <= 0) {
-			this.entityData.set(TRICK_TYPE, TRICK_NONE);
-			return;
-		}
-
-		this.applyTrickMovement(ticks);
-		this.entityData.set(TRICK_TICKS, ticks - 1);
-		if (ticks - 1 <= 0) {
-			this.entityData.set(TRICK_TYPE, TRICK_NONE);
-		}
+	void setTrickType(int trickType) {
+		this.entityData.set(TRICK_TYPE, trickType);
 	}
 
-	private void applyTrickMovement(int ticksRemaining) {
-		if (!(this.getControllingPassenger() instanceof Player driver) || !driver.isCreative()) {
-			return;
-		}
-
-		double progress = (TRICK_DURATION_TICKS - ticksRemaining) / (double) TRICK_DURATION_TICKS;
-		double lift = Math.sin(progress * Math.PI) * 0.12D;
-		Vec3 forward = this.forwardVector();
-		if (this.trickType() == TRICK_LOOP) {
-			lift += Math.sin(progress * Math.PI * 2.0D) * 0.2D;
-			driver.setXRot((float) Math.sin(progress * Math.PI * 2.0D) * 65.0F);
-		} else if (this.trickType() == TRICK_BARREL_ROLL) {
-			driver.setYRot(driver.getYRot() + 18.0F);
-			driver.setXRot((float) Math.sin(progress * Math.PI * 2.0D) * 28.0F);
-			this.setYRot(this.getYRot() + 18.0F);
-			this.yRotO = this.getYRot();
-		}
-
-		this.setNoGravity(true);
-		this.setDeltaMovement(this.getDeltaMovement().add(forward.scale(0.08D)).add(0.0D, lift, 0.0D));
+	void setTrickTicks(int ticks) {
+		this.entityData.set(TRICK_TICKS, ticks);
 	}
 
 	@Override
 	public void travel(Vec3 travelVector) {
-		if (this.isAlive() && this.isVehicle() && this.getControllingPassenger() instanceof Player driver) {
-			this.setYRot(driver.getYRot());
-			this.yRotO = this.getYRot();
-			this.setXRot(0.0F);
-			this.setYHeadRot(this.getYRot());
-			this.yBodyRot = this.getYRot();
-
-			if (driver.isCreative()) {
-				if (this.creativeFlightEnabled) {
-					this.setNoGravity(true);
-					this.forwardInput = driver.zza;
-				} else {
-					this.setNoGravity(false);
-					this.travelGround(driver, travelVector);
-				}
-				return;
-			}
-
-			this.setNoGravity(false);
-			this.travelGround(driver, travelVector);
+		if (PoliceCruiserTravelController.travelWithDriver(this, travelVector)) {
 			return;
 		}
 
 		super.travel(travelVector);
 	}
 
-	private void travelGround(Player driver, Vec3 travelVector) {
+	void travelGround(Player driver, Vec3 travelVector) {
 		float strafe = PoliceCruiserControlPolicy.strafeInput(driver.xxa);
 		float forward = PoliceCruiserControlPolicy.forwardInput(driver.zza);
 		this.forwardInput = forward;
@@ -299,148 +223,13 @@ public class PoliceCruiserEntity extends Mob {
 		super.travel(new Vec3(strafe, travelVector.y, forward));
 	}
 
-	private void tickCreativeFlightLift() {
-		if (!this.creativeFlightEnabled || !(this.getControllingPassenger() instanceof Player driver) || !driver.isCreative()) {
-			return;
-		}
-		this.setNoGravity(true);
-		float forwardInput = PoliceCruiserControlPolicy.forwardInput(driver.zza);
-		float strafeInput = PoliceCruiserControlPolicy.strafeInput(driver.xxa);
-		this.forwardInput = forwardInput;
-
-		Vec3 look = driver.getLookAngle();
-		Vec3 horizontalForward = this.forwardVector();
-		Vec3 right = this.calculateViewVector(0.0F, driver.getYRot() - 90.0F).normalize();
-		Vec3 forward = forwardInput > 0.0F ? look : horizontalForward;
-		Vec3 desired = forward.scale(forwardInput).add(right.scale(strafeInput)).add(0.0D, this.creativeFlightLiftInput * 0.75D, 0.0D);
-		if (desired.lengthSqr() > 1.0E-4D) {
-			desired = desired.normalize().scale(PoliceCruiserGameplayConfig.CREATIVE_FLIGHT_SPEED);
-		}
-
-		Vec3 motion = this.getDeltaMovement().scale(0.62D).add(desired);
-		if (desired.lengthSqr() <= 1.0E-4D) {
-			motion = motion.scale(0.65D);
-		}
-		this.setDeltaMovement(motion);
-		this.move(MoverType.SELF, this.getDeltaMovement());
-	}
-
-	private void handleFrontImpact() {
-		if (!this.isVehicle()) {
-			return;
-		}
-
-		double horizontalSpeed = this.getDeltaMovement().multiply(1.0D, 0.0D, 1.0D).length();
-		if (horizontalSpeed < PoliceCruiserGameplayConfig.IMPACT_MIN_SPEED && Math.abs(this.forwardInput) <= 0.05F) {
-			return;
-		}
-
-		AABB entityCrashBox = this.entityCrashImpactBox();
-		AABB blockCrashBox = this.blockCrashImpactBox();
-		if (!this.level().noBlockCollision(this, blockCrashBox)) {
-			Vec3 movement = this.getDeltaMovement();
-			this.setDeltaMovement(movement.x * -0.18D, Math.min(movement.y, 0.0D) * 0.2D, movement.z * -0.18D);
-			if (this.level() instanceof ServerLevel level) {
-				level.playSound(null, this.blockPosition(), SoundEvents.COPPER_BULB_BREAK, SoundSource.PLAYERS, 0.7F, 0.75F);
-				this.damageCrashOccupants(level);
-			}
-		}
-
-		if (!(this.level() instanceof ServerLevel level)) {
-			return;
-		}
-
-		boolean hitMob = false;
-		for (Entity entity : this.level().getEntities(this, entityCrashBox, this::canDamageOnImpact)) {
-			if (entity instanceof LivingEntity target) {
-				if (target instanceof BankRobberEntity robber && PoliceCaptureHandler.captureRobber(this, robber)) {
-					hitMob = true;
-					continue;
-				}
-				if (target.invulnerableTime > 0) {
-					continue;
-				}
-				target.hurtServer(level, this.damageSources().generic(), PoliceCruiserGameplayConfig.IMPACT_DAMAGE);
-				target.push(this.impactForwardVector().scale(0.95D).add(0.0D, 0.25D, 0.0D));
-				hitMob = true;
-			}
-		}
-		if (hitMob) {
-			level.playSound(null, this.blockPosition(), SoundEvents.MACE_SMASH_GROUND, SoundSource.PLAYERS, 0.65F, 1.15F);
-			this.damageCrashOccupants(level);
-		}
-	}
-
-	private boolean canDamageOnImpact(Entity entity) {
-		return entity instanceof LivingEntity
-				&& entity != this.getControllingPassenger()
-				&& !entity.isPassengerOfSameVehicle(this)
-				&& entity.isAlive();
-	}
-
-	private AABB frontImpactBox() {
-		Vec3 center = this.position().add(this.impactForwardVector().scale(2.2D)).add(0.0D, 0.8D, 0.0D);
-		return AABB.ofSize(center, 3.6D, 1.9D, 2.3D);
-	}
-
-	private AABB entityCrashImpactBox() {
-		AABB impact = this.getBoundingBox().inflate(1.35D, 0.45D, 1.35D).minmax(this.frontImpactBox());
-		Vec3 movement = this.getDeltaMovement();
-		if (movement.lengthSqr() > 1.0E-4D) {
-			impact = impact.minmax(impact.move(movement.reverse().scale(2.0D)))
-					.expandTowards(movement.normalize().scale(1.6D));
-		}
-		return impact;
-	}
-
-	private AABB blockCrashImpactBox() {
-		return this.frontImpactBox();
-	}
-
-	private void damageCrashOccupants(ServerLevel level) {
-		if (this.crashCooldownTicks > 0) {
-			return;
-		}
-
-		this.crashCooldownTicks = 12;
+	void hurtVehicleFromCrash(ServerLevel level) {
 		super.hurtServer(level, this.damageSources().flyIntoWall(), PoliceCruiserGameplayConfig.CRASH_TRUCK_DAMAGE);
-		if (this.getControllingPassenger() instanceof Player driver && !driver.isCreative()) {
-			driver.hurtServer(level, this.damageSources().flyIntoWall(), PoliceCruiserGameplayConfig.CRASH_SELF_DAMAGE);
-		}
 	}
 
-	private void playDrivenEngineSound() {
-		if (!this.isVehicle() || this.tickCount % 9 != 0) {
-			return;
-		}
-
-		float pitch = 0.75F + Math.min((float) this.getDeltaMovement().length() * 0.65F, 0.45F);
-		this.level().playSound(null, this.getX(), this.getY() + 0.45D, this.getZ(), SoundEvents.MINECART_RIDING, SoundSource.PLAYERS, 0.32F, pitch);
-	}
-
-	private void playSirenPulse() {
-		float pitch = this.tickCount % 32 < 16 ? 0.82F : 1.48F;
-		this.level().playSound(null, this.getX(), this.getY() + 1.0D, this.getZ(), SoundEvents.NOTE_BLOCK_BIT.value(), SoundSource.PLAYERS, 1.05F, pitch);
-		this.level().playSound(null, this.getX(), this.getY() + 1.0D, this.getZ(), SoundEvents.NOTE_BLOCK_XYLOPHONE.value(), SoundSource.PLAYERS, 0.38F, pitch * 0.74F);
-	}
-
-	private Vec3 forwardVector() {
+	Vec3 forwardVector() {
 		Vec3 forward = this.calculateViewVector(0.0F, this.getYRot());
 		return new Vec3(forward.x, 0.0D, forward.z).normalize();
-	}
-
-	private Vec3 impactForwardVector() {
-		Vec3 movement = this.getDeltaMovement().multiply(1.0D, 0.0D, 1.0D);
-		if (movement.lengthSqr() > 0.0001D) {
-			return movement.normalize();
-		}
-		if (this.getControllingPassenger() instanceof Player driver) {
-			Vec3 look = driver.getLookAngle().multiply(1.0D, 0.0D, 1.0D);
-			if (look.lengthSqr() > 0.0001D) {
-				return look.normalize();
-			}
-		}
-		return this.forwardVector();
 	}
 
 	@Override

@@ -65,7 +65,7 @@ final class HesitantHostileMobGoal extends Goal {
 			return;
 		}
 
-		Player player = this.yorkie.playerToStayNear(level);
+		Player player = this.yorkie.trust.playerToStayNear(this.yorkie, level);
 		this.yorkie.getLookControl().setLookAt(this.target, 10.0F, this.yorkie.getMaxHeadXRot());
 		if (this.retreatTicks > 0) {
 			this.retreatTicks--;
@@ -81,13 +81,12 @@ final class HesitantHostileMobGoal extends Goal {
 		MushroomBehaviorDebugger.debug(this.yorkie, "hostile_approach", "hostile: approaching " + this.targetName(), false);
 
 		if (this.yorkie.tickCount % 45 == 0) {
-			this.yorkie.bark();
+			MushroomYorkieSounds.bark(this.yorkie);
 		}
 
 		if (this.yorkie.distanceToSqr(this.target) <= 2.2D) {
 			this.yorkie.swing(InteractionHand.MAIN_HAND);
-			this.yorkie.doHurtTarget(level, this.target);
-			this.yorkie.playSound(MushroomYorkieEntity.cuteWolfSounds().growlSound().value(), 0.45F, 1.6F);
+			MushroomHostileCombat.attack(this.yorkie, level, this.target);
 			MushroomBehaviorDebugger.debug(this.yorkie, "hostile_attack", "hostile: nipped " + this.targetName(), true);
 			this.retreatTicks = 45 + this.yorkie.getRandom().nextInt(25);
 			this.nextMoveTick = 0;
@@ -98,8 +97,8 @@ final class HesitantHostileMobGoal extends Goal {
 		return this.yorkie.isTame()
 				&& !this.yorkie.isOrderedToSit()
 				&& !this.yorkie.isMushroomSleeping()
-				&& !this.yorkie.isUsingCreativeFlight()
-				&& !this.yorkie.shouldAskToGoOutside(level);
+				&& !this.yorkie.isNoGravity()
+				&& !MushroomNightBehavior.shouldAskToGoOutside(this.yorkie, level);
 	}
 
 	private Monster findTarget(ServerLevel level) {
@@ -108,7 +107,7 @@ final class HesitantHostileMobGoal extends Goal {
 		}
 
 		this.nextSearchTick = 30;
-		Player player = this.yorkie.playerToStayNear(level);
+		Player player = this.yorkie.trust.playerToStayNear(this.yorkie, level);
 		Vec3 center = player == null ? this.yorkie.position() : player.position();
 		AABB area = new AABB(center, center).inflate(MushroomYorkieEntity.HOSTILE_MOB_SEARCH_RADIUS, 5.0D, MushroomYorkieEntity.HOSTILE_MOB_SEARCH_RADIUS);
 		List<Monster> monsters = level.getEntitiesOfClass(Monster.class, area, monster -> monster.isAlive() && this.yorkie.canAttack(monster));

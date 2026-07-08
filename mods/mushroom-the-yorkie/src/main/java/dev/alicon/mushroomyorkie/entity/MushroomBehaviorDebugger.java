@@ -56,8 +56,8 @@ final class MushroomBehaviorDebugger {
 		String detail = "baseline: tame=" + yorkie.isTame()
 				+ ", sitting=" + yorkie.isOrderedToSit()
 				+ ", sleeping=" + yorkie.isMushroomSleeping()
-				+ ", flyingOwner=" + yorkie.ownerIsCreativeFlying()
-				+ ", needsOutside=" + yorkie.shouldAskToGoOutside(level);
+				+ ", flyingOwner=" + MushroomYorkieStateQueries.ownerIsCreativeFlying(yorkie)
+				+ ", needsOutside=" + MushroomNightBehavior.shouldAskToGoOutside(yorkie, level);
 		debug(yorkie, "baseline", detail, false);
 	}
 
@@ -112,7 +112,7 @@ final class MushroomBehaviorDebugger {
 		}
 
 		if (yorkie.level() instanceof ServerLevel level) {
-			return yorkie.playerToStayNear(level);
+			return yorkie.trust.playerToStayNear(yorkie, level);
 		}
 
 		return null;

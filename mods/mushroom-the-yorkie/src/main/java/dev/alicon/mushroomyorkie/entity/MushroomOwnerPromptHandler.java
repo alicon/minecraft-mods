@@ -21,7 +21,7 @@ final class MushroomOwnerPromptHandler {
 		boolean ownerHasTreat = yorkie.isTame() && owner != null && owner.isHolding(ModItems.YORKIE_TREAT);
 		if (ownerHasTreat && !yorkie.isMushroomSleeping() && yorkie.tickCount % MushroomYorkieEntity.BARK_INTERVAL_TICKS == 0) {
 			MushroomBehaviorDebugger.debug(yorkie, "treat_attention", "treat attention: owner is holding a Yorkie treat", false);
-			yorkie.bark();
+			MushroomYorkieSounds.bark(yorkie);
 		}
 	}
 
@@ -39,12 +39,12 @@ final class MushroomOwnerPromptHandler {
 
 		boolean hasAnyBowl = MushroomDomesticLocator.hasAnyBowl(level, yorkie.blockPosition());
 		boolean hasFoodBowl = MushroomDomesticLocator.hasFoodBowl(level, yorkie.blockPosition());
-		long day = MushroomYorkieEntity.currentDay(level);
+		long day = MushroomNightBehavior.currentDay(level);
 		if (!DomesticCarePolicy.shouldAskForFood(yorkie.needs.hunger(), hasAnyBowl, hasFoodBowl, yorkie.domestic.ateFoodToday(day))) {
 			return;
 		}
 
-		yorkie.whine();
+		MushroomYorkieSounds.whine(yorkie);
 		MushroomOwnerNotice.send(yorkie, "message.mushroom_yorkie.notice_hungry_soon", MushroomOwnerNotice.LONG_COOLDOWN_TICKS);
 		MushroomBehaviorDebugger.debug(yorkie, "food_prompt", "domestic care: food bowl is empty", true);
 	}

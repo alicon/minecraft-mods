@@ -9,7 +9,7 @@ final class MushroomReliefHandler {
 	}
 
 	static void tick(MushroomYorkieEntity yorkie, ServerLevel level) {
-		long day = MushroomYorkieEntity.currentDay(level);
+		long day = MushroomNightBehavior.currentDay(level);
 		if (!yorkie.isTame()
 				|| !yorkie.needs.shouldWarnPotty()
 				|| !yorkie.relief.shouldAskToday(day, true)
@@ -24,7 +24,7 @@ final class MushroomReliefHandler {
 
 		yorkie.needs.relieveOutside();
 		yorkie.relief.recordRelief(day);
-		yorkie.bark();
+		MushroomYorkieSounds.bark(yorkie);
 		MushroomOwnerNotice.send(yorkie, "message.mushroom_yorkie.notice_relieved", MushroomOwnerNotice.MEDIUM_COOLDOWN_TICKS);
 		MushroomBehaviorDebugger.debug(yorkie, "potty_relieved", "potty: relieved outside and reset for the day", true);
 	}

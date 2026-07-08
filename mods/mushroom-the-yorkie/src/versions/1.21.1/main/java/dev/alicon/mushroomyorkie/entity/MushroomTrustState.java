@@ -28,7 +28,7 @@ final class MushroomTrustState {
 	}
 
 	boolean wasScoldedToday(ServerLevel level) {
-		return this.scoldedDay == MushroomYorkieEntity.currentDay(level);
+		return this.scoldedDay == MushroomNightBehavior.currentDay(level);
 	}
 
 	Player playerToStayNear(MushroomYorkieEntity yorkie, ServerLevel level) {
@@ -37,7 +37,7 @@ final class MushroomTrustState {
 	}
 
 	boolean recordTrustedPlayerHit(ServerLevel level, Player player) {
-		long day = MushroomYorkieEntity.currentDay(level);
+		long day = MushroomNightBehavior.currentDay(level);
 		if (this.hitCountDay != day) {
 			this.hitCountDay = day;
 			this.hitsToday = 0;

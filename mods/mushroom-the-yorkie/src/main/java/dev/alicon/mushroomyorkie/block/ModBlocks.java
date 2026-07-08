@@ -28,19 +28,17 @@ public final class ModBlocks {
 	}
 
 	private static BlockBehaviour.Properties bowlProperties(String name) {
-		return BlockBehaviour.Properties.of()
+		return MushroomBlockProperties.withId(BlockBehaviour.Properties.of()
 				.strength(0.2F)
 				.sound(SoundType.COPPER)
-				.noOcclusion()
-				.setId(key(name));
+				.noOcclusion(), key(name));
 	}
 
 	private static BlockBehaviour.Properties woolProperties(String name) {
-		return BlockBehaviour.Properties.of()
+		return MushroomBlockProperties.withId(BlockBehaviour.Properties.of()
 				.strength(0.3F)
 				.sound(SoundType.WOOL)
-				.noOcclusion()
-				.setId(key(name));
+				.noOcclusion(), key(name));
 	}
 
 	private static Block register(String name, Block block) {
