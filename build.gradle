@@ -14,6 +14,7 @@ tasks.register('validateModLayout') {
 	description = 'Validates monorepo mod layout and fabric.mod.json metadata.'
 
 	doLast {
+		def expectedRepositoryUrl = 'https://github.com/alicon/minecraft-mods'
 		if (rootProject.file('src').exists()) {
 			throw new GradleException("Root src/ is not allowed in this multi-mod layout; put mod sources under mods/<mod-name>/src")
 		}
@@ -48,6 +49,14 @@ tasks.register('validateModLayout') {
 			}
 			if (!seenModIds.add(metadata.id)) {
 				throw new GradleException("Duplicate mod id '${metadata.id}'")
+			}
+			if (metadata.license != 'MIT') {
+				throw new GradleException("${modProject.path} fabric.mod.json license must be MIT")
+			}
+
+			def contact = metadata.contact ?: [:]
+			if (contact.homepage != expectedRepositoryUrl || contact.sources != expectedRepositoryUrl || contact.issues != "${expectedRepositoryUrl}/issues") {
+				throw new GradleException("${modProject.path} fabric.mod.json contact links must point at ${expectedRepositoryUrl}")
 			}
 
 			def iconPath = metadata.icon

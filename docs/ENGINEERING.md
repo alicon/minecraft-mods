@@ -188,6 +188,7 @@ Logs and in-game diagnostics should make development clearer without spamming no
 - no stale root `src/` directory
 - unique mod ids
 - existing icons and entrypoint classes
+- consistent MIT license and monorepo contact links in `fabric.mod.json`
 - duplicate translation-key detection
 - item model texture reference validation for local assets
 - no trailing whitespace, CRLF line endings, or missing final newlines
