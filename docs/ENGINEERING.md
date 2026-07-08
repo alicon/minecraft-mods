@@ -195,6 +195,7 @@ Logs and in-game diagnostics should make development clearer without spamming no
 - no client-only imports from common/server source
 - Javadocs for public declarations that are not overrides
 - release notes for every declared mod version
+- consistent versioned source roots and override exclude maps
 - successful per-mod Javadoc generation
 - per-mod JVM unit tests
 

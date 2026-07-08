@@ -295,6 +295,111 @@ tasks.register('validateReleaseNotes') {
 	}
 }
 
+tasks.register('validateVersionedSourceLayout') {
+	group = 'verification'
+	description = 'Validates supported Minecraft version source roots and override excludes.'
+
+	doLast {
+		def violations = []
+
+		subprojects.each { modProject ->
+			def modDir = modProject.projectDir
+			def versionsDir = modDir.toPath().resolve('src/versions').toFile()
+			def versionMatrix = modProject.ext.has('supported_minecraft_versions') ? modProject.ext.supported_minecraft_versions : [:]
+			def declaredVersions = versionMatrix.keySet().collect { it.toString() } as Set
+
+			if (versionMatrix.isEmpty()) {
+				if (versionsDir.directory) {
+					violations << "${modProject.path} has src/versions but no supported_minecraft_versions map"
+				}
+				return
+			}
+
+			declaredVersions.each { minecraftVersion ->
+				def versionDir = versionsDir.toPath().resolve(minecraftVersion).toFile()
+				if (!versionDir.directory) {
+					violations << "${modProject.path} declares Minecraft ${minecraftVersion} but is missing src/versions/${minecraftVersion}"
+				}
+			}
+
+			if (versionsDir.directory) {
+				versionsDir.eachDir { versionDir ->
+					if (!declaredVersions.contains(versionDir.name)) {
+						violations << "${modProject.path} has undeclared versioned sources in src/versions/${versionDir.name}"
+					}
+				}
+			}
+
+			[
+					[
+							name           : 'common',
+							excludeProperty: 'versioned_common_excludes',
+							sourcePath     : 'src/main/java',
+							versionPath    : 'main/java'
+					],
+					[
+							name           : 'client',
+							excludeProperty: 'versioned_client_excludes',
+							sourcePath     : 'src/client/java',
+							versionPath    : 'client/java'
+					]
+			].each { environment ->
+				def excludeMap = modProject.ext.has(environment.excludeProperty)
+						? modProject.ext.get(environment.excludeProperty)
+						: [:]
+
+				excludeMap.each { minecraftVersion, excludedPaths ->
+					def version = minecraftVersion.toString()
+					if (!declaredVersions.contains(version)) {
+						violations << "${modProject.path} ${environment.excludeProperty} references undeclared Minecraft ${version}"
+					}
+
+					def seenExcludes = [] as Set
+					excludedPaths.each { excludedPath ->
+						if (!seenExcludes.add(excludedPath)) {
+							violations << "${modProject.path} duplicates ${excludedPath} in ${environment.excludeProperty} for ${version}"
+						}
+
+						def baseFile = modDir.toPath().resolve("${environment.sourcePath}/${excludedPath}").toFile()
+						if (!baseFile.file) {
+							violations << "${modProject.path} ${environment.excludeProperty} references missing ${environment.sourcePath}/${excludedPath}"
+						}
+					}
+				}
+
+				def baseSourceDir = modDir.toPath().resolve(environment.sourcePath).toFile()
+				if (!baseSourceDir.directory) {
+					return
+				}
+
+				declaredVersions.each { minecraftVersion ->
+					def excludedPaths = (excludeMap.get(minecraftVersion) ?: []) as Set
+					def versionSourceDir = versionsDir.toPath().resolve("${minecraftVersion}/${environment.versionPath}").toFile()
+					if (!versionSourceDir.directory) {
+						return
+					}
+
+					versionSourceDir.eachFileRecurse { versionFile ->
+						if (!versionFile.file || !versionFile.name.endsWith('.java')) {
+							return
+						}
+
+						def relativePath = versionSourceDir.toPath().relativize(versionFile.toPath()).toString().replace(File.separator, '/')
+						def baseFile = baseSourceDir.toPath().resolve(relativePath).toFile()
+						if (baseFile.file && !excludedPaths.contains(relativePath)) {
+							violations << "${modProject.path} ${environment.name} source ${relativePath} shadows shared source for ${minecraftVersion} but is not listed in ${environment.excludeProperty}"
+						}
+					}
+				}
+			}
+		}
+
+		if (!violations.empty) {
+			throw new GradleException("Versioned source layout validation failed:\n" + violations.join('\n'))
+		}
+	}
+}
+
 Object activeMinecraftVersionFor(Project modProject) {
 	return modProject.ext.has('active_minecraft_version')
 			? modProject.ext.active_minecraft_version
@@ -347,5 +452,6 @@ gradle.projectsEvaluated {
 		dependsOn tasks.named('validateNoClientImportsInMain')
 		dependsOn tasks.named('validatePublicApiDocs')
 		dependsOn tasks.named('validateReleaseNotes')
+		dependsOn tasks.named('validateVersionedSourceLayout')
 	}
 }
