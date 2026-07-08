@@ -13,10 +13,11 @@ By default, the workspace builds the version in `gradle.properties`. Individual 
 small version matrix with version-specific source roots when the compatibility value is worth the
 extra maintenance.
 
-NARwhal Together currently supports:
+Current Minecraft target support:
 
-- Minecraft Java Edition `1.21.11`
-- Minecraft Java Edition `1.21.1`
+- NARwhal Together: Minecraft Java Edition `1.21.11` and `1.21.1`
+- Mushroom the Yorkie: Minecraft Java Edition `1.21.11` and `1.21.1`
+- Cops and Robbers: Minecraft Java Edition `1.21.11`
 
 ## Non-Goals For Now
 
@@ -48,6 +49,7 @@ The active version is selected from `gradle.properties`, or per command with:
 
 ```shell
 ./gradlew :narwhal-together:check -Ptarget_minecraft_version=1.21.1
+./gradlew :mushroom-the-yorkie:check -Ptarget_minecraft_version=1.21.1
 ```
 
 A mod that uses versioned sources must declare its supported version matrix in its `build.gradle`.
@@ -71,6 +73,7 @@ source roots from that matrix. Versioned mods publish distinct Modrinth version 
 Before publishing:
 
 - run `./gradlew check`
+- run `./gradlew check -Ptarget_minecraft_version=1.21.1` for mods with a 1.21.1 compatibility target
 - run `./gradlew build`
 - complete the relevant manual checks in `docs/TESTING.md`
 - update docs when behavior, requirements, output paths, or release steps change

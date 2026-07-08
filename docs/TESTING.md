@@ -26,6 +26,7 @@ Run all verification:
 
 ```shell
 ./gradlew check
+./gradlew check -Ptarget_minecraft_version=1.21.1
 ```
 
 This runs:
@@ -47,10 +48,11 @@ Run one mod's tests:
 ./gradlew :cops-and-robbers:test
 ```
 
-Run a supported NARwhal Minecraft-version variant:
+Run one mod against a supported Minecraft-version variant:
 
 ```shell
 ./gradlew :narwhal-together:check -Ptarget_minecraft_version=1.21.1
+./gradlew :mushroom-the-yorkie:check -Ptarget_minecraft_version=1.21.1
 ```
 
 Build all jars:
@@ -64,6 +66,7 @@ Production jars are written to:
 ```text
 build/mods/narwhal-together/<minecraft-version>/libs/narwhal-together-<version>.jar
 build/mods/mushroom-the-yorkie/<minecraft-version>/libs/mushroom-the-yorkie-<version>.jar
+build/mods/cops-and-robbers/<minecraft-version>/libs/cops-and-robbers-<version>.jar
 ```
 
 Run Mushroom's headless Minecraft GameTests:

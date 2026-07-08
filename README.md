@@ -26,7 +26,8 @@ Each mod has its own `fabric.mod.json`, Java package, assets, and jar. Shared Fa
 
 ## Requirements
 
-- Minecraft Java Edition 1.21.11
+- Minecraft Java Edition 1.21.11 by default
+- NARwhal Together and Mushroom the Yorkie also support Minecraft Java Edition 1.21.1
 - Fabric Loader 0.19.3 or newer
 - Fabric API
 - Java 21 or newer
@@ -37,18 +38,19 @@ Each mod has its own `fabric.mod.json`, Java package, assets, and jar. Shared Fa
 ./gradlew build
 ```
 
-Distributable jars are written symmetrically:
+Distributable jars are written under the active Minecraft target:
 
 ```text
-build/mods/narwhal-together/libs/narwhal-together-<version>.jar
-build/mods/mushroom-the-yorkie/libs/mushroom-the-yorkie-<version>.jar
-build/mods/cops-and-robbers/libs/cops-and-robbers-<version>.jar
+build/mods/narwhal-together/<minecraft-version>/libs/narwhal-together-<version>.jar
+build/mods/mushroom-the-yorkie/<minecraft-version>/libs/mushroom-the-yorkie-<version>.jar
+build/mods/cops-and-robbers/<minecraft-version>/libs/cops-and-robbers-<version>.jar
 ```
 
 ## Verification
 
 ```shell
 ./gradlew check
+./gradlew check -Ptarget_minecraft_version=1.21.1
 ```
 
 This runs unit tests plus repo quality gates for layout, metadata, formatting, file size, forbidden client imports, public API docs, and Javadocs.

@@ -12,7 +12,7 @@ Create a Modrinth **Mod** project for NARwhal Together with these values:
 - Client environment: `Required`
 - Server environment: `Required`
 - Loader: `Fabric`
-- Game version: `1.21.11`
+- Game version: `1.21.11` and `1.21.1`
 - Required dependency: `Fabric API`
 - Optional dependency: `Controlify`
 
@@ -28,7 +28,7 @@ Create a Modrinth **Mod** project for Mushroom the Yorkie with these values:
 - Client environment: `Required`
 - Server environment: `Required`
 - Loader: `Fabric`
-- Game version: `1.21.11`
+- Game version: `1.21.11` and `1.21.1`
 - Required dependency: `Fabric API`
 
 Use `mods/mushroom-the-yorkie/src/main/resources/assets/mushroom_yorkie/icon.png` as the project icon, `docs/MODRINTH_MUSHROOM.md` as the long description, and these gallery images:
@@ -76,6 +76,6 @@ Run **Sync Modrinth Metadata** from the repository's Actions tab whenever the na
 2. Update `mod_version` in the selected mod's `mods/<mod>/build.gradle`.
 3. Commit and push the release changes.
 4. Open the repository's **Actions** tab.
-5. Run **Publish to Modrinth**, select the mod, and select `alpha`, `beta`, or `release`.
+5. Run **Publish to Modrinth**, select the mod, select the Minecraft target, and select `alpha`, `beta`, or `release`.
 
-The workflow rebuilds from the selected commit and uploads the remapped production JAR. The publishing task declares Fabric API as required. NARwhal also declares Controlify as optional.
+The workflow rebuilds from the selected commit and uploads the remapped production JAR for the selected Minecraft target. The publishing task declares Fabric API as required. NARwhal also declares Controlify as optional.
