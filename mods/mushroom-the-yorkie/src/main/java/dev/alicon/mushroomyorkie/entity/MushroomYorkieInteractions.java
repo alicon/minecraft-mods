@@ -66,14 +66,7 @@ final class MushroomYorkieInteractions {
 		if (stack.is(ModItems.YORKIE_HARNESS) && yorkie.isTame() && yorkie.isOwnedBy(player)) {
 			if (!yorkie.level().isClientSide()) {
 				if (yorkie.hasHarness()) {
-					yorkie.setHarness(false);
-					ItemStack removedHarness = new ItemStack(ModItems.YORKIE_HARNESS);
-					if (!player.addItem(removedHarness)) {
-						player.drop(removedHarness, false);
-					}
-					yorkie.playSound(SoundEvents.ARMOR_EQUIP_LEATHER.value(), 0.45F, 0.85F);
-					player.displayClientMessage(Component.translatable("message.mushroom_yorkie.harness_off"), true);
-					MushroomBehaviorDebugger.debug(yorkie, "harness_off", "harness: removed", true);
+					removeHarness(yorkie, player);
 				} else {
 					yorkie.setHarness(true);
 					yorkie.useInteractionItem(player, hand, stack);
@@ -132,6 +125,17 @@ final class MushroomYorkieInteractions {
 					return InteractionResult.SUCCESS;
 				}
 
+				if (player.isSecondaryUseActive() && yorkie.hasHarness()) {
+					removeHarness(yorkie, player);
+					return InteractionResult.SUCCESS;
+				}
+
+				if (!yorkie.isOrderedToSit() && yorkie.isWetForSitting()) {
+					player.displayClientMessage(Component.translatable("message.mushroom_yorkie.sit_water"), true);
+					MushroomBehaviorDebugger.debug(yorkie, "sit_blocked_water", "ordered: sit blocked while Mushroom is in water", true);
+					return InteractionResult.SUCCESS;
+				}
+
 				yorkie.setMushroomOrderedToSit(!yorkie.isOrderedToSit());
 				MushroomBehaviorDebugger.debug(
 						yorkie,
@@ -154,6 +158,17 @@ final class MushroomYorkieInteractions {
 		}
 
 		return null;
+	}
+
+	private static void removeHarness(MushroomYorkieEntity yorkie, Player player) {
+		yorkie.setHarness(false);
+		ItemStack removedHarness = new ItemStack(ModItems.YORKIE_HARNESS);
+		if (!player.addItem(removedHarness)) {
+			player.drop(removedHarness, false);
+		}
+		yorkie.playSound(SoundEvents.ARMOR_EQUIP_LEATHER.value(), 0.45F, 0.85F);
+		player.displayClientMessage(Component.translatable("message.mushroom_yorkie.harness_off"), true);
+		MushroomBehaviorDebugger.debug(yorkie, "harness_off", "harness: removed", true);
 	}
 
 	private static boolean hasOtherLoadedMushroomOwnedBy(ServerLevel level, Player player, MushroomYorkieEntity ignoredYorkie) {

@@ -121,6 +121,7 @@ final class DomesticCareGoal extends Goal {
 				&& !this.yorkie.isOrderedToSit()
 				&& !this.yorkie.isMushroomSleeping()
 				&& this.yorkie.scaredRunTicks <= 0
+				&& !MushroomBehaviorProfiles.keepsRoutineNeedsQuiet(this.yorkie, level)
 				&& !this.yorkie.wasScoldedToday(level);
 	}
 

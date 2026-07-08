@@ -9,6 +9,7 @@ import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
@@ -128,10 +129,11 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		this.goalSelector.addGoal(9, new UntamedStayNearPlayerGoal(this));
 		this.goalSelector.addGoal(10, new SitWhenOrderedToGoal(this));
 		this.goalSelector.addGoal(11, new FollowOwnerGoal(this, 1.25D, 2.0F, 1.0F));
-		this.goalSelector.addGoal(12, new DaytimeBumShuffleGoal(this));
-		this.goalSelector.addGoal(13, new RandomStrollGoal(this, 0.9D, 80));
-		this.goalSelector.addGoal(14, new LookAtPlayerGoal(this, Player.class, 8.0F));
-		this.goalSelector.addGoal(15, new RandomLookAroundGoal(this));
+		this.goalSelector.addGoal(12, new CreativeProfileGoal(this));
+		this.goalSelector.addGoal(13, new DaytimeBumShuffleGoal(this));
+		this.goalSelector.addGoal(14, new RandomStrollGoal(this, 0.9D, 80));
+		this.goalSelector.addGoal(15, new LookAtPlayerGoal(this, Player.class, 8.0F));
+		this.goalSelector.addGoal(16, new RandomLookAroundGoal(this));
 	}
 
 	@Override
@@ -202,6 +204,7 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	@Override
 	protected void customServerAiStep(ServerLevel level) {
 		super.customServerAiStep(level);
+		this.preventWaterSitting();
 		MushroomFlightController.followFlyingOwner(this);
 		MushroomOwnerContactHandler.tick(this, level);
 		this.tickNightBehavior(level);
@@ -217,12 +220,12 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 
 	@Override
 	protected boolean canFlyToOwner() {
-		return this.ownerIsCreativeFlying();
+		return this.ownerIsCreative();
 	}
 
 	private void tickNightBehavior(ServerLevel level) {
 		boolean sleepingAtNight = this.shouldSleepAtNight(level);
-		if (!sleepingAtNight) {
+		if (!sleepingAtNight && !MushroomBehaviorProfiles.keepsCreativeBuilderFocus(this, level)) {
 			this.setSleeping(false);
 			if (!isNight(level)) {
 				this.nightWakeTicks = 0;
@@ -287,12 +290,23 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	}
 
 	void setMushroomOrderedToSit(boolean sitting) {
+		if (sitting && this.isWetForSitting()) {
+			sitting = false;
+		}
 		this.setOrderedToSit(sitting);
 		this.updateSittingPose();
 	}
 
 	private void updateSittingPose() {
-		this.setInSittingPose(this.isMushroomSleeping() || this.isOrderedToSit());
+		this.setInSittingPose(!this.isWetForSitting() && (this.isMushroomSleeping() || this.isOrderedToSit()));
+	}
+
+	private void preventWaterSitting() {
+		if (this.isOrderedToSit() && this.isWetForSitting()) {
+			this.setMushroomOrderedToSit(false);
+			this.setSleeping(false);
+			MushroomBehaviorDebugger.debug(this, "water_follow", "ordered: follow forced because Mushroom is in water", true);
+		}
 	}
 
 	/** Loaded-world owner lookup for the one-Mushroom-per-player rule; unloaded chunks are intentionally ignored. */
@@ -403,6 +417,19 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	boolean ownerIsCreativeFlying() {
 		LivingEntity owner = this.getOwner();
 		return owner instanceof Player player && player.isCreative() && player.getAbilities().flying;
+	}
+
+	boolean ownerIsCreative() {
+		LivingEntity owner = this.getOwner();
+		return owner instanceof Player player && player.isCreative() && owner.level() == this.level();
+	}
+
+	boolean isUsingCreativeFlight() {
+		return this.isNoGravity();
+	}
+
+	boolean isWetForSitting() {
+		return this.isInWater() || this.level().getFluidState(this.blockPosition()).is(FluidTags.WATER);
 	}
 
 	@Override

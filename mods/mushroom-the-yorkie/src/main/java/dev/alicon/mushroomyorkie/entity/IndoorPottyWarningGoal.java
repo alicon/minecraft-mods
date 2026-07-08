@@ -24,7 +24,9 @@ final class IndoorPottyWarningGoal extends Goal {
 
 	@Override
 	public boolean canUse() {
-		return this.yorkie.level() instanceof ServerLevel level && this.yorkie.shouldAskToGoOutside(level);
+		return this.yorkie.level() instanceof ServerLevel level
+				&& this.yorkie.shouldAskToGoOutside(level)
+				&& !MushroomBehaviorProfiles.keepsRoutineNeedsQuiet(this.yorkie, level);
 	}
 
 	@Override
@@ -38,6 +40,7 @@ final class IndoorPottyWarningGoal extends Goal {
 		this.nextMoveTick = 0;
 		this.nextTargetSearchTick = this.yorkie.tickCount + TARGET_REFRESH_TICKS;
 		this.circleStep = 0;
+		MushroomOwnerNotice.send(this.yorkie, "message.mushroom_yorkie.notice_potty", MushroomOwnerNotice.MEDIUM_COOLDOWN_TICKS);
 		MushroomBehaviorDebugger.debug(this.yorkie, "potty_warning_start", "potty warning: needs outside", true);
 	}
 

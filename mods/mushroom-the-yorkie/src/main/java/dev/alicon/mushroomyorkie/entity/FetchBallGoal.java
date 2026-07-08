@@ -25,8 +25,8 @@ final class FetchBallGoal extends Goal {
 	private static final double PICKUP_VERTICAL_DISTANCE = 2.0D;
 	private static final double RETURN_DISTANCE_SQR = 4.0D;
 	private static final double MAX_SURVIVAL_FETCH_DROP = 3.0D;
-	private static final double FETCH_SPEED = 1.45D;
-	private static final double RETURN_SPEED = 1.35D;
+	private static final double FETCH_SPEED = 1.30D;
+	private static final double RETURN_SPEED = 1.20D;
 	private static final int UNSAFE_FETCH_BARK_TICKS = 20 * 2;
 	private static final int UNREACHABLE_FETCH_TICKS = 20;
 	private static final int WATER_SURFACE_SCAN_BLOCKS = 10;
@@ -216,6 +216,7 @@ final class FetchBallGoal extends Goal {
 		} else {
 			MushroomBehaviorDebugger.debug(this.yorkie, "fetch_water_unsafe", "fetch: skipping wet toy without breathing room", true);
 		}
+		MushroomOwnerNotice.send(this.yorkie, "message.mushroom_yorkie.notice_fetch_tricky", MushroomOwnerNotice.SHORT_COOLDOWN_TICKS);
 	}
 
 	private void abortUnreachableFetch(ServerLevel level, ItemEntity item) {
@@ -224,6 +225,7 @@ final class FetchBallGoal extends Goal {
 		this.unsafeFetchLookTarget = item.position();
 		this.unreachableTicks = 0;
 		this.yorkie.getNavigation().stop();
+		MushroomOwnerNotice.send(this.yorkie, "message.mushroom_yorkie.notice_fetch_unreachable", MushroomOwnerNotice.SHORT_COOLDOWN_TICKS);
 		MushroomBehaviorDebugger.debug(this.yorkie, "fetch_unreachable", "fetch: toy is not reachable from this edge", true);
 	}
 

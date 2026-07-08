@@ -1,6 +1,7 @@
 package dev.alicon.mushroomyorkie;
 
 import dev.alicon.mushroomyorkie.block.ModBlocks;
+import dev.alicon.mushroomyorkie.entity.MushroomBehaviorProfiles;
 import dev.alicon.mushroomyorkie.entity.ModEntities;
 import dev.alicon.mushroomyorkie.entity.MushroomYorkieEntity;
 import dev.alicon.mushroomyorkie.item.ModCreativeTabs;
@@ -27,6 +28,7 @@ public final class MushroomTheYorkie implements ModInitializer {
 		ModItems.initialize();
 		ModCreativeTabs.initialize();
 		FabricDefaultAttributeRegistry.register(ModEntities.MUSHROOM_YORKIE, MushroomYorkieEntity.createAttributes());
+		MushroomBehaviorProfiles.register();
 		MushroomWakeUpSpawner.register(config);
 		MushroomOwnerTravelHandler.register();
 

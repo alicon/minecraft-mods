@@ -5,6 +5,9 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 
 final class MushroomFlightController {
+	private static final double CREATIVE_RECOVERY_FLIGHT_DISTANCE_SQ = 12.0D * 12.0D;
+	private static final double CREATIVE_WATER_RECOVERY_DISTANCE_SQ = 4.0D;
+
 	private MushroomFlightController() {
 	}
 
@@ -19,13 +22,19 @@ final class MushroomFlightController {
 			return;
 		}
 
-		boolean followingFlyingOwner = !yorkie.isOrderedToSit() && yorkie.ownerIsCreativeFlying();
-		yorkie.setNoGravity(followingFlyingOwner);
-		updateFlightTrick(yorkie, followingFlyingOwner);
-		if (!followingFlyingOwner) {
+		boolean flyingToOwner = shouldFlyToOwner(yorkie);
+		yorkie.setNoGravity(flyingToOwner);
+		updateFlightTrick(yorkie, flyingToOwner);
+		if (!flyingToOwner) {
 			return;
 		}
-		MushroomBehaviorDebugger.debug(yorkie, "creative_flight", "creative flight: following flying owner", false);
+		boolean ownerFlying = yorkie.ownerIsCreativeFlying();
+		MushroomBehaviorDebugger.debug(
+				yorkie,
+				ownerFlying ? "creative_flight" : "creative_recovery_flight",
+				ownerFlying ? "creative flight: following flying owner" : "creative flight: recovering to creative owner",
+				false
+		);
 
 		LivingEntity owner = yorkie.getOwner();
 		if (owner == null || owner.level() != yorkie.level()) {
@@ -49,6 +58,29 @@ final class MushroomFlightController {
 		yorkie.setDeltaMovement(movement);
 		yorkie.hurtMarked = true;
 		MushroomBehaviorDebugger.debug(yorkie, "creative_flight_move", "creative flight: closing distance to owner", false);
+	}
+
+	private static boolean shouldFlyToOwner(MushroomYorkieEntity yorkie) {
+		if (yorkie.isOrderedToSit() || !yorkie.ownerIsCreative()) {
+			return false;
+		}
+		if (yorkie.ownerIsCreativeFlying()) {
+			return true;
+		}
+
+		LivingEntity owner = yorkie.getOwner();
+		if (owner == null || owner.level() != yorkie.level()) {
+			return false;
+		}
+
+		double distanceSqr = yorkie.distanceToSqr(owner);
+		if (yorkie.isUsingCreativeFlight()) {
+			return distanceSqr > MushroomYorkieEntity.CREATIVE_FLIGHT_FOLLOW_DISTANCE_SQ;
+		}
+		if (yorkie.isWetForSitting()) {
+			return distanceSqr > CREATIVE_WATER_RECOVERY_DISTANCE_SQ;
+		}
+		return distanceSqr > CREATIVE_RECOVERY_FLIGHT_DISTANCE_SQ && yorkie.getNavigation().isDone();
 	}
 
 	private static void faceFlightTarget(MushroomYorkieEntity yorkie, Vec3 delta) {

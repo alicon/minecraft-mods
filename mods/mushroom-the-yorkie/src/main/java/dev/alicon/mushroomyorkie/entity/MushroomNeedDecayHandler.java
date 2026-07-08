@@ -11,7 +11,7 @@ final class MushroomNeedDecayHandler {
 
 	static void tick(MushroomYorkieEntity yorkie, ServerLevel level) {
 		if (yorkie.tickCount % MushroomYorkieEntity.NEEDS_INTERVAL_TICKS == 0) {
-			boolean resting = yorkie.isOrderedToSit() || yorkie.isMushroomSleeping();
+			boolean resting = yorkie.isOrderedToSit() || yorkie.isMushroomSleeping() || MushroomBehaviorProfiles.shouldRestLikeSitting(yorkie, level);
 			yorkie.needs.tickNeeds(level.canSeeSky(yorkie.blockPosition()), resting, shouldSpendHunger(yorkie, resting));
 		}
 
@@ -20,6 +20,7 @@ final class MushroomNeedDecayHandler {
 				&& MushroomOwnerContactHandler.ownerIsCloseEnoughForNeglect(yorkie)
 				&& yorkie.tickCount % STARVING_DAMAGE_INTERVAL_TICKS == 0) {
 			yorkie.whine();
+			MushroomOwnerNotice.send(yorkie, "message.mushroom_yorkie.notice_hungry_critical", STARVING_DAMAGE_INTERVAL_TICKS);
 			yorkie.hurtFromNeglect(level, 1.0F);
 			MushroomBehaviorDebugger.debug(yorkie, "starving", "needs: food bar is empty", true);
 		}

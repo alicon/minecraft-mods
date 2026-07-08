@@ -25,6 +25,7 @@ final class MushroomReliefHandler {
 		yorkie.needs.relieveOutside();
 		yorkie.relief.recordRelief(day);
 		yorkie.bark();
+		MushroomOwnerNotice.send(yorkie, "message.mushroom_yorkie.notice_relieved", MushroomOwnerNotice.MEDIUM_COOLDOWN_TICKS);
 		MushroomBehaviorDebugger.debug(yorkie, "potty_relieved", "potty: relieved outside and reset for the day", true);
 	}
 }

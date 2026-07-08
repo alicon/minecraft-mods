@@ -1,7 +1,6 @@
 package dev.alicon.mushroomyorkie.entity;
 
 import dev.alicon.mushroomyorkie.item.ModItems;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -27,11 +26,14 @@ final class MushroomOwnerPromptHandler {
 	}
 
 	private static void tickFoodPrompt(MushroomYorkieEntity yorkie, ServerLevel level) {
-		if (!(yorkie.getOwner() instanceof Player owner)
+		if (!(yorkie.getOwner() instanceof Player)
 				|| !yorkie.isTame()
 				|| yorkie.isOrderedToSit()
 				|| yorkie.isMushroomSleeping()
 				|| yorkie.tickCount % FOOD_PROMPT_INTERVAL_TICKS != 0) {
+			return;
+		}
+		if (MushroomBehaviorProfiles.keepsRoutineNeedsQuiet(yorkie, level)) {
 			return;
 		}
 
@@ -43,7 +45,7 @@ final class MushroomOwnerPromptHandler {
 		}
 
 		yorkie.whine();
-		owner.displayClientMessage(Component.translatable("message.mushroom_yorkie.food_bowl_empty"), true);
+		MushroomOwnerNotice.send(yorkie, "message.mushroom_yorkie.notice_hungry_soon", MushroomOwnerNotice.LONG_COOLDOWN_TICKS);
 		MushroomBehaviorDebugger.debug(yorkie, "food_prompt", "domestic care: food bowl is empty", true);
 	}
 }

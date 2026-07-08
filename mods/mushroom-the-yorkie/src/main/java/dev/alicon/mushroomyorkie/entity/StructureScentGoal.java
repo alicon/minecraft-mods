@@ -372,9 +372,9 @@ final class StructureScentGoal extends Goal {
 
 		this.nextMessageTick = FOLLOW_MESSAGE_TICKS;
 		if (key.endsWith("start") || key.endsWith("arrived")) {
-			owner.displayClientMessage(Component.translatable(key, Component.translatable(this.scent.target().descriptionKey())), true);
+			MushroomOwnerNotice.send(this.yorkie, key, 0, Component.translatable(this.scent.target().descriptionKey()));
 		} else {
-			owner.displayClientMessage(Component.translatable(key), true);
+			MushroomOwnerNotice.send(this.yorkie, key, 0);
 		}
 	}
 

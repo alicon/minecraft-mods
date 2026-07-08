@@ -46,6 +46,7 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 
 	@Override
 	public void start() {
+		MushroomOwnerNotice.send(this.yorkie, "message.mushroom_yorkie.notice_peaceful_mob", MushroomOwnerNotice.MEDIUM_COOLDOWN_TICKS);
 		MushroomBehaviorDebugger.debug(this.yorkie, "peaceful_mob_start", "peaceful mob: found " + this.targetName(), true);
 	}
 
@@ -70,6 +71,7 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 		if (this.yorkie.distanceToSqr(owner) > OWNER_RECALL_DISTANCE_SQR) {
 			this.yorkie.getLookControl().setLookAt(owner, 10.0F, this.yorkie.getMaxHeadXRot());
 			this.yorkie.getNavigation().moveTo(owner, 1.35D);
+			MushroomOwnerNotice.send(this.yorkie, "message.mushroom_yorkie.notice_peaceful_return", MushroomOwnerNotice.MEDIUM_COOLDOWN_TICKS);
 			MushroomBehaviorDebugger.debug(this.yorkie, "peaceful_mob_owner_far", "peaceful mob: returning because owner walked away", false);
 			return;
 		}
@@ -77,6 +79,9 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 		if (MushroomFoodPolicy.isHoldingPeacefulMobRecallItem(owner)) {
 			if (MushroomFoodPolicy.isHoldingPeacefulMobCalmingItem(owner)) {
 				this.yorkie.mutePeacefulMobBarking((ServerLevel) this.yorkie.level());
+				MushroomOwnerNotice.send(this.yorkie, "message.mushroom_yorkie.notice_peaceful_calmed", MushroomOwnerNotice.MEDIUM_COOLDOWN_TICKS);
+			} else {
+				MushroomOwnerNotice.send(this.yorkie, "message.mushroom_yorkie.notice_peaceful_return", MushroomOwnerNotice.MEDIUM_COOLDOWN_TICKS);
 			}
 			this.yorkie.getNavigation().moveTo(owner, 1.25D);
 			MushroomBehaviorDebugger.debug(this.yorkie, "peaceful_mob_recall", "peaceful mob: returning because owner has a recall item", false);
@@ -103,7 +108,9 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 		return this.yorkie.isTame()
 				&& !this.yorkie.isOrderedToSit()
 				&& !this.yorkie.isMushroomSleeping()
+				&& !this.yorkie.isUsingCreativeFlight()
 				&& !this.yorkie.shouldAskToGoOutside(level)
+				&& !MushroomBehaviorProfiles.keepsCreativeBuilderFocus(this.yorkie, level)
 				&& !this.yorkie.peacefulMobBarkingMuted(level)
 				&& this.yorkie.getOwner() != null;
 	}

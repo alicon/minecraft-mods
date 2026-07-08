@@ -98,6 +98,7 @@ final class HesitantHostileMobGoal extends Goal {
 		return this.yorkie.isTame()
 				&& !this.yorkie.isOrderedToSit()
 				&& !this.yorkie.isMushroomSleeping()
+				&& !this.yorkie.isUsingCreativeFlight()
 				&& !this.yorkie.shouldAskToGoOutside(level);
 	}
 
