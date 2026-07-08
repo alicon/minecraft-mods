@@ -8,7 +8,7 @@ Create a Modrinth **Mod** project for NARwhal Together with these values:
 - Suggested slug: `narwhal-together`
 - Summary: `Little tools for big Minecraft adventures together.`
 - License: `MIT`
-- Source: `https://github.com/alicon/narwhal-together`
+- Source: `https://github.com/alicon/minecraft-mods`
 - Client environment: `Required`
 - Server environment: `Required`
 - Loader: `Fabric`
@@ -24,7 +24,7 @@ Create a Modrinth **Mod** project for Mushroom the Yorkie with these values:
 - Suggested slug: `mushroom-the-yorkie`
 - Summary: `A tiny Yorkie companion with treats, naps, bathroom barks, and sheep-chasing opinions.`
 - License: `MIT`
-- Source: `https://github.com/alicon/narwhal-together`
+- Source: `https://github.com/alicon/minecraft-mods`
 - Client environment: `Required`
 - Server environment: `Required`
 - Loader: `Fabric`
@@ -35,7 +35,6 @@ Use `mods/mushroom-the-yorkie/src/main/resources/assets/mushroom_yorkie/icon.png
 
 - `docs/media/mushroom-the-yorkie-banner.png`
 - `docs/media/mushroom-the-yorkie-sleeping.png`
-- `docs/media/mushroom-the-yorkie-mob-chase.png`
 - `docs/media/mushroom-the-yorkie-adventure.png`
 
 Create a Modrinth **Mod** project for Cops and Robbers with these values:

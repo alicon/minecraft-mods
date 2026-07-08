@@ -22,6 +22,6 @@ This is a lightweight pretend-play mod for family Minecraft sessions. It gives k
 
 Cops and Robbers must be installed on every participating client and on the server or LAN host.
 
-- Minecraft Java Edition
+- Minecraft Java Edition 1.21.11
 - Fabric Loader
 - Fabric API

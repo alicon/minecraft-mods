@@ -45,7 +45,7 @@ Mushroom the Yorkie must be installed on every participating client and on the s
 
 - Fabric Loader
 - Fabric API
-- Minecraft Java Edition 1.21.11
+- Minecraft Java Edition 1.21.11 or 1.21.1
 
 ## Why Mushroom?
 

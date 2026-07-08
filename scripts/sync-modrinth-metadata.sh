@@ -8,20 +8,35 @@ fi
 : "${MODRINTH_TOKEN:?MODRINTH_TOKEN is required. Set it directly or save it in macOS Keychain as service 'modrinth-token' with account 'abellicon'.}"
 
 mod="${MODRINTH_MOD:-narwhal-together}"
+repository_url="https://github.com/alicon/minecraft-mods"
+license_url="${repository_url}/blob/main/LICENSE"
+source_url="$repository_url"
+issues_url="${repository_url}/issues"
+user_agent="alicon/minecraft-mods (${repository_url})"
+
+require_command() {
+	if ! command -v "$1" >/dev/null 2>&1; then
+		echo "Missing required command: $1" >&2
+		exit 127
+	fi
+}
+
+require_file() {
+	if [[ ! -f "$1" ]]; then
+		echo "Required file does not exist: $1" >&2
+		exit 1
+	fi
+}
 
 case "$mod" in
 	narwhal-together)
 		: "${MODRINTH_PROJECT_ID:?MODRINTH_PROJECT_ID is required for narwhal-together}"
 		project_id="$MODRINTH_PROJECT_ID"
-		user_agent="alicon/narwhal-together (github.com/alicon/narwhal-together)"
 		body_file="docs/MODRINTH.md"
 		icon_file="mods/narwhal-together/src/main/resources/assets/narwhal_together/icon.png"
 		title="NARwhal Together"
 		description="Controller-friendly tools that make Minecraft easier and more fun for families playing together."
 		categories='["utility", "social"]'
-		license_url="https://github.com/alicon/narwhal-together/blob/main/LICENSE"
-		source_url="https://github.com/alicon/narwhal-together"
-		issues_url="https://github.com/alicon/narwhal-together/issues"
 		stale_gallery_titles=()
 		gallery_specs=(
 			"Playing Together|docs/media/narwhal-together-banner.png|Three young adventurers regroup beneath the NARwhal Together mascot.|true|0"
@@ -29,15 +44,11 @@ case "$mod" in
 		;;
 	mushroom-the-yorkie)
 		project_id="${MUSHROOM_MODRINTH_PROJECT_ID:-mushroom-the-yorkie}"
-		user_agent="alicon/mushroom-the-yorkie (github.com/alicon/minecraft-mods)"
 		body_file="docs/MODRINTH_MUSHROOM.md"
 		icon_file="mods/mushroom-the-yorkie/src/main/resources/assets/mushroom_yorkie/icon.png"
 		title="Mushroom the Yorkie"
 		description="A tiny Yorkie companion with treats, naps, bathroom barks, sheep-chasing opinions, and tiny barrel rolls."
 		categories='["mobs", "game-mechanics"]'
-		license_url="https://github.com/alicon/minecraft-mods/blob/main/LICENSE"
-		source_url="https://github.com/alicon/minecraft-mods"
-		issues_url="https://github.com/alicon/minecraft-mods/issues"
 		stale_gallery_titles=(
 			"Big Feelings About Cows"
 			"Big feelings about Sheep!"
@@ -50,15 +61,11 @@ case "$mod" in
 		;;
 	cops-and-robbers)
 		project_id="${COPS_ROBBERS_MODRINTH_PROJECT_ID:-cops-and-robbers}"
-		user_agent="alicon/cops-and-robbers (github.com/alicon/minecraft-mods)"
 		body_file="docs/MODRINTH_COPS_AND_ROBBERS.md"
 		icon_file="mods/cops-and-robbers/src/main/resources/assets/cops_robbers/icon.png"
 		title="Cops and Robbers"
 		description="Police cruisers, fire trucks, robbers, banks, and patrol play for family Minecraft worlds."
 		categories='["adventure", "mobs", "game-mechanics"]'
-		license_url="https://github.com/alicon/minecraft-mods/blob/main/LICENSE"
-		source_url="https://github.com/alicon/minecraft-mods"
-		issues_url="https://github.com/alicon/minecraft-mods/issues"
 		stale_gallery_titles=()
 		gallery_specs=()
 		;;
@@ -67,6 +74,15 @@ case "$mod" in
 		exit 2
 		;;
 esac
+
+require_command curl
+require_command jq
+require_file "$body_file"
+require_file "$icon_file"
+for spec in "${gallery_specs[@]}"; do
+	IFS='|' read -r _gallery_title gallery_file _gallery_description _featured _ordering <<<"$spec"
+	require_file "$gallery_file"
+done
 
 api="https://api.modrinth.com/v2/project/${project_id}"
 auth_header="Authorization: ${MODRINTH_TOKEN}"
