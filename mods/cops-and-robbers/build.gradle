@@ -2,7 +2,7 @@ ext {
 	mod_id = 'cops_robbers'
 	mod_archive_name = 'cops-and-robbers'
 	mod_display_name = 'Cops and Robbers'
-	mod_version = '0.1.1'
+	mod_version = '0.1.2'
 	modrinth_project_env = 'COPS_ROBBERS_MODRINTH_PROJECT_ID'
 	modrinth_project_fallback = 'cops-and-robbers'
 	modrinth_optional_projects = []

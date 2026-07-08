@@ -2,7 +2,7 @@ ext {
 	mod_id = 'narwhal_together'
 	mod_archive_name = 'narwhal-together'
 	mod_display_name = 'NARwhal Together'
-	mod_version = '0.1.1'
+	mod_version = '0.1.2'
 	modrinth_project_env = 'MODRINTH_PROJECT_ID'
 	modrinth_project_fallback = 'narwhal-together'
 	modrinth_optional_projects = ['controlify']

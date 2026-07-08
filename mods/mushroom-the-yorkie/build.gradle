@@ -2,7 +2,7 @@ ext {
 	mod_id = 'mushroom_yorkie'
 	mod_archive_name = 'mushroom-the-yorkie'
 	mod_display_name = 'Mushroom the Yorkie'
-	mod_version = '0.1.1'
+	mod_version = '0.1.2'
 	modrinth_project_env = 'MUSHROOM_MODRINTH_PROJECT_ID'
 	modrinth_project_fallback = 'mushroom-the-yorkie'
 	modrinth_optional_projects = []
