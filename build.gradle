@@ -267,6 +267,34 @@ tasks.register('validatePublicApiDocs') {
 	}
 }
 
+tasks.register('validateReleaseNotes') {
+	group = 'verification'
+	description = 'Requires release notes for each mod version declared in Gradle.'
+
+	doLast {
+		def violations = []
+
+		subprojects.each { modProject ->
+			if (!modProject.ext.has('mod_version')) {
+				return
+			}
+
+			def releaseNotes = rootProject.file("docs/release-notes/${modProject.name}/${modProject.ext.mod_version}.md")
+			if (!releaseNotes.file) {
+				violations << "${modProject.path} is missing ${rootProject.projectDir.toPath().relativize(releaseNotes.toPath())}"
+				return
+			}
+			if (releaseNotes.text.trim().empty) {
+				violations << "${rootProject.projectDir.toPath().relativize(releaseNotes.toPath())} is empty"
+			}
+		}
+
+		if (!violations.empty) {
+			throw new GradleException("Release note validation failed:\n" + violations.join('\n'))
+		}
+	}
+}
+
 Object activeMinecraftVersionFor(Project modProject) {
 	return modProject.ext.has('active_minecraft_version')
 			? modProject.ext.active_minecraft_version
@@ -318,5 +346,6 @@ gradle.projectsEvaluated {
 		dependsOn tasks.named('validateJavaFileSizes')
 		dependsOn tasks.named('validateNoClientImportsInMain')
 		dependsOn tasks.named('validatePublicApiDocs')
+		dependsOn tasks.named('validateReleaseNotes')
 	}
 }

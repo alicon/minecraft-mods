@@ -194,6 +194,7 @@ Logs and in-game diagnostics should make development clearer without spamming no
 - Java file-size warnings at 300 lines and failures above 500 lines
 - no client-only imports from common/server source
 - Javadocs for public declarations that are not overrides
+- release notes for every declared mod version
 - successful per-mod Javadoc generation
 - per-mod JVM unit tests
 
