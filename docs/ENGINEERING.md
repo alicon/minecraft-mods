@@ -31,7 +31,8 @@ Good examples:
 ## Configuration
 
 - Centralize shared versions in `gradle.properties`.
-- Centralize repeated build behavior in `gradle/fabric-mod.gradle`.
+- Centralize repeated mod build behavior in `gradle/fabric-mod.gradle`.
+- Centralize repository validation gates in `gradle/repo-validation.gradle`.
 - Give each mod only the configuration that is truly unique: mod id, display name, archive name, Modrinth project id, optional dependencies.
 - Do not hard-code repeated Minecraft, Fabric Loader, Fabric API, Java, or JUnit versions in subprojects.
 - Keep output paths symmetric across mods.

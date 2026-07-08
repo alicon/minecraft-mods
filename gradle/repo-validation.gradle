@@ -1,0 +1,452 @@
+tasks.register('validateModLayout') {
+	group = 'verification'
+	description = 'Validates monorepo mod layout and fabric.mod.json metadata.'
+
+	doLast {
+		def expectedRepositoryUrl = 'https://github.com/alicon/minecraft-mods'
+		if (rootProject.file('src').exists()) {
+			throw new GradleException("Root src/ is not allowed in this multi-mod layout; put mod sources under mods/<mod-name>/src")
+		}
+
+		def seenModIds = [] as Set
+
+		subprojects.each { modProject ->
+			def modDir = modProject.projectDir
+			def minecraftVersion = activeMinecraftVersionFor(modProject)
+			def metadataFile = modDir.toPath().resolve('src/main/resources/fabric.mod.json').toFile()
+			def mainSourceDir = modDir.toPath().resolve('src/main/java').toFile()
+			def clientSourceDir = modDir.toPath().resolve('src/client/java').toFile()
+			def versionsDir = modDir.toPath().resolve('src/versions').toFile()
+			def activeVersionDir = modDir.toPath().resolve("src/versions/${minecraftVersion}").toFile()
+
+			if (!metadataFile.file) {
+				throw new GradleException("${modProject.path} is missing src/main/resources/fabric.mod.json")
+			}
+			if (!mainSourceDir.directory) {
+				throw new GradleException("${modProject.path} is missing src/main/java")
+			}
+			if (!clientSourceDir.directory) {
+				throw new GradleException("${modProject.path} is missing src/client/java")
+			}
+			if (versionsDir.directory && !activeVersionDir.directory) {
+				throw new GradleException("${modProject.path} has versioned sources but no src/versions/${minecraftVersion}")
+			}
+
+			def metadata = new groovy.json.JsonSlurper().parse(metadataFile)
+			if (metadata.id != modProject.ext.mod_id) {
+				throw new GradleException("${modProject.path} fabric.mod.json id '${metadata.id}' does not match Gradle mod_id '${modProject.ext.mod_id}'")
+			}
+			if (!seenModIds.add(metadata.id)) {
+				throw new GradleException("Duplicate mod id '${metadata.id}'")
+			}
+			if (metadata.license != 'MIT') {
+				throw new GradleException("${modProject.path} fabric.mod.json license must be MIT")
+			}
+
+			def contact = metadata.contact ?: [:]
+			if (contact.homepage != expectedRepositoryUrl || contact.sources != expectedRepositoryUrl || contact.issues != "${expectedRepositoryUrl}/issues") {
+				throw new GradleException("${modProject.path} fabric.mod.json contact links must point at ${expectedRepositoryUrl}")
+			}
+
+			def iconPath = metadata.icon
+			if (!iconPath) {
+				throw new GradleException("${modProject.path} fabric.mod.json is missing icon")
+			}
+			def iconFile = modDir.toPath().resolve("src/main/resources/${iconPath}").toFile()
+			if (!iconFile.file) {
+				throw new GradleException("${modProject.path} icon '${iconPath}' does not exist")
+			}
+
+			(metadata.entrypoints ?: [:]).each { environment, entrypoints ->
+				entrypoints.each { entrypoint ->
+					def sourceRoots = sourceRootsFor(modDir, environment, minecraftVersion)
+					def entrypointPath = "${entrypoint.replace('.', '/')}.java"
+					def sourceFile = sourceRoots.collect { root -> root.toPath().resolve(entrypointPath).toFile() }
+							.find { it.file }
+					if (sourceFile == null) {
+						throw new GradleException("${modProject.path} ${environment} entrypoint '${entrypoint}' does not exist in ${sourceRoots.collect { rootProject.projectDir.toPath().relativize(it.toPath()).toString() }.join(', ')}")
+					}
+				}
+			}
+
+			def langDir = modDir.toPath().resolve("src/main/resources/assets/${metadata.id}/lang").toFile()
+			if (langDir.directory) {
+				langDir.eachFileMatch(~/.*\.json/) { langFile ->
+					def keyMatches = (langFile.text =~ /"([^"]+)"\s*:/).collect { it[1] }
+					def duplicateKeys = keyMatches.countBy { it }.findAll { it.value > 1 }.keySet()
+					if (!duplicateKeys.empty) {
+						throw new GradleException("${modProject.path} ${langFile.name} has duplicate translation keys: ${duplicateKeys.sort().join(', ')}")
+					}
+				}
+			}
+
+			def modelDir = modDir.toPath().resolve("src/main/resources/assets/${metadata.id}/models").toFile()
+			if (modelDir.directory) {
+				modelDir.eachFileRecurse { modelFile ->
+					if (!modelFile.file || !modelFile.name.endsWith('.json')) {
+						return
+					}
+
+					def model = new groovy.json.JsonSlurper().parse(modelFile)
+					(model.textures ?: [:]).each { layer, textureRef ->
+						if (!(textureRef instanceof String) || textureRef.startsWith('#')) {
+							return
+						}
+
+						def parts = textureRef.contains(':') ? textureRef.split(':', 2) : [metadata.id, textureRef]
+						def namespace = parts[0]
+						def texturePath = parts[1]
+						if (namespace == 'minecraft') {
+							return
+						}
+
+						def textureFile = modDir.toPath().resolve("src/main/resources/assets/${namespace}/textures/${texturePath}.png").toFile()
+						if (!textureFile.file) {
+							throw new GradleException("${modProject.path} model ${modelFile.name} references missing texture '${textureRef}'")
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+tasks.register('validateFormatting') {
+	group = 'verification'
+	description = 'Validates low-level text formatting for source-controlled files.'
+
+	doLast {
+		def checkedExtensions = ['.gradle', '.java', '.json', '.md', '.properties', '.sh', '.yml', '.yaml']
+		def checkedFiles = ['.editorconfig', '.gitattributes', '.gitignore']
+		def ignoredDirs = ['.git', '.gradle', '.gradle-user-home', 'build']
+		def violations = []
+
+		rootProject.projectDir.eachFileRecurse { file ->
+			if (!file.file) {
+				return
+			}
+			def relative = rootProject.projectDir.toPath().relativize(file.toPath()).toString()
+			def firstPathPart = relative.split(/[\/\\]/, 2)[0]
+			if (ignoredDirs.contains(firstPathPart) || relative.contains("${File.separator}build${File.separator}")) {
+				return
+			}
+			if (!checkedExtensions.any { relative.endsWith(it) } && !checkedFiles.contains(relative)) {
+				return
+			}
+
+			def bytes = file.bytes
+			def text = new String(bytes, java.nio.charset.StandardCharsets.UTF_8)
+			if (text.contains('\r\n')) {
+				violations << "${relative}: uses CRLF line endings"
+			}
+			if (bytes.length > 0 && bytes[bytes.length - 1] != (byte) '\n') {
+				violations << "${relative}: missing final newline"
+			}
+			text.readLines().eachWithIndex { line, index ->
+				if (line ==~ /.*[ \t]$/) {
+					violations << "${relative}:${index + 1}: trailing whitespace"
+				}
+			}
+		}
+
+		if (!violations.empty) {
+			throw new GradleException("Formatting validation failed:\n" + violations.join('\n'))
+		}
+	}
+}
+
+tasks.register('validateJavaFileSizes') {
+	group = 'verification'
+	description = 'Fails Java files over 500 lines and warns at 300 lines.'
+
+	doLast {
+		def oversized = []
+		def warnings = []
+
+		rootProject.file('mods').eachFileRecurse { file ->
+			if (!file.file || !file.name.endsWith('.java')) {
+				return
+			}
+			def relative = rootProject.projectDir.toPath().relativize(file.toPath()).toString()
+			if (relative.contains("${File.separator}build${File.separator}")) {
+				return
+			}
+
+			def lineCount = file.readLines().size()
+			if (lineCount > 500) {
+				oversized << "${relative}: ${lineCount} lines"
+			} else if (lineCount > 300) {
+				warnings << "${relative}: ${lineCount} lines"
+			}
+		}
+
+		warnings.each { logger.warn("Java file approaching factoring threshold: ${it}") }
+		if (!oversized.empty) {
+			throw new GradleException("Java files over 500 lines must be factored:\n" + oversized.join('\n'))
+		}
+	}
+}
+
+tasks.register('validateNoClientImportsInMain') {
+	group = 'verification'
+	description = 'Prevents common/server source from importing client-only Minecraft classes.'
+
+	doLast {
+		def forbiddenImports = [
+				'import net.minecraft.client.',
+				'import com.mojang.blaze3d.',
+				'import org.lwjgl.'
+		]
+		def violations = []
+
+		subprojects.each { modProject ->
+			sourceRootsFor(modProject.projectDir, 'main', activeMinecraftVersionFor(modProject)).each { mainJava ->
+				if (!mainJava.directory) {
+					return
+				}
+				mainJava.eachFileRecurse { file ->
+					if (!file.file || !file.name.endsWith('.java')) {
+						return
+					}
+					def relative = rootProject.projectDir.toPath().relativize(file.toPath()).toString()
+					file.readLines().eachWithIndex { line, index ->
+						if (forbiddenImports.any { line.startsWith(it) }) {
+							violations << "${relative}:${index + 1}: client-only import in common source: ${line.trim()}"
+						}
+					}
+				}
+			}
+		}
+
+		if (!violations.empty) {
+			throw new GradleException("Client-only imports found in common source:\n" + violations.join('\n'))
+		}
+	}
+}
+
+tasks.register('validatePublicApiDocs') {
+	group = 'verification'
+	description = 'Requires Javadocs for public declarations that are not Minecraft/API overrides.'
+
+	doLast {
+		def declaration = ~/^\s*public\s+((final\s+|abstract\s+)?(class|interface|enum|record)\b|([A-Za-z0-9_<>\[\], ?]+\s+)?[A-Za-z_][A-Za-z0-9_]*\s*\(|(static\s+final\s+)?[A-Za-z0-9_<>\[\], ?]+\s+[A-Z0-9_]+\s*=).*/
+		def violations = []
+
+		subprojects.each { modProject ->
+			def minecraftVersion = activeMinecraftVersionFor(modProject)
+			(['main', 'client'] as Set).each { environment ->
+				sourceRootsFor(modProject.projectDir, environment, minecraftVersion).each { sourceDir ->
+					if (!sourceDir.directory) {
+						return
+					}
+					sourceDir.eachFileRecurse { file ->
+						if (!file.file || !file.name.endsWith('.java')) {
+							return
+						}
+						def lines = file.readLines()
+						lines.eachWithIndex { line, index ->
+							if (!(line ==~ declaration)) {
+								return
+							}
+							if (hasPublicApiDoc(lines, index)) {
+								return
+							}
+
+							def relative = rootProject.projectDir.toPath().relativize(file.toPath()).toString()
+							violations << "${relative}:${index + 1}: public declaration needs Javadoc or @Override"
+						}
+					}
+				}
+			}
+		}
+
+		if (!violations.empty) {
+			throw new GradleException("Public API documentation validation failed:\n" + violations.join('\n'))
+		}
+	}
+}
+
+tasks.register('validateReleaseNotes') {
+	group = 'verification'
+	description = 'Requires release notes for each mod version declared in Gradle.'
+
+	doLast {
+		def violations = []
+
+		subprojects.each { modProject ->
+			if (!modProject.ext.has('mod_version')) {
+				return
+			}
+
+			def releaseNotes = rootProject.file("docs/release-notes/${modProject.name}/${modProject.ext.mod_version}.md")
+			if (!releaseNotes.file) {
+				violations << "${modProject.path} is missing ${rootProject.projectDir.toPath().relativize(releaseNotes.toPath())}"
+				return
+			}
+			if (releaseNotes.text.trim().empty) {
+				violations << "${rootProject.projectDir.toPath().relativize(releaseNotes.toPath())} is empty"
+			}
+		}
+
+		if (!violations.empty) {
+			throw new GradleException("Release note validation failed:\n" + violations.join('\n'))
+		}
+	}
+}
+
+tasks.register('validateVersionedSourceLayout') {
+	group = 'verification'
+	description = 'Validates supported Minecraft version source roots and override excludes.'
+
+	doLast {
+		def violations = []
+
+		subprojects.each { modProject ->
+			def modDir = modProject.projectDir
+			def versionsDir = modDir.toPath().resolve('src/versions').toFile()
+			def versionMatrix = modProject.ext.has('supported_minecraft_versions') ? modProject.ext.supported_minecraft_versions : [:]
+			def declaredVersions = versionMatrix.keySet().collect { it.toString() } as Set
+
+			if (versionMatrix.isEmpty()) {
+				if (versionsDir.directory) {
+					violations << "${modProject.path} has src/versions but no supported_minecraft_versions map"
+				}
+				return
+			}
+
+			declaredVersions.each { minecraftVersion ->
+				def versionDir = versionsDir.toPath().resolve(minecraftVersion).toFile()
+				if (!versionDir.directory) {
+					violations << "${modProject.path} declares Minecraft ${minecraftVersion} but is missing src/versions/${minecraftVersion}"
+				}
+			}
+
+			if (versionsDir.directory) {
+				versionsDir.eachDir { versionDir ->
+					if (!declaredVersions.contains(versionDir.name)) {
+						violations << "${modProject.path} has undeclared versioned sources in src/versions/${versionDir.name}"
+					}
+				}
+			}
+
+			[
+					[
+							name           : 'common',
+							excludeProperty: 'versioned_common_excludes',
+							sourcePath     : 'src/main/java',
+							versionPath    : 'main/java'
+					],
+					[
+							name           : 'client',
+							excludeProperty: 'versioned_client_excludes',
+							sourcePath     : 'src/client/java',
+							versionPath    : 'client/java'
+					]
+			].each { environment ->
+				def excludeMap = modProject.ext.has(environment.excludeProperty)
+						? modProject.ext.get(environment.excludeProperty)
+						: [:]
+
+				excludeMap.each { minecraftVersion, excludedPaths ->
+					def version = minecraftVersion.toString()
+					if (!declaredVersions.contains(version)) {
+						violations << "${modProject.path} ${environment.excludeProperty} references undeclared Minecraft ${version}"
+					}
+
+					def seenExcludes = [] as Set
+					excludedPaths.each { excludedPath ->
+						if (!seenExcludes.add(excludedPath)) {
+							violations << "${modProject.path} duplicates ${excludedPath} in ${environment.excludeProperty} for ${version}"
+						}
+
+						def baseFile = modDir.toPath().resolve("${environment.sourcePath}/${excludedPath}").toFile()
+						if (!baseFile.file) {
+							violations << "${modProject.path} ${environment.excludeProperty} references missing ${environment.sourcePath}/${excludedPath}"
+						}
+					}
+				}
+
+				def baseSourceDir = modDir.toPath().resolve(environment.sourcePath).toFile()
+				if (!baseSourceDir.directory) {
+					return
+				}
+
+				declaredVersions.each { minecraftVersion ->
+					def excludedPaths = (excludeMap.get(minecraftVersion) ?: []) as Set
+					def versionSourceDir = versionsDir.toPath().resolve("${minecraftVersion}/${environment.versionPath}").toFile()
+					if (!versionSourceDir.directory) {
+						return
+					}
+
+					versionSourceDir.eachFileRecurse { versionFile ->
+						if (!versionFile.file || !versionFile.name.endsWith('.java')) {
+							return
+						}
+
+						def relativePath = versionSourceDir.toPath().relativize(versionFile.toPath()).toString().replace(File.separator, '/')
+						def baseFile = baseSourceDir.toPath().resolve(relativePath).toFile()
+						if (baseFile.file && !excludedPaths.contains(relativePath)) {
+							violations << "${modProject.path} ${environment.name} source ${relativePath} shadows shared source for ${minecraftVersion} but is not listed in ${environment.excludeProperty}"
+						}
+					}
+				}
+			}
+		}
+
+		if (!violations.empty) {
+			throw new GradleException("Versioned source layout validation failed:\n" + violations.join('\n'))
+		}
+	}
+}
+
+Object activeMinecraftVersionFor(Project modProject) {
+	return modProject.ext.has('active_minecraft_version')
+			? modProject.ext.active_minecraft_version
+			: modProject.minecraft_version
+}
+
+List<File> sourceRootsFor(File modDir, String environment, Object minecraftVersion) {
+	def sourceRoots = []
+	def sourcePath = environment == 'client' ? 'src/client/java' : 'src/main/java'
+	sourceRoots << modDir.toPath().resolve(sourcePath).toFile()
+	def versionPath = environment == 'client'
+			? "src/versions/${minecraftVersion}/client/java"
+			: "src/versions/${minecraftVersion}/main/java"
+	sourceRoots << modDir.toPath().resolve(versionPath).toFile()
+	return sourceRoots
+}
+
+boolean hasPublicApiDoc(List<String> lines, int declarationIndex) {
+	int index = declarationIndex - 1
+	while (index >= 0 && lines[index].trim().isEmpty()) {
+		index--
+	}
+	while (index >= 0 && lines[index].trim().startsWith('@')) {
+		if (lines[index].trim() == '@Override') {
+			return true
+		}
+		index--
+		while (index >= 0 && lines[index].trim().isEmpty()) {
+			index--
+		}
+	}
+
+	if (index < 0) {
+		return false
+	}
+
+	def previous = lines[index].trim()
+	return previous == '*/' || (previous.startsWith('/**') && previous.endsWith('*/'))
+}
+
+gradle.projectsEvaluated {
+	tasks.named('check') {
+		dependsOn tasks.named('validateModLayout')
+		dependsOn tasks.named('validateFormatting')
+		dependsOn tasks.named('validateJavaFileSizes')
+		dependsOn tasks.named('validateNoClientImportsInMain')
+		dependsOn tasks.named('validatePublicApiDocs')
+		dependsOn tasks.named('validateReleaseNotes')
+		dependsOn tasks.named('validateVersionedSourceLayout')
+	}
+}
