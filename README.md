@@ -53,7 +53,7 @@ build/mods/cops-and-robbers/<minecraft-version>/libs/cops-and-robbers-<version>.
 ./gradlew check -Ptarget_minecraft_version=1.21.1
 ```
 
-This runs unit tests plus repo quality gates for layout, metadata, formatting, file size, forbidden client imports, public API docs, and Javadocs.
+This runs unit tests plus repo quality gates for layout, metadata links, formatting, file size, versioned-source layout, release notes, forbidden client imports, public API docs, and Javadocs.
 
 ## Per-Mod Builds
 

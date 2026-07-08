@@ -11,6 +11,7 @@ body:
       options:
         - NARwhal Together
         - Mushroom the Yorkie
+        - Cops and Robbers
         - Repo/build tooling
         - Not sure
     validations:
@@ -50,7 +51,7 @@ body:
     id: mod-version
     attributes:
       label: Mod version or jar name
-      placeholder: "narwhal-together-0.1.0.jar"
+      placeholder: "narwhal-together-0.1.1.jar"
   - type: textarea
     id: logs
     attributes:

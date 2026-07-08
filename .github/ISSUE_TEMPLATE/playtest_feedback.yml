@@ -11,6 +11,7 @@ body:
       options:
         - NARwhal Together
         - Mushroom the Yorkie
+        - Cops and Robbers
         - Multiple mods
     validations:
       required: true
@@ -18,7 +19,7 @@ body:
     id: version
     attributes:
       label: Version or jar name
-      placeholder: "mushroom-the-yorkie-0.1.0.jar"
+      placeholder: "mushroom-the-yorkie-0.1.1.jar"
   - type: textarea
     id: worked
     attributes:
