@@ -156,10 +156,12 @@ Run Mushroom's richer live bridge scenario against a disposable world:
 ```shell
 make modrinth-autoplay-yorkie PLAYTEST_TEMPLATE_WORLD="Clean Template" BRIDGE_SCREENSHOT_NAME=yorkie-smoke.png
 make modrinth-autoplay-yorkie-visual PLAYTEST_TEMPLATE_WORLD="Clean Template" BRIDGE_SCREENSHOT_NAME=yorkie-gallery
+make modrinth-autoplay-yorkie-biome-scout PLAYTEST_WORLD="New World (21)" BRIDGE_SCREENSHOT_NAME=yorkie-biome-scout
 ```
 
 The Yorkie scenario checks duplicate-claim blocking, treat taming, owner sit/follow commands, harness equip/removal, lead rejection without a harness, exact treat/toy/player-food need changes, sheltered nighttime sleep, double-click wake-up, exact shelter cleanup, dog food and water bowl use, same-day bowl refill rejection, outdoor potty relief, screenshot capture, and positive lead attach with the harness equipped.
 The Yorkie visual sweep captures gallery-ready scenes for sitting, a fence-tied leash walk, nighttime sleep, water, fetch, flying, food and water bowls, wants-outside messaging, sheep chasing, and hostile spider defense.
+The Yorkie biome scout samples real worldgen in an existing save, records seed/coordinates/biomes, and captures review screenshots for natural outdoor staging candidates.
 
 Run Cops and Robbers' richer live bridge scenario against a disposable world:
 
@@ -194,6 +196,7 @@ Mushroom the Yorkie:
 
 - live Modrinth bridge smoke covers duplicate-claim blocking, treat taming, sit/follow, harness on/off, lead gating, exact toy/player-food effects, sheltered sleep/wake, dog food/water bowl consumption, same-day bowl refill rejection, outdoor potty relief, cleanup, screenshot capture, and lead attach
 - live Modrinth bridge visual sweep captures sitting, leash, sleep, water, fetch, flying, bowl, wants-outside, passive chase, and hostile defense screenshots for gallery review
+- live Modrinth bridge biome scout records seed, coordinate, biome, water/tree/height signals, and review screenshots for real-worldgen Yorkie staging locations
 - default pet needs
 - save/load value clamping
 - treat effects

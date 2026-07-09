@@ -79,10 +79,12 @@ Run Mushroom's richer bridge scenario:
 ```shell
 make modrinth-autoplay-yorkie PLAYTEST_TEMPLATE_WORLD="Clean Template" BRIDGE_SCREENSHOT_NAME=yorkie-smoke.png
 make modrinth-autoplay-yorkie-visual PLAYTEST_TEMPLATE_WORLD="Clean Template" BRIDGE_SCREENSHOT_NAME=yorkie-gallery
+make modrinth-autoplay-yorkie-biome-scout PLAYTEST_WORLD="New World (21)" BRIDGE_SCREENSHOT_NAME=yorkie-biome-scout
 ```
 
 It covers duplicate-claim blocking, treat taming, owner commands, harness/lead behavior, exact food and toy effects, sheltered nighttime sleep/wake, dog food and water bowl use, same-day bowl refill rejection, outdoor potty relief, exact shelter cleanup, screenshot capture, and positive leash attach.
 The visual sweep captures clean gallery scenes for sitting, a fence-tied leash walk, sleep, water, fetch, flying, food and water bowls, wants-outside messaging, sheep chasing, and hostile spider defense.
+The biome scout samples real worldgen coordinates in an existing save, records seed/coordinates/biomes, and captures candidate staging screenshots for natural outdoor gallery refreshes.
 
 Run Cops and Robbers' richer bridge scenario:
 

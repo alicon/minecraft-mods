@@ -140,6 +140,9 @@ final class PlaytestBridgeServer {
 			} else if ("POST".equals(method) && "/count-blocks".equals(path)) {
 				JsonObject body = readBody(exchange);
 				sendJson(exchange, 200, runOnServerThread(() -> BridgeWorldActions.countBlocks(this.playerFromBody(body), body)));
+			} else if ("POST".equals(method) && "/terrain-scan".equals(path)) {
+				JsonObject body = readBody(exchange);
+				sendJson(exchange, 200, runOnServerThread(() -> BridgeWorldActions.terrainScan(this.playerFromBody(body), body)));
 			} else if ("POST".equals(method) && "/screenshot".equals(path)) {
 				JsonObject body = readBody(exchange);
 				sendJson(exchange, 200, this.screenshot(body));
@@ -168,6 +171,7 @@ final class PlaytestBridgeServer {
 		JsonObject state = this.health();
 		state.addProperty("motd", this.server.getMotd());
 		state.addProperty("tickCount", this.server.getTickCount());
+		state.addProperty("seed", this.server.overworld().getSeed());
 		Path savePath = this.server.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
 		state.addProperty("savePath", savePath.toString());
 		Path saveName = savePath.getFileName();

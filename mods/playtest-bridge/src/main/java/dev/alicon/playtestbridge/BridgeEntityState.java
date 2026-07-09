@@ -6,6 +6,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -15,6 +16,7 @@ import net.minecraft.world.entity.Leashable;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -31,6 +33,9 @@ final class BridgeEntityState {
 		state.addProperty("health", player.getHealth());
 		state.addProperty("food", player.getFoodData().getFoodLevel());
 		state.addProperty("dimension", player.level().dimension().toString());
+		if (player.level() instanceof ServerLevel level) {
+			state.addProperty("biome", biomeId(level, player.blockPosition()));
+		}
 		state.add("position", position(player.position()));
 		state.add("abilities", playerAbilities(player));
 		if (player.getVehicle() != null) {
@@ -122,6 +127,13 @@ final class BridgeEntityState {
 		value.addProperty("y", round(position.y));
 		value.addProperty("z", round(position.z));
 		return value;
+	}
+
+	private static String biomeId(ServerLevel level, BlockPos position) {
+		Holder<Biome> biome = level.getBiome(position);
+		return biome.unwrapKey()
+				.map(key -> key.identifier().toString())
+				.orElseGet(biome::getRegisteredName);
 	}
 
 	static JsonObject blockPosition(BlockPos position) {

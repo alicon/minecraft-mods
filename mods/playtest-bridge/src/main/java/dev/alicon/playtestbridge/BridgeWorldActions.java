@@ -7,18 +7,23 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 
@@ -26,6 +31,7 @@ final class BridgeWorldActions {
 	private static final Pattern RESOURCE_ID = Pattern.compile("[a-z0-9_.-]+:[a-z0-9_./-]+");
 	private static final int MAX_OFFSET = 16;
 	private static final int MAX_COUNT_BLOCK_VOLUME = 65536;
+	private static final int MAX_TERRAIN_SCAN_RADIUS = 256;
 
 	private BridgeWorldActions() {
 	}
@@ -159,6 +165,80 @@ final class BridgeWorldActions {
 		return response;
 	}
 
+	static JsonObject terrainScan(ServerPlayer player, JsonObject body) {
+		if (!(player.level() instanceof ServerLevel level)) {
+			throw new IllegalArgumentException("player is not in a server level");
+		}
+
+		int centerX = optionalRawInt(body, "x", player.blockPosition().getX());
+		int centerZ = optionalRawInt(body, "z", player.blockPosition().getZ());
+		int radius = optionalInt(body, "radius", 48, 4, MAX_TERRAIN_SCAN_RADIUS);
+		int step = optionalInt(body, "step", 8, 1, 32);
+		int minY = Integer.MAX_VALUE;
+		int maxY = Integer.MIN_VALUE;
+		long totalY = 0L;
+		int samples = 0;
+		int waterSamples = 0;
+		int leafColumns = 0;
+		int logColumns = 0;
+		int openSkySamples = 0;
+		Map<String, Integer> topBlocks = new LinkedHashMap<>();
+		Map<String, Integer> biomes = new LinkedHashMap<>();
+
+		for (int x = centerX - radius; x <= centerX + radius; x += step) {
+			for (int z = centerZ - radius; z <= centerZ + radius; z += step) {
+				int surfaceY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+				BlockPos surface = new BlockPos(x, surfaceY, z);
+				BlockState top = level.getBlockState(surface.below());
+				samples++;
+				minY = Math.min(minY, surfaceY);
+				maxY = Math.max(maxY, surfaceY);
+				totalY += surfaceY;
+				if (top.getFluidState().is(FluidTags.WATER)) {
+					waterSamples++;
+				}
+				if (level.canSeeSky(surface)) {
+					openSkySamples++;
+				}
+				if (hasTaggedBlock(level, surface, BlockTags.LEAVES, 18)) {
+					leafColumns++;
+				}
+				if (hasTaggedBlock(level, surface, BlockTags.LOGS, 18)) {
+					logColumns++;
+				}
+				topBlocks.merge(blockId(top), 1, Integer::sum);
+				biomes.merge(biomeId(level, surface), 1, Integer::sum);
+			}
+		}
+
+		int centerY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, centerX, centerZ);
+		BlockPos center = new BlockPos(centerX, centerY, centerZ);
+		JsonObject response = new JsonObject();
+		response.addProperty("ok", true);
+		response.addProperty("seed", level.getSeed());
+		response.add("center", BridgeEntityState.blockPosition(center));
+		response.addProperty("centerBiome", biomeId(level, center));
+		response.addProperty("centerTopBlock", blockId(level.getBlockState(center.below())));
+		response.addProperty("radius", radius);
+		response.addProperty("step", step);
+		response.addProperty("samples", samples);
+		response.addProperty("minY", minY);
+		response.addProperty("maxY", maxY);
+		response.addProperty("heightRange", maxY - minY);
+		response.addProperty("averageY", samples == 0 ? 0.0D : (double) totalY / (double) samples);
+		response.addProperty("waterSamples", waterSamples);
+		response.addProperty("waterRatio", samples == 0 ? 0.0D : (double) waterSamples / (double) samples);
+		response.addProperty("leafColumns", leafColumns);
+		response.addProperty("leafRatio", samples == 0 ? 0.0D : (double) leafColumns / (double) samples);
+		response.addProperty("logColumns", logColumns);
+		response.addProperty("logRatio", samples == 0 ? 0.0D : (double) logColumns / (double) samples);
+		response.addProperty("openSkySamples", openSkySamples);
+		response.addProperty("openSkyRatio", samples == 0 ? 0.0D : (double) openSkySamples / (double) samples);
+		response.add("topBlocks", countsJson(topBlocks));
+		response.add("biomes", countsJson(biomes));
+		return response;
+	}
+
 	private static JsonObject setBlock(ServerLevel level, BlockPos position, BlockState state, JsonObject body) {
 		BlockState previous = level.getBlockState(position);
 		boolean changed = true;
@@ -188,6 +268,30 @@ final class BridgeWorldActions {
 		response.addProperty("state", blockStateId(level.getBlockState(position)));
 		response.add("position", BridgeEntityState.blockPosition(position));
 		return response;
+	}
+
+	private static boolean hasTaggedBlock(ServerLevel level, BlockPos surface, net.minecraft.tags.TagKey<Block> tag, int height) {
+		for (int dy = 0; dy <= height; dy++) {
+			if (level.getBlockState(surface.above(dy)).is(tag)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static String biomeId(ServerLevel level, BlockPos position) {
+		Holder<Biome> biome = level.getBiome(position);
+		return biome.unwrapKey()
+				.map(key -> key.identifier().toString())
+				.orElseGet(biome::getRegisteredName);
+	}
+
+	private static JsonObject countsJson(Map<String, Integer> counts) {
+		JsonObject json = new JsonObject();
+		for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+			json.addProperty(entry.getKey(), entry.getValue());
+		}
+		return json;
 	}
 
 	private static boolean matchesReplace(BlockState previous, String replace) {
@@ -299,6 +403,13 @@ final class BridgeWorldActions {
 	private static int requiredInt(JsonObject object, String name) {
 		if (!object.has(name) || object.get(name).isJsonNull()) {
 			throw new IllegalArgumentException("missing integer field: " + name);
+		}
+		return object.get(name).getAsInt();
+	}
+
+	private static int optionalRawInt(JsonObject object, String name, int fallback) {
+		if (!object.has(name) || object.get(name).isJsonNull()) {
+			return fallback;
 		}
 		return object.get(name).getAsInt();
 	}

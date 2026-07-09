@@ -106,6 +106,13 @@ case "$bridge_scenario" in
 			--screenshot-name "$screenshot_name" \
 			"${report_args[@]}"
 		;;
+	yorkie-biome-scout)
+		node "$repo_root/tools/playtest-harness/src/bridge-cli.js" yorkie-biome-scout \
+			--host "$bridge_host" \
+			--port "$bridge_port" \
+			--screenshot-name "$screenshot_name" \
+			"${report_args[@]}"
+		;;
 	cops-smoke)
 		node "$repo_root/tools/playtest-harness/src/bridge-cli.js" cops-smoke \
 			--host "$bridge_host" \

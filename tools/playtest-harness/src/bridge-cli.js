@@ -1642,6 +1642,257 @@ async function runYorkieVisualSweep(baseUrl, args) {
   };
 }
 
+function seededRandom(seedInput) {
+  let state = 2166136261;
+  for (const char of String(seedInput)) {
+    state ^= char.charCodeAt(0);
+    state = Math.imul(state, 16777619);
+  }
+  return () => {
+    state += 0x6D2B79F5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function sortedCounts(counts) {
+  return Object.entries(counts || {})
+    .sort((left, right) => right[1] - left[1])
+    .map(([name, count]) => ({ name, count }));
+}
+
+function terrainScoutScore(scan) {
+  const water = scan.waterRatio || 0;
+  const heightRange = scan.heightRange || 0;
+  const trees = Math.max(scan.leafRatio || 0, scan.logRatio || 0);
+  const openSky = scan.openSkyRatio || 0;
+  const biomeNames = sortedCounts(scan.biomes).map((biome) => biome.name);
+  const voidRatio = ((scan.topBlocks || {})['minecraft:void_air'] || 0) / Math.max(1, scan.samples || 1);
+  const cherryBiome = biomeNames.some((name) => name.includes('cherry_grove'));
+  const meadowBiome = biomeNames.some((name) => name.includes('meadow'));
+  const scenicBiome = biomeNames.some((name) => (
+    name.includes('cherry_grove')
+    || name.includes('meadow')
+    || name.includes('grove')
+    || name.includes('forest')
+    || name.includes('river')
+    || name.includes('jagged_peaks')
+    || name.includes('stony_peaks')
+    || name.includes('frozen_peaks')
+    || name.includes('snowy_slopes')
+  ));
+  const flatPenalty = heightRange < 7 ? 26 : 0;
+  const extremePenalty = Math.max(0, heightRange - 85) * 0.5;
+  const oceanPenalty = water > 0.65 ? (water - 0.65) * 80 : 0;
+  const voidPenalty = voidRatio * 80;
+  const openValley = Math.max(0, 36 - Math.abs(heightRange - 26)) + openSky * 18 + trees * 14 - water * 10;
+  const lake = (water > 0.06 && water < 0.48 ? 44 : -18) + Math.max(0, 24 - Math.abs(heightRange - 18)) + trees * 10;
+  const mountain = Math.min(heightRange, 70) * 0.35 + openSky * 8 + trees * 6 - Math.max(0, water - 0.25) * 22;
+  let total = Math.max(openValley, lake, mountain)
+    + (scenicBiome ? 12 : 0)
+    + (cherryBiome ? 30 : 0)
+    + (meadowBiome ? 18 : 0)
+    - flatPenalty
+    - extremePenalty
+    - oceanPenalty
+    - voidPenalty;
+  const tags = [];
+  if (water > 0.06 && water < 0.55) {
+    tags.push('lake');
+  }
+  if (heightRange >= 12 && heightRange <= 55 && openSky > 0.35) {
+    tags.push('valley');
+  }
+  if (heightRange > 40) {
+    tags.push('hills');
+  }
+  if (trees > 0.05) {
+    tags.push('trees');
+  }
+  if (scenicBiome) {
+    tags.push('scenic-biome');
+  }
+  if (cherryBiome) {
+    tags.push('cherry');
+  }
+  if (meadowBiome) {
+    tags.push('meadow');
+  }
+  if (heightRange < 7) {
+    tags.push('too-flat');
+  }
+  if (water > 0.65) {
+    tags.push('too-much-water');
+  }
+  if (voidRatio > 0) {
+    tags.push('void-sample');
+  }
+  total = Math.round(total * 10) / 10;
+  return {
+    total,
+    tags,
+    components: {
+      openValley: Math.round(openValley * 10) / 10,
+      lake: Math.round(lake * 10) / 10,
+      mountain: Math.round(mountain * 10) / 10,
+      flatPenalty,
+      extremePenalty: Math.round(extremePenalty * 10) / 10,
+      oceanPenalty: Math.round(oceanPenalty * 10) / 10,
+      voidPenalty: Math.round(voidPenalty * 10) / 10
+    }
+  };
+}
+
+async function runYorkieBiomeScout(baseUrl, args) {
+  const requestedName = option(args, 'screenshotName', 'BRIDGE_SCREENSHOT_NAME', '');
+  const screenshotPrefix = (requestedName || `mushroom-yorkie-biome-scout-${Date.now()}`)
+    .replace(/\.png$/i, '')
+    .replace(/[^A-Za-z0-9._-]/g, '-');
+  const samples = Math.round(optionNumber(args, 'samples', 'YORKIE_SCOUT_SAMPLES', 24));
+  const captures = Math.round(optionNumber(args, 'captures', 'YORKIE_SCOUT_CAPTURES', 6));
+  const range = Math.round(optionNumber(args, 'range', 'YORKIE_SCOUT_RANGE', 12000));
+  const radius = Math.round(optionNumber(args, 'radius', 'YORKIE_SCOUT_RADIUS', 40));
+  const step = Math.round(optionNumber(args, 'step', 'YORKIE_SCOUT_STEP', 16));
+  const scoutSeed = option(args, 'scoutSeed', 'YORKIE_SCOUT_SEED', `${Date.now()}`);
+  const random = seededRandom(scoutSeed);
+  const steps = [];
+
+  async function stepResult(name, run) {
+    const value = await run();
+    steps.push({ name, ok: true, value });
+    return value;
+  }
+
+  async function command(commandText) {
+    return requestJson(baseUrl, '/command', 'POST', { command: commandText });
+  }
+
+  async function checkedCommand(commandText) {
+    const result = await command(commandText);
+    requireCondition(result.success !== false, `Command failed: ${commandText}`);
+    return result;
+  }
+
+  async function terrainScan(x, z) {
+    return requestJson(baseUrl, '/terrain-scan', 'POST', {
+      player: playerName,
+      x,
+      z,
+      radius,
+      step
+    });
+  }
+
+  async function cleanScreenshot(name) {
+    const shot = await requestJson(baseUrl, '/screenshot', 'POST', {
+      name,
+      resume: true,
+      hideGui: true,
+      clearChat: true
+    });
+    return shot.file;
+  }
+
+  function randomCoordinate() {
+    return Math.round(((random() * 2 - 1) * range) / 16) * 16;
+  }
+
+  function candidateSummary(scan, index) {
+    const score = terrainScoutScore(scan);
+    return {
+      index,
+      score,
+      seed: scan.seed,
+      center: scan.center,
+      centerBiome: scan.centerBiome,
+      centerTopBlock: scan.centerTopBlock,
+      heightRange: scan.heightRange,
+      averageY: Math.round((scan.averageY || 0) * 10) / 10,
+      waterRatio: Math.round((scan.waterRatio || 0) * 1000) / 1000,
+      leafRatio: Math.round((scan.leafRatio || 0) * 1000) / 1000,
+      logRatio: Math.round((scan.logRatio || 0) * 1000) / 1000,
+      openSkyRatio: Math.round((scan.openSkyRatio || 0) * 1000) / 1000,
+      topBiomes: sortedCounts(scan.biomes).slice(0, 4),
+      topBlocks: sortedCounts(scan.topBlocks).slice(0, 6)
+    };
+  }
+
+  const initialState = await requestJson(baseUrl, '/state');
+  const playerName = singlePlayerName(initialState);
+  await stepResult('prepare biome scout', async () => {
+    await command('time set noon');
+    await command('weather clear');
+    await command('gamerule doDaylightCycle false');
+    await checkedCommand(`gamemode spectator ${playerName}`);
+    return {
+      saveName: initialState.saveName,
+      savePath: initialState.savePath,
+      seed: initialState.seed,
+      scoutSeed,
+      samples,
+      captures,
+      range,
+      radius,
+      step
+    };
+  });
+
+  const candidates = await stepResult('scan random terrain candidates', async () => {
+    const scanned = [];
+    for (let index = 0; index < samples; index += 1) {
+      const x = randomCoordinate();
+      const z = randomCoordinate();
+      try {
+        await checkedCommand(`tp ${playerName} ${x + 0.5} 220 ${z + 0.5}`);
+        await sleep(1200);
+        const scan = await terrainScan(x, z);
+        scanned.push(candidateSummary(scan, index + 1));
+      } catch (error) {
+        scanned.push({
+          index: index + 1,
+          error: error.message,
+          center: { x, z },
+          score: { total: -999, tags: ['scan-failed'], components: {} }
+        });
+      }
+    }
+    return scanned.sort((left, right) => right.score.total - left.score.total);
+  });
+
+  const selected = candidates.slice(0, Math.max(0, captures));
+  const screenshots = await stepResult('capture top scout candidates', async () => {
+    const captured = [];
+    for (let index = 0; index < selected.length; index += 1) {
+      const candidate = selected[index];
+      const center = candidate.center;
+      const cameraDistance = Math.max(34, radius * 0.72);
+      const cameraY = Math.min(220, Math.max(center.y + 16, center.y + Math.min(candidate.heightRange, 36)));
+      await checkedCommand(`tp ${playerName} ${center.x + 0.5} ${cameraY} ${center.z - cameraDistance} facing ${center.x + 0.5} ${center.y + 3} ${center.z + 0.5}`);
+      await sleep(2600);
+      const wide = await cleanScreenshot(`${screenshotPrefix}-candidate-${String(index + 1).padStart(2, '0')}-wide.png`);
+      await checkedCommand(`tp ${playerName} ${center.x - 22.5} ${Math.min(300, center.y + 10)} ${center.z - 24.5} facing ${center.x + 0.5} ${center.y + 2.5} ${center.z + 0.5}`);
+      await sleep(1600);
+      const low = await cleanScreenshot(`${screenshotPrefix}-candidate-${String(index + 1).padStart(2, '0')}-low.png`);
+      captured.push({ ...candidate, screenshots: { wide, low } });
+    }
+    return captured;
+  });
+
+  return {
+    ok: true,
+    scenario: 'yorkie-biome-scout',
+    saveName: initialState.saveName,
+    savePath: initialState.savePath,
+    seed: initialState.seed,
+    scoutSeed,
+    candidates,
+    screenshots,
+    steps
+  };
+}
+
 async function runCopsSmoke(baseUrl, args) {
   const cruiserType = option(args, 'type', 'COPS_CRUISER_ENTITY', 'cops_robbers:police_cruiser');
   const robberType = option(args, 'robberType', 'COPS_ROBBER_ENTITY', 'cops_robbers:bank_robber');
@@ -2375,10 +2626,10 @@ function printBridgeUsage() {
 
 Actions:
   health, state, smoke, chat, command, look, give, summon, teleport
-  player-abilities, use-entity, clear-entities
-  set-block-near-entity, set-block, block, use-block, count-blocks
-  yorkie-smoke, yorkie-water-smoke, yorkie-adventure-smoke, yorkie-visual-sweep
-  cops-smoke, cops-structures-smoke, cops-visual-sweep, screenshot
+	  player-abilities, use-entity, clear-entities
+	  set-block-near-entity, set-block, block, use-block, count-blocks, terrain-scan
+	  yorkie-smoke, yorkie-water-smoke, yorkie-adventure-smoke, yorkie-visual-sweep, yorkie-biome-scout
+	  cops-smoke, cops-structures-smoke, cops-visual-sweep, screenshot
 
 Common options:
   --host <host>        Bridge host. Default: 127.0.0.1
@@ -2528,6 +2779,14 @@ async function main() {
     };
     putOptional(body, 'player', option(args, 'player', 'BRIDGE_PLAYER', ''));
     result = await requestJson(baseUrl, '/count-blocks', 'POST', body);
+  } else if (action === 'terrain-scan') {
+    const body = {};
+    putOptional(body, 'player', option(args, 'player', 'BRIDGE_PLAYER', ''));
+    putOptional(body, 'x', optionNumber(args, 'x', 'BRIDGE_X', ''));
+    putOptional(body, 'z', optionNumber(args, 'z', 'BRIDGE_Z', ''));
+    putOptional(body, 'radius', optionNumber(args, 'radius', 'BRIDGE_RADIUS', 48));
+    putOptional(body, 'step', optionNumber(args, 'step', 'BRIDGE_STEP', 8));
+    result = await requestJson(baseUrl, '/terrain-scan', 'POST', body);
   } else if (action === 'yorkie-smoke') {
     result = await runYorkieSmoke(baseUrl, args);
   } else if (action === 'yorkie-water-smoke') {
@@ -2536,6 +2795,8 @@ async function main() {
     result = await runYorkieAdventureSmoke(baseUrl, args);
   } else if (action === 'yorkie-visual-sweep') {
     result = await runYorkieVisualSweep(baseUrl, args);
+  } else if (action === 'yorkie-biome-scout') {
+    result = await runYorkieBiomeScout(baseUrl, args);
   } else if (action === 'cops-smoke') {
     result = await runCopsSmoke(baseUrl, args);
   } else if (action === 'cops-structures-smoke') {
