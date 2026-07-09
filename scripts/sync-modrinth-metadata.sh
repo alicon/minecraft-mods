@@ -78,7 +78,7 @@ require_command curl
 require_command jq
 require_file "$body_file"
 require_file "$icon_file"
-for spec in "${gallery_specs[@]}"; do
+for spec in ${gallery_specs[@]+"${gallery_specs[@]}"}; do
 	IFS='|' read -r _gallery_title gallery_file _gallery_description _featured _ordering <<<"$spec"
 	require_file "$gallery_file"
 done
@@ -172,7 +172,7 @@ urlencode() {
 }
 
 if ((${#stale_gallery_titles[@]})); then
-	for stale_title in "${stale_gallery_titles[@]}"; do
+	for stale_title in ${stale_gallery_titles[@]+"${stale_gallery_titles[@]}"}; do
 		while IFS= read -r stale_url; do
 			if [[ -z "$stale_url" ]]; then
 				continue
@@ -187,7 +187,7 @@ if ((${#stale_gallery_titles[@]})); then
 fi
 
 if ((${#gallery_specs[@]})); then
-	for spec in "${gallery_specs[@]}"; do
+	for spec in ${gallery_specs[@]+"${gallery_specs[@]}"}; do
 		IFS='|' read -r gallery_title gallery_file gallery_description featured ordering <<<"$spec"
 		if jq -e --arg title "$gallery_title" '.gallery[]? | select(.title == $title)' <<<"$project_json" >/dev/null; then
 			continue
