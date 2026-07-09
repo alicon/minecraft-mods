@@ -22,6 +22,20 @@ Useful knobs:
 
 Heavier runs can find more variety, but they can also overload singleplayer chunk generation. If the bridge stops responding after an aggressive run, restart Minecraft before continuing.
 
+## Natural Gallery Command
+
+Use a copied save for staging because the natural gallery scenario places props, mobs, and cleanup commands in the world:
+
+```shell
+make modrinth-autoplay-yorkie-natural-gallery \
+  PLAYTEST_TEMPLATE_WORLD="New World (21)" \
+  PLAYTEST_WORLD_PREFIX="Codex Yorkie Natural" \
+  BRIDGE_SCREENSHOT_NAME=yorkie-natural-gallery \
+  BRIDGE_REPORT_FILE=build/playtest-reports/yorkie-natural-gallery.json
+```
+
+The scenario reuses the saved coordinates below and captures outdoor sitting, leashed, water, fetch, flying, bowl, chase, and hostile-defense scenes in real terrain.
+
 ## New World (21)
 
 Save: `New World (21)`

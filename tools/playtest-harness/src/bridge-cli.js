@@ -1893,6 +1893,534 @@ async function runYorkieBiomeScout(baseUrl, args) {
   };
 }
 
+async function runYorkieNaturalGallery(baseUrl, args) {
+  const yorkieType = option(args, 'type', 'YORKIE_ENTITY', 'mushroom_yorkie:mushroom_yorkie');
+  const requestedName = option(args, 'screenshotName', 'BRIDGE_SCREENSHOT_NAME', '');
+  const screenshotPrefix = (requestedName || `mushroom-yorkie-natural-gallery-${Date.now()}`)
+    .replace(/\.png$/i, '')
+    .replace(/[^A-Za-z0-9._-]/g, '-');
+  const radius = optionNumber(args, 'radius', 'YORKIE_RADIUS', 18);
+  const steps = [];
+  const locations = {
+    valley: { x: -80, z: 7216 },
+    lake: { x: 4448, z: 4000 },
+    jungleWater: { x: 3760, z: -304 },
+    taigaRiver: { x: -13520, z: 2112 },
+    highlands: { x: -4848, z: 2128 },
+    cherry: { x: -2624, z: 7664 }
+  };
+  const surfaceCache = new Map();
+
+  async function step(name, run) {
+    const value = await run();
+    steps.push({ name, ok: true, value });
+    return value;
+  }
+
+  async function command(commandText) {
+    return requestJson(baseUrl, '/command', 'POST', { command: commandText });
+  }
+
+  async function checkedCommand(commandText) {
+    const result = await command(commandText);
+    requireCondition(result.success !== false, `Command failed: ${commandText}`);
+    return result;
+  }
+
+  async function clearEntities(type) {
+    return requestJson(baseUrl, '/clear-entities', 'POST', { type });
+  }
+
+  async function setAbsoluteBlock(position, block, replace = '') {
+    const body = { ...position, block };
+    if (replace) {
+      body.replace = replace;
+    }
+    return requestJson(baseUrl, '/set-block', 'POST', body);
+  }
+
+  async function useBlock(body) {
+    return requestJson(baseUrl, '/use-block', 'POST', body);
+  }
+
+  async function useYorkie(body) {
+    return requestJson(baseUrl, '/use-entity', 'POST', {
+      type: yorkieType,
+      radius,
+      ...body
+    });
+  }
+
+  async function playerAbilities(body) {
+    return requestJson(baseUrl, '/player-abilities', 'POST', body);
+  }
+
+  async function mergeYorkieData(nbt) {
+    await command(`data merge entity @e[type=${yorkieType},limit=1,sort=nearest] ${nbt}`);
+    return waitForEntity(baseUrl, yorkieType);
+  }
+
+  async function freezeEntity(type) {
+    await command(`data merge entity @e[type=${type},limit=1,sort=nearest] {NoAI:1b}`);
+    return waitForEntity(baseUrl, type);
+  }
+
+  async function terrainScan(x, z, scanRadius = 4, stepSize = 4) {
+    return requestJson(baseUrl, '/terrain-scan', 'POST', {
+      player: playerName,
+      x: Math.round(x),
+      z: Math.round(z),
+      radius: scanRadius,
+      step: stepSize
+    });
+  }
+
+  async function surfaceAt(x, z) {
+    const key = `${Math.round(x)},${Math.round(z)}`;
+    if (!surfaceCache.has(key)) {
+      const scan = await terrainScan(x, z);
+      surfaceCache.set(key, {
+        x: scan.center.x,
+        y: scan.center.y,
+        z: scan.center.z,
+        biome: scan.centerBiome,
+        topBlock: scan.centerTopBlock,
+        scan
+      });
+    }
+    return surfaceCache.get(key);
+  }
+
+  function offsetGrid(maxDistance = 10) {
+    const offsets = [{ dx: 0, dz: 0 }];
+    for (let distance = 1; distance <= maxDistance; distance += 1) {
+      offsets.push(
+        { dx: distance, dz: 0 },
+        { dx: -distance, dz: 0 },
+        { dx: 0, dz: distance },
+        { dx: 0, dz: -distance },
+        { dx: distance, dz: distance },
+        { dx: -distance, dz: distance },
+        { dx: distance, dz: -distance },
+        { dx: -distance, dz: -distance }
+      );
+    }
+    return offsets;
+  }
+
+  const landBlocks = new Set([
+    'minecraft:grass_block',
+    'minecraft:podzol',
+    'minecraft:coarse_dirt',
+    'minecraft:dirt',
+    'minecraft:moss_block',
+    'minecraft:sand',
+    'minecraft:gravel',
+    'minecraft:stone',
+    'minecraft:mud',
+    'minecraft:clay',
+    'minecraft:red_sand'
+  ]);
+  const foliageBlocks = [
+    'minecraft:short_grass',
+    'minecraft:grass',
+    'minecraft:tall_grass',
+    'minecraft:fern',
+    'minecraft:large_fern',
+    'minecraft:bush',
+    'minecraft:dead_bush',
+    'minecraft:sweet_berry_bush',
+    'minecraft:wildflowers',
+    'minecraft:seagrass',
+    'minecraft:tall_seagrass'
+  ];
+
+  function isWater(surface) {
+    return surface.topBlock === 'minecraft:water';
+  }
+
+  function isLand(surface) {
+    return landBlocks.has(surface.topBlock);
+  }
+
+  async function findSurfaceNear(base, predicate, maxDistance = 12) {
+    for (const offset of offsetGrid(maxDistance)) {
+      const surface = await surfaceAt(base.x + offset.dx, base.z + offset.dz);
+      if (predicate(surface)) {
+        return surface;
+      }
+    }
+    throw new Error(`No matching surface near ${JSON.stringify(base)}`);
+  }
+
+  async function cleanArea(center, horizontal = 36) {
+    const minX = Math.round(center.x - horizontal);
+    const minZ = Math.round(center.z - horizontal);
+    const size = horizontal * 2;
+    await command(`kill @e[type=!minecraft:player,x=${minX},y=-64,z=${minZ},dx=${size},dy=384,dz=${size}]`);
+    await sleep(300);
+  }
+
+  async function clearFoliage(position, horizontal = 3, vertical = 3) {
+    const x1 = Math.floor(position.x - horizontal);
+    const y1 = Math.floor(position.y);
+    const z1 = Math.floor(position.z - horizontal);
+    const x2 = Math.floor(position.x + horizontal);
+    const y2 = Math.floor(position.y + vertical);
+    const z2 = Math.floor(position.z + horizontal);
+    for (const block of foliageBlocks) {
+      await command(`fill ${x1} ${y1} ${z1} ${x2} ${y2} ${z2} minecraft:air replace ${block}`);
+    }
+  }
+
+  async function prepScene(name, location) {
+    return step(`prepare ${name}`, async () => {
+      await command('time set noon');
+      await command('weather clear');
+      await command('gamerule doMobSpawning false');
+      await command('gamerule doDaylightCycle false');
+      await command('gamerule doMobLoot false');
+      await command('gamerule sendCommandFeedback false');
+      await checkedCommand(`gamemode spectator ${playerName}`);
+      await checkedCommand(`tp ${playerName} ${location.x + 0.5} 180 ${location.z + 0.5}`);
+      await sleep(2400);
+      const center = await surfaceAt(location.x, location.z);
+      await checkedCommand(`gamemode creative ${playerName}`);
+      await playerAbilities({ flying: false, mayfly: true });
+      await command(`clear ${playerName}`);
+      for (const type of [
+        yorkieType,
+        'minecraft:item',
+        'minecraft:cow',
+        'minecraft:sheep',
+        'minecraft:pig',
+        'minecraft:chicken',
+        'minecraft:zombie',
+        'minecraft:skeleton',
+        'minecraft:spider',
+        'minecraft:creeper'
+      ]) {
+        await clearEntities(type);
+      }
+      await cleanArea(center);
+      return center;
+    });
+  }
+
+  async function screenshot(suffix, options = {}) {
+    const shot = await requestJson(baseUrl, '/screenshot', 'POST', {
+      name: `${screenshotPrefix}-${suffix}.png`,
+      resume: true,
+      hideGui: options.hideGui !== false,
+      clearChat: options.clearChat !== false
+    });
+    return shot.file;
+  }
+
+  async function cameraShot(suffix, camera, target, options = {}) {
+    await checkedCommand(`gamemode spectator ${playerName}`);
+    await checkedCommand(`tp ${playerName} ${camera.x} ${camera.y} ${camera.z} facing ${target.x} ${target.y} ${target.z}`);
+    await sleep(options.delayMillis || 1200);
+    return screenshot(suffix, options);
+  }
+
+  async function summonYorkie(position, options = {}) {
+    const yaw = options.yaw === undefined ? 180 : options.yaw;
+    const nbtParts = [`Rotation:[${yaw.toFixed(1)}f,0.0f]`, 'PersistenceRequired:1b'];
+    if (options.noAi) {
+      nbtParts.push('NoAI:1b');
+    }
+    if (options.noGravity) {
+      nbtParts.push('NoGravity:1b');
+    }
+    await checkedCommand(`gamemode creative ${playerName}`);
+    await playerAbilities({ flying: false, mayfly: true });
+    await checkedCommand(`tp ${playerName} ${position.x} ${position.y} ${position.z + 2.8} facing ${position.x} ${position.y + 0.4} ${position.z}`);
+    await sleep(250);
+    await checkedCommand(`summon ${yorkieType} ${position.x} ${position.y} ${position.z} {${nbtParts.join(',')}}`);
+    await waitForEntity(baseUrl, yorkieType, 5000);
+    if (options.tame !== false) {
+      await checkedCommand(`gamemode creative ${playerName}`);
+      await checkedCommand(`tp ${playerName} ${position.x} ${position.y} ${position.z + 2.2} facing ${position.x} ${position.y + 0.4} ${position.z}`);
+      const tamed = await useYorkie({ item: 'mushroom_yorkie:yorkie_treat', count: 2 });
+      requireCondition(tamed.target.tameable && tamed.target.tameable.tame, 'Yorkie did not become tame for natural gallery scene');
+    }
+    if (options.needs) {
+      await mergeYorkieData(options.needs);
+    }
+    if (options.harness) {
+      const harnessed = await useYorkie({ item: 'mushroom_yorkie:yorkie_harness', count: 1 });
+      requireCondition(harnessed.target.custom && harnessed.target.custom.harness, 'Yorkie harness did not equip for natural gallery scene');
+    }
+    if (options.sit) {
+      const sat = await useYorkie({ emptyHand: true });
+      requireCondition(sat.target.tameable && sat.target.tameable.orderedToSit, 'Yorkie did not sit for natural gallery scene');
+    }
+    return waitForEntity(baseUrl, yorkieType, 5000);
+  }
+
+  async function poseYorkie(position, target, options = {}) {
+    await checkedCommand(`tp @e[type=${yorkieType},limit=1,sort=nearest] ${position.x} ${position.y} ${position.z} facing ${target.x} ${target.y} ${target.z}`);
+    if (options.freeze !== false) {
+      await freezeEntity(yorkieType);
+    }
+    return waitForEntity(baseUrl, yorkieType, 5000);
+  }
+
+  async function placeBlockOn(surface, dx, dz, block) {
+    const target = await surfaceAt(surface.x + dx, surface.z + dz);
+    return setAbsoluteBlock({ x: target.x, y: target.y, z: target.z }, block);
+  }
+
+  const initialState = await requestJson(baseUrl, '/state');
+  const playerName = singlePlayerName(initialState);
+  const screenshots = {};
+
+  let center = await prepScene('natural sitting portrait', locations.cherry);
+  screenshots.sitting = await step('capture natural sitting no leash', async () => {
+    const land = await findSurfaceNear(center, isLand, 12);
+    await clearFoliage(land, 5, 4);
+    const camera = { x: land.x - 2.6, y: land.y + 0.95, z: land.z - 3.6 };
+    await clearFoliage({ x: camera.x, y: land.y, z: camera.z }, 2, 4);
+    await placeBlockOn(land, -2, 1, 'mushroom_yorkie:dog_bed');
+    await summonYorkie({ x: land.x + 0.5, y: land.y, z: land.z + 0.5 }, { noAi: true, sit: true, yaw: 200 });
+    const yorkie = await poseYorkie(
+      { x: land.x + 0.5, y: land.y, z: land.z + 0.5 },
+      { x: camera.x, y: camera.y, z: camera.z }
+    );
+    return {
+      land,
+      yorkie,
+      file: await cameraShot(
+        'sitting-no-leash',
+        camera,
+        { x: land.x + 0.5, y: land.y + 0.35, z: land.z + 0.5 }
+      )
+    };
+  });
+
+  center = await prepScene('natural leashed walk', locations.lake);
+  screenshots.leashed = await step('capture natural leashed walk', async () => {
+    const land = await findSurfaceNear(center, isLand, 14);
+    await clearFoliage(land, 5, 4);
+    const camera = { x: land.x - 2.3, y: land.y + 0.95, z: land.z - 3.4 };
+    await clearFoliage({ x: camera.x, y: land.y, z: camera.z }, 2, 4);
+    const fence = { x: land.x + 1, y: land.y, z: land.z + 1 };
+    const fenceNeighbor = { x: land.x + 1, y: land.y, z: land.z + 2 };
+    await setAbsoluteBlock(fence, 'minecraft:oak_fence');
+    await setAbsoluteBlock(fenceNeighbor, 'minecraft:oak_fence');
+    const yorkie = await summonYorkie({ x: land.x + 0.3, y: land.y, z: land.z + 0.65 }, { noAi: true, harness: true, yaw: 160 });
+    await checkedCommand(`gamemode creative ${playerName}`);
+    await checkedCommand(`tp ${playerName} ${land.x + 1.9} ${land.y} ${land.z - 0.8} facing ${land.x - 0.5} ${land.y + 0.3} ${land.z + 0.5}`);
+    const lead = await useYorkie({ item: 'minecraft:lead', count: 1 });
+    requireCondition(lead.target.leash && lead.target.leash.leashed, 'Leash did not attach for natural gallery scene');
+    const tied = await useBlock({
+      item: 'minecraft:lead',
+      count: 1,
+      x: fence.x,
+      y: fence.y,
+      z: fence.z,
+      face: 'up'
+    });
+    await sleep(350);
+    return {
+      land,
+      yorkie,
+      lead,
+      tied,
+      file: await cameraShot(
+        'leashed-walk',
+        camera,
+        { x: land.x + 0.75, y: land.y + 0.35, z: land.z + 0.75 }
+      )
+    };
+  });
+
+  center = await prepScene('natural water paddle', locations.lake);
+  screenshots.water = await step('capture natural water', async () => {
+    const water = await findSurfaceNear(center, isWater, 16);
+    const camera = { x: water.x - 2.4, y: water.y + 0.85, z: water.z - 3.7 };
+    const yorkie = await summonYorkie({ x: water.x + 0.5, y: water.y + 0.05, z: water.z + 0.5 }, {
+      yaw: 185,
+      needs: '{Hunger:10,Potty:10,Mood:90,Energy:80}'
+    });
+    await sleep(900);
+    return {
+      water,
+      yorkie,
+      file: await cameraShot(
+        'in-water',
+        camera,
+        { x: water.x + 0.5, y: water.y + 0.35, z: water.z + 0.5 },
+        { delayMillis: 1500 }
+      )
+    };
+  });
+
+  center = await prepScene('natural fetching ball', locations.jungleWater);
+  screenshots.fetching = await step('capture natural fetching', async () => {
+    const land = await findSurfaceNear(center, isLand, 12);
+    await clearFoliage(land, 5, 4);
+    const camera = { x: land.x - 2.4, y: land.y + 0.95, z: land.z - 3.6 };
+    await clearFoliage({ x: camera.x, y: land.y, z: camera.z }, 2, 4);
+    await summonYorkie({ x: land.x - 3.0, y: land.y, z: land.z + 0.5 }, {
+      noAi: true,
+      yaw: 95,
+      needs: '{Hunger:0,Potty:0,Mood:65,Energy:85}'
+    });
+    await command(`summon item ${land.x + 2.4} ${land.y + 0.4} ${land.z + 0.5} {Item:{id:"mushroom_yorkie:yorkie_ball",count:1}}`);
+    await sleep(1200);
+    await checkedCommand(`tp @e[type=${yorkieType},limit=1,sort=nearest] ${land.x - 0.85} ${land.y} ${land.z + 0.45} facing ${land.x + 2.4} ${land.y + 0.35} ${land.z + 0.5}`);
+    await freezeEntity(yorkieType);
+    return {
+      land,
+      item: await waitForItemCount(baseUrl, 'mushroom_yorkie:yorkie_ball', 1, 5000).catch(() => []),
+      yorkie: await waitForEntity(baseUrl, yorkieType, 5000),
+      file: await cameraShot(
+        'fetching-ball',
+        camera,
+        { x: land.x + 0.4, y: land.y + 0.35, z: land.z + 0.4 }
+      )
+    };
+  });
+
+  center = await prepScene('natural flying', locations.highlands);
+  screenshots.flying = await step('capture natural flying', async () => {
+    const land = await findSurfaceNear(center, isLand, 10);
+    const camera = { x: land.x - 3.0, y: land.y + 6.45, z: land.z - 4.4 };
+    const yorkie = await summonYorkie({ x: land.x + 0.5, y: land.y + 5.5, z: land.z + 0.5 }, {
+      noAi: true,
+      noGravity: true,
+      yaw: 190,
+      needs: '{Hunger:0,Potty:0,Mood:100,Energy:90}'
+    });
+    return {
+      land,
+      yorkie,
+      file: await cameraShot(
+        'flying',
+        camera,
+        { x: land.x + 0.5, y: land.y + 5.65, z: land.z + 0.5 },
+        { delayMillis: 1700 }
+      )
+    };
+  });
+
+  center = await prepScene('natural eating', locations.jungleWater);
+  screenshots.eating = await step('capture natural eating', async () => {
+    const land = await findSurfaceNear(center, isLand, 10);
+    await clearFoliage(land, 5, 4);
+    const camera = { x: land.x - 2.1, y: land.y + 0.85, z: land.z - 3.2 };
+    await clearFoliage({ x: camera.x, y: land.y, z: camera.z }, 2, 4);
+    await placeBlockOn(land, 0, 0, 'mushroom_yorkie:dog_food_bowl');
+    await summonYorkie({ x: land.x, y: land.y, z: land.z + 1.35 }, {
+      noAi: true,
+      yaw: 180,
+      needs: '{Hunger:90,Potty:20,Mood:70,Energy:70,LastFoodBowlDay:-1L}'
+    });
+    await checkedCommand(`tp @e[type=${yorkieType},limit=1,sort=nearest] ${land.x} ${land.y} ${land.z + 1.35} facing ${land.x} ${land.y + 0.2} ${land.z}`);
+    return {
+      land,
+      yorkie: await waitForEntity(baseUrl, yorkieType, 5000),
+      file: await cameraShot(
+        'eating-food-bowl',
+        camera,
+        { x: land.x, y: land.y + 0.35, z: land.z + 0.7 }
+      )
+    };
+  });
+
+  center = await prepScene('natural drinking', locations.lake);
+  screenshots.drinking = await step('capture natural drinking', async () => {
+    const land = await findSurfaceNear(center, isLand, 14);
+    await clearFoliage(land, 5, 4);
+    const camera = { x: land.x - 2.1, y: land.y + 0.85, z: land.z - 3.2 };
+    await clearFoliage({ x: camera.x, y: land.y, z: camera.z }, 2, 4);
+    await placeBlockOn(land, 0, 0, 'mushroom_yorkie:dog_water_bowl');
+    await summonYorkie({ x: land.x, y: land.y, z: land.z + 1.35 }, {
+      noAi: true,
+      yaw: 180,
+      needs: '{Hunger:20,Potty:20,Mood:70,Energy:70,LastWaterBowlDay:-1L}'
+    });
+    await checkedCommand(`tp @e[type=${yorkieType},limit=1,sort=nearest] ${land.x} ${land.y} ${land.z + 1.35} facing ${land.x} ${land.y + 0.2} ${land.z}`);
+    return {
+      land,
+      yorkie: await waitForEntity(baseUrl, yorkieType, 5000),
+      file: await cameraShot(
+        'drinking-water-bowl',
+        camera,
+        { x: land.x, y: land.y + 0.35, z: land.z + 0.7 }
+      )
+    };
+  });
+
+  center = await prepScene('natural sheep chase', locations.taigaRiver);
+  screenshots.passiveChase = await step('capture natural sheep chase', async () => {
+    const land = await findSurfaceNear(center, isLand, 10);
+    await clearFoliage(land, 5, 4);
+    const camera = { x: land.x - 2.9, y: land.y + 0.95, z: land.z - 4.2 };
+    await clearFoliage({ x: camera.x, y: land.y, z: camera.z }, 2, 4);
+    await summonYorkie({ x: land.x - 2.2, y: land.y, z: land.z + 0.5 }, {
+      noAi: true,
+      yaw: 90,
+      needs: '{Hunger:10,Potty:10,Mood:80,Energy:80}'
+    });
+    await checkedCommand(`summon minecraft:sheep ${land.x + 1.8} ${land.y} ${land.z + 0.45} {NoAI:1b,PersistenceRequired:1b,Rotation:[270.0f,0.0f]}`);
+    await checkedCommand(`tp @e[type=${yorkieType},limit=1,sort=nearest] ${land.x - 0.5} ${land.y} ${land.z + 0.35} facing ${land.x + 1.8} ${land.y + 0.35} ${land.z + 0.45}`);
+    await freezeEntity(yorkieType);
+    const sheep = await freezeEntity('minecraft:sheep');
+    return {
+      land,
+      sheep,
+      yorkie: await waitForEntity(baseUrl, yorkieType, 5000),
+      file: await cameraShot(
+        'chasing-sheep',
+        camera,
+        { x: land.x + 0.4, y: land.y + 0.45, z: land.z + 0.3 }
+      )
+    };
+  });
+
+  center = await prepScene('natural spider defense', locations.taigaRiver);
+  screenshots.hostileAttack = await step('capture natural spider defense', async () => {
+    const land = await findSurfaceNear(center, isLand, 10);
+    await clearFoliage(land, 5, 4);
+    const camera = { x: land.x - 2.7, y: land.y + 0.85, z: land.z - 3.7 };
+    await clearFoliage({ x: camera.x, y: land.y, z: camera.z }, 2, 4);
+    await command('difficulty easy');
+    await summonYorkie({ x: land.x - 1.2, y: land.y, z: land.z + 0.35 }, {
+      noAi: true,
+      yaw: 90,
+      needs: '{Hunger:10,Potty:10,Mood:85,Energy:85}'
+    });
+    await checkedCommand(`summon minecraft:spider ${land.x + 1.35} ${land.y} ${land.z + 0.45} {NoAI:1b,PersistenceRequired:1b,Health:15.0f,Rotation:[270.0f,0.0f]}`);
+    await checkedCommand(`tp @e[type=${yorkieType},limit=1,sort=nearest] ${land.x - 0.7} ${land.y} ${land.z + 0.25} facing ${land.x + 1.35} ${land.y + 0.35} ${land.z + 0.45}`);
+    await freezeEntity(yorkieType);
+    const spider = await freezeEntity('minecraft:spider');
+    return {
+      land,
+      spider,
+      yorkie: await waitForEntity(baseUrl, yorkieType, 5000),
+      file: await cameraShot(
+        'attacking-spider',
+        camera,
+        { x: land.x + 0.25, y: land.y + 0.35, z: land.z + 0.35 }
+      )
+    };
+  });
+
+  return {
+    ok: true,
+    scenario: 'yorkie-natural-gallery',
+    saveName: initialState.saveName,
+    savePath: initialState.savePath,
+    seed: initialState.seed,
+    locations,
+    screenshots,
+    steps
+  };
+}
+
 async function runCopsSmoke(baseUrl, args) {
   const cruiserType = option(args, 'type', 'COPS_CRUISER_ENTITY', 'cops_robbers:police_cruiser');
   const robberType = option(args, 'robberType', 'COPS_ROBBER_ENTITY', 'cops_robbers:bank_robber');
@@ -2628,7 +3156,7 @@ Actions:
   health, state, smoke, chat, command, look, give, summon, teleport
 	  player-abilities, use-entity, clear-entities
 	  set-block-near-entity, set-block, block, use-block, count-blocks, terrain-scan
-	  yorkie-smoke, yorkie-water-smoke, yorkie-adventure-smoke, yorkie-visual-sweep, yorkie-biome-scout
+	  yorkie-smoke, yorkie-water-smoke, yorkie-adventure-smoke, yorkie-visual-sweep, yorkie-biome-scout, yorkie-natural-gallery
 	  cops-smoke, cops-structures-smoke, cops-visual-sweep, screenshot
 
 Common options:
@@ -2797,6 +3325,8 @@ async function main() {
     result = await runYorkieVisualSweep(baseUrl, args);
   } else if (action === 'yorkie-biome-scout') {
     result = await runYorkieBiomeScout(baseUrl, args);
+  } else if (action === 'yorkie-natural-gallery') {
+    result = await runYorkieNaturalGallery(baseUrl, args);
   } else if (action === 'cops-smoke') {
     result = await runCopsSmoke(baseUrl, args);
   } else if (action === 'cops-structures-smoke') {

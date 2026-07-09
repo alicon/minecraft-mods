@@ -71,7 +71,7 @@ LIVE_TEST_MODS_DIR ?= $(or $(MODRINTH_LIVE_TEST_MODS_DIR),$(MODRINTH_PROFILE)/mo
 LIVE_TEST_BACKUP_SUFFIX := codexbak-$(shell date +%Y%m%d%H%M%S)
 MODRINTH_VERSION_TYPE ?= alpha
 
-.PHONY: help build build-all check test validate quick-validate api-docs format-check clean live-test live-test-mushroom live-test-cops live-test-bridge preview-structures modrinth-playtest-world modrinth-launch-world modrinth-autoplay-smoke modrinth-autoplay-yorkie modrinth-autoplay-yorkie-water modrinth-autoplay-yorkie-adventure modrinth-autoplay-yorkie-visual modrinth-autoplay-yorkie-biome-scout modrinth-autoplay-cops modrinth-autoplay-cops-structures modrinth-autoplay-cops-visual harness-install harness-list harness-run harness-companion harness-watch harness-mushroom-smoke harness-cops-smoke bridge-health bridge-state bridge-smoke bridge-chat bridge-command bridge-look bridge-give bridge-summon bridge-teleport bridge-player-abilities bridge-use-entity bridge-clear-entities bridge-set-block-near-entity bridge-set-block bridge-use-block bridge-count-blocks bridge-terrain-scan bridge-yorkie-smoke bridge-yorkie-water-smoke bridge-yorkie-adventure-smoke bridge-yorkie-visual-sweep bridge-yorkie-biome-scout bridge-cops-smoke bridge-cops-structures-smoke bridge-cops-visual-sweep bridge-screenshot release release-dry-run publish-modrinth deploy-modrinth sync-modrinth print-vars
+.PHONY: help build build-all check test validate quick-validate api-docs format-check clean live-test live-test-mushroom live-test-cops live-test-bridge preview-structures modrinth-playtest-world modrinth-launch-world modrinth-autoplay-smoke modrinth-autoplay-yorkie modrinth-autoplay-yorkie-water modrinth-autoplay-yorkie-adventure modrinth-autoplay-yorkie-visual modrinth-autoplay-yorkie-biome-scout modrinth-autoplay-yorkie-natural-gallery modrinth-autoplay-cops modrinth-autoplay-cops-structures modrinth-autoplay-cops-visual harness-install harness-list harness-run harness-companion harness-watch harness-mushroom-smoke harness-cops-smoke bridge-health bridge-state bridge-smoke bridge-chat bridge-command bridge-look bridge-give bridge-summon bridge-teleport bridge-player-abilities bridge-use-entity bridge-clear-entities bridge-set-block-near-entity bridge-set-block bridge-use-block bridge-count-blocks bridge-terrain-scan bridge-yorkie-smoke bridge-yorkie-water-smoke bridge-yorkie-adventure-smoke bridge-yorkie-visual-sweep bridge-yorkie-biome-scout bridge-yorkie-natural-gallery bridge-cops-smoke bridge-cops-structures-smoke bridge-cops-visual-sweep bridge-screenshot release release-dry-run publish-modrinth deploy-modrinth sync-modrinth print-vars
 
 help:
 	@printf '%s\n' \
@@ -89,6 +89,7 @@ help:
 		'  make modrinth-autoplay-yorkie-adventure Launch a world and run Yorkie flight/water adventure checks.' \
 		'  make modrinth-autoplay-yorkie-visual   Launch a world and capture Yorkie gallery screenshots.' \
 		'  make modrinth-autoplay-yorkie-biome-scout Launch a world and capture real-biome staging candidates.' \
+		'  make modrinth-autoplay-yorkie-natural-gallery Launch a copied scout world and capture natural Yorkie gallery scenes.' \
 		'  make modrinth-autoplay-cops            Launch a world and run the Cops and Robbers bridge scenario.' \
 		'  make modrinth-autoplay-cops-structures Launch a world and run Cops structure/heist checks.' \
 		'  make modrinth-autoplay-cops-visual     Launch a world and capture clean Cops visual screenshots.' \
@@ -119,6 +120,7 @@ help:
 		'  make bridge-yorkie-adventure-smoke     Run Yorkie flight/water bridge checks.' \
 		'  make bridge-yorkie-visual-sweep        Capture Yorkie gallery scenario screenshots.' \
 		'  make bridge-yorkie-biome-scout         Scout random real terrain for future Yorkie gallery staging.' \
+		'  make bridge-yorkie-natural-gallery     Capture staged Yorkie screenshots in saved real-biome locations.' \
 		'  make bridge-cops-smoke                 Run the Cops and Robbers bridge scenario.' \
 		'  make bridge-cops-structures-smoke      Run Cops structure/heist bridge checks.' \
 		'  make bridge-cops-visual-sweep          Capture Cops mob, vehicle, and structure screenshots.' \
@@ -258,6 +260,9 @@ modrinth-autoplay-yorkie-visual:
 modrinth-autoplay-yorkie-biome-scout:
 	$(MAKE) modrinth-autoplay-smoke PLAYTEST_BRIDGE_SCENARIO=yorkie-biome-scout BRIDGE_SCREENSHOT_NAME="$(BRIDGE_SCREENSHOT_NAME)"
 
+modrinth-autoplay-yorkie-natural-gallery:
+	$(MAKE) modrinth-autoplay-smoke PLAYTEST_BRIDGE_SCENARIO=yorkie-natural-gallery BRIDGE_SCREENSHOT_NAME="$(BRIDGE_SCREENSHOT_NAME)"
+
 modrinth-autoplay-cops:
 	$(MAKE) modrinth-autoplay-smoke PLAYTEST_BRIDGE_SCENARIO=cops-smoke BRIDGE_SCREENSHOT_NAME="$(BRIDGE_SCREENSHOT_NAME)"
 
@@ -362,6 +367,9 @@ bridge-yorkie-visual-sweep:
 
 bridge-yorkie-biome-scout:
 	$(HARNESS) run bridge -- yorkie-biome-scout --host "$(BRIDGE_HOST)" --port "$(BRIDGE_PORT)" --screenshot-name "$(BRIDGE_SCREENSHOT_NAME)" --samples "$(YORKIE_SCOUT_SAMPLES)" --captures "$(YORKIE_SCOUT_CAPTURES)" --range "$(YORKIE_SCOUT_RANGE)" --radius "$(YORKIE_SCOUT_RADIUS)" --step "$(YORKIE_SCOUT_STEP)" --scout-seed "$(YORKIE_SCOUT_SEED)" --report-file "$(BRIDGE_REPORT_FILE)"
+
+bridge-yorkie-natural-gallery:
+	$(HARNESS) run bridge -- yorkie-natural-gallery --host "$(BRIDGE_HOST)" --port "$(BRIDGE_PORT)" --screenshot-name "$(BRIDGE_SCREENSHOT_NAME)" --report-file "$(BRIDGE_REPORT_FILE)"
 
 bridge-cops-smoke:
 	$(HARNESS) run bridge -- cops-smoke --host "$(BRIDGE_HOST)" --port "$(BRIDGE_PORT)" --screenshot-name "$(BRIDGE_SCREENSHOT_NAME)" --report-file "$(BRIDGE_REPORT_FILE)"
