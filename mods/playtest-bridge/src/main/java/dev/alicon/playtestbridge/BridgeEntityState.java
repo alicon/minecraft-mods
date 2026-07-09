@@ -33,6 +33,9 @@ final class BridgeEntityState {
 		state.addProperty("dimension", player.level().dimension().toString());
 		state.add("position", position(player.position()));
 		state.add("abilities", playerAbilities(player));
+		if (player.getVehicle() != null) {
+			state.add("vehicle", entityRef(player.getVehicle()));
+		}
 		state.add("nearbyEntities", nearbyEntities(player));
 		return state;
 	}
@@ -70,6 +73,16 @@ final class BridgeEntityState {
 		state.addProperty("noGravity", entity.isNoGravity());
 		state.addProperty("inWater", entity.isInWater());
 		state.add("position", position(entity.position()));
+		if (entity.getVehicle() != null) {
+			state.add("vehicle", entityRef(entity.getVehicle()));
+		}
+		if (!entity.getPassengers().isEmpty()) {
+			JsonArray passengers = new JsonArray();
+			for (Entity passenger : entity.getPassengers()) {
+				passengers.add(entityRef(passenger));
+			}
+			state.add("passengers", passengers);
+		}
 		if (entity instanceof LivingEntity living) {
 			state.addProperty("health", round(living.getHealth()));
 			state.addProperty("maxHealth", round(living.getMaxHealth()));
@@ -131,11 +144,28 @@ final class BridgeEntityState {
 		JsonObject custom = new JsonObject();
 		putBooleanMethod(custom, entity, "hasHarness");
 		putBooleanMethod(custom, entity, "isCurledUpSleeping");
+		putBooleanMethod(custom, entity, "lightsEnabled");
+		putBooleanMethod(custom, entity, "sirenEnabled");
+		putBooleanMethod(custom, entity, "isJailed");
+		putBooleanMethod(custom, entity, "isSpecialJailbreaker");
+		putBooleanMethod(custom, entity, "hasStolenGold");
+		putBooleanMethod(custom, entity, "hasLitBankFire");
 		putIntegerMethod(custom, entity, "getFlightTrickType");
 		putIntegerMethod(custom, entity, "getFlightTrickTicks");
+		putIntegerMethod(custom, entity, "trickType");
+		putIntegerMethod(custom, entity, "trickTicks");
+		putIntegerMethod(custom, entity, "capturedRobbers");
 		putNeeds(custom, entity);
 		putDomestic(custom, entity);
 		return custom;
+	}
+
+	private static JsonObject entityRef(Entity entity) {
+		JsonObject ref = new JsonObject();
+		ref.addProperty("id", entity.getId());
+		ref.addProperty("type", BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString());
+		ref.addProperty("name", entity.getName().getString());
+		return ref;
 	}
 
 	private static void putNeeds(JsonObject custom, Entity entity) {

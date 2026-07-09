@@ -1,5 +1,8 @@
 'use strict';
 
+const fs = require('node:fs');
+const path = require('node:path');
+
 function parseArgs(argv) {
   const args = { action: null };
   for (let index = 0; index < argv.length; index += 1) {
@@ -82,6 +85,15 @@ function sleep(ms) {
   });
 }
 
+function writeReportFile(file, result) {
+  if (!file) {
+    return;
+  }
+  const resolved = path.resolve(file);
+  fs.mkdirSync(path.dirname(resolved), { recursive: true });
+  fs.writeFileSync(resolved, `${JSON.stringify(result, null, 2)}\n`);
+}
+
 async function requestJson(baseUrl, path, method = 'GET', body = null) {
   const response = await fetch(`${baseUrl}${path}`, {
     method,
@@ -144,7 +156,7 @@ async function waitForEntityState(baseUrl, type, predicate, timeoutMs = 10000, p
   let lastState = null;
   while (Date.now() < deadline) {
     lastState = await requestJson(baseUrl, '/state');
-    const entity = nearestEntity(lastState, type);
+    const entity = entitiesOfType(lastState, type).find((candidate) => predicate(candidate));
     if (entity && predicate(entity)) {
       return entity;
     }
@@ -165,6 +177,20 @@ async function waitForEntityCount(baseUrl, type, count, timeoutMs = 10000, pollM
     await sleep(pollMs);
   }
   throw new Error(`Timed out waiting for ${count} ${type} entities; last state: ${JSON.stringify(lastState)}`);
+}
+
+async function waitForNoEntities(baseUrl, type, timeoutMs = 10000, pollMs = 250) {
+  const deadline = Date.now() + timeoutMs;
+  let lastState = null;
+  while (Date.now() < deadline) {
+    lastState = await requestJson(baseUrl, '/state');
+    const entities = entitiesOfType(lastState, type);
+    if (entities.length === 0) {
+      return { ok: true, type, count: 0 };
+    }
+    await sleep(pollMs);
+  }
+  throw new Error(`Timed out waiting for no ${type} entities; last state: ${JSON.stringify(lastState)}`);
 }
 
 async function waitForBlock(baseUrl, position, block, timeoutMs = 10000, pollMs = 250) {
@@ -326,6 +352,7 @@ async function runYorkieSmoke(baseUrl, args) {
     await command('weather clear');
     await command('gamerule doMobSpawning false');
     await command('gamerule doDaylightCycle false');
+    await command('gamerule doMobLoot false');
     await clearEntities('cops_robbers:bank_robber');
     await clearEntities('cops_robbers:police_cruiser');
     await clearEntities(yorkieType);
@@ -599,7 +626,9 @@ async function runYorkieSmoke(baseUrl, args) {
 
   const screenshot = await step('screenshot', async () => requestJson(baseUrl, '/screenshot', 'POST', {
     name: screenshotName,
-    resume: true
+    resume: true,
+    hideGui: true,
+    clearChat: true
   }));
 
   const leadAttached = await step('lead attaches with harness', async () => useYorkie({
@@ -667,6 +696,10 @@ async function runYorkieWaterSmoke(baseUrl, args) {
       radius,
       ...body
     });
+  }
+
+  async function playerAbilities(body) {
+    return requestJson(baseUrl, '/player-abilities', 'POST', body);
   }
 
   async function mergeYorkieData(nbt) {
@@ -844,7 +877,9 @@ async function runYorkieWaterSmoke(baseUrl, args) {
 
   const screenshot = await step('screenshot', async () => requestJson(baseUrl, '/screenshot', 'POST', {
     name: screenshotName,
-    resume: true
+    resume: true,
+    hideGui: true,
+    clearChat: true
   }));
 
   return {
@@ -1043,7 +1078,9 @@ async function runYorkieAdventureSmoke(baseUrl, args) {
 
   const screenshot = await step('screenshot', async () => requestJson(baseUrl, '/screenshot', 'POST', {
     name: screenshotName,
-    resume: true
+    resume: true,
+    hideGui: true,
+    clearChat: true
   }));
 
   return {
@@ -1055,9 +1092,1312 @@ async function runYorkieAdventureSmoke(baseUrl, args) {
   };
 }
 
+async function runYorkieVisualSweep(baseUrl, args) {
+  const yorkieType = option(args, 'type', 'YORKIE_ENTITY', 'mushroom_yorkie:mushroom_yorkie');
+  const requestedName = option(args, 'screenshotName', 'BRIDGE_SCREENSHOT_NAME', '');
+  const screenshotPrefix = (requestedName || `mushroom-yorkie-gallery-${Date.now()}`)
+    .replace(/\.png$/i, '')
+    .replace(/[^A-Za-z0-9._-]/g, '-');
+  const visualX = Math.round(optionNumber(args, 'visualX', 'YORKIE_VISUAL_X', 0));
+  const visualY = Math.round(optionNumber(args, 'visualY', 'YORKIE_VISUAL_Y', 178));
+  const visualZ = Math.round(optionNumber(args, 'visualZ', 'YORKIE_VISUAL_Z', 0));
+  const radius = optionNumber(args, 'radius', 'YORKIE_RADIUS', 18);
+  const steps = [];
+
+  async function step(name, run) {
+    const value = await run();
+    steps.push({ name, ok: true, value });
+    return value;
+  }
+
+  async function command(commandText) {
+    return requestJson(baseUrl, '/command', 'POST', { command: commandText });
+  }
+
+  async function checkedCommand(commandText) {
+    const result = await command(commandText);
+    requireCondition(result.success !== false, `Command failed: ${commandText}`);
+    return result;
+  }
+
+  async function clearEntities(type) {
+    return requestJson(baseUrl, '/clear-entities', 'POST', { type });
+  }
+
+  async function setAbsoluteBlock(position, block, replace = '') {
+    const body = { ...position, block };
+    if (replace) {
+      body.replace = replace;
+    }
+    return requestJson(baseUrl, '/set-block', 'POST', body);
+  }
+
+  async function useBlock(body) {
+    return requestJson(baseUrl, '/use-block', 'POST', body);
+  }
+
+  async function useYorkie(body) {
+    return requestJson(baseUrl, '/use-entity', 'POST', {
+      type: yorkieType,
+      radius,
+      ...body
+    });
+  }
+
+  async function playerAbilities(body) {
+    return requestJson(baseUrl, '/player-abilities', 'POST', body);
+  }
+
+  async function mergeYorkieData(nbt) {
+    await command(`data merge entity @e[type=${yorkieType},limit=1,sort=nearest] ${nbt}`);
+    return waitForEntity(baseUrl, yorkieType);
+  }
+
+  async function freezeEntity(type) {
+    await command(`data merge entity @e[type=${type},limit=1,sort=nearest] {NoAI:1b}`);
+    return waitForEntity(baseUrl, type);
+  }
+
+  async function screenshot(suffix, options = {}) {
+    const shot = await requestJson(baseUrl, '/screenshot', 'POST', {
+      name: `${screenshotPrefix}-${suffix}.png`,
+      resume: true,
+      hideGui: options.hideGui !== false,
+      clearChat: options.clearChat !== false
+    });
+    return shot.file;
+  }
+
+  async function cameraShot(suffix, camera, target, options = {}) {
+    await checkedCommand(`gamemode spectator ${playerName}`);
+    await checkedCommand(`tp ${playerName} ${camera.x} ${camera.y} ${camera.z} facing ${target.x} ${target.y} ${target.z}`);
+    await sleep(options.delayMillis || 650);
+    return screenshot(suffix, options);
+  }
+
+  function point(dx, dy = 0, dz = 0) {
+    return { x: visualX + dx, y: visualY + dy, z: visualZ + dz };
+  }
+
+  function horizontalDistanceSqr(first, second) {
+    const dx = first.position.x - second.position.x;
+    const dz = first.position.z - second.position.z;
+    return dx * dx + dz * dz;
+  }
+
+  async function waitForEntityPair(targetType, predicate, timeoutMillis, failureMessage) {
+    const deadline = Date.now() + timeoutMillis;
+    let last;
+    while (Date.now() <= deadline) {
+      const yorkie = await waitForEntity(baseUrl, yorkieType, 1000);
+      const target = await waitForEntity(baseUrl, targetType, 1000);
+      last = { yorkie, target };
+      if (predicate(yorkie, target)) {
+        return last;
+      }
+      await sleep(250);
+    }
+    throw new Error(`${failureMessage}: ${JSON.stringify(last)}`);
+  }
+
+  async function waitForYorkieAndItem(itemId, predicate, timeoutMillis, failureMessage) {
+    const deadline = Date.now() + timeoutMillis;
+    let last;
+    while (Date.now() <= deadline) {
+      const yorkie = await waitForEntity(baseUrl, yorkieType, 1000);
+      const items = await waitForItemCount(baseUrl, itemId, 1, 500).catch(() => []);
+      const item = items[0] || null;
+      last = { yorkie, item };
+      if (item && predicate(yorkie, item)) {
+        return last;
+      }
+      await sleep(200);
+    }
+    throw new Error(`${failureMessage}: ${JSON.stringify(last)}`);
+  }
+
+  function tiledRanges(min, max, size) {
+    const ranges = [];
+    for (let start = min; start <= max; start += size) {
+      ranges.push([start, Math.min(start + size - 1, max)]);
+    }
+    return ranges;
+  }
+
+  async function fillBox(min, max, block, checked = false) {
+    const run = checked ? checkedCommand : command;
+    return run(`fill ${min.x} ${min.y} ${min.z} ${max.x} ${max.y} ${max.z} ${block}`);
+  }
+
+  async function setBlocks(block, positions) {
+    const placements = [];
+    for (const position of positions) {
+      placements.push(await setAbsoluteBlock(position, block));
+    }
+    return placements;
+  }
+
+  async function buildCherryTree(position, height = 4) {
+    const dx = position.x - visualX;
+    const dz = position.z - visualZ;
+    const rel = (x, y, z) => point(dx + x, y, dz + z);
+    const leaves = 'minecraft:cherry_leaves[persistent=true]';
+
+    await fillBox(rel(0, 0, 0), rel(0, height - 1, 0), 'minecraft:cherry_log');
+    await setBlocks('minecraft:cherry_log[axis=x]', [rel(-1, height - 1, 0), rel(1, height - 1, 0)]);
+    await setBlocks('minecraft:cherry_log[axis=z]', [rel(0, height - 1, -1), rel(0, height - 1, 1)]);
+    await fillBox(rel(-2, height - 1, -1), rel(2, height - 1, 1), leaves);
+    await fillBox(rel(-1, height - 1, -2), rel(1, height - 1, 2), leaves);
+    await fillBox(rel(-3, height, -2), rel(3, height, 2), leaves);
+    await fillBox(rel(-2, height, -3), rel(2, height, 3), leaves);
+    await fillBox(rel(-2, height + 1, -2), rel(2, height + 1, 2), leaves);
+    await fillBox(rel(-1, height + 2, -1), rel(1, height + 2, 1), leaves);
+    await setBlocks('minecraft:air', [
+      rel(-3, height, -2),
+      rel(-3, height, 2),
+      rel(3, height, -2),
+      rel(3, height, 2),
+      rel(-2, height, -3),
+      rel(-2, height, 3),
+      rel(2, height, -3),
+      rel(2, height, 3),
+      rel(-2, height + 1, -2),
+      rel(-2, height + 1, 2),
+      rel(2, height + 1, -2),
+      rel(2, height + 1, 2)
+    ]);
+    await setBlocks(leaves, [
+      rel(-3, height - 1, 0),
+      rel(3, height - 1, 0),
+      rel(0, height - 1, -3),
+      rel(0, height - 1, 3),
+      rel(-2, height - 2, 1),
+      rel(2, height - 2, -1)
+    ]);
+    await setBlocks('minecraft:pink_petals', [
+      rel(-2, 0, -1),
+      rel(2, 0, 1),
+      rel(-1, 0, 2),
+      rel(1, 0, -2)
+    ]);
+  }
+
+  async function buildBaseStage() {
+    const xRanges = tiledRanges(visualX - 48, visualX + 48, 16);
+    const zRanges = tiledRanges(visualZ - 42, visualZ + 42, 16);
+    const yRanges = tiledRanges(visualY, visualY + 30, 10);
+    for (const [minX, maxX] of xRanges) {
+      for (const [minZ, maxZ] of zRanges) {
+        for (const [minY, maxY] of yRanges) {
+          await fillBox({ x: minX, y: minY, z: minZ }, { x: maxX, y: maxY, z: maxZ }, 'minecraft:air');
+        }
+      }
+    }
+    await fillBox(point(-48, -1, -42), point(48, -1, 42), 'minecraft:grass_block');
+    await fillBox(point(-48, -2, -42), point(48, -2, 42), 'minecraft:dirt');
+    await fillBox(point(-1, -1, -16), point(1, -1, 18), 'minecraft:dirt_path');
+    await fillBox(point(-22, -1, -4), point(-7, -1, 18), 'minecraft:moss_block');
+    await fillBox(point(8, -1, -2), point(22, -1, 14), 'minecraft:sand');
+    await fillBox(point(12, 0, 2), point(19, 0, 10), 'minecraft:water');
+    await command(`fillbiome ${visualX - 48} ${visualY - 2} ${visualZ - 42} ${visualX + 48} ${visualY + 18} ${visualZ + 42} minecraft:cherry_grove`);
+    await command(`fillbiome ${visualX + 8} ${visualY - 2} ${visualZ - 2} ${visualX + 24} ${visualY + 18} ${visualZ + 16} minecraft:river`);
+    await command(`fillbiome ${visualX - 24} ${visualY - 2} ${visualZ - 6} ${visualX - 7} ${visualY + 18} ${visualZ + 20} minecraft:lush_caves`);
+    await command(`kill @e[type=!minecraft:player,x=${visualX - 50},y=${visualY - 4},z=${visualZ - 44},dx=100,dy=38,dz=88]`);
+    await sleep(500);
+    await command(`kill @e[type=minecraft:item,x=${visualX - 50},y=${visualY - 4},z=${visualZ - 44},dx=100,dy=38,dz=88]`);
+    await command(`kill @e[type=minecraft:leash_knot,x=${visualX - 50},y=${visualY - 4},z=${visualZ - 44},dx=100,dy=38,dz=88]`);
+  }
+
+  async function decorateMeadow() {
+    await buildCherryTree(point(-7, 0, 5), 4);
+    await buildCherryTree(point(7, 0, 6), 4);
+    await buildCherryTree(point(-13, 0, 14), 5);
+    await buildCherryTree(point(14, 0, 17), 4);
+    await fillBox(point(-20, 0, 0), point(-18, 0, 2), 'minecraft:azalea_leaves');
+    await fillBox(point(-16, 0, 7), point(-14, 0, 9), 'minecraft:flowering_azalea_leaves');
+    await setBlocks('minecraft:mossy_cobblestone', [point(-4, 0, 6), point(5, 0, 8), point(10, 0, -5), point(-9, 0, -3)]);
+    await setBlocks('minecraft:poppy', [point(-12, 0, -5), point(-9, 0, 7), point(10, 0, -6), point(14, 0, 5)]);
+    await setBlocks('minecraft:dandelion', [point(-14, 0, 3), point(-7, 0, -8), point(8, 0, 8), point(12, 0, -2)]);
+    await setBlocks('minecraft:cornflower', [point(-4, 0, 8), point(5, 0, -7), point(16, 0, 2)]);
+    await setBlocks('minecraft:pink_petals', [
+      point(-5, 0, 2),
+      point(3, 0, 4),
+      point(6, 0, 11),
+      point(-8, 0, 12),
+      point(-3, 0, -2),
+      point(3, 0, -1),
+      point(-4, 0, 0),
+      point(4, 0, 1)
+    ]);
+  }
+
+  async function buildCozyRoom(options = {}) {
+    await fillBox(point(-5, -1, -2), point(5, -1, 6), 'minecraft:cherry_planks', true);
+    await fillBox(point(-5, 0, 6), point(5, 3, 6), 'minecraft:cherry_planks');
+    await fillBox(point(-5, 0, -2), point(-5, 3, 6), 'minecraft:cherry_planks');
+    await fillBox(point(5, 0, -2), point(5, 3, 6), 'minecraft:cherry_planks');
+    await fillBox(point(-5, 3, -2), point(5, 3, 6), 'minecraft:stripped_cherry_log');
+    await fillBox(point(-4, 1, -2), point(4, 2, -2), 'minecraft:glass_pane');
+    await fillBox(point(-2, 1, 6), point(2, 2, 6), 'minecraft:glass_pane');
+    await setBlocks('minecraft:bookshelf', [
+      point(-4, 0, 4),
+      point(-4, 1, 4),
+      point(4, 0, 4),
+      point(4, 1, 4)
+    ]);
+    await setBlocks('minecraft:red_carpet', [
+      point(-1, 0, 0),
+      point(0, 0, 0),
+      point(1, 0, 0),
+      point(-1, 0, 1),
+      point(0, 0, 1),
+      point(1, 0, 1)
+    ]);
+    await setBlocks('minecraft:lantern[hanging=true]', [point(-3, 2, 1), point(3, 2, 3)]);
+    await setBlocks('minecraft:potted_cherry_sapling', [point(-4, 1, -1), point(4, 1, -1)]);
+    if (options.backDoor) {
+      await fillBox(point(-4, 0, 6), point(-3, 2, 6), 'minecraft:air');
+      await setBlocks('minecraft:cherry_door[facing=south,half=lower,hinge=left,open=true]', [point(-4, 0, 6)]);
+      await setBlocks('minecraft:cherry_door[facing=south,half=upper,hinge=left,open=true]', [point(-4, 1, 6)]);
+      await fillBox(point(-5, -1, 7), point(1, -1, 11), 'minecraft:grass_block');
+      await setBlocks('minecraft:pink_petals', [point(-4, 0, 7), point(-2, 0, 8), point(0, 0, 10)]);
+    }
+  }
+
+  async function prepScene(name, options = {}) {
+    await step(`prepare ${name}`, async () => {
+      await command('time set noon');
+      await command('weather clear');
+      await command('gamerule doMobSpawning false');
+      await command('gamerule doDaylightCycle false');
+      await command('gamerule doMobLoot false');
+      await command('gamerule sendCommandFeedback false');
+      await checkedCommand(`gamemode creative ${playerName}`);
+      await playerAbilities({ flying: false, mayfly: true });
+      await command(`clear ${playerName}`);
+      for (const type of [
+        yorkieType,
+        'minecraft:item',
+        'minecraft:cow',
+        'minecraft:sheep',
+        'minecraft:pig',
+        'minecraft:chicken',
+        'minecraft:zombie',
+        'minecraft:skeleton',
+        'minecraft:spider',
+        'minecraft:creeper'
+      ]) {
+        await clearEntities(type);
+      }
+      await buildBaseStage();
+      if (options.meadow !== false) {
+        await decorateMeadow();
+      }
+      await checkedCommand(`tp ${playerName} ${visualX + 0.5} ${visualY + 1.0} ${visualZ - 8.5} 0 0`);
+      return { base: point(0, 0, 0) };
+    });
+  }
+
+  async function summonYorkie(position, options = {}) {
+    const yaw = options.yaw === undefined ? 180 : options.yaw;
+    const nbtParts = [`Rotation:[${yaw.toFixed(1)}f,0.0f]`, 'PersistenceRequired:1b'];
+    if (options.noAi) {
+      nbtParts.push('NoAI:1b');
+    }
+    if (options.noGravity) {
+      nbtParts.push('NoGravity:1b');
+    }
+    await checkedCommand(`summon ${yorkieType} ${position.x} ${position.y} ${position.z} {${nbtParts.join(',')}}`);
+    await waitForEntity(baseUrl, yorkieType, 5000);
+    if (options.tame !== false) {
+      await checkedCommand(`gamemode creative ${playerName}`);
+      await checkedCommand(`tp ${playerName} ${position.x} ${position.y} ${position.z + 2.2} facing ${position.x} ${position.y + 0.4} ${position.z}`);
+      const tamed = await useYorkie({ item: 'mushroom_yorkie:yorkie_treat', count: 2 });
+      requireCondition(tamed.target.tameable && tamed.target.tameable.tame, 'Yorkie did not become tame for visual scene');
+    }
+    if (options.needs) {
+      await mergeYorkieData(options.needs);
+    }
+    if (options.harness) {
+      const harnessed = await useYorkie({ item: 'mushroom_yorkie:yorkie_harness', count: 1 });
+      requireCondition(harnessed.target.custom && harnessed.target.custom.harness, 'Yorkie harness did not equip for visual scene');
+    }
+    if (options.sit) {
+      const sat = await useYorkie({ emptyHand: true });
+      requireCondition(sat.target.tameable && sat.target.tameable.orderedToSit, 'Yorkie did not sit for visual scene');
+    }
+    return waitForEntity(baseUrl, yorkieType, 5000);
+  }
+
+  const playerName = singlePlayerName(await requestJson(baseUrl, '/state'));
+  const screenshots = {};
+
+  await prepScene('portrait sitting');
+  screenshots.sitting = await step('capture sitting no leash', async () => {
+    const yorkie = await summonYorkie(point(0.5, 0, 0.5), { sit: true, yaw: 180 });
+    await setAbsoluteBlock(point(-2, 0, 1), 'mushroom_yorkie:dog_bed');
+    return {
+      yorkie,
+      file: await cameraShot('sitting-no-leash', point(0.5, 0.95, -3.1), point(0.5, 0.35, 0.5))
+    };
+  });
+
+  await prepScene('leashed walk');
+  screenshots.leashed = await step('capture leashed walk', async () => {
+    const yorkie = await summonYorkie(point(-0.5, 0, 0.5), { harness: true, yaw: 165 });
+    await setBlocks('minecraft:oak_fence', [point(2, 0, 1), point(3, 0, 1)]);
+    await checkedCommand(`gamemode creative ${playerName}`);
+    await checkedCommand(`tp ${playerName} ${visualX + 1.9} ${visualY} ${visualZ - 0.8} facing ${visualX - 0.5} ${visualY + 0.3} ${visualZ + 0.5}`);
+    const lead = await useYorkie({ item: 'minecraft:lead', count: 1 });
+    requireCondition(lead.target.leash && lead.target.leash.leashed, 'Leash did not attach for visual scene');
+    const tied = await useBlock({
+      item: 'minecraft:lead',
+      count: 1,
+      x: visualX + 2,
+      y: visualY,
+      z: visualZ + 1,
+      face: 'up'
+    });
+    await sleep(350);
+    return {
+      yorkie,
+      lead,
+      tied,
+      tiedYorkie: await waitForEntity(baseUrl, yorkieType, 5000),
+      file: await cameraShot('leashed-walk', point(1.2, 1.05, -3.0), point(0.1, 0.35, 0.8))
+    };
+  });
+
+  await prepScene('sleeping indoors', { meadow: false });
+  screenshots.sleeping = await step('capture sleeping indoors', async () => {
+    await buildCozyRoom();
+    await setAbsoluteBlock(point(0, 0, 1), 'mushroom_yorkie:dog_bed');
+    await command('time set night');
+    await playerAbilities({ flying: false, mayfly: true });
+    await summonYorkie(point(0.5, 0, 1.5), { yaw: 180 });
+    const sleeping = await waitForEntityState(
+      baseUrl,
+      yorkieType,
+      (entity) => entity.custom && entity.custom.curledUpSleeping,
+      15000
+    );
+    return {
+      sleeping,
+      file: await cameraShot('sleeping-indoors', point(0.5, 1.05, -3.4), point(0.5, 0.35, 1.5))
+    };
+  });
+
+  await prepScene('water paddle');
+  screenshots.water = await step('capture in water', async () => {
+    await fillBox(point(-5, -1, -1), point(5, -1, 5), 'minecraft:sand');
+    await fillBox(point(-4, 0, 0), point(4, 0, 4), 'minecraft:water');
+    const yorkie = await summonYorkie(point(0.5, 0.05, 2.5), { yaw: 180, needs: '{Hunger:10,Potty:10,Mood:90,Energy:80}' });
+    await sleep(900);
+    return {
+      yorkie,
+      file: await cameraShot('in-water', point(0.5, 1.1, -3.0), point(0.5, 0.35, 2.5))
+    };
+  });
+
+  await prepScene('fetching ball');
+  screenshots.fetching = await step('capture fetching ball', async () => {
+    await summonYorkie(point(-3.0, 0, 0.5), { yaw: 95, needs: '{Hunger:0,Potty:0,Mood:65,Energy:85}' });
+    await checkedCommand(`clear ${playerName}`);
+    await command(`summon item ${visualX + 2.4} ${visualY + 0.4} ${visualZ + 0.5} {Item:{id:"mushroom_yorkie:yorkie_ball",count:1}}`);
+    const approach = await waitForYorkieAndItem(
+      'mushroom_yorkie:yorkie_ball',
+      (entity, item) => entity.position.x > visualX - 2.15 && horizontalDistanceSqr(entity, item) > 4.0,
+      5000,
+      'Yorkie did not start fetching the gallery ball'
+    );
+    await freezeEntity(yorkieType);
+    return {
+      approach,
+      item: await waitForItemCount(baseUrl, 'mushroom_yorkie:yorkie_ball', 1, 5000).catch(() => []),
+      yorkie: await waitForEntity(baseUrl, yorkieType, 5000),
+      file: await cameraShot('fetching-ball', point(0.0, 1.1, -3.4), point(0.0, 0.35, 0.5))
+    };
+  });
+
+  await prepScene('flying');
+  screenshots.flying = await step('capture flying', async () => {
+    await fillBox(point(-5, -1, 4), point(5, -1, 10), 'minecraft:smooth_quartz');
+    const yorkie = await summonYorkie(point(0.5, 5.0, 1.5), {
+      noAi: true,
+      noGravity: true,
+      yaw: 180,
+      needs: '{Hunger:0,Potty:0,Mood:100,Energy:90}'
+    });
+    return {
+      yorkie,
+      file: await cameraShot('flying', point(0.5, 5.9, -3.0), point(0.5, 5.05, 1.5))
+    };
+  });
+
+  await prepScene('eating');
+  screenshots.eating = await step('capture eating', async () => {
+    await setAbsoluteBlock(point(0, 0, 0), 'mushroom_yorkie:dog_food_bowl');
+    await summonYorkie(point(0, 0, 1.35), {
+      noAi: true,
+      yaw: 180,
+      needs: '{Hunger:90,Potty:20,Mood:70,Energy:70,LastFoodBowlDay:-1L}'
+    });
+    await checkedCommand(`tp @e[type=${yorkieType},limit=1,sort=nearest] ${visualX} ${visualY} ${visualZ + 1.35} facing ${visualX} ${visualY + 0.2} ${visualZ}`);
+    return {
+      yorkie: await waitForEntity(baseUrl, yorkieType, 5000),
+      file: await cameraShot('eating-food-bowl', point(0, 0.95, -3.2), point(0.0, 0.35, 0.8))
+    };
+  });
+
+  await prepScene('drinking');
+  screenshots.drinking = await step('capture drinking', async () => {
+    await setAbsoluteBlock(point(0, 0, 0), 'mushroom_yorkie:dog_water_bowl');
+    await summonYorkie(point(0, 0, 1.35), {
+      noAi: true,
+      yaw: 180,
+      needs: '{Hunger:20,Potty:20,Mood:70,Energy:70,LastWaterBowlDay:-1L}'
+    });
+    await checkedCommand(`tp @e[type=${yorkieType},limit=1,sort=nearest] ${visualX} ${visualY} ${visualZ + 1.35} facing ${visualX} ${visualY + 0.2} ${visualZ}`);
+    return {
+      yorkie: await waitForEntity(baseUrl, yorkieType, 5000),
+      file: await cameraShot('drinking-water-bowl', point(0, 0.95, -3.2), point(0.0, 0.35, 0.8))
+    };
+  });
+
+  await prepScene('potty message', { meadow: false });
+  screenshots.potty = await step('capture wants outside message', async () => {
+    await buildCozyRoom({ backDoor: true });
+    await summonYorkie(point(-2.8, 0, 4.8), {
+      yaw: 25,
+      needs: '{Hunger:20,Potty:95,Mood:70,Energy:80,LastReliefDay:-1L}'
+    });
+    await sleep(1600);
+    await mergeYorkieData('{NoAI:1b}');
+    await command(`title ${playerName} actionbar {"text":"Mushroom wants outside.","color":"gold"}`);
+    return {
+      yorkie: await waitForEntity(baseUrl, yorkieType, 5000),
+      file: await cameraShot('wants-outside-message', point(0.0, 1.2, -4.2), point(-2.1, 0.45, 4.8), {
+        hideGui: false,
+        clearChat: true,
+        delayMillis: 450
+      })
+    };
+  });
+
+  await prepScene('chasing passive mob');
+  screenshots.passiveChase = await step('capture chasing passive mob', async () => {
+    await summonYorkie(point(-3.0, 0, 0.5), { yaw: 90, needs: '{Hunger:10,Potty:10,Mood:80,Energy:80}' });
+    await checkedCommand(`clear ${playerName}`);
+    await checkedCommand(`gamemode survival ${playerName}`);
+    await checkedCommand(`tp ${playerName} ${visualX} ${visualY} ${visualZ - 3.0} facing ${visualX + 0.5} ${visualY + 0.3} ${visualZ + 0.5}`);
+    await checkedCommand(`summon minecraft:sheep ${visualX + 2.5} ${visualY} ${visualZ + 0.5} {PersistenceRequired:1b,Rotation:[270.0f,0.0f]}`);
+    const chase = await waitForEntityPair(
+      'minecraft:sheep',
+      (entity, sheep) => entity.position.x > visualX - 2.0 && horizontalDistanceSqr(entity, sheep) < 18.0,
+      8000,
+      'Yorkie did not chase the passive mob for the gallery scene'
+    );
+    await freezeEntity(yorkieType);
+    await freezeEntity('minecraft:sheep');
+    return {
+      chase,
+      yorkie: await waitForEntity(baseUrl, yorkieType, 5000),
+      sheep: await waitForEntity(baseUrl, 'minecraft:sheep', 5000),
+      file: await cameraShot('chasing-sheep', point(0.3, 1.25, -5.2), point(0.8, 0.45, 0.2))
+    };
+  });
+
+  await prepScene('attacking hostile mob');
+  screenshots.hostileAttack = await step('capture attacking hostile mob', async () => {
+    await command('difficulty easy');
+    await summonYorkie(point(-2.5, 0, 0.5), { yaw: 90, needs: '{Hunger:10,Potty:10,Mood:85,Energy:85}' });
+    await checkedCommand(`clear ${playerName}`);
+    await checkedCommand(`gamemode survival ${playerName}`);
+    await checkedCommand(`tp ${playerName} ${visualX} ${visualY} ${visualZ - 3.0} facing ${visualX + 0.5} ${visualY + 0.3} ${visualZ + 0.5}`);
+    await checkedCommand(`summon minecraft:spider ${visualX + 2.0} ${visualY} ${visualZ + 0.5} {NoAI:1b,PersistenceRequired:1b,Rotation:[270.0f,0.0f]}`);
+    const attack = await waitForEntityPair(
+      'minecraft:spider',
+      (_entity, spider) => spider.health < spider.maxHealth,
+      10000,
+      'Yorkie did not damage the hostile mob for the gallery scene'
+    );
+    await clearEntities('minecraft:spider');
+    await checkedCommand(`summon minecraft:spider ${visualX + 1.45} ${visualY} ${visualZ + 0.45} {NoAI:1b,PersistenceRequired:1b,Health:15.0f,Rotation:[270.0f,0.0f]}`);
+    await checkedCommand(`tp @e[type=${yorkieType},limit=1,sort=nearest] ${visualX - 0.85} ${visualY} ${visualZ + 0.25} facing ${visualX + 1.45} ${visualY + 0.35} ${visualZ + 0.45}`);
+    await freezeEntity(yorkieType);
+    const stagedSpider = await freezeEntity('minecraft:spider');
+    return {
+      attack,
+      yorkie: await waitForEntity(baseUrl, yorkieType, 5000),
+      spider: stagedSpider,
+      file: await cameraShot('attacking-spider', point(0.0, 1.0, -4.1), point(0.35, 0.35, 0.35))
+    };
+  });
+
+  return {
+    ok: true,
+    scenario: 'yorkie-visual-sweep',
+    screenshots,
+    steps
+  };
+}
+
+async function runCopsSmoke(baseUrl, args) {
+  const cruiserType = option(args, 'type', 'COPS_CRUISER_ENTITY', 'cops_robbers:police_cruiser');
+  const robberType = option(args, 'robberType', 'COPS_ROBBER_ENTITY', 'cops_robbers:bank_robber');
+  const copType = option(args, 'copType', 'COPS_COP_ENTITY', 'cops_robbers:cop');
+  const fireTruckType = option(args, 'fireTruckType', 'COPS_FIRE_TRUCK_ENTITY', 'cops_robbers:fire_truck');
+  const firemanType = option(args, 'firemanType', 'COPS_FIREMAN_ENTITY', 'cops_robbers:fireman');
+  const tellerType = option(args, 'tellerType', 'COPS_TELLER_ENTITY', 'cops_robbers:teller');
+  const radius = optionNumber(args, 'radius', 'COPS_RADIUS', 16);
+  const screenshotName = option(
+    args,
+    'screenshotName',
+    'BRIDGE_SCREENSHOT_NAME',
+    `cops-and-robbers-smoke-${Date.now()}.png`
+  );
+  const steps = [];
+
+  async function step(name, run) {
+    const value = await run();
+    steps.push({ name, ok: true, value });
+    return value;
+  }
+
+  async function command(commandText) {
+    return requestJson(baseUrl, '/command', 'POST', { command: commandText });
+  }
+
+  async function checkedCommand(commandText) {
+    const result = await command(commandText);
+    requireCondition(result.success !== false, `Command failed: ${commandText}`);
+    return result;
+  }
+
+  async function inventoryCount(item) {
+    const result = await command(`clear ${playerName} ${item} 0`);
+    return result.result || 0;
+  }
+
+  async function clearEntities(type) {
+    return requestJson(baseUrl, '/clear-entities', 'POST', { type });
+  }
+
+  async function useEntity(type, body = {}) {
+    return requestJson(baseUrl, '/use-entity', 'POST', {
+      type,
+      radius,
+      ...body
+    });
+  }
+
+  async function setAbsoluteBlock(position, block, replace = '') {
+    const body = { ...position, block };
+    if (replace) {
+      body.replace = replace;
+    }
+    return requestJson(baseUrl, '/set-block', 'POST', body);
+  }
+
+  async function buildArena(arenaRadius = 14) {
+    const state = await requestJson(baseUrl, '/state');
+    const player = state.players.find((candidate) => candidate.name === playerName);
+    requireCondition(player, `Could not find player state for ${playerName}`);
+    const base = {
+      x: Math.round(player.position.x),
+      y: Math.ceil(player.position.y),
+      z: Math.round(player.position.z)
+    };
+    await command(
+      `fill ${base.x - arenaRadius} ${base.y} ${base.z - arenaRadius} ${base.x + arenaRadius} ${base.y + 8} ${base.z + arenaRadius} minecraft:air`
+    );
+    await command(
+      `fill ${base.x - arenaRadius} ${base.y - 1} ${base.z - arenaRadius} ${base.x + arenaRadius} ${base.y - 1} ${base.z + arenaRadius} minecraft:smooth_stone`
+    );
+    await command(`tp ${playerName} ${base.x + 0.5} ${base.y} ${base.z + 0.5}`);
+    const floorBlock = await waitForBlock(baseUrl, { x: base.x, y: base.y - 1, z: base.z }, 'minecraft:smooth_stone', 5000);
+    return { base, radius: arenaRadius, floorBlock };
+  }
+
+  async function placeMinimalJail(base, cruiserBlock) {
+    const cell = {
+      x: cruiserBlock.x + 5,
+      y: base.y,
+      z: cruiserBlock.z + 5
+    };
+    const dropoff = {
+      x: cruiserBlock.x,
+      y: base.y - 1,
+      z: cruiserBlock.z
+    };
+    const door = {
+      x: cruiserBlock.x + 2,
+      y: base.y,
+      z: cruiserBlock.z + 2
+    };
+    const placements = [];
+
+    async function set(position, block, replace = '') {
+      const placed = await setAbsoluteBlock(position, block, replace);
+      placements.push(placed);
+      return placed;
+    }
+
+    await set(dropoff, 'minecraft:yellow_concrete');
+    await set(door, 'minecraft:iron_door');
+    await set({ x: cell.x, y: cell.y - 1, z: cell.z }, 'minecraft:smooth_stone');
+    await set(cell, 'minecraft:air');
+    await set({ x: cell.x, y: cell.y + 1, z: cell.z }, 'minecraft:air');
+
+    const barOffsets = [
+      { x: -2, z: 0 },
+      { x: 2, z: 0 },
+      { x: 0, z: -2 },
+      { x: 0, z: 2 }
+    ];
+    for (const offset of barOffsets) {
+      await set({ x: cell.x + offset.x, y: cell.y, z: cell.z + offset.z }, 'minecraft:iron_bars');
+      await set({ x: cell.x + offset.x, y: cell.y + 1, z: cell.z + offset.z }, 'minecraft:iron_bars');
+    }
+
+    return { cell, dropoff, door, placements };
+  }
+
+  const playerName = singlePlayerName(await requestJson(baseUrl, '/state'));
+  let arenaBase = null;
+  const cruiserBlock = {};
+
+  await step('prepare patrol arena', async () => {
+    await command('time set day');
+    await command('weather clear');
+    await command('difficulty easy');
+    await command('gamerule doMobSpawning false');
+    await command('gamerule doDaylightCycle false');
+    await command(`gamemode creative ${playerName}`);
+    await command(`clear ${playerName}`);
+    await clearEntities(robberType);
+    await clearEntities(cruiserType);
+    await clearEntities(fireTruckType);
+    await clearEntities(copType);
+    await clearEntities(firemanType);
+    await clearEntities(tellerType);
+    const arena = await buildArena(14);
+    arenaBase = arena.base;
+    cruiserBlock.x = arenaBase.x + 2;
+    cruiserBlock.y = arenaBase.y;
+    cruiserBlock.z = arenaBase.z;
+    await requestJson(baseUrl, '/chat', 'POST', { message: 'Cops and Robbers runtime smoke starting.' });
+    return arena;
+  });
+
+  await step('registered items are giveable', async () => {
+    const items = [
+      'cops_robbers:police_cruiser_spawn_egg',
+      'cops_robbers:fire_truck_spawn_egg',
+      'cops_robbers:bank_robber_spawn_egg',
+      'cops_robbers:teller_spawn_egg',
+      'cops_robbers:cop_spawn_egg',
+      'cops_robbers:fireman_spawn_egg',
+      'cops_robbers:bank_kit',
+      'cops_robbers:police_station_kit',
+      'cops_robbers:fire_station_kit'
+    ];
+    const commands = [];
+    for (const item of items) {
+      commands.push(await checkedCommand(`give ${playerName} ${item} 1`));
+    }
+    await command(`clear ${playerName}`);
+    return { items, commands };
+  });
+
+  await step('summon support cast', async () => {
+    await checkedCommand(`summon ${fireTruckType} ${arenaBase.x - 4.5} ${arenaBase.y} ${arenaBase.z + 2.5}`);
+    await checkedCommand(`summon ${copType} ${arenaBase.x - 2.5} ${arenaBase.y} ${arenaBase.z + 5.5}`);
+    await checkedCommand(`summon ${firemanType} ${arenaBase.x - 4.5} ${arenaBase.y} ${arenaBase.z + 5.5}`);
+    await checkedCommand(`summon ${tellerType} ${arenaBase.x - 6.5} ${arenaBase.y} ${arenaBase.z + 5.5}`);
+    const fireTruck = await waitForEntity(baseUrl, fireTruckType);
+    const cop = await waitForEntity(baseUrl, copType);
+    const fireman = await waitForEntity(baseUrl, firemanType);
+    const teller = await waitForEntity(baseUrl, tellerType);
+    return { fireTruck, cop, fireman, teller };
+  });
+
+  const mounted = await step('summon and mount cruiser', async () => {
+    await checkedCommand(`summon ${cruiserType} ${cruiserBlock.x + 0.5} ${cruiserBlock.y} ${cruiserBlock.z + 0.5}`);
+    const cruiser = await waitForEntityState(
+      baseUrl,
+      cruiserType,
+      (entity) => entity.custom && entity.custom.lightsEnabled === true && entity.custom.capturedRobbers === 0,
+      5000
+    );
+    const interaction = await useEntity(cruiserType, { emptyHand: true });
+    requireCondition(interaction.consumed, 'Cruiser interaction was not consumed');
+    const mountedState = await requestJson(baseUrl, '/state');
+    const player = mountedState.players.find((candidate) => candidate.name === playerName);
+    const mountedCruiser = nearestEntity(mountedState, cruiserType);
+    requireCondition(player && player.vehicle && player.vehicle.type === cruiserType, 'Player did not mount the police cruiser');
+    requireCondition(
+      mountedCruiser && mountedCruiser.passengers && mountedCruiser.passengers.some((passenger) => passenger.name === playerName),
+      'Police cruiser state did not report the player passenger'
+    );
+    return { cruiser, interaction, player, mountedCruiser };
+  });
+  requireCondition(mounted.player.vehicle.type === cruiserType, 'Mounted cruiser verification was not retained');
+
+  const capture = await step('capture nearby robber carrying stolen gold', async () => {
+    await command(`clear ${playerName} minecraft:gold_ingot`);
+    const beforeGold = await inventoryCount('minecraft:gold_ingot');
+    await checkedCommand(`summon ${robberType} ${cruiserBlock.x + 1.5} ${arenaBase.y} ${cruiserBlock.z + 0.5} {stolen_gold:1b}`);
+    const captured = await waitForEntityState(
+      baseUrl,
+      cruiserType,
+      (entity) => entity.custom && entity.custom.capturedRobbers >= 1,
+      10000
+    );
+    const cleared = await waitForNoEntities(baseUrl, robberType, 5000);
+    const afterGold = await inventoryCount('minecraft:gold_ingot');
+    requireCondition(captured.custom.capturedRobbers === 1, `Expected one captured robber, saw ${captured.custom.capturedRobbers}`);
+    requireCondition(afterGold === beforeGold + 1, `Expected recovered gold count ${beforeGold + 1}, saw ${afterGold}`);
+    return { captured, cleared, beforeGold, afterGold };
+  });
+  requireCondition(capture.captured.custom.capturedRobbers === 1, 'Capture count did not reach one');
+
+  const jail = await step('drop captured robber into jail', async () => {
+    const jailBuild = await placeMinimalJail(arenaBase, cruiserBlock);
+    const released = await waitForEntityState(
+      baseUrl,
+      cruiserType,
+      (entity) => entity.custom && entity.custom.capturedRobbers === 0,
+      25000,
+      500
+    );
+    const prisoner = await waitForEntityState(
+      baseUrl,
+      robberType,
+      (entity) => entity.custom && entity.custom.jailed === true,
+      10000
+    );
+    return { jailBuild, released, prisoner };
+  });
+  requireCondition(jail.prisoner.custom.jailed, 'Dropped-off robber did not report jailed state');
+
+  const screenshot = await step('screenshot', async () => requestJson(baseUrl, '/screenshot', 'POST', {
+    name: screenshotName,
+    resume: true,
+    hideGui: true,
+    clearChat: true
+  }));
+
+  return {
+    ok: true,
+    scenario: 'cops-smoke',
+    cruiser: cruiserType,
+    robber: robberType,
+    screenshot: screenshot.file,
+    steps
+  };
+}
+
+async function runCopsStructuresSmoke(baseUrl, args) {
+  const robberType = option(args, 'robberType', 'COPS_ROBBER_ENTITY', 'cops_robbers:bank_robber');
+  const fireTruckType = option(args, 'fireTruckType', 'COPS_FIRE_TRUCK_ENTITY', 'cops_robbers:fire_truck');
+  const firemanType = option(args, 'firemanType', 'COPS_FIREMAN_ENTITY', 'cops_robbers:fireman');
+  const tellerType = option(args, 'tellerType', 'COPS_TELLER_ENTITY', 'cops_robbers:teller');
+  const screenshotName = option(
+    args,
+    'screenshotName',
+    'BRIDGE_SCREENSHOT_NAME',
+    `cops-and-robbers-structures-${Date.now()}.png`
+  );
+  const steps = [];
+
+  async function step(name, run) {
+    const value = await run();
+    steps.push({ name, ok: true, value });
+    return value;
+  }
+
+  async function command(commandText) {
+    return requestJson(baseUrl, '/command', 'POST', { command: commandText });
+  }
+
+  async function checkedCommand(commandText) {
+    const result = await command(commandText);
+    requireCondition(result.success !== false, `Command failed: ${commandText}`);
+    return result;
+  }
+
+  async function clearEntities(type) {
+    return requestJson(baseUrl, '/clear-entities', 'POST', { type });
+  }
+
+  async function setAbsoluteBlock(position, block, replace = '') {
+    const body = { ...position, block };
+    if (replace) {
+      body.replace = replace;
+    }
+    return requestJson(baseUrl, '/set-block', 'POST', body);
+  }
+
+  async function useEntity(type, body = {}) {
+    return requestJson(baseUrl, '/use-entity', 'POST', {
+      type,
+      radius: 24,
+      ...body
+    });
+  }
+
+  async function useBlock(body) {
+    return requestJson(baseUrl, '/use-block', 'POST', body);
+  }
+
+  async function countBlocks(box) {
+    return requestJson(baseUrl, '/count-blocks', 'POST', box);
+  }
+
+  function blockCount(scan, block) {
+    return (scan.counts && scan.counts[block]) || 0;
+  }
+
+  async function buildLargeArena(arenaRadius = 34) {
+    const state = await requestJson(baseUrl, '/state');
+    const player = state.players.find((candidate) => candidate.name === playerName);
+    requireCondition(player, `Could not find player state for ${playerName}`);
+    const base = {
+      x: Math.round(player.position.x),
+      y: Math.ceil(player.position.y),
+      z: Math.round(player.position.z)
+    };
+    const ranges = [
+      [base.x - arenaRadius, base.x],
+      [base.x + 1, base.x + arenaRadius]
+    ];
+    for (const [minX, maxX] of ranges) {
+      await command(
+        `fill ${minX} ${base.y} ${base.z - arenaRadius} ${maxX} ${base.y + 8} ${base.z + arenaRadius} minecraft:air`
+      );
+    }
+    await command(
+      `fill ${base.x - arenaRadius} ${base.y - 1} ${base.z - arenaRadius} ${base.x + arenaRadius} ${base.y - 1} ${base.z + arenaRadius} minecraft:smooth_stone`
+    );
+    await command(`tp ${playerName} ${base.x + 0.5} ${base.y} ${base.z + 0.5} 0 0`);
+    const floorBlock = await waitForBlock(baseUrl, { x: base.x, y: base.y - 1, z: base.z }, 'minecraft:smooth_stone', 5000);
+    return { base, radius: arenaRadius, floorBlock };
+  }
+
+  async function placeKit(item, origin) {
+    await command(`tp ${playerName} ${origin.x + 0.5} ${origin.y} ${origin.z + 2.5} 0 0`);
+    const used = await useBlock({
+      x: origin.x,
+      y: origin.y - 1,
+      z: origin.z,
+      item,
+      count: 1,
+      face: 'up'
+    });
+    requireCondition(used.consumed, `${item} use on block was not consumed`);
+    return used;
+  }
+
+  const playerName = singlePlayerName(await requestJson(baseUrl, '/state'));
+  let arenaBase = null;
+  let stationOrigin = null;
+  let fireStationOrigin = null;
+  let bankOrigin = null;
+
+  await step('prepare structure arena', async () => {
+    await command('time set day');
+    await command('weather clear');
+    await command('difficulty easy');
+    await command('gamerule doMobSpawning false');
+    await command('gamerule doDaylightCycle false');
+    await command(`gamemode creative ${playerName}`);
+    await command(`clear ${playerName}`);
+    await clearEntities(robberType);
+    await clearEntities('cops_robbers:police_cruiser');
+    await clearEntities(fireTruckType);
+    await clearEntities('cops_robbers:cop');
+    await clearEntities(firemanType);
+    await clearEntities(tellerType);
+    const arena = await buildLargeArena(34);
+    arenaBase = arena.base;
+    stationOrigin = { x: arenaBase.x - 22, y: arenaBase.y, z: arenaBase.z + 2 };
+    fireStationOrigin = { x: arenaBase.x, y: arenaBase.y, z: arenaBase.z + 2 };
+    bankOrigin = { x: arenaBase.x + 22, y: arenaBase.y, z: arenaBase.z + 2 };
+    await requestJson(baseUrl, '/chat', 'POST', { message: 'Cops and Robbers structures smoke starting.' });
+    return arena;
+  });
+
+  const station = await step('place police station kit', async () => {
+    const used = await placeKit('cops_robbers:police_station_kit', stationOrigin);
+    const scan = await countBlocks({
+      x1: stationOrigin.x - 10,
+      y1: stationOrigin.y,
+      z1: stationOrigin.z - 23,
+      x2: stationOrigin.x + 10,
+      y2: stationOrigin.y + 6,
+      z2: stationOrigin.z + 8
+    });
+    requireCondition(blockCount(scan, 'minecraft:iron_bars') >= 70, `Police station has too few iron bars: ${blockCount(scan, 'minecraft:iron_bars')}`);
+    requireCondition(blockCount(scan, 'minecraft:iron_door') >= 6, `Police station has too few iron door blocks: ${blockCount(scan, 'minecraft:iron_door')}`);
+    requireCondition(blockCount(scan, 'minecraft:quartz_block') >= 100, `Police station has too few quartz blocks: ${blockCount(scan, 'minecraft:quartz_block')}`);
+    return { used, scan };
+  });
+  requireCondition(blockCount(station.scan, 'minecraft:iron_bars') >= 70, 'Police station block count did not persist');
+
+  const fireStation = await step('place fire station kit', async () => {
+    const used = await placeKit('cops_robbers:fire_station_kit', fireStationOrigin);
+    const scan = await countBlocks({
+      x1: fireStationOrigin.x - 10,
+      y1: fireStationOrigin.y,
+      z1: fireStationOrigin.z - 14,
+      x2: fireStationOrigin.x + 10,
+      y2: fireStationOrigin.y + 7,
+      z2: fireStationOrigin.z + 9
+    });
+    requireCondition(blockCount(scan, 'minecraft:red_concrete') >= 140, `Fire station has too little red concrete: ${blockCount(scan, 'minecraft:red_concrete')}`);
+    requireCondition(blockCount(scan, 'minecraft:smooth_stone') >= 250, `Fire station has too little smooth stone: ${blockCount(scan, 'minecraft:smooth_stone')}`);
+    requireCondition(blockCount(scan, 'minecraft:white_wool') >= 50, `Fire station has too little white wool: ${blockCount(scan, 'minecraft:white_wool')}`);
+    return { used, scan };
+  });
+  requireCondition(blockCount(fireStation.scan, 'minecraft:red_concrete') >= 140, 'Fire station block count did not persist');
+
+  await step('fire station kit spawned crew', async () => {
+    const firemen = await waitForEntityCount(baseUrl, firemanType, 3, 10000);
+    const trucks = await waitForEntityCount(baseUrl, fireTruckType, 1, 10000);
+    requireCondition(firemen.length >= 3, `Expected at least 3 firefighters, saw ${firemen.length}`);
+    requireCondition(trucks.length >= 1, `Expected at least 1 fire truck, saw ${trucks.length}`);
+    return { firemen, trucks };
+  });
+
+  const bank = await step('place bank kit', async () => {
+    const used = await placeKit('cops_robbers:bank_kit', bankOrigin);
+    const scan = await countBlocks({
+      x1: bankOrigin.x - 10,
+      y1: bankOrigin.y,
+      z1: bankOrigin.z - 14,
+      x2: bankOrigin.x + 10,
+      y2: bankOrigin.y + 6,
+      z2: bankOrigin.z + 7
+    });
+    requireCondition(blockCount(scan, 'minecraft:chest') >= 7, `Bank has too few vault chests: ${blockCount(scan, 'minecraft:chest')}`);
+    requireCondition(blockCount(scan, 'minecraft:gold_block') >= 2, `Bank has too few gold blocks: ${blockCount(scan, 'minecraft:gold_block')}`);
+    requireCondition(blockCount(scan, 'minecraft:white_wool') >= 100, `Bank has too little white wool: ${blockCount(scan, 'minecraft:white_wool')}`);
+    return { used, scan };
+  });
+  requireCondition(blockCount(bank.scan, 'minecraft:chest') >= 7, 'Bank chest count did not persist');
+
+  await step('bank kit spawned tellers', async () => {
+    const tellers = await waitForEntityCount(baseUrl, tellerType, 3, 10000);
+    requireCondition(tellers.length >= 3, `Expected at least 3 tellers, saw ${tellers.length}`);
+    return { tellers };
+  });
+
+  await step('robber steals from placed vault', async () => {
+    const vaultChest = await blockAt(baseUrl, { x: bankOrigin.x, y: bankOrigin.y + 1, z: bankOrigin.z - 8 });
+    requireCondition(vaultChest.block === 'minecraft:chest', `Expected bank vault chest at scripted vault point, saw ${vaultChest.block}`);
+    await checkedCommand(`summon ${robberType} ${bankOrigin.x + 0.5} ${bankOrigin.y + 1} ${bankOrigin.z - 7.5}`);
+    const robber = await waitForEntityState(
+      baseUrl,
+      robberType,
+      (entity) => entity.custom && entity.custom.stolenGold === true,
+      12000
+    );
+    await checkedCommand(`tp @e[type=${robberType},limit=1,sort=nearest] ${bankOrigin.x + 8.5} ${bankOrigin.y + 1} ${bankOrigin.z - 4.5}`);
+    const arsonist = await waitForEntityState(
+      baseUrl,
+      robberType,
+      (entity) => entity.custom && entity.custom.litBankFire === true,
+      15000
+    );
+    return { vaultChest, robber, arsonist };
+  });
+
+  await step('firefighter extinguishes nearby fire', async () => {
+    const fireBase = { x: arenaBase.x, y: arenaBase.y - 1, z: arenaBase.z + 24 };
+    const fire = { x: fireBase.x + 1, y: arenaBase.y, z: fireBase.z };
+    await setAbsoluteBlock(fireBase, 'minecraft:oak_planks');
+    await setAbsoluteBlock(fire, 'minecraft:fire');
+    await checkedCommand(`summon ${firemanType} ${fireBase.x + 0.5} ${arenaBase.y} ${fireBase.z + 0.5}`);
+    const extinguished = await waitForBlock(baseUrl, fire, 'minecraft:air', 10000);
+    return { fireBase, fire, extinguished };
+  });
+
+  await step('fire truck water cannon extinguishes fire', async () => {
+    await clearEntities(firemanType);
+    await clearEntities(fireTruckType);
+    const truck = { x: arenaBase.x + 8, y: arenaBase.y, z: arenaBase.z + 22 };
+    const fireBase = { x: truck.x, y: arenaBase.y - 1, z: truck.z + 4 };
+    const fire = { x: fireBase.x, y: arenaBase.y, z: fireBase.z };
+    await setAbsoluteBlock(fireBase, 'minecraft:oak_planks');
+    await setAbsoluteBlock(fire, 'minecraft:fire');
+    await checkedCommand(`summon ${fireTruckType} ${truck.x + 0.5} ${truck.y} ${truck.z + 0.5}`);
+    await checkedCommand(`tp @e[type=${fireTruckType},limit=1,sort=nearest] ${truck.x + 0.5} ${truck.y} ${truck.z + 0.5} 0 0`);
+    const mounted = await useEntity(fireTruckType, { emptyHand: true });
+    requireCondition(mounted.consumed, 'Fire truck interaction was not consumed');
+    const extinguished = await waitForBlock(baseUrl, fire, 'minecraft:air', 10000);
+    return { truck, fireBase, fire, mounted, extinguished };
+  });
+
+  const screenshot = await step('screenshot', async () => requestJson(baseUrl, '/screenshot', 'POST', {
+    name: screenshotName,
+    resume: true,
+    hideGui: true,
+    clearChat: true
+  }));
+
+  return {
+    ok: true,
+    scenario: 'cops-structures-smoke',
+    screenshot: screenshot.file,
+    steps
+  };
+}
+
+async function runCopsVisualSweep(baseUrl, args) {
+  const robberType = option(args, 'robberType', 'COPS_ROBBER_ENTITY', 'cops_robbers:bank_robber');
+  const cruiserType = option(args, 'cruiserType', 'COPS_CRUISER_ENTITY', 'cops_robbers:police_cruiser');
+  const fireTruckType = option(args, 'fireTruckType', 'COPS_FIRE_TRUCK_ENTITY', 'cops_robbers:fire_truck');
+  const copType = option(args, 'copType', 'COPS_COP_ENTITY', 'cops_robbers:cop');
+  const firemanType = option(args, 'firemanType', 'COPS_FIREMAN_ENTITY', 'cops_robbers:fireman');
+  const tellerType = option(args, 'tellerType', 'COPS_TELLER_ENTITY', 'cops_robbers:teller');
+  const visualX = Math.round(optionNumber(args, 'visualX', 'COPS_VISUAL_X', 0));
+  const visualY = Math.round(optionNumber(args, 'visualY', 'COPS_VISUAL_Y', 120));
+  const visualZ = Math.round(optionNumber(args, 'visualZ', 'COPS_VISUAL_Z', 0));
+  const requestedName = option(args, 'screenshotName', 'BRIDGE_SCREENSHOT_NAME', '');
+  const screenshotPrefix = (requestedName || `cops-visual-${Date.now()}`)
+    .replace(/\.png$/i, '')
+    .replace(/[^A-Za-z0-9._-]/g, '-');
+  const steps = [];
+
+  async function step(name, run) {
+    const value = await run();
+    steps.push({ name, ok: true, value });
+    return value;
+  }
+
+  async function command(commandText) {
+    return requestJson(baseUrl, '/command', 'POST', { command: commandText });
+  }
+
+  async function checkedCommand(commandText) {
+    const result = await command(commandText);
+    requireCondition(result.success !== false, `Command failed: ${commandText}`);
+    return result;
+  }
+
+  async function clearEntities(type) {
+    return requestJson(baseUrl, '/clear-entities', 'POST', { type });
+  }
+
+  async function useBlock(body) {
+    return requestJson(baseUrl, '/use-block', 'POST', body);
+  }
+
+  async function cleanScreenshot(suffix) {
+    const shot = await requestJson(baseUrl, '/screenshot', 'POST', {
+      name: `${screenshotPrefix}-${suffix}.png`,
+      resume: true,
+      hideGui: true,
+      clearChat: true
+    });
+    return shot.file;
+  }
+
+  async function cameraShot(suffix, camera, target) {
+    await checkedCommand(`gamemode spectator ${playerName}`);
+    await checkedCommand(`tp ${playerName} ${camera.x} ${camera.y} ${camera.z} facing ${target.x} ${target.y} ${target.z}`);
+    await sleep(650);
+    return cleanScreenshot(suffix);
+  }
+
+  async function buildVisualStage(radius = 44) {
+    const base = {
+      x: visualX,
+      y: visualY,
+      z: visualZ
+    };
+    function tiledRanges(min, max, size) {
+      const ranges = [];
+      for (let start = min; start <= max; start += size) {
+        ranges.push([start, Math.min(start + size - 1, max)]);
+      }
+      return ranges;
+    }
+    const xRanges = tiledRanges(base.x - radius, base.x + radius, 16);
+    const zRanges = tiledRanges(base.z - radius, base.z + radius, 16);
+    const yRanges = [
+      [base.y, base.y + 9],
+      [base.y + 10, base.y + 19],
+      [base.y + 20, base.y + 29],
+      [base.y + 30, base.y + 39],
+      [base.y + 40, base.y + 49],
+      [base.y + 50, base.y + 59]
+    ];
+    for (const [minX, maxX] of xRanges) {
+      for (const [minZ, maxZ] of zRanges) {
+        for (const [minY, maxY] of yRanges) {
+          await command(`fill ${minX} ${minY} ${minZ} ${maxX} ${maxY} ${maxZ} minecraft:air`);
+        }
+      }
+    }
+    await command(`fill ${base.x - radius} ${base.y - 1} ${base.z - radius} ${base.x + radius} ${base.y - 1} ${base.z + radius} minecraft:smooth_stone`);
+    return { base, radius };
+  }
+
+  async function placeKit(item, origin) {
+    await checkedCommand(`gamemode creative ${playerName}`);
+    await checkedCommand(`tp ${playerName} ${origin.x + 0.5} ${origin.y} ${origin.z + 2.5} 0 0`);
+    const used = await useBlock({
+      x: origin.x,
+      y: origin.y - 1,
+      z: origin.z,
+      item,
+      count: 1,
+      face: 'up'
+    });
+    requireCondition(used.consumed, `${item} use on block was not consumed`);
+    return used;
+  }
+
+  const playerName = singlePlayerName(await requestJson(baseUrl, '/state'));
+  let arenaBase = null;
+  let stationOrigin = null;
+  let fireStationOrigin = null;
+  let bankOrigin = null;
+  const screenshots = {};
+
+  await step('prepare visual stage', async () => {
+    await command('time set noon');
+    await command('weather clear');
+    await command('gamerule doMobSpawning false');
+    await command('gamerule doDaylightCycle false');
+    await checkedCommand(`gamemode creative ${playerName}`);
+    await command(`clear ${playerName}`);
+    for (const type of [robberType, cruiserType, fireTruckType, copType, firemanType, tellerType]) {
+      await clearEntities(type);
+    }
+    const arena = await buildVisualStage(54);
+    arenaBase = arena.base;
+    stationOrigin = { x: arenaBase.x - 32, y: arenaBase.y, z: arenaBase.z + 24 };
+    fireStationOrigin = { x: arenaBase.x, y: arenaBase.y, z: arenaBase.z + 24 };
+    bankOrigin = { x: arenaBase.x + 32, y: arenaBase.y, z: arenaBase.z + 24 };
+    await command(`kill @e[type=!minecraft:player,x=${arenaBase.x - arena.radius},y=${arenaBase.y - 4},z=${arenaBase.z - arena.radius},dx=${arena.radius * 2},dy=70,dz=${arena.radius * 2}]`);
+    await sleep(1500);
+    await command(`kill @e[type=minecraft:item,x=${arenaBase.x - arena.radius},y=${arenaBase.y - 4},z=${arenaBase.z - arena.radius},dx=${arena.radius * 2},dy=70,dz=${arena.radius * 2}]`);
+    await checkedCommand(`tp ${playerName} ${arenaBase.x + 0.5} ${arenaBase.y + 2.0} ${arenaBase.z - 8.5} 0 0`);
+    return arena;
+  });
+
+  await step('summon visual lineup', async () => {
+    const lineup = [
+      { type: robberType, x: arenaBase.x - 8, z: arenaBase.z, nbt: '{NoAI:1b,PersistenceRequired:1b,Rotation:[180.0f,0.0f]}' },
+      { type: robberType, x: arenaBase.x - 5, z: arenaBase.z, nbt: '{NoAI:1b,PersistenceRequired:1b,stolen_gold:1b,Rotation:[180.0f,0.0f]}' },
+      { type: copType, x: arenaBase.x - 2, z: arenaBase.z, nbt: '{NoAI:1b,PersistenceRequired:1b,Rotation:[180.0f,0.0f]}' },
+      { type: tellerType, x: arenaBase.x + 1, z: arenaBase.z, nbt: '{NoAI:1b,PersistenceRequired:1b,Rotation:[180.0f,0.0f]}' },
+      { type: firemanType, x: arenaBase.x + 4, z: arenaBase.z, nbt: '{NoAI:1b,PersistenceRequired:1b,Rotation:[180.0f,0.0f]}' }
+    ];
+    for (const mob of lineup) {
+      await checkedCommand(`summon ${mob.type} ${mob.x + 0.5} ${arenaBase.y} ${mob.z + 0.5} ${mob.nbt}`);
+    }
+    await checkedCommand(`summon ${cruiserType} ${arenaBase.x - 5.5} ${arenaBase.y} ${arenaBase.z + 7.5}`);
+    await checkedCommand(`tp @e[type=${cruiserType},limit=1,sort=nearest] ${arenaBase.x - 5.5} ${arenaBase.y} ${arenaBase.z + 7.5} 180 0`);
+    await checkedCommand(`summon ${fireTruckType} ${arenaBase.x + 5.5} ${arenaBase.y} ${arenaBase.z + 7.5}`);
+    await checkedCommand(`tp @e[type=${fireTruckType},limit=1,sort=nearest] ${arenaBase.x + 5.5} ${arenaBase.y} ${arenaBase.z + 7.5} 180 0`);
+    const robberWithGold = await waitForEntityState(baseUrl, robberType, (entity) => entity.custom && entity.custom.stolenGold === true, 5000);
+    const cruiser = await waitForEntity(baseUrl, cruiserType, 5000);
+    const fireTruck = await waitForEntity(baseUrl, fireTruckType, 5000);
+    return { lineup, robberWithGold, cruiser, fireTruck };
+  });
+
+  screenshots.lineup = await step('capture mob and vehicle lineup', async () => cameraShot(
+    'lineup',
+    { x: arenaBase.x + 0.5, y: arenaBase.y + 2.4, z: arenaBase.z - 13.5 },
+    { x: arenaBase.x + 0.5, y: arenaBase.y + 1.1, z: arenaBase.z + 2.5 }
+  ));
+
+  screenshots.mobs = await step('capture mob skins closeup', async () => cameraShot(
+    'mobs-close',
+    { x: arenaBase.x - 2.0, y: arenaBase.y + 2.1, z: arenaBase.z - 8.5 },
+    { x: arenaBase.x - 2.0, y: arenaBase.y + 1.0, z: arenaBase.z + 0.5 }
+  ));
+
+  screenshots.vehicles = await step('capture vehicles closeup', async () => cameraShot(
+    'vehicles-close',
+    { x: arenaBase.x + 0.5, y: arenaBase.y + 3.0, z: arenaBase.z + 0.5 },
+    { x: arenaBase.x + 0.5, y: arenaBase.y + 1.1, z: arenaBase.z + 7.5 }
+  ));
+
+  await step('place visual structures', async () => {
+    const station = await placeKit('cops_robbers:police_station_kit', stationOrigin);
+    const fireStation = await placeKit('cops_robbers:fire_station_kit', fireStationOrigin);
+    const bank = await placeKit('cops_robbers:bank_kit', bankOrigin);
+    await waitForEntityCount(baseUrl, tellerType, 3, 10000);
+    await waitForEntityCount(baseUrl, firemanType, 3, 10000);
+    await waitForEntityCount(baseUrl, fireTruckType, 1, 10000);
+    return { station, fireStation, bank, stationOrigin, fireStationOrigin, bankOrigin };
+  });
+
+  screenshots.station = await step('capture police station front', async () => cameraShot(
+    'station-front',
+    { x: stationOrigin.x + 0.5, y: stationOrigin.y + 4.5, z: stationOrigin.z + 21.5 },
+    { x: stationOrigin.x + 0.5, y: stationOrigin.y + 2.2, z: stationOrigin.z + 3.0 }
+  ));
+
+  screenshots.fireStation = await step('capture fire station front', async () => cameraShot(
+    'fire-station-front',
+    { x: fireStationOrigin.x + 0.5, y: fireStationOrigin.y + 4.5, z: fireStationOrigin.z + 19.5 },
+    { x: fireStationOrigin.x + 0.5, y: fireStationOrigin.y + 2.2, z: fireStationOrigin.z + 3.0 }
+  ));
+
+  screenshots.bank = await step('capture bank front', async () => cameraShot(
+    'bank-front',
+    { x: bankOrigin.x + 0.5, y: bankOrigin.y + 4.5, z: bankOrigin.z + 19.5 },
+    { x: bankOrigin.x + 0.5, y: bankOrigin.y + 2.2, z: bankOrigin.z + 3.0 }
+  ));
+
+  screenshots.overview = await step('capture visual overview', async () => cameraShot(
+    'overview',
+    { x: arenaBase.x + 0.5, y: arenaBase.y + 22.0, z: arenaBase.z - 34.5 },
+    { x: arenaBase.x + 0.5, y: arenaBase.y + 2.0, z: arenaBase.z + 18.0 }
+  ));
+
+  return {
+    ok: true,
+    scenario: 'cops-visual-sweep',
+    screenshots,
+    steps
+  };
+}
+
+function printBridgeUsage() {
+  console.log(`Usage: node src/bridge-cli.js [action] [options]
+
+Actions:
+  health, state, smoke, chat, command, look, give, summon, teleport
+  player-abilities, use-entity, clear-entities
+  set-block-near-entity, set-block, block, use-block, count-blocks
+  yorkie-smoke, yorkie-water-smoke, yorkie-adventure-smoke, yorkie-visual-sweep
+  cops-smoke, cops-structures-smoke, cops-visual-sweep, screenshot
+
+Common options:
+  --host <host>        Bridge host. Default: 127.0.0.1
+  --port <port>        Bridge port. Default: 57321
+  --player <name>      Target player when multiple players are online
+  --x/--y/--z <n>      Absolute block or teleport coordinates
+  --item <id>          Namespaced item id for give/use-block/use-entity
+  --block <id>         Namespaced block id or block state for set-block actions
+  --report-file <path> Write the full JSON result to a file
+`);
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const action = args.action || 'health';
+  if (args.help || action === 'help') {
+    printBridgeUsage();
+    return;
+  }
   const host = option(args, 'host', 'BRIDGE_HOST', '127.0.0.1');
   const port = option(args, 'port', 'BRIDGE_PORT', '57321');
   const baseUrl = `http://${host}:${port}`;
@@ -1163,22 +2503,58 @@ async function main() {
     };
     putOptional(body, 'player', option(args, 'player', 'BRIDGE_PLAYER', ''));
     result = await requestJson(baseUrl, '/block', 'POST', body);
+  } else if (action === 'use-block') {
+    const body = {
+      x: optionNumber(args, 'x', 'BRIDGE_X', undefined),
+      y: optionNumber(args, 'y', 'BRIDGE_Y', undefined),
+      z: optionNumber(args, 'z', 'BRIDGE_Z', undefined),
+      item: option(args, 'item', 'BRIDGE_ITEM', 'minecraft:apple'),
+      count: optionNumber(args, 'count', 'BRIDGE_COUNT', 1)
+    };
+    putOptional(body, 'player', option(args, 'player', 'BRIDGE_PLAYER', ''));
+    putOptional(body, 'face', option(args, 'face', 'BRIDGE_FACE', 'up'));
+    putOptional(body, 'hitX', optionNumber(args, 'hitX', 'BRIDGE_HIT_X', 0.5));
+    putOptional(body, 'hitY', optionNumber(args, 'hitY', 'BRIDGE_HIT_Y', 1.0));
+    putOptional(body, 'hitZ', optionNumber(args, 'hitZ', 'BRIDGE_HIT_Z', 0.5));
+    result = await requestJson(baseUrl, '/use-block', 'POST', body);
+  } else if (action === 'count-blocks') {
+    const body = {
+      x1: optionNumber(args, 'x1', 'BRIDGE_X1', undefined),
+      y1: optionNumber(args, 'y1', 'BRIDGE_Y1', undefined),
+      z1: optionNumber(args, 'z1', 'BRIDGE_Z1', undefined),
+      x2: optionNumber(args, 'x2', 'BRIDGE_X2', undefined),
+      y2: optionNumber(args, 'y2', 'BRIDGE_Y2', undefined),
+      z2: optionNumber(args, 'z2', 'BRIDGE_Z2', undefined)
+    };
+    putOptional(body, 'player', option(args, 'player', 'BRIDGE_PLAYER', ''));
+    result = await requestJson(baseUrl, '/count-blocks', 'POST', body);
   } else if (action === 'yorkie-smoke') {
     result = await runYorkieSmoke(baseUrl, args);
   } else if (action === 'yorkie-water-smoke') {
     result = await runYorkieWaterSmoke(baseUrl, args);
   } else if (action === 'yorkie-adventure-smoke') {
     result = await runYorkieAdventureSmoke(baseUrl, args);
+  } else if (action === 'yorkie-visual-sweep') {
+    result = await runYorkieVisualSweep(baseUrl, args);
+  } else if (action === 'cops-smoke') {
+    result = await runCopsSmoke(baseUrl, args);
+  } else if (action === 'cops-structures-smoke') {
+    result = await runCopsStructuresSmoke(baseUrl, args);
+  } else if (action === 'cops-visual-sweep') {
+    result = await runCopsVisualSweep(baseUrl, args);
   } else if (action === 'screenshot') {
     const body = {};
     putOptional(body, 'name', option(args, 'name', 'BRIDGE_SCREENSHOT_NAME', ''));
     const keepScreen = optionBoolean(args, 'keepScreen', 'BRIDGE_SCREENSHOT_KEEP_SCREEN', false);
     body.resume = keepScreen ? false : optionBoolean(args, 'resume', 'BRIDGE_SCREENSHOT_RESUME', true);
+    body.hideGui = optionBoolean(args, 'hideGui', 'BRIDGE_SCREENSHOT_HIDE_GUI', false);
+    body.clearChat = optionBoolean(args, 'clearChat', 'BRIDGE_SCREENSHOT_CLEAR_CHAT', false);
     result = await requestJson(baseUrl, '/screenshot', 'POST', body);
   } else {
     throw new Error(`Unknown bridge action: ${action}`);
   }
 
+  writeReportFile(option(args, 'reportFile', 'BRIDGE_REPORT_FILE', ''), result);
   console.log(JSON.stringify(result, null, 2));
 }
 

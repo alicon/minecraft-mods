@@ -1,5 +1,6 @@
 package dev.alicon.copsrobbers.world;
 
+import dev.alicon.copsrobbers.item.FireStationKitItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -43,32 +44,7 @@ final class PatrolNeighborhoodStructures {
 	}
 
 	static void buildFireStation(ServerLevel level, BlockPos center) {
-		fill(level, center, -8, 1, -5, 8, 1, 10, Blocks.SMOOTH_STONE);
-		fill(level, center, -8, 2, -5, 8, 4, -5, Blocks.RED_CONCRETE);
-		fill(level, center, -8, 2, 10, 8, 4, 10, Blocks.RED_CONCRETE);
-		fill(level, center, -8, 2, -5, -8, 4, 10, Blocks.RED_CONCRETE);
-		fill(level, center, 8, 2, -5, 8, 4, 10, Blocks.RED_CONCRETE);
-		fill(level, center, -8, 5, -5, 8, 5, 10, Blocks.SMOOTH_QUARTZ);
-		fill(level, center, -7, 2, -4, 7, 4, 9, Blocks.AIR);
-		fill(level, center, -4, 2, -5, 4, 4, -5, Blocks.GLASS_PANE);
-		fill(level, center, -1, 2, -5, 1, 4, -5, Blocks.WHITE_CONCRETE);
-		set(level, center, 0, 1, -6, Blocks.SMOOTH_STONE);
-		placeIronDoor(level, center, 0, 2, -5, Direction.NORTH);
-		set(level, center, 0, 2, -6, Blocks.STONE_PRESSURE_PLATE);
-		set(level, center, 0, 2, -4, Blocks.STONE_PRESSURE_PLATE);
-		fill(level, center, -7, 3, -5, -5, 3, -5, Blocks.GLASS_PANE);
-		fill(level, center, 5, 3, -5, 7, 3, -5, Blocks.GLASS_PANE);
-		fill(level, center, -8, 3, 0, -8, 3, 3, Blocks.GLASS_PANE);
-		fill(level, center, 8, 3, 0, 8, 3, 3, Blocks.GLASS_PANE);
-		fill(level, center, -7, 2, 3, -5, 4, 8, Blocks.WHITE_WOOL);
-		fill(level, center, -5, 4, 0, -1, 4, 0, Blocks.SEA_LANTERN);
-		fill(level, center, 1, 4, 0, 5, 4, 0, Blocks.SEA_LANTERN);
-		fill(level, center, -5, 4, 6, -1, 4, 6, Blocks.SEA_LANTERN);
-		fill(level, center, 1, 4, 6, 5, 4, 6, Blocks.SEA_LANTERN);
-		placeSign(level, center, 0, 6, -6, Direction.NORTH, "Fire", "Station");
-		set(level, center, 0, 6, -5, Blocks.WHITE_CONCRETE);
-		set(level, center, -1, 6, -5, Blocks.RED_CONCRETE);
-		set(level, center, 1, 6, -5, Blocks.RED_CONCRETE);
+		FireStationKitItem.placeFireStation(level, center, Direction.NORTH);
 	}
 
 	private static void fill(ServerLevel level, BlockPos center, int minX, int minY, int minZ, int maxX, int maxY, int maxZ, Block block) {

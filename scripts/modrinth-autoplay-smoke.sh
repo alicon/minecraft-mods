@@ -7,6 +7,7 @@ bridge_port="${BRIDGE_PORT:-57321}"
 bridge_message="${BRIDGE_MESSAGE:-Codex autonomous bridge smoke passed.}"
 bridge_distance="${BRIDGE_DISTANCE:-16}"
 bridge_scenario="${PLAYTEST_BRIDGE_SCENARIO:-smoke}"
+report_file="${BRIDGE_REPORT_FILE:-}"
 timeout_seconds="${PLAYTEST_BOOT_TIMEOUT_SECONDS:-180}"
 poll_seconds="${PLAYTEST_BOOT_POLL_SECONDS:-2}"
 screenshot_delay_seconds="${PLAYTEST_SCREENSHOT_DELAY_SECONDS:-5}"
@@ -55,13 +56,18 @@ if (( SECONDS >= deadline )); then
 fi
 
 printf 'Bridge loaded expected world: %s\n' "$world_name"
+report_args=()
+if [[ -n "$report_file" ]]; then
+	report_args=(--report-file "$report_file")
+fi
 case "$bridge_scenario" in
 	smoke)
 		node "$repo_root/tools/playtest-harness/src/bridge-cli.js" smoke \
 			--host "$bridge_host" \
 			--port "$bridge_port" \
 			--distance "$bridge_distance" \
-			--message "$bridge_message"
+			--message "$bridge_message" \
+			"${report_args[@]}"
 
 		if [[ "$screenshot_delay_seconds" != "0" ]]; then
 			sleep "$screenshot_delay_seconds"
@@ -76,19 +82,50 @@ case "$bridge_scenario" in
 		node "$repo_root/tools/playtest-harness/src/bridge-cli.js" yorkie-smoke \
 			--host "$bridge_host" \
 			--port "$bridge_port" \
-			--screenshot-name "$screenshot_name"
+			--screenshot-name "$screenshot_name" \
+			"${report_args[@]}"
 		;;
 	yorkie-water-smoke)
 		node "$repo_root/tools/playtest-harness/src/bridge-cli.js" yorkie-water-smoke \
 			--host "$bridge_host" \
 			--port "$bridge_port" \
-			--screenshot-name "$screenshot_name"
+			--screenshot-name "$screenshot_name" \
+			"${report_args[@]}"
 		;;
 	yorkie-adventure-smoke)
 		node "$repo_root/tools/playtest-harness/src/bridge-cli.js" yorkie-adventure-smoke \
 			--host "$bridge_host" \
 			--port "$bridge_port" \
-			--screenshot-name "$screenshot_name"
+			--screenshot-name "$screenshot_name" \
+			"${report_args[@]}"
+		;;
+	yorkie-visual-sweep)
+		node "$repo_root/tools/playtest-harness/src/bridge-cli.js" yorkie-visual-sweep \
+			--host "$bridge_host" \
+			--port "$bridge_port" \
+			--screenshot-name "$screenshot_name" \
+			"${report_args[@]}"
+		;;
+	cops-smoke)
+		node "$repo_root/tools/playtest-harness/src/bridge-cli.js" cops-smoke \
+			--host "$bridge_host" \
+			--port "$bridge_port" \
+			--screenshot-name "$screenshot_name" \
+			"${report_args[@]}"
+		;;
+	cops-structures-smoke)
+		node "$repo_root/tools/playtest-harness/src/bridge-cli.js" cops-structures-smoke \
+			--host "$bridge_host" \
+			--port "$bridge_port" \
+			--screenshot-name "$screenshot_name" \
+			"${report_args[@]}"
+		;;
+	cops-visual-sweep)
+		node "$repo_root/tools/playtest-harness/src/bridge-cli.js" cops-visual-sweep \
+			--host "$bridge_host" \
+			--port "$bridge_port" \
+			--screenshot-name "$screenshot_name" \
+			"${report_args[@]}"
 		;;
 	*)
 		printf 'Unknown PLAYTEST_BRIDGE_SCENARIO: %s\n' "$bridge_scenario" >&2

@@ -34,8 +34,16 @@ Create a Modrinth **Mod** project for Mushroom the Yorkie with these values:
 Use `mods/mushroom-the-yorkie/src/main/resources/assets/mushroom_yorkie/icon.png` as the project icon, `docs/MODRINTH_MUSHROOM.md` as the long description, and these gallery images:
 
 - `docs/media/mushroom-the-yorkie-banner.png`
+- `docs/media/mushroom-the-yorkie-leashed.png`
 - `docs/media/mushroom-the-yorkie-sleeping.png`
-- `docs/media/mushroom-the-yorkie-adventure.png`
+- `docs/media/mushroom-the-yorkie-water.png`
+- `docs/media/mushroom-the-yorkie-fetching.png`
+- `docs/media/mushroom-the-yorkie-flying.png`
+- `docs/media/mushroom-the-yorkie-eating.png`
+- `docs/media/mushroom-the-yorkie-drinking.png`
+- `docs/media/mushroom-the-yorkie-wants-outside.png`
+- `docs/media/mushroom-the-yorkie-sheep-chase.png`
+- `docs/media/mushroom-the-yorkie-spider.png`
 
 Create a Modrinth **Mod** project for Cops and Robbers with these values:
 
@@ -50,7 +58,14 @@ Create a Modrinth **Mod** project for Cops and Robbers with these values:
 - Game version: `1.21.11`
 - Required dependency: `Fabric API`
 
-Use `mods/cops-and-robbers/src/main/resources/assets/cops_robbers/icon.png` as the project icon and `docs/MODRINTH_COPS_AND_ROBBERS.md` as the long description.
+Use `mods/cops-and-robbers/src/main/resources/assets/cops_robbers/icon.png` as the project icon, `docs/MODRINTH_COPS_AND_ROBBERS.md` as the long description, and these gallery images:
+
+- `docs/media/cops-and-robbers-lineup.png`
+- `docs/media/cops-and-robbers-mobs.png`
+- `docs/media/cops-and-robbers-vehicles.png`
+- `docs/media/cops-and-robbers-police-station.png`
+- `docs/media/cops-and-robbers-bank.png`
+- `docs/media/cops-and-robbers-fire-station.png`
 
 ## Configure publishing
 

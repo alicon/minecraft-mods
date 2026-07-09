@@ -3,7 +3,7 @@
 	"id": "cops_robbers",
 	"version": "${version}",
 	"name": "Cops and Robbers",
-	"description": "Adds a rideable, low-poly electric police truck with a red-and-blue lightbar.",
+	"description": "Adds police cruisers, fire trucks, cops, robbers, bank tellers, and placeable bank, fire station, and police station kits for playful patrol scenes.",
 	"authors": [
 		"alicon"
 	],

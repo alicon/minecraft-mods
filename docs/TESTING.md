@@ -121,11 +121,17 @@ make bridge-use-entity BRIDGE_ENTITY=mushroom_yorkie:mushroom_yorkie BRIDGE_ITEM
 make bridge-clear-entities BRIDGE_ENTITY=mushroom_yorkie:mushroom_yorkie
 make bridge-set-block-near-entity BRIDGE_ENTITY=mushroom_yorkie:mushroom_yorkie BRIDGE_BLOCK=minecraft:oak_planks BRIDGE_DY=2
 make bridge-set-block BRIDGE_X=0 BRIDGE_Y=100 BRIDGE_Z=0 BRIDGE_BLOCK=minecraft:air
+make bridge-use-block BRIDGE_X=0 BRIDGE_Y=99 BRIDGE_Z=0 BRIDGE_ITEM=cops_robbers:bank_kit
+make bridge-count-blocks BRIDGE_X1=-8 BRIDGE_Y1=100 BRIDGE_Z1=-8 BRIDGE_X2=8 BRIDGE_Y2=106 BRIDGE_Z2=8
 make bridge-screenshot BRIDGE_SCREENSHOT_NAME=playtest.png
+make bridge-yorkie-smoke BRIDGE_SCREENSHOT_NAME=yorkie-smoke.png
+make bridge-cops-smoke BRIDGE_SCREENSHOT_NAME=cops-smoke.png
+make bridge-cops-structures-smoke BRIDGE_SCREENSHOT_NAME=cops-structures.png
+make bridge-cops-visual-sweep BRIDGE_SCREENSHOT_NAME=cops-visual
 ```
 
 Restart Minecraft after installing `playtest-bridge`. The bridge binds to `127.0.0.1:57321` by default and is intended only for local development profiles.
-Screenshots close the active client screen before capture by default; set `BRIDGE_SCREENSHOT_RESUME=0` to keep the current screen visible.
+Screenshots close the active client screen before capture by default; set `BRIDGE_SCREENSHOT_RESUME=0` to keep the current screen visible. Set `BRIDGE_SCREENSHOT_HIDE_GUI=1` and `BRIDGE_SCREENSHOT_CLEAR_CHAT=1` for clean visual inspection captures.
 
 Launch Modrinth directly into an existing save:
 
@@ -149,14 +155,30 @@ Run Mushroom's richer live bridge scenario against a disposable world:
 
 ```shell
 make modrinth-autoplay-yorkie PLAYTEST_TEMPLATE_WORLD="Clean Template" BRIDGE_SCREENSHOT_NAME=yorkie-smoke.png
+make modrinth-autoplay-yorkie-visual PLAYTEST_TEMPLATE_WORLD="Clean Template" BRIDGE_SCREENSHOT_NAME=yorkie-gallery
 ```
 
 The Yorkie scenario checks duplicate-claim blocking, treat taming, owner sit/follow commands, harness equip/removal, lead rejection without a harness, exact treat/toy/player-food need changes, sheltered nighttime sleep, double-click wake-up, exact shelter cleanup, dog food and water bowl use, same-day bowl refill rejection, outdoor potty relief, screenshot capture, and positive lead attach with the harness equipped.
+The Yorkie visual sweep captures gallery-ready scenes for sitting, a fence-tied leash walk, nighttime sleep, water, fetch, flying, food and water bowls, wants-outside messaging, sheep chasing, and hostile spider defense.
+
+Run Cops and Robbers' richer live bridge scenario against a disposable world:
+
+```shell
+make modrinth-autoplay-cops PLAYTEST_TEMPLATE_WORLD="Clean Template" BRIDGE_SCREENSHOT_NAME=cops-smoke.png
+make modrinth-autoplay-cops-structures PLAYTEST_TEMPLATE_WORLD="Clean Template" BRIDGE_SCREENSHOT_NAME=cops-structures.png
+make modrinth-autoplay-cops-visual PLAYTEST_TEMPLATE_WORLD="Clean Template" BRIDGE_SCREENSHOT_NAME=cops-visual
+```
+
+The fast Cops scenario checks item registration, the cruiser/fire truck/cop/fireman/teller entity registrations, cruiser mounting, mounted cruiser robber capture, jail dropoff conversion into a jailed robber, bridge state assertions, and screenshot capture.
+The Cops structures scenario checks real item-on-block police station, fire station, and bank kit placement, signature generated block counts, teller/fire crew spawning, robber vault theft, firefighter extinguishing, mounted fire truck water-cannon extinguishing, and screenshot capture.
+The Cops visual sweep builds a clean high-altitude stage, captures HUD-free lineup, mob skin closeup, vehicle closeup, police station front, fire station front, bank front, and overview screenshots, and uses real kit placement for the buildings.
 
 This uses Modrinth's `modrinth://launch/instance/<instance-id>?singleplayer_world=<save-folder>` deep link and avoids clicking through the launcher UI. The template save must not be the currently open world.
 The launcher script uses `open -g` by default so Modrinth is not deliberately activated during launch. Minecraft can still grab mouse/keyboard focus when the game window starts or enters relative-mouse mode; press Escape to release it, or set `MODRINTH_OPEN_BACKGROUND=0` if you want the client to come forward intentionally.
 The launcher also sets `pauseOnLostFocus:false` by default so singleplayer test worlds keep ticking when Minecraft is not frontmost. Set `PLAYTEST_DISABLE_PAUSE_ON_LOST_FOCUS=0` to leave that profile option unchanged.
+If Modrinth was not already running, the launcher re-opens the deep link after a short cold-start delay because the app can otherwise receive the URL before its state is initialized. Set `MODRINTH_STARTUP_RETRY_SECONDS=0` to disable that retry.
 Set `PLAYTEST_SCREENSHOT_DELAY_SECONDS=0` to skip the default post-smoke screenshot delay.
+Set `BRIDGE_REPORT_FILE=build/playtest-reports/<name>.json` to save the full bridge scenario result for later debugging instead of relying only on terminal output.
 
 ## Current Automated Coverage
 
@@ -171,6 +193,7 @@ NARwhal Together:
 Mushroom the Yorkie:
 
 - live Modrinth bridge smoke covers duplicate-claim blocking, treat taming, sit/follow, harness on/off, lead gating, exact toy/player-food effects, sheltered sleep/wake, dog food/water bowl consumption, same-day bowl refill rejection, outdoor potty relief, cleanup, screenshot capture, and lead attach
+- live Modrinth bridge visual sweep captures sitting, leash, sleep, water, fetch, flying, bowl, wants-outside, passive chase, and hostile defense screenshots for gallery review
 - default pet needs
 - save/load value clamping
 - treat effects
@@ -190,6 +213,9 @@ Mushroom the Yorkie:
 
 Cops and Robbers:
 
+- live Modrinth bridge smoke covers item registration, all core Cops entity registrations, cruiser mounting, mounted cruiser robber capture, jail dropoff, jailed robber state, and screenshot capture
+- live Modrinth bridge structures smoke covers real kit item use, generated station/fire station/bank block signatures, teller and fire crew spawning, robber vault theft, firefighter extinguishing, mounted fire truck water-cannon extinguishing, and screenshot capture
+- live Modrinth bridge visual sweep captures clean mob skin, vehicle, police station, fire station, bank, and overview screenshots for visual regression review
 - cruiser flight lift input clamps to the server-authoritative control range
 - non-finite cruiser lift input becomes neutral before it can affect motion
 - cruiser reverse and strafe controls use reduced handling multipliers
@@ -225,7 +251,7 @@ Good future GameTests:
 - non-owner cannot command Mushroom
 - NARwhal payload registration does not fail on startup
 - Cops and Robbers spawn eggs create custom entities
-- police station and bank kits place expected structures
+- police station, fire station, and bank kits place expected structures
 - cruiser driver controls mutate only the currently controlled cruiser
 - bank robbery/capture/recovery flow works in a real server world
 
@@ -290,7 +316,7 @@ Cops and Robbers:
 - [ ] Creative inventory has Cops and Robbers items and spawn eggs.
 - [ ] Police cruiser can be driven and responds to lights and siren controls.
 - [ ] Creative-only cruiser flight and tricks are unavailable to non-creative players.
-- [ ] Bank and police station kits place their expected structures.
+- [ ] Bank, fire station, and police station kits place their expected structures.
 - [ ] Robber capture, jail release, and gold recovery messages are understandable.
 - [ ] Fire truck and fire response behavior do not spam logs or chat.
 - [ ] No errors attributed to `cops_robbers` appear in the latest log.

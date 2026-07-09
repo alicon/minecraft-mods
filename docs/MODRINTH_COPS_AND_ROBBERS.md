@@ -11,6 +11,7 @@ Build a police station, place a bank, patrol in a police cruiser, and chase down
 - Bank robbers that target nearby banks and can scatter when patrol vehicles approach.
 - Police cruiser capture behavior for collecting robbers and dropping them near jail cells.
 - Placeable police station kit with a jail cell and cruiser garage.
+- Placeable fire station kit with a truck bay and responder crew.
 - Placeable bank kit with tellers, a vault, and robber targets.
 - Creative spawn eggs for cruisers, fire trucks, cops, robbers, bank tellers, and firefighters.
 

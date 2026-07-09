@@ -134,6 +134,12 @@ final class PlaytestBridgeServer {
 			} else if ("POST".equals(method) && "/block".equals(path)) {
 				JsonObject body = readBody(exchange);
 				sendJson(exchange, 200, runOnServerThread(() -> this.block(body)));
+			} else if ("POST".equals(method) && "/use-block".equals(path)) {
+				JsonObject body = readBody(exchange);
+				sendJson(exchange, 200, runOnServerThread(() -> BridgeWorldActions.useBlock(this.playerFromBody(body), body)));
+			} else if ("POST".equals(method) && "/count-blocks".equals(path)) {
+				JsonObject body = readBody(exchange);
+				sendJson(exchange, 200, runOnServerThread(() -> BridgeWorldActions.countBlocks(this.playerFromBody(body), body)));
 			} else if ("POST".equals(method) && "/screenshot".equals(path)) {
 				JsonObject body = readBody(exchange);
 				sendJson(exchange, 200, this.screenshot(body));
@@ -300,7 +306,9 @@ final class PlaytestBridgeServer {
 	private JsonObject screenshot(JsonObject body) throws Exception {
 		String name = optionalString(body, "name", "");
 		boolean resume = optionalBoolean(body, "resume", true);
-		return BridgeClientHooks.captureScreenshot(name, resume).get(SERVER_TASK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+		boolean hideGui = optionalBoolean(body, "hideGui", false);
+		boolean clearChat = optionalBoolean(body, "clearChat", false);
+		return BridgeClientHooks.captureScreenshot(name, resume, hideGui, clearChat).get(SERVER_TASK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
 	}
 
 	private EntityHitResult findEntityHit(ServerPlayer player, ServerLevel level, Vec3 start, Vec3 end, double distance) {

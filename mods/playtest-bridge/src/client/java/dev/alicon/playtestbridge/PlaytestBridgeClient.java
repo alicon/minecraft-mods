@@ -19,7 +19,7 @@ public final class PlaytestBridgeClient implements ClientModInitializer {
 		PlaytestBridge.LOGGER.info("Playtest bridge client screenshot hook initialized");
 	}
 
-	private CompletableFuture<JsonObject> captureScreenshot(String name, boolean resume) {
+	private CompletableFuture<JsonObject> captureScreenshot(String name, boolean resume, boolean hideGui, boolean clearChat) {
 		CompletableFuture<JsonObject> future = new CompletableFuture<>();
 		Minecraft client = Minecraft.getInstance();
 		client.execute(() -> {
@@ -30,9 +30,16 @@ public final class PlaytestBridgeClient implements ClientModInitializer {
 				if (resume && client.screen != null) {
 					client.setScreen(null);
 				}
+				boolean previousHideGui = client.options.hideGui;
+				if (hideGui) {
+					client.options.hideGui = true;
+				}
+				if (clearChat) {
+					client.gui.getChat().clearMessages(false);
+				}
 				long delayMillis = resume ? 250L : 0L;
 				CompletableFuture.delayedExecutor(delayMillis, TimeUnit.MILLISECONDS)
-						.execute(() -> client.execute(() -> grabScreenshot(client, name, resume, future)));
+						.execute(() -> client.execute(() -> grabScreenshot(client, name, resume, hideGui, clearChat, previousHideGui, future)));
 			} catch (Exception exception) {
 				future.completeExceptionally(exception);
 			}
@@ -40,19 +47,27 @@ public final class PlaytestBridgeClient implements ClientModInitializer {
 		return future;
 	}
 
-	private void grabScreenshot(Minecraft client, String name, boolean resumed, CompletableFuture<JsonObject> future) {
+	private void grabScreenshot(Minecraft client, String name, boolean resumed, boolean hideGui, boolean clearChat, boolean previousHideGui, CompletableFuture<JsonObject> future) {
 		try {
 			String fileName = screenshotName(name);
 			File screenshot = new File(new File(client.gameDirectory, Screenshot.SCREENSHOT_DIR), fileName);
 			Screenshot.grab(client.gameDirectory, fileName, client.getMainRenderTarget(), 1, message -> {
+				if (hideGui) {
+					client.options.hideGui = previousHideGui;
+				}
 				JsonObject response = new JsonObject();
 				response.addProperty("ok", true);
 				response.addProperty("file", screenshot.getAbsolutePath());
 				response.addProperty("message", message.getString());
 				response.addProperty("resumed", resumed);
+				response.addProperty("hideGui", hideGui);
+				response.addProperty("clearChat", clearChat);
 				future.complete(response);
 			});
 		} catch (Exception exception) {
+			if (hideGui) {
+				client.options.hideGui = previousHideGui;
+			}
 			future.completeExceptionally(exception);
 		}
 	}

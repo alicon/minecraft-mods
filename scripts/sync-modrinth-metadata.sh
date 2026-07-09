@@ -49,13 +49,34 @@ case "$mod" in
 		description="A tiny Yorkie companion with treats, naps, bathroom barks, sheep-chasing opinions, and tiny barrel rolls."
 		categories='["mobs", "game-mechanics"]'
 		stale_gallery_titles=(
+			"Mushroom Wants a Treat"
+			"Curled Up Indoors"
+			"Adventure Companion"
 			"Big Feelings About Cows"
 			"Big feelings about Sheep!"
+			"Sitting Pretty"
+			"Leashed Walk"
+			"Paddling in Water"
+			"Fetching the Ball"
+			"Tiny Flight"
+			"Snack Bowl"
+			"Water Bowl"
+			"Wants Outside"
+			"Sheep Opinions"
+			"Tiny Defender"
 		)
 		gallery_specs=(
-			"Mushroom Wants a Treat|docs/media/mushroom-the-yorkie-banner.png|Mushroom watches for a treat beside the bed.|true|0"
-			"Curled Up Indoors|docs/media/mushroom-the-yorkie-sleeping.png|At night indoors, Mushroom curls up and closes his eyes.|false|1"
-			"Adventure Companion|docs/media/mushroom-the-yorkie-adventure.png|A small companion for big family worlds.|false|2"
+			"Sitting Pretty|docs/media/mushroom-the-yorkie-banner.png|Mushroom sits beside his dog bed with no leash.|true|0"
+			"Leashed Walk|docs/media/mushroom-the-yorkie-leashed.png|Mushroom wears his harness and is tied to a fence lead for a walk.|false|1"
+			"Curled Up Indoors|docs/media/mushroom-the-yorkie-sleeping.png|At night indoors, Mushroom curls up on his dog bed.|false|2"
+			"Paddling in Water|docs/media/mushroom-the-yorkie-water.png|Mushroom splashes through shallow water.|false|3"
+			"Fetching the Ball|docs/media/mushroom-the-yorkie-fetching.png|Mushroom starts after a dropped Yorkie Ball.|false|4"
+			"Tiny Flight|docs/media/mushroom-the-yorkie-flying.png|Mushroom hovers midair during creative-flight play.|false|5"
+			"Snack Bowl|docs/media/mushroom-the-yorkie-eating.png|Mushroom checks in on a filled dog food bowl.|false|6"
+			"Water Bowl|docs/media/mushroom-the-yorkie-drinking.png|Mushroom checks in on a filled water bowl.|false|7"
+			"Wants Outside|docs/media/mushroom-the-yorkie-wants-outside.png|Mushroom asks to go outside from an indoor room.|false|8"
+			"Sheep Opinions|docs/media/mushroom-the-yorkie-sheep-chase.png|Mushroom starts chasing a nearby sheep.|false|9"
+			"Tiny Defender|docs/media/mushroom-the-yorkie-spider.png|Mushroom nips a hostile spider.|false|10"
 		)
 		;;
 	cops-and-robbers)
@@ -66,7 +87,14 @@ case "$mod" in
 		description="Police cruisers, fire trucks, robbers, banks, and patrol play for family Minecraft worlds."
 		categories='["adventure", "mobs", "game-mechanics"]'
 		stale_gallery_titles=()
-		gallery_specs=()
+		gallery_specs=(
+			"Patrol Scene Lineup|docs/media/cops-and-robbers-lineup.png|Cops, robbers, bank staff, emergency crews, and vehicles staged together.|true|0"
+			"Mob Cast Closeup|docs/media/cops-and-robbers-mobs.png|Bank robbers, a cop, a teller, and a fireman ready for patrol scenes.|false|1"
+			"Emergency Vehicles|docs/media/cops-and-robbers-vehicles.png|A police cruiser and fire truck for chases, captures, and fire response.|false|2"
+			"Police Station Kit|docs/media/cops-and-robbers-police-station.png|The placeable police station kit gives patrol worlds a jail and station front.|false|3"
+			"Bank Kit|docs/media/cops-and-robbers-bank.png|The placeable bank kit creates a target for robber heists and teller spawns.|false|4"
+			"Fire Station Kit|docs/media/cops-and-robbers-fire-station.png|The placeable fire station kit adds a red responder base with a truck bay and crew.|false|5"
+		)
 		;;
 	*)
 		echo "Unknown MODRINTH_MOD '$mod'. Expected narwhal-together, mushroom-the-yorkie, or cops-and-robbers." >&2
@@ -184,6 +212,10 @@ if ((${#stale_gallery_titles[@]})); then
 				"$api/gallery?url=$(urlencode "$stale_url")"
 		done < <(jq -r --arg title "$stale_title" '.gallery[]? | select(.title == $title) | .url' <<<"$project_json")
 	done
+	project_json="$(curl --fail-with-body --silent --show-error \
+		--header "$auth_header" \
+		--header "User-Agent: $user_agent" \
+		"$api")"
 fi
 
 if ((${#gallery_specs[@]})); then

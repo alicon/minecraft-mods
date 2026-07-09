@@ -1,0 +1,20 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "misc",
+	"pattern": [
+		"RWR",
+		"IFI",
+		"SSS"
+	],
+	"key": {
+		"F": "minecraft:fire_charge",
+		"I": "minecraft:iron_ingot",
+		"R": "minecraft:red_concrete",
+		"S": "minecraft:smooth_stone",
+		"W": "minecraft:white_concrete"
+	},
+	"result": {
+		"count": 1,
+		"id": "cops_robbers:fire_station_kit"
+	}
+}

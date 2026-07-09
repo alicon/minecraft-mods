@@ -73,6 +73,13 @@ public final class ModItems {
 					.stacksTo(16)
 					.setId(key("bank_kit")))
 	);
+	/** Places a compact fire station with a fire truck bay. */
+	public static final Item FIRE_STATION_KIT = register(
+			"fire_station_kit",
+			new FireStationKitItem(new Item.Properties()
+					.stacksTo(16)
+					.setId(key("fire_station_kit")))
+	);
 
 	private ModItems() {
 	}

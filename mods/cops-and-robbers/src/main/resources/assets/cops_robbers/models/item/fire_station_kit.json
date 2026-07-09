@@ -1,0 +1,6 @@
+{
+	"parent": "minecraft:item/generated",
+	"textures": {
+		"layer0": "cops_robbers:item/fire_station_kit"
+	}
+}

@@ -37,6 +37,7 @@ public final class ModCreativeTabs {
 					output.accept(ModItems.FIREMAN_SPAWN_EGG);
 					output.accept(ModItems.POLICE_STATION_KIT);
 					output.accept(ModItems.BANK_KIT);
+					output.accept(ModItems.FIRE_STATION_KIT);
 				})
 				.build());
 
@@ -51,6 +52,7 @@ public final class ModCreativeTabs {
 		ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.TOOLS_AND_UTILITIES).register(entries -> {
 			entries.accept(ModItems.POLICE_STATION_KIT);
 			entries.accept(ModItems.BANK_KIT);
+			entries.accept(ModItems.FIRE_STATION_KIT);
 		});
 	}
 }
