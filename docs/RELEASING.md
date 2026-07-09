@@ -65,7 +65,7 @@ After the Modrinth project exists:
 
 Never commit the token.
 
-For local metadata syncs on macOS, the token can be stored in Keychain as a generic password with service `modrinth-token` and account `abellicon`. The sync script reads that entry automatically when `MODRINTH_TOKEN` is not already set.
+For local release commands on macOS, the token can be stored in Keychain as a generic password with service `modrinth-token` and account `abellicon`. The release and sync scripts read that entry automatically when `MODRINTH_TOKEN` is not already set.
 
 Run **Sync Modrinth Metadata** from the repository's Actions tab whenever the name, description, license, links, icon, or gallery material changes. Select the mod to sync from the workflow input. The workflow leaves the project's review status unchanged.
 
@@ -73,8 +73,45 @@ Run **Sync Modrinth Metadata** from the repository's Actions tab whenever the na
 
 1. Complete `docs/TESTING.md` using the exact JAR being released.
 2. Update `mod_version` in the selected mod's `mods/<mod>/build.gradle`.
-3. Commit and push the release changes.
-4. Open the repository's **Actions** tab.
-5. Run **Publish to Modrinth**, select the mod, select the Minecraft target, and select `alpha`, `beta`, or `release`.
+3. Add matching notes at `docs/release-notes/<mod>/<version>.md`.
+4. Commit and push the release changes.
+5. Wait for CI to pass on `main`.
+6. Preview the local release plan:
 
-The workflow rebuilds from the selected commit and uploads the remapped production JAR for the selected Minecraft target. The publishing task declares Fabric API as required. NARwhal also declares Controlify as optional.
+   ```shell
+   make release-dry-run
+   ```
+
+7. Publish the release:
+
+   ```shell
+   make release MODRINTH_VERSION_TYPE=alpha
+   ```
+
+The local release command:
+
+- validates each selected Minecraft target with `check --warning-mode all`
+- builds every selected release artifact
+- prints SHA-256 checksums
+- syncs Modrinth metadata for every selected mod
+- publishes every selected Modrinth version
+- installs the Minecraft `1.21.11` jars into the local Dad's Minecraft profile by default
+- backs up previous matching profile jars before copying new ones
+
+By default, `make release` publishes all three mods: NARwhal Together and Mushroom the Yorkie for Minecraft `1.21.11` and `1.21.1`, and Cops and Robbers for Minecraft `1.21.11`.
+
+Useful release switches:
+
+```shell
+make release RELEASE_DRY_RUN=1
+make release RELEASE_SKIP_PROFILE=1
+make release RELEASE_SKIP_PUBLISH=1
+make release RELEASE_SKIP_METADATA=1
+make release RELEASE_MODS="narwhal-together mushroom-the-yorkie"
+make release RELEASE_MINECRAFT_VERSIONS="1.21.1" RELEASE_MODS="narwhal-together mushroom-the-yorkie"
+make release RELEASE_INSTALL_MC_VERSION=1.21.11
+```
+
+The command refuses to publish from a dirty working tree unless `ALLOW_DIRTY_RELEASE=1` is set. Keep the default guard for normal releases so Modrinth artifacts map cleanly back to a commit.
+
+The GitHub **Publish to Modrinth** workflow remains available as a single-mod fallback. It rebuilds from the selected commit and uploads the remapped production JAR for the selected Minecraft target. The publishing task declares Fabric API as required. NARwhal also declares Controlify as optional.

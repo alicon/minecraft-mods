@@ -15,7 +15,7 @@ final class FetchBallGoal extends Goal {
 	private static final int MAX_FETCH_CHASE_TICKS = 20 * 35;
 	private static final double FETCH_SPEED = 1.30D;
 	private static final int UNSAFE_FETCH_BARK_TICKS = 20 * 2;
-	private static final int UNREACHABLE_FETCH_TICKS = 20;
+	private static final int UNREACHABLE_FETCH_TICKS = 20 * 4;
 
 	private final MushroomYorkieEntity yorkie;
 	private final FetchToyMovement movement;
@@ -142,7 +142,7 @@ final class FetchBallGoal extends Goal {
 			return;
 		}
 
-		this.movement.moveToward(FetchToyChase.moveTarget(this.yorkie, this.toy), FETCH_SPEED);
+		this.movement.moveToward(FetchToyChase.moveTarget(level, this.yorkie, this.toy), FETCH_SPEED);
 		if (this.fetchLooksUnreachable(level, this.toy)) {
 			this.abortUnreachableFetch(level, this.toy);
 		}
@@ -239,6 +239,8 @@ final class FetchBallGoal extends Goal {
 			this.lastReturnedToy = result.returnedToy();
 		}
 		this.nextSearchGameTime = level.getGameTime() + RETURN_COOLDOWN_TICKS;
+		this.carrying = false;
+		this.carriedToy = ItemStack.EMPTY;
 		this.completed = true;
 	}
 }

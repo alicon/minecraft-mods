@@ -1,0 +1,32 @@
+{
+	"schemaVersion": 1,
+	"id": "playtest_bridge",
+	"version": "${version}",
+	"name": "Playtest Bridge",
+	"description": "Loopback-only local HTTP bridge for Minecraft mod playtesting.",
+	"authors": [
+		"alicon"
+	],
+	"contact": {
+		"homepage": "https://github.com/alicon/minecraft-mods",
+		"sources": "https://github.com/alicon/minecraft-mods",
+		"issues": "https://github.com/alicon/minecraft-mods/issues"
+	},
+	"license": "MIT",
+	"icon": "assets/playtest_bridge/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"dev.alicon.playtestbridge.PlaytestBridge"
+		],
+		"client": [
+			"dev.alicon.playtestbridge.PlaytestBridgeClient"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "${minecraft_dependency}",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}

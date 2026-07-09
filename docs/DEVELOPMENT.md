@@ -66,6 +66,15 @@ The Makefile backs up older matching jars before copying the newly built jar. On
 
 ## Release Helpers
 
+Preview and run the full local release flow:
+
+```shell
+make release-dry-run
+make release MODRINTH_VERSION_TYPE=alpha
+```
+
+The full release flow validates all selected Minecraft targets, builds release jars, syncs Modrinth metadata, publishes Modrinth versions, installs the default Minecraft `1.21.11` jars into the local Dad's Minecraft profile, and prints checksums and publish URLs. It refuses to publish from a dirty worktree unless `ALLOW_DIRTY_RELEASE=1` is set.
+
 Sync Modrinth project metadata:
 
 ```shell

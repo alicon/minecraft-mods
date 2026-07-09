@@ -79,6 +79,85 @@ Run Mushroom's headless Minecraft GameTests:
 
 GameTests boot a scripted Minecraft server from the CLI. They are slower than unit tests, so keep them focused on behavior that needs a real world, entity registry, or server tick loop.
 
+## Local Playtest Harness
+
+The Mineflayer harness in `tools/playtest-harness/` can join a local dev server, dedicated test server, or single-player LAN world. Use it for player-like smoke checks, live bot companionship, and artifact capture that is faster than repeating manual setup by hand.
+
+Install once:
+
+```shell
+make harness-install
+```
+
+Join a world and follow the human player:
+
+```shell
+make harness-companion HARNESS_PORT=<lan-or-server-port> HARNESS_TARGET=<your-player-name>
+```
+
+Run op-only smoke scenarios in a local test world:
+
+```shell
+make harness-mushroom-smoke HARNESS_PORT=<lan-or-server-port>
+make harness-cops-smoke HARNESS_PORT=<lan-or-server-port>
+```
+
+The Make targets start a Prismarine viewer by default at `http://localhost:3007` and write JSON event logs/snapshots to `tools/playtest-harness/artifacts/`. Set `HARNESS_VIEWER=0` to disable the viewer.
+
+For real Fabric modded worlds, install the local Playtest Bridge mod and use its loopback HTTP endpoints instead of Mineflayer:
+
+```shell
+make live-test-bridge
+make bridge-health
+make bridge-state
+make bridge-smoke BRIDGE_MESSAGE="Codex bridge smoke passed."
+make bridge-chat BRIDGE_MESSAGE="Codex can see the world."
+make bridge-command BRIDGE_COMMAND="time set day"
+make bridge-look BRIDGE_PLAYER=<your-player-name>
+make bridge-give BRIDGE_ITEM=minecraft:apple BRIDGE_COUNT=1
+make bridge-summon BRIDGE_ENTITY=cops_robbers:police_cruiser
+make bridge-teleport BRIDGE_X=0 BRIDGE_Y=100 BRIDGE_Z=0
+make bridge-use-entity BRIDGE_ENTITY=mushroom_yorkie:mushroom_yorkie BRIDGE_ITEM=mushroom_yorkie:yorkie_treat BRIDGE_RADIUS=12
+make bridge-clear-entities BRIDGE_ENTITY=mushroom_yorkie:mushroom_yorkie
+make bridge-set-block-near-entity BRIDGE_ENTITY=mushroom_yorkie:mushroom_yorkie BRIDGE_BLOCK=minecraft:oak_planks BRIDGE_DY=2
+make bridge-set-block BRIDGE_X=0 BRIDGE_Y=100 BRIDGE_Z=0 BRIDGE_BLOCK=minecraft:air
+make bridge-screenshot BRIDGE_SCREENSHOT_NAME=playtest.png
+```
+
+Restart Minecraft after installing `playtest-bridge`. The bridge binds to `127.0.0.1:57321` by default and is intended only for local development profiles.
+Screenshots close the active client screen before capture by default; set `BRIDGE_SCREENSHOT_RESUME=0` to keep the current screen visible.
+
+Launch Modrinth directly into an existing save:
+
+```shell
+make modrinth-launch-world PLAYTEST_WORLD="New World (21)"
+```
+
+Create a disposable save by copying a closed template world, then launch Modrinth directly into the copy:
+
+```shell
+make modrinth-playtest-world PLAYTEST_TEMPLATE_WORLD="Clean Template" PLAYTEST_WORLD_PREFIX="Codex Playtest"
+```
+
+Run the full local automation loop against a copied template world:
+
+```shell
+make modrinth-autoplay-smoke PLAYTEST_TEMPLATE_WORLD="Clean Template" BRIDGE_SCREENSHOT_NAME=playtest.png
+```
+
+Run Mushroom's richer live bridge scenario against a disposable world:
+
+```shell
+make modrinth-autoplay-yorkie PLAYTEST_TEMPLATE_WORLD="Clean Template" BRIDGE_SCREENSHOT_NAME=yorkie-smoke.png
+```
+
+The Yorkie scenario checks duplicate-claim blocking, treat taming, owner sit/follow commands, harness equip/removal, lead rejection without a harness, exact treat/toy/player-food need changes, sheltered nighttime sleep, double-click wake-up, exact shelter cleanup, dog food and water bowl use, same-day bowl refill rejection, outdoor potty relief, screenshot capture, and positive lead attach with the harness equipped.
+
+This uses Modrinth's `modrinth://launch/instance/<instance-id>?singleplayer_world=<save-folder>` deep link and avoids clicking through the launcher UI. The template save must not be the currently open world.
+The launcher script uses `open -g` by default so Modrinth is not deliberately activated during launch. Minecraft can still grab mouse/keyboard focus when the game window starts or enters relative-mouse mode; press Escape to release it, or set `MODRINTH_OPEN_BACKGROUND=0` if you want the client to come forward intentionally.
+The launcher also sets `pauseOnLostFocus:false` by default so singleplayer test worlds keep ticking when Minecraft is not frontmost. Set `PLAYTEST_DISABLE_PAUSE_ON_LOST_FOCUS=0` to leave that profile option unchanged.
+Set `PLAYTEST_SCREENSHOT_DELAY_SECONDS=0` to skip the default post-smoke screenshot delay.
+
 ## Current Automated Coverage
 
 NARwhal Together:
@@ -91,6 +170,7 @@ NARwhal Together:
 
 Mushroom the Yorkie:
 
+- live Modrinth bridge smoke covers duplicate-claim blocking, treat taming, sit/follow, harness on/off, lead gating, exact toy/player-food effects, sheltered sleep/wake, dog food/water bowl consumption, same-day bowl refill rejection, outdoor potty relief, cleanup, screenshot capture, and lead attach
 - default pet needs
 - save/load value clamping
 - treat effects

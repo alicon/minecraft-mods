@@ -90,7 +90,9 @@ final class DomesticCareGoal extends Goal {
 		Vec3 target = Vec3.atBottomCenterOf(this.targetPos);
 		this.yorkie.getLookControl().setLookAt(target.x, target.y, target.z);
 		if (this.yorkie.distanceToSqr(target) <= USE_DISTANCE_SQR) {
-			this.targetUse.consume(level, this.yorkie, this.targetPos);
+			if (this.targetUse.isStillAvailable(level, this.targetPos)) {
+				this.targetUse.consume(level, this.yorkie, this.targetPos);
+			}
 			this.completed = true;
 			return;
 		}

@@ -25,3 +25,6 @@ replay_*.log
 
 __pycache__/
 *.py[cod]
+
+tools/playtest-harness/node_modules/
+tools/playtest-harness/artifacts/

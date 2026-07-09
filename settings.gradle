@@ -14,7 +14,9 @@ rootProject.name = 'minecraft-mods'
 include 'narwhal-together'
 include 'mushroom-the-yorkie'
 include 'cops-and-robbers'
+include 'playtest-bridge'
 
 project(':narwhal-together').projectDir = file('mods/narwhal-together')
 project(':mushroom-the-yorkie').projectDir = file('mods/mushroom-the-yorkie')
 project(':cops-and-robbers').projectDir = file('mods/cops-and-robbers')
+project(':playtest-bridge').projectDir = file('mods/playtest-bridge')

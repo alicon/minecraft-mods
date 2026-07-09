@@ -118,7 +118,7 @@ tasks.register('validateFormatting') {
 	doLast {
 		def checkedExtensions = ['.gradle', '.java', '.json', '.md', '.properties', '.sh', '.yml', '.yaml']
 		def checkedFiles = ['.editorconfig', '.gitattributes', '.gitignore']
-		def ignoredDirs = ['.git', '.gradle', '.gradle-user-home', 'build']
+		def ignoredDirs = ['.git', '.gradle', '.gradle-user-home', 'build', 'node_modules']
 		def violations = []
 
 		rootProject.projectDir.eachFileRecurse { file ->
@@ -126,8 +126,8 @@ tasks.register('validateFormatting') {
 				return
 			}
 			def relative = rootProject.projectDir.toPath().relativize(file.toPath()).toString()
-			def firstPathPart = relative.split(/[\/\\]/, 2)[0]
-			if (ignoredDirs.contains(firstPathPart) || relative.contains("${File.separator}build${File.separator}")) {
+			def pathParts = relative.split(/[\/\\]/)
+			if (pathParts.any { ignoredDirs.contains(it) } || relative.contains("${File.separator}build${File.separator}")) {
 				return
 			}
 			if (!checkedExtensions.any { relative.endsWith(it) } && !checkedFiles.contains(relative)) {

@@ -1,0 +1,11 @@
+ext {
+	mod_id = 'playtest_bridge'
+	mod_archive_name = 'playtest-bridge'
+	mod_display_name = 'Playtest Bridge'
+	mod_version = '0.1.0'
+	modrinth_project_env = 'PLAYTEST_BRIDGE_MODRINTH_PROJECT_ID'
+	modrinth_project_fallback = 'playtest-bridge'
+	modrinth_optional_projects = []
+}
+
+apply from: rootProject.file('gradle/fabric-mod.gradle')

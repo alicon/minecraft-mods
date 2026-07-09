@@ -1,0 +1,23 @@
+{
+  "name": "minecraft-playtest-harness",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mineflayer-based local playtest harness for this Minecraft mods workspace.",
+  "license": "MIT",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node src/cli.js",
+    "list": "node src/cli.js --list",
+    "bridge": "node src/bridge-cli.js",
+    "check": "for file in src/*.js src/scenarios/*.js; do node --check \"$file\"; done"
+  },
+  "dependencies": {
+    "minecraft-data": "3.111.0",
+    "mineflayer": "4.37.1",
+    "mineflayer-pathfinder": "2.4.5",
+    "prismarine-viewer": "1.33.0"
+  }
+}
