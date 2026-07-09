@@ -2073,6 +2073,25 @@ async function runYorkieNaturalGallery(baseUrl, args) {
     }
   }
 
+  async function clearStagedBlocks(center, horizontal = 18) {
+    const x1 = Math.floor(center.x - horizontal);
+    const y1 = Math.floor(center.y - 4);
+    const z1 = Math.floor(center.z - horizontal);
+    const x2 = Math.floor(center.x + horizontal);
+    const y2 = Math.floor(center.y + 8);
+    const z2 = Math.floor(center.z + horizontal);
+    for (const block of [
+      'minecraft:birch_fence',
+      'minecraft:oak_fence',
+      'mushroom_yorkie:dog_bed',
+      'mushroom_yorkie:dog_food_bowl',
+      'mushroom_yorkie:dog_water_bowl'
+    ]) {
+      await command(`fill ${x1} ${y1} ${z1} ${x2} ${y2} ${z2} minecraft:air replace ${block}`);
+    }
+    await command(`fill ${x1} ${y1} ${z1} ${x2} ${y2} ${z2} minecraft:grass_block replace minecraft:dirt_path`);
+  }
+
   async function prepScene(name, location) {
     return step(`prepare ${name}`, async () => {
       await command('time set noon');
@@ -2103,6 +2122,7 @@ async function runYorkieNaturalGallery(baseUrl, args) {
         await clearEntities(type);
       }
       await cleanArea(center);
+      await clearStagedBlocks(center);
       return center;
     });
   }
@@ -2172,6 +2192,28 @@ async function runYorkieNaturalGallery(baseUrl, args) {
     return setAbsoluteBlock({ x: target.x, y: target.y, z: target.z }, block);
   }
 
+  async function clearPropColumn(surface) {
+    await setAbsoluteBlock({ x: surface.x, y: surface.y, z: surface.z }, 'minecraft:air');
+    await setAbsoluteBlock({ x: surface.x, y: surface.y + 1, z: surface.z }, 'minecraft:air');
+  }
+
+  async function prepareFlatPropPatch(surface, horizontal = 2) {
+    const prepared = [];
+    for (let dx = -horizontal; dx <= horizontal; dx += 1) {
+      for (let dz = -horizontal; dz <= horizontal; dz += 1) {
+        const x = surface.x + dx;
+        const z = surface.z + dz;
+        await setAbsoluteBlock({ x, y: surface.y - 1, z }, 'minecraft:dirt_path');
+        await setAbsoluteBlock({ x, y: surface.y, z }, 'minecraft:air');
+        await setAbsoluteBlock({ x, y: surface.y + 1, z }, 'minecraft:air');
+        await setAbsoluteBlock({ x, y: surface.y + 2, z }, 'minecraft:air');
+        prepared.push({ x, y: surface.y, z });
+      }
+    }
+    await clearFoliage(surface, horizontal + 2, 4);
+    return prepared;
+  }
+
   const initialState = await requestJson(baseUrl, '/state');
   const playerName = singlePlayerName(initialState);
   const screenshots = {};
@@ -2203,15 +2245,17 @@ async function runYorkieNaturalGallery(baseUrl, args) {
   screenshots.leashed = await step('capture natural leashed walk', async () => {
     const land = await findSurfaceNear(center, isLand, 14);
     await clearFoliage(land, 5, 4);
-    const camera = { x: land.x - 2.3, y: land.y + 0.95, z: land.z - 3.4 };
+    const camera = { x: land.x - 2.8, y: land.y + 1.05, z: land.z - 3.9 };
     await clearFoliage({ x: camera.x, y: land.y, z: camera.z }, 2, 4);
-    const fence = { x: land.x + 1, y: land.y, z: land.z + 1 };
-    const fenceNeighbor = { x: land.x + 1, y: land.y, z: land.z + 2 };
-    await setAbsoluteBlock(fence, 'minecraft:oak_fence');
-    await setAbsoluteBlock(fenceNeighbor, 'minecraft:oak_fence');
-    const yorkie = await summonYorkie({ x: land.x + 0.3, y: land.y, z: land.z + 0.65 }, { noAi: true, harness: true, yaw: 160 });
+    const fence = { x: land.x - 1, y: land.y, z: land.z };
+    const fenceTop = { x: fence.x, y: fence.y + 1, z: fence.z };
+    const fenceNeighbor = { x: land.x - 1, y: land.y, z: land.z + 1 };
+    await setAbsoluteBlock(fence, 'minecraft:birch_fence');
+    await setAbsoluteBlock(fenceTop, 'minecraft:birch_fence');
+    await setAbsoluteBlock(fenceNeighbor, 'minecraft:birch_fence');
+    const yorkie = await summonYorkie({ x: land.x + 0.65, y: land.y, z: land.z + 0.65 }, { noAi: true, harness: true, yaw: 220 });
     await checkedCommand(`gamemode creative ${playerName}`);
-    await checkedCommand(`tp ${playerName} ${land.x + 1.9} ${land.y} ${land.z - 0.8} facing ${land.x - 0.5} ${land.y + 0.3} ${land.z + 0.5}`);
+    await checkedCommand(`tp ${playerName} ${land.x - 0.3} ${land.y} ${land.z - 1.4} facing ${land.x + 0.6} ${land.y + 0.3} ${land.z + 0.6}`);
     const lead = await useYorkie({ item: 'minecraft:lead', count: 1 });
     requireCondition(lead.target.leash && lead.target.leash.leashed, 'Leash did not attach for natural gallery scene');
     const tied = await useBlock({
@@ -2231,7 +2275,7 @@ async function runYorkieNaturalGallery(baseUrl, args) {
       file: await cameraShot(
         'leashed-walk',
         camera,
-        { x: land.x + 0.75, y: land.y + 0.35, z: land.z + 0.75 }
+        { x: land.x - 0.05, y: land.y + 0.55, z: land.z + 0.55 }
       )
     };
   });
@@ -2241,9 +2285,14 @@ async function runYorkieNaturalGallery(baseUrl, args) {
     const water = await findSurfaceNear(center, isWater, 16);
     const camera = { x: water.x - 2.4, y: water.y + 0.85, z: water.z - 3.7 };
     const yorkie = await summonYorkie({ x: water.x + 0.5, y: water.y + 0.05, z: water.z + 0.5 }, {
+      noAi: true,
       yaw: 185,
       needs: '{Hunger:10,Potty:10,Mood:90,Energy:80}'
     });
+    await poseYorkie(
+      { x: water.x + 0.5, y: water.y + 0.05, z: water.z + 0.5 },
+      { x: camera.x, y: camera.y, z: camera.z }
+    );
     await sleep(900);
     return {
       water,
@@ -2268,7 +2317,8 @@ async function runYorkieNaturalGallery(baseUrl, args) {
       yaw: 95,
       needs: '{Hunger:0,Potty:0,Mood:65,Energy:85}'
     });
-    await command(`summon item ${land.x + 2.4} ${land.y + 0.4} ${land.z + 0.5} {Item:{id:"mushroom_yorkie:yorkie_ball",count:1}}`);
+    await command(`summon item ${land.x + 2.4} ${land.y + 0.25} ${land.z + 0.5} {NoGravity:1b,PickupDelay:32767,Age:-32768,Item:{id:"mushroom_yorkie:yorkie_ball",count:1}}`);
+    await checkedCommand(`summon minecraft:item_display ${land.x + 2.25} ${land.y + 0.48} ${land.z + 0.5} {item:{id:"mushroom_yorkie:yorkie_ball",count:1},item_display:"gui",billboard:"center",transformation:{translation:[0.0f,0.0f,0.0f],scale:[1.15f,1.15f,1.15f],left_rotation:[0.0f,0.0f,0.0f,1.0f],right_rotation:[0.0f,0.0f,0.0f,1.0f]}}`);
     await sleep(1200);
     await checkedCommand(`tp @e[type=${yorkieType},limit=1,sort=nearest] ${land.x - 0.85} ${land.y} ${land.z + 0.45} facing ${land.x + 2.4} ${land.y + 0.35} ${land.z + 0.5}`);
     await freezeEntity(yorkieType);
@@ -2333,23 +2383,25 @@ async function runYorkieNaturalGallery(baseUrl, args) {
   center = await prepScene('natural drinking', locations.lake);
   screenshots.drinking = await step('capture natural drinking', async () => {
     const land = await findSurfaceNear(center, isLand, 14);
-    await clearFoliage(land, 5, 4);
-    const camera = { x: land.x - 2.1, y: land.y + 0.85, z: land.z - 3.2 };
+    await prepareFlatPropPatch(land, 2);
+    await clearFoliage(land, 6, 4);
+    const camera = { x: land.x - 2.2, y: land.y + 0.9, z: land.z - 3.4 };
     await clearFoliage({ x: camera.x, y: land.y, z: camera.z }, 2, 4);
+    await clearPropColumn(land);
     await placeBlockOn(land, 0, 0, 'mushroom_yorkie:dog_water_bowl');
-    await summonYorkie({ x: land.x, y: land.y, z: land.z + 1.35 }, {
+    await summonYorkie({ x: land.x + 0.5, y: land.y, z: land.z + 1.05 }, {
       noAi: true,
       yaw: 180,
       needs: '{Hunger:20,Potty:20,Mood:70,Energy:70,LastWaterBowlDay:-1L}'
     });
-    await checkedCommand(`tp @e[type=${yorkieType},limit=1,sort=nearest] ${land.x} ${land.y} ${land.z + 1.35} facing ${land.x} ${land.y + 0.2} ${land.z}`);
+    await checkedCommand(`tp @e[type=${yorkieType},limit=1,sort=nearest] ${land.x + 0.5} ${land.y} ${land.z + 1.05} facing ${land.x + 0.5} ${land.y + 0.2} ${land.z}`);
     return {
       land,
       yorkie: await waitForEntity(baseUrl, yorkieType, 5000),
       file: await cameraShot(
         'drinking-water-bowl',
         camera,
-        { x: land.x, y: land.y + 0.35, z: land.z + 0.7 }
+        { x: land.x + 0.35, y: land.y + 0.35, z: land.z + 0.55 }
       )
     };
   });
