@@ -19,6 +19,10 @@ final class MushroomPeacefulMobMemory {
 		return this.remembered.contains(animal.getUUID());
 	}
 
+	void remember(Animal animal) {
+		this.remember(animal.getUUID());
+	}
+
 	void rememberNearby(ServerLevel level, MushroomYorkieEntity yorkie) {
 		AABB area = yorkie.getBoundingBox().inflate(REMEMBER_RADIUS, 4.0D, REMEMBER_RADIUS);
 		for (Animal animal : level.getEntitiesOfClass(Animal.class, area, animal -> animal != yorkie && animal.isAlive())) {

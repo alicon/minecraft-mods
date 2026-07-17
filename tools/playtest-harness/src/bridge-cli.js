@@ -1092,8 +1092,159 @@ async function runYorkieAdventureSmoke(baseUrl, args) {
   };
 }
 
+async function runYorkieHomeSquirrel(baseUrl, args) {
+  const yorkieType = 'mushroom_yorkie:mushroom_yorkie';
+  const squirrelType = 'mushroom_yorkie:squirrel';
+  const requestedName = option(args, 'screenshotName', 'BRIDGE_SCREENSHOT_NAME', 'yorkie-home-squirrel');
+  const screenshotPrefix = requestedName.replace(/\.png$/i, '').replace(/[^A-Za-z0-9._-]/g, '-');
+  const base = { x: 0, y: 178, z: 0 };
+  const steps = [];
+
+  async function step(name, run) {
+    const value = await run();
+    steps.push({ name, ok: true, value });
+    return value;
+  }
+
+  async function command(commandText) {
+    return requestJson(baseUrl, '/command', 'POST', { command: commandText });
+  }
+
+  async function checkedCommand(commandText) {
+    const result = await command(commandText);
+    requireCondition(result.success !== false, `Command failed: ${commandText}`);
+    return result;
+  }
+
+  async function clearEntities(type) {
+    return requestJson(baseUrl, '/clear-entities', 'POST', { type });
+  }
+
+  async function setBlock(x, y, z, block) {
+    return requestJson(baseUrl, '/set-block', 'POST', { x, y, z, block });
+  }
+
+  async function useYorkie(body) {
+    return requestJson(baseUrl, '/use-entity', 'POST', { type: yorkieType, radius: 18, ...body });
+  }
+
+  async function prepareScene() {
+    await checkedCommand(`gamemode creative ${playerName}`);
+    await requestJson(baseUrl, '/player-abilities', 'POST', { player: playerName, flying: false, mayfly: true });
+    await command('gamerule doMobSpawning false');
+    await command('gamerule doDaylightCycle false');
+    await command('weather clear');
+    await clearEntities(yorkieType);
+    await clearEntities(squirrelType);
+    await command(`fill ${base.x - 16} ${base.y} ${base.z - 12} ${base.x + 32} ${base.y + 12} ${base.z + 20} minecraft:air`);
+    await command(`fill ${base.x - 16} ${base.y - 1} ${base.z - 12} ${base.x + 32} ${base.y - 1} ${base.z + 20} minecraft:grass_block`);
+    await checkedCommand(`tp ${playerName} ${base.x + 0.5} ${base.y} ${base.z - 3.5}`);
+  }
+
+  async function summonTamedYorkie(x, z) {
+    await checkedCommand(`summon ${yorkieType} ${x} ${base.y} ${z} {PersistenceRequired:1b}`);
+    await waitForEntity(baseUrl, yorkieType, 5000);
+    await checkedCommand(`tp ${playerName} ${x} ${base.y} ${z + 2.0} facing ${x} ${base.y + 0.4} ${z}`);
+    const tamed = await useYorkie({ item: 'mushroom_yorkie:yorkie_treat', count: 2 });
+    requireCondition(tamed.target.tameable && tamed.target.tameable.tame, 'Yorkie did not tame in focused scenario');
+    await checkedCommand(`data merge entity @e[type=${yorkieType},limit=1,sort=nearest] {Hunger:10,Potty:10,Mood:90,Energy:90,PeacefulMobBarkMutedUntil:-1L,CalmedPeacefulMobs:""}`);
+    return waitForEntity(baseUrl, yorkieType, 5000);
+  }
+
+  async function cameraShot(suffix, camera, target) {
+    await checkedCommand(`gamemode spectator ${playerName}`);
+    await checkedCommand(`tp ${playerName} ${camera.x} ${camera.y} ${camera.z} facing ${target.x} ${target.y} ${target.z}`);
+    await sleep(700);
+    const shot = await requestJson(baseUrl, '/screenshot', 'POST', {
+      name: `${screenshotPrefix}-${suffix}.png`,
+      resume: true,
+      hideGui: true,
+      clearChat: true
+    });
+    return shot.file;
+  }
+
+  const playerName = singlePlayerName(await requestJson(baseUrl, '/state'));
+  const screenshots = {};
+
+  await step('prepare doghouse scene', prepareScene);
+  screenshots.doghouse = await step('sleep inside softly lit doghouse', async () => {
+    await setBlock(base.x, base.y, base.z + 2, 'mushroom_yorkie:doghouse[facing=north]');
+    await setBlock(base.x - 2, base.y, base.z + 1, 'minecraft:pink_petals');
+    await setBlock(base.x + 2, base.y, base.z + 2, 'minecraft:pink_petals');
+    await summonTamedYorkie(base.x + 4.5, base.z + 2.5);
+    await command('time set night');
+    const sleeping = await waitForEntityState(
+      baseUrl,
+      yorkieType,
+      (entity) => entity.custom && entity.custom.curledUpSleeping && Math.abs(entity.position.x - base.x - 0.5) < 0.4,
+      15000
+    );
+    return {
+      sleeping,
+      file: await cameraShot(
+        'sleeping-doghouse',
+				{ x: base.x + 0.5, y: base.y + 0.82, z: base.z - 0.3 },
+        { x: base.x + 0.5, y: base.y + 0.42, z: base.z + 2.35 }
+      )
+    };
+  });
+
+  await step('prepare squirrel tree scene', async () => {
+    await prepareScene();
+    await command('time set noon');
+    await checkedCommand(`fill ${base.x + 8} ${base.y} ${base.z + 4} ${base.x + 8} ${base.y + 4} ${base.z + 4} minecraft:oak_log`);
+    await checkedCommand(`fill ${base.x + 6} ${base.y + 3} ${base.z + 2} ${base.x + 10} ${base.y + 6} ${base.z + 6} minecraft:oak_leaves[persistent=true]`);
+    await checkedCommand(`fill ${base.x + 8} ${base.y} ${base.z + 4} ${base.x + 8} ${base.y + 4} ${base.z + 4} minecraft:oak_log`);
+  });
+
+  screenshots.squirrel = await step('squirrel finds tree and Mushroom gives up', async () => {
+    await summonTamedYorkie(base.x - 2.5, base.z + 0.5);
+    await checkedCommand(`gamemode survival ${playerName}`);
+    await checkedCommand(`tp ${playerName} ${base.x + 0.5} ${base.y} ${base.z - 3.5}`);
+    await checkedCommand(`summon ${squirrelType} ${base.x + 2.5} ${base.y} ${base.z + 1.0} {PersistenceRequired:1b}`);
+    const atTree = await waitForEntityState(baseUrl, squirrelType, (entity) => entity.custom && entity.custom.foundTree, 18000);
+    const chase = await waitForEntityState(
+      baseUrl,
+      yorkieType,
+      (entity) => {
+        const dx = entity.position.x - atTree.position.x;
+        const dz = entity.position.z - atTree.position.z;
+        return dx * dx + dz * dz < 16.0;
+      },
+      8000
+    );
+		const camera = { x: atTree.position.x - 3.0, y: atTree.position.y + 1.15, z: atTree.position.z - 3.2 };
+    const target = { x: atTree.position.x, y: atTree.position.y + 0.55, z: atTree.position.z };
+    const file = await cameraShot('chasing-squirrel', camera, target);
+		await checkedCommand(`gamemode survival ${playerName}`);
+		await checkedCommand(`tp ${playerName} ${base.x - 4.5} ${base.y} ${base.z - 5.5}`);
+    const returned = await waitForEntityState(baseUrl, yorkieType, (entity) => entity.distance < 2.8, 35000);
+    return { atTree, chase, returnedAfterThirtySeconds: returned, file };
+  });
+
+  const distanceGiveUp = await step('give up when treeless squirrel runs too far', async () => {
+    await prepareScene();
+    await command('time set noon');
+    await summonTamedYorkie(base.x - 2.5, base.z + 0.5);
+    await checkedCommand(`gamemode survival ${playerName}`);
+    await checkedCommand(`tp ${playerName} ${base.x + 0.5} ${base.y} ${base.z - 3.5}`);
+    await checkedCommand(`summon ${squirrelType} ${base.x + 2.5} ${base.y} ${base.z + 1.0} {PersistenceRequired:1b}`);
+    const chaseStarted = await waitForEntityState(baseUrl, yorkieType, (entity) => entity.position.x > base.x + 0.5, 8000);
+		await checkedCommand(`tp ${playerName} ${base.x - 4.5} ${base.y} ${base.z - 5.5}`);
+    await checkedCommand(`tp @e[type=${squirrelType},limit=1,sort=nearest] ${base.x + 25.5} ${base.y} ${base.z}`);
+    const returned = await waitForEntityState(baseUrl, yorkieType, (entity) => entity.distance < 2.8, 12000);
+    const squirrel = await waitForEntity(baseUrl, squirrelType, 5000);
+    requireCondition(!squirrel.custom || !squirrel.custom.foundTree, 'Treeless squirrel unexpectedly reported a tree');
+    return { chaseStarted, squirrel, returned };
+  });
+
+  return { ok: true, scenario: 'yorkie-home-squirrel', screenshots, distanceGiveUp, steps };
+}
+
 async function runYorkieVisualSweep(baseUrl, args) {
   const yorkieType = option(args, 'type', 'YORKIE_ENTITY', 'mushroom_yorkie:mushroom_yorkie');
+  const squirrelType = 'mushroom_yorkie:squirrel';
   const requestedName = option(args, 'screenshotName', 'BRIDGE_SCREENSHOT_NAME', '');
   const screenshotPrefix = (requestedName || `mushroom-yorkie-gallery-${Date.now()}`)
     .replace(/\.png$/i, '')
@@ -1377,6 +1528,7 @@ async function runYorkieVisualSweep(baseUrl, args) {
       await command(`clear ${playerName}`);
       for (const type of [
         yorkieType,
+        squirrelType,
         'minecraft:item',
         'minecraft:cow',
         'minecraft:sheep',
@@ -1487,6 +1639,27 @@ async function runYorkieVisualSweep(baseUrl, args) {
     };
   });
 
+  await prepScene('sleeping in doghouse', { meadow: false });
+  screenshots.doghouse = await step('capture sleeping in doghouse', async () => {
+    await setAbsoluteBlock(point(0, 0, 1), 'mushroom_yorkie:doghouse[facing=north]');
+    await setBlocks('minecraft:pink_petals', [point(-2, 0, 0), point(2, 0, 1), point(-2, 0, 3), point(2, 0, 3)]);
+    await command('time set night');
+    await playerAbilities({ flying: false, mayfly: true });
+    await summonYorkie(point(3.5, 0, 1.5), { yaw: 270 });
+    const sleeping = await waitForEntityState(
+      baseUrl,
+      yorkieType,
+      (entity) => entity.custom && entity.custom.curledUpSleeping && Math.abs(entity.position.x - visualX - 0.5) < 0.4,
+      15000
+    );
+    return {
+      sleeping,
+      file: await cameraShot('sleeping-doghouse', point(0.5, 0.82, -1.8), point(0.5, 0.42, 1.35), {
+        delayMillis: 900
+      })
+    };
+  });
+
   await prepScene('water paddle');
   screenshots.water = await step('capture in water', async () => {
     await fillBox(point(-5, -1, -1), point(5, -1, 5), 'minecraft:sand');
@@ -1586,7 +1759,10 @@ async function runYorkieVisualSweep(baseUrl, args) {
 
   await prepScene('chasing passive mob');
   screenshots.passiveChase = await step('capture chasing passive mob', async () => {
-    await summonYorkie(point(-3.0, 0, 0.5), { yaw: 90, needs: '{Hunger:10,Potty:10,Mood:80,Energy:80}' });
+    await summonYorkie(point(-3.0, 0, 0.5), {
+      yaw: 90,
+      needs: '{Hunger:10,Potty:10,Mood:80,Energy:80,PeacefulMobBarkMutedUntil:-1L,CalmedPeacefulMobs:""}'
+    });
     await checkedCommand(`clear ${playerName}`);
     await checkedCommand(`gamemode survival ${playerName}`);
     await checkedCommand(`tp ${playerName} ${visualX} ${visualY} ${visualZ - 3.0} facing ${visualX + 0.5} ${visualY + 0.3} ${visualZ + 0.5}`);
@@ -1604,6 +1780,46 @@ async function runYorkieVisualSweep(baseUrl, args) {
       yorkie: await waitForEntity(baseUrl, yorkieType, 5000),
       sheep: await waitForEntity(baseUrl, 'minecraft:sheep', 5000),
       file: await cameraShot('chasing-sheep', point(0.3, 1.25, -5.2), point(0.8, 0.45, 0.2))
+    };
+  });
+
+  await prepScene('chasing squirrel to tree');
+  screenshots.squirrelChase = await step('capture squirrel tree chase and give-up', async () => {
+    await summonYorkie(point(-2.5, 0, 0.5), {
+      yaw: 90,
+      needs: '{Hunger:10,Potty:10,Mood:90,Energy:90,PeacefulMobBarkMutedUntil:-1L,CalmedPeacefulMobs:""}'
+    });
+    await checkedCommand(`clear ${playerName}`);
+    await checkedCommand(`gamemode survival ${playerName}`);
+    await checkedCommand(`tp ${playerName} ${visualX} ${visualY} ${visualZ - 3.0} facing ${visualX + 2.0} ${visualY + 0.4} ${visualZ + 1.0}`);
+    await checkedCommand(`summon ${squirrelType} ${visualX + 2.0} ${visualY} ${visualZ + 1.0} {PersistenceRequired:1b,Rotation:[270.0f,0.0f]}`);
+    const atTree = await waitForEntityState(
+      baseUrl,
+      squirrelType,
+      (entity) => entity.custom && entity.custom.foundTree,
+      18000
+    );
+    const chase = await waitForEntityPair(
+      squirrelType,
+      (entity, squirrel) => horizontalDistanceSqr(entity, squirrel) < 16.0,
+      5000,
+      'Yorkie did not follow the squirrel to its tree'
+    );
+    const target = { x: atTree.position.x, y: atTree.position.y + 0.55, z: atTree.position.z };
+    const camera = { x: atTree.position.x - 3.8, y: atTree.position.y + 1.25, z: atTree.position.z - 4.2 };
+    const file = await cameraShot('chasing-squirrel', camera, target, { delayMillis: 450 });
+    const returned = await waitForEntityState(
+      baseUrl,
+      yorkieType,
+      (entity) => entity.distance < 2.8,
+      35000
+    );
+    return {
+      atTree,
+      chase,
+      returnedAfterGiveUp: returned,
+      squirrel: await waitForEntity(baseUrl, squirrelType, 5000),
+      file
     };
   });
 
@@ -3208,7 +3424,7 @@ Actions:
   health, state, smoke, chat, command, look, give, summon, teleport
 	  player-abilities, use-entity, clear-entities
 	  set-block-near-entity, set-block, block, use-block, count-blocks, terrain-scan
-	  yorkie-smoke, yorkie-water-smoke, yorkie-adventure-smoke, yorkie-visual-sweep, yorkie-biome-scout, yorkie-natural-gallery
+	  yorkie-smoke, yorkie-water-smoke, yorkie-adventure-smoke, yorkie-home-squirrel, yorkie-visual-sweep, yorkie-biome-scout, yorkie-natural-gallery
 	  cops-smoke, cops-structures-smoke, cops-visual-sweep, screenshot
 
 Common options:
@@ -3373,6 +3589,8 @@ async function main() {
     result = await runYorkieWaterSmoke(baseUrl, args);
   } else if (action === 'yorkie-adventure-smoke') {
     result = await runYorkieAdventureSmoke(baseUrl, args);
+  } else if (action === 'yorkie-home-squirrel') {
+    result = await runYorkieHomeSquirrel(baseUrl, args);
   } else if (action === 'yorkie-visual-sweep') {
     result = await runYorkieVisualSweep(baseUrl, args);
   } else if (action === 'yorkie-biome-scout') {

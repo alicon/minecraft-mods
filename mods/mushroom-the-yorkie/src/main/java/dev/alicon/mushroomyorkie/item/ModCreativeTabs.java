@@ -30,19 +30,23 @@ public final class ModCreativeTabs {
 				.icon(() -> new ItemStack(ModItems.MUSHROOM_YORKIE_SPAWN_EGG))
 				.displayItems((parameters, output) -> {
 					output.accept(ModItems.MUSHROOM_YORKIE_SPAWN_EGG);
+					output.accept(ModItems.SQUIRREL_SPAWN_EGG);
 					output.accept(ModItems.YORKIE_TREAT);
 					output.accept(ModItems.YORKIE_HARNESS);
 					output.accept(ModItems.DOG_BOWL);
 					output.accept(ModItems.DOG_FOOD_BOWL);
 					output.accept(ModItems.DOG_WATER_BOWL);
 					output.accept(ModItems.DOG_BED);
+					output.accept(ModItems.DOGHOUSE);
 					output.accept(ModItems.YORKIE_BALL);
 					output.accept(ModItems.YORKIE_CHEW_TOY);
 				})
 				.build());
 
-		ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.SPAWN_EGGS).register(entries ->
-				entries.accept(ModItems.MUSHROOM_YORKIE_SPAWN_EGG));
+		ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.SPAWN_EGGS).register(entries -> {
+			entries.accept(ModItems.MUSHROOM_YORKIE_SPAWN_EGG);
+			entries.accept(ModItems.SQUIRREL_SPAWN_EGG);
+		});
 		ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.FOOD_AND_DRINKS).register(entries ->
 				entries.accept(ModItems.YORKIE_TREAT));
 		ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.TOOLS_AND_UTILITIES).register(entries ->
@@ -52,6 +56,7 @@ public final class ModCreativeTabs {
 			entries.accept(ModItems.DOG_FOOD_BOWL);
 			entries.accept(ModItems.DOG_WATER_BOWL);
 			entries.accept(ModItems.DOG_BED);
+			entries.accept(ModItems.DOGHOUSE);
 		});
 		ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.TOOLS_AND_UTILITIES).register(entries -> {
 			entries.accept(ModItems.YORKIE_BALL);

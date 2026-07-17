@@ -1,0 +1,8 @@
+{
+	"variants": {
+		"facing=north": {"model": "mushroom_yorkie:block/doghouse"},
+		"facing=east": {"model": "mushroom_yorkie:block/doghouse", "y": 90},
+		"facing=south": {"model": "mushroom_yorkie:block/doghouse", "y": 180},
+		"facing=west": {"model": "mushroom_yorkie:block/doghouse", "y": 270}
+	}
+}

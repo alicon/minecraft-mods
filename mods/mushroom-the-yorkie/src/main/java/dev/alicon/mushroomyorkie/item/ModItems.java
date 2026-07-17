@@ -24,6 +24,8 @@ public final class ModItems {
 	public static final Item DOG_WATER_BOWL = register("dog_water_bowl", new BlockItem(ModBlocks.DOG_WATER_BOWL, properties("dog_water_bowl", 16)));
 	/** Soft placeable bed that Mushroom can curl up on at night. */
 	public static final Item DOG_BED = register("dog_bed", new BlockItem(ModBlocks.DOG_BED, properties("dog_bed", 16)));
+	/** Cozy placeable doghouse with a bed and a tiny warm light for Mushroom. */
+	public static final Item DOGHOUSE = register("doghouse", new BlockItem(ModBlocks.DOGHOUSE, properties("doghouse", 16)));
 	/** Wool toy ball Mushroom can fetch when dropped away from his owner. */
 	public static final Item YORKIE_BALL = register("yorkie_ball", new YorkieBallItem(properties("yorkie_ball", 16)));
 	/** Soft wool chew toy that cheers Mushroom up when used on him. */
@@ -35,6 +37,14 @@ public final class ModItems {
 						properties("mushroom_yorkie_spawn_egg", 64),
 						ModEntities.MUSHROOM_YORKIE
 				))
+	);
+	/** Spawn egg for the tree-seeking woodland squirrel. */
+	public static final Item SQUIRREL_SPAWN_EGG = register(
+			"squirrel_spawn_egg",
+			new SquirrelSpawnEggItem(MushroomItemProperties.spawnEgg(
+					properties("squirrel_spawn_egg", 64),
+					ModEntities.SQUIRREL
+			))
 	);
 
 	private ModItems() {

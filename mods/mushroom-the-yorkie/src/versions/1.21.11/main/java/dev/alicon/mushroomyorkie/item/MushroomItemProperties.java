@@ -1,7 +1,7 @@
 package dev.alicon.mushroomyorkie.item;
 
-import dev.alicon.mushroomyorkie.entity.MushroomYorkieEntity;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Item;
 
@@ -13,7 +13,7 @@ final class MushroomItemProperties {
 		return properties.setId(key);
 	}
 
-	static Item.Properties spawnEgg(Item.Properties properties, EntityType<MushroomYorkieEntity> entityType) {
+	static <T extends Entity> Item.Properties spawnEgg(Item.Properties properties, EntityType<T> entityType) {
 		return properties.spawnEgg(entityType);
 	}
 }

@@ -1,0 +1,16 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "building",
+	"key": {
+		"D": "minecraft:dark_oak_planks",
+		"L": "minecraft:lantern",
+		"P": "minecraft:cherry_planks",
+		"W": "minecraft:red_wool"
+	},
+	"pattern": [
+		"DDD",
+		"PLP",
+		"PWP"
+	],
+	"result": {"count": 1, "id": "mushroom_yorkie:doghouse"}
+}

@@ -19,6 +19,15 @@ public final class ModEntities {
 					.clientTrackingRange(8)
 					.updateInterval(3)
 	);
+	/** Tiny woodland squirrel that searches for trees when Mushroom gives chase. */
+	public static final EntityType<SquirrelEntity> SQUIRREL = register(
+			"squirrel",
+			EntityType.Builder.of(SquirrelEntity::new, MobCategory.CREATURE)
+					.sized(0.38F, 0.56F)
+					.eyeHeight(0.38F)
+					.clientTrackingRange(8)
+					.updateInterval(3)
+	);
 
 	private ModEntities() {
 	}

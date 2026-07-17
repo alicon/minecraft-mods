@@ -162,6 +162,7 @@ final class BridgeEntityState {
 		putBooleanMethod(custom, entity, "isSpecialJailbreaker");
 		putBooleanMethod(custom, entity, "hasStolenGold");
 		putBooleanMethod(custom, entity, "hasLitBankFire");
+		putBooleanMethod(custom, entity, "hasFoundTree");
 		putIntegerMethod(custom, entity, "getFlightTrickType");
 		putIntegerMethod(custom, entity, "getFlightTrickTicks");
 		putIntegerMethod(custom, entity, "trickType");

@@ -24,6 +24,7 @@ ext {
 					'dev/alicon/mushroomyorkie/entity/MushroomYorkieEntity.java',
 					'dev/alicon/mushroomyorkie/gametest/MushroomYorkieGameTests.java',
 					'dev/alicon/mushroomyorkie/item/MushroomYorkieSpawnEggItem.java',
+					'dev/alicon/mushroomyorkie/item/SquirrelSpawnEggItem.java',
 					'dev/alicon/mushroomyorkie/item/YorkieBallItem.java',
 					'dev/alicon/mushroomyorkie/item/YorkieChewToyItem.java',
 					'dev/alicon/mushroomyorkie/item/YorkieToyThrowHandler.java'
@@ -34,6 +35,8 @@ ext {
 					'dev/alicon/mushroomyorkie/client/render/MushroomYorkieModel.java',
 					'dev/alicon/mushroomyorkie/client/render/MushroomYorkieRenderer.java',
 					'dev/alicon/mushroomyorkie/client/render/MushroomYorkieRenderState.java',
+					'dev/alicon/mushroomyorkie/client/render/SquirrelModel.java',
+					'dev/alicon/mushroomyorkie/client/render/SquirrelRenderer.java',
 					'dev/alicon/mushroomyorkie/client/MushroomEntityRendererRegistration.java'
 			]
 	]

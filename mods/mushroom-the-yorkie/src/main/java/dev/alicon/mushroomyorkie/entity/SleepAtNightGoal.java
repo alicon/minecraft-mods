@@ -10,6 +10,7 @@ import net.minecraft.world.phys.Vec3;
 final class SleepAtNightGoal extends Goal {
 	private static final int MOVE_RETRY_TICKS = 40;
 	private static final double BED_REACHED_DISTANCE_SQR = 0.64D;
+	private static final double DOGHOUSE_REACHED_DISTANCE_SQR = 2.25D;
 	private static final double BED_TOP_Y_OFFSET = 0.25D;
 
 	private final MushroomYorkieEntity yorkie;
@@ -45,12 +46,12 @@ final class SleepAtNightGoal extends Goal {
 
 	@Override
 	public void tick() {
-		if (this.bedPos != null && this.yorkie.level() instanceof ServerLevel level && !level.getBlockState(this.bedPos).is(ModBlocks.DOG_BED)) {
+		if (this.bedPos != null && this.yorkie.level() instanceof ServerLevel level && !MushroomDomesticLocator.isSleepSpot(level.getBlockState(this.bedPos))) {
 			this.bedPos = null;
 			this.bedTarget = null;
 		}
 
-		if (this.bedTarget != null && this.yorkie.distanceToSqr(this.bedTarget) > BED_REACHED_DISTANCE_SQR) {
+		if (this.bedTarget != null && this.yorkie.distanceToSqr(this.bedTarget) > this.reachedDistanceSqr()) {
 			this.moveToBed();
 			return;
 		}
@@ -78,6 +79,15 @@ final class SleepAtNightGoal extends Goal {
 
 	private static Vec3 bedCenter(BlockPos pos) {
 		return Vec3.atBottomCenterOf(pos).add(0.0D, BED_TOP_Y_OFFSET, 0.0D);
+	}
+
+	private double reachedDistanceSqr() {
+		if (this.bedPos != null
+				&& this.yorkie.level() instanceof ServerLevel level
+				&& level.getBlockState(this.bedPos).is(ModBlocks.DOGHOUSE)) {
+			return DOGHOUSE_REACHED_DISTANCE_SQR;
+		}
+		return BED_REACHED_DISTANCE_SQR;
 	}
 
 	private BlockPos findNearestBed() {

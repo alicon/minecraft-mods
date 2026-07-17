@@ -19,6 +19,8 @@ public final class ModBlocks {
 	public static final Block DOG_WATER_BOWL = register("dog_water_bowl", new DogBowlBlock(bowlProperties("dog_water_bowl")));
 	/** Soft indoor dog bed for Mushroom. */
 	public static final Block DOG_BED = register("dog_bed", new DogBedBlock(woolProperties("dog_bed")));
+	/** Open-fronted softly lit home where Mushroom can sleep outdoors. */
+	public static final Block DOGHOUSE = register("doghouse", new DoghouseBlock(doghouseProperties("doghouse")));
 
 	private ModBlocks() {
 	}
@@ -39,6 +41,14 @@ public final class ModBlocks {
 				.strength(0.3F)
 				.sound(SoundType.WOOL)
 				.noOcclusion(), key(name));
+	}
+
+	private static BlockBehaviour.Properties doghouseProperties(String name) {
+		return MushroomBlockProperties.withId(MushroomBlockProperties.noCollision(BlockBehaviour.Properties.of()
+				.strength(1.5F)
+				.sound(SoundType.WOOD)
+				.lightLevel(state -> 12)
+				.noOcclusion()), key(name));
 	}
 
 	private static Block register(String name, Block block) {

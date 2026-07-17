@@ -26,7 +26,10 @@ final class MushroomNightBehavior {
 	}
 
 	static boolean shouldSleepAtNight(MushroomYorkieEntity yorkie, ServerLevel level) {
-		return yorkie.isTame() && !MushroomYorkieStateQueries.ownerIsCreativeFlying(yorkie) && isNight(level) && isInside(level, yorkie);
+		return yorkie.isTame()
+				&& !MushroomYorkieStateQueries.ownerIsCreativeFlying(yorkie)
+				&& isNight(level)
+				&& (isInside(level, yorkie) || MushroomDomesticLocator.findNearestDoghouse(level, yorkie.blockPosition()) != null);
 	}
 
 	static boolean shouldAskToGoOutside(MushroomYorkieEntity yorkie, ServerLevel level) {

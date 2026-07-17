@@ -11,4 +11,8 @@ final class MushroomBlockProperties {
 	static BlockBehaviour.Properties withId(BlockBehaviour.Properties properties, ResourceKey<Block> key) {
 		return properties;
 	}
+
+	static BlockBehaviour.Properties noCollision(BlockBehaviour.Properties properties) {
+		return properties.noCollission();
+	}
 }

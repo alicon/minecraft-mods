@@ -1,0 +1,14 @@
+{
+	"type": "minecraft:block",
+	"pools": [
+		{
+			"rolls": 1,
+			"entries": [
+				{"type": "minecraft:item", "name": "mushroom_yorkie:doghouse"}
+			],
+			"conditions": [
+				{"condition": "minecraft:survives_explosion"}
+			]
+		}
+	]
+}

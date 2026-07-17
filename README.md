@@ -5,7 +5,7 @@ Fabric mod workspace for small Minecraft projects.
 ## Mods
 
 - **NARwhal Together**: family-focused multiplayer helpers. Current feature: press `G` to teleport to the next online player.
-- **Mushroom the Yorkie**: a tiny pointy-eared Yorkie companion with pet needs, treats, bowls, a dog bed, toys, food-bar care, lost-dog recovery, tame/follow/sit behavior, and early trick hooks.
+- **Mushroom the Yorkie**: a tiny pointy-eared Yorkie companion with pet needs, treats, bowls, toys, a softly lit doghouse for sleeping, squirrel chases, lost-dog recovery, and tame/follow/sit behavior.
 - **Cops and Robbers**: police cruisers, fire trucks, cops, robbers, bank tellers, and placeable bank/police station kits.
 
 ## Layout

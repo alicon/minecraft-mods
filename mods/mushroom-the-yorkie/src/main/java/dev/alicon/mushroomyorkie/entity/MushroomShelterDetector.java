@@ -1,5 +1,6 @@
 package dev.alicon.mushroomyorkie.entity;
 
+import dev.alicon.mushroomyorkie.block.ModBlocks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -16,6 +17,10 @@ final class MushroomShelterDetector {
 	}
 
 	static boolean isSheltered(ServerLevel level, BlockPos origin) {
+		if (level.getBlockState(origin).is(ModBlocks.DOGHOUSE)) {
+			return true;
+		}
+
 		if (level.canSeeSky(origin) || !hasSolidOverhead(level, origin)) {
 			return false;
 		}

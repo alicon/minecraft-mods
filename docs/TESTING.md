@@ -125,6 +125,7 @@ make bridge-use-block BRIDGE_X=0 BRIDGE_Y=99 BRIDGE_Z=0 BRIDGE_ITEM=cops_robbers
 make bridge-count-blocks BRIDGE_X1=-8 BRIDGE_Y1=100 BRIDGE_Z1=-8 BRIDGE_X2=8 BRIDGE_Y2=106 BRIDGE_Z2=8
 make bridge-screenshot BRIDGE_SCREENSHOT_NAME=playtest.png
 make bridge-yorkie-smoke BRIDGE_SCREENSHOT_NAME=yorkie-smoke.png
+make bridge-yorkie-home-squirrel BRIDGE_SCREENSHOT_NAME=yorkie-home-squirrel
 make bridge-cops-smoke BRIDGE_SCREENSHOT_NAME=cops-smoke.png
 make bridge-cops-structures-smoke BRIDGE_SCREENSHOT_NAME=cops-structures.png
 make bridge-cops-visual-sweep BRIDGE_SCREENSHOT_NAME=cops-visual
@@ -155,12 +156,14 @@ Run Mushroom's richer live bridge scenario against a disposable world:
 
 ```shell
 make modrinth-autoplay-yorkie PLAYTEST_TEMPLATE_WORLD="Clean Template" BRIDGE_SCREENSHOT_NAME=yorkie-smoke.png
+make modrinth-autoplay-yorkie-home-squirrel PLAYTEST_TEMPLATE_WORLD="Clean Template" BRIDGE_SCREENSHOT_NAME=yorkie-home-squirrel
 make modrinth-autoplay-yorkie-visual PLAYTEST_TEMPLATE_WORLD="Clean Template" BRIDGE_SCREENSHOT_NAME=yorkie-gallery
 make modrinth-autoplay-yorkie-biome-scout PLAYTEST_WORLD="New World (21)" BRIDGE_SCREENSHOT_NAME=yorkie-biome-scout
 make modrinth-autoplay-yorkie-natural-gallery PLAYTEST_TEMPLATE_WORLD="New World (21)" PLAYTEST_WORLD_PREFIX="Codex Yorkie Natural" BRIDGE_SCREENSHOT_NAME=yorkie-natural-gallery
 ```
 
 The Yorkie scenario checks duplicate-claim blocking, treat taming, owner sit/follow commands, harness equip/removal, lead rejection without a harness, exact treat/toy/player-food need changes, sheltered nighttime sleep, double-click wake-up, exact shelter cleanup, dog food and water bowl use, same-day bowl refill rejection, outdoor potty relief, screenshot capture, and positive lead attach with the harness equipped.
+The Yorkie home-and-squirrel scenario verifies that Mushroom walks fully into the softly lit doghouse and curls up visibly, a squirrel reaches a tree, Mushroom starts the chase and returns after 30 seconds, and he returns early when a tree-less squirrel gets more than 24 blocks from the player. It captures focused doghouse and chase screenshots and records the squirrel's tree state in the JSON report.
 The Yorkie visual sweep captures gallery-ready scenes for sitting, a fence-tied leash walk, nighttime sleep, water, fetch, flying, food and water bowls, wants-outside messaging, sheep chasing, and hostile spider defense.
 The Yorkie biome scout samples real worldgen in an existing save, records seed/coordinates/biomes, and captures review screenshots for natural outdoor staging candidates.
 The Yorkie natural gallery scenario copies the scouted save and stages Mushroom at saved real-biome coordinates for outdoor sitting, leashed, water, fetch, flying, bowl, chase, and hostile-defense screenshots.
@@ -197,6 +200,7 @@ NARwhal Together:
 Mushroom the Yorkie:
 
 - live Modrinth bridge smoke covers duplicate-claim blocking, treat taming, sit/follow, harness on/off, lead gating, exact toy/player-food effects, sheltered sleep/wake, dog food/water bowl consumption, same-day bowl refill rejection, outdoor potty relief, cleanup, screenshot capture, and lead attach
+- live Modrinth home-and-squirrel bridge scenario covers doghouse sleep and lighting, squirrel tree seeking, chase start, the exact 30-second give-up, the tree-less 24-block safety recall, and focused screenshots
 - live Modrinth bridge visual sweep captures sitting, leash, sleep, water, fetch, flying, bowl, wants-outside, passive chase, and hostile defense screenshots for gallery review
 - live Modrinth bridge biome scout records seed, coordinate, biome, water/tree/height signals, and review screenshots for real-worldgen Yorkie staging locations
 - live Modrinth bridge natural gallery stages saved real-biome coordinates and captures outdoor sitting, leashed, water, fetch, flying, bowl, chase, and hostile-defense gallery screenshots
@@ -299,12 +303,17 @@ Mushroom the Yorkie:
 - [ ] A lost loaded Mushroom that has not been near the owner for a full Minecraft day returns to the player's bed after successful sleep when not already near the bed.
 - [ ] Mushroom only whines for food when at least one dog bowl has been placed nearby and no filled food bowl is available.
 - [ ] At night indoors, Mushroom walks to a nearby Dog Bed before curling up.
+- [ ] At night, Mushroom walks fully into a nearby Mushroom's Doghouse, remains visible through the doorway, and curls up under its warm light.
 - [ ] At night, waking Mushroom and then ordering him to sit leaves him seated without floor-shuffling.
 - [ ] During daytime, Mushroom can rarely do a short bum-shuffle while not ordered to sit.
 - [ ] When Mushroom needs outside, he relieves himself once per Minecraft day after a few seconds under open sky.
 - [ ] In a cave base with a closed door, Mushroom circles the door; with an open reachable path, he searches toward outside instead.
 - [ ] With debug messages enabled, the baseline state wraps into readable chat lines and outdoor relief emits `potty_relieved`.
 - [ ] Calming peaceful-mob barking with a treat makes nearby passive mobs stop triggering repeat barking.
+- [ ] A squirrel continually seeks a nearby reachable tree; Mushroom barks and chases it for no more than 30 seconds, then gives up without immediately restarting.
+- [ ] The Squirrel Spawn Egg has its own russet, cream-speckled, bushy-tail artwork rather than reusing Mushroom's egg.
+- [ ] Squirrels naturally spawn in small groups on valid peaceful-animal ground in biomes that already spawn rabbits, foxes, wolves, ocelots, pandas, or parrots.
+- [ ] If a squirrel has not found a tree and gets more than 24 blocks from the player, Mushroom gives up early and returns instead of following it farther away.
 - [ ] Right-clicking with a Yorkie Ball, Yorkie Chew Toy, or vanilla Bone throws it like a soft snowball; Mushroom fetches it and returns it near the owner.
 - [ ] Mushroom starts chasing a thrown toy quickly, without a multi-second pause.
 - [ ] Dropped Yorkie Balls, Yorkie Chew Toys, and vanilla Bones are all fetch targets, even when dropped close to the owner.

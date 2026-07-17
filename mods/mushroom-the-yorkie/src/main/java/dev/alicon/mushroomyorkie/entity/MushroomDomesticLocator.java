@@ -22,7 +22,15 @@ final class MushroomDomesticLocator {
 	}
 
 	static BlockPos findNearestDogBed(ServerLevel level, BlockPos origin) {
-		return findNearest(level, origin, state -> state.is(ModBlocks.DOG_BED));
+		return findNearest(level, origin, MushroomDomesticLocator::isSleepSpot);
+	}
+
+	static BlockPos findNearestDoghouse(ServerLevel level, BlockPos origin) {
+		return findNearest(level, origin, state -> state.is(ModBlocks.DOGHOUSE));
+	}
+
+	static boolean isSleepSpot(BlockState state) {
+		return state.is(ModBlocks.DOG_BED) || state.is(ModBlocks.DOGHOUSE);
 	}
 
 	static boolean hasAnyBowl(ServerLevel level, BlockPos origin) {

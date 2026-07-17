@@ -99,6 +99,13 @@ case "$bridge_scenario" in
 			--screenshot-name "$screenshot_name" \
 			"${report_args[@]}"
 		;;
+	yorkie-home-squirrel)
+		node "$repo_root/tools/playtest-harness/src/bridge-cli.js" yorkie-home-squirrel \
+			--host "$bridge_host" \
+			--port "$bridge_port" \
+			--screenshot-name "$screenshot_name" \
+			"${report_args[@]}"
+		;;
 	yorkie-visual-sweep)
 		node "$repo_root/tools/playtest-harness/src/bridge-cli.js" yorkie-visual-sweep \
 			--host "$bridge_host" \
