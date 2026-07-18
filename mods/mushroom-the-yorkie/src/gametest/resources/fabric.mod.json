@@ -1,0 +1,18 @@
+{
+	"schemaVersion": 1,
+	"id": "mushroom_yorkie_gametest",
+	"version": "1.0.0",
+	"name": "Mushroom the Yorkie GameTests",
+	"environment": "*",
+	"entrypoints": {
+		"fabric-gametest": [
+			"dev.alicon.mushroomyorkie.gametest.MushroomYorkieGameTests"
+		]
+	},
+	"depends": {
+		"fabricloader": "*",
+		"fabric-api": "*",
+		"minecraft": "*",
+		"mushroom_yorkie": "*"
+	}
+}

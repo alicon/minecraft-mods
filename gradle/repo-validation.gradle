@@ -42,6 +42,13 @@ tasks.register('validateModLayout') {
 			if (metadata.license != 'MIT') {
 				throw new GradleException("${modProject.path} fabric.mod.json license must be MIT")
 			}
+			def productionEntrypoints = metadata.entrypoints ?: [:]
+			def gameTestEntrypoints = ['fabric-gametest', 'fabric-client-gametest'].findAll {
+				productionEntrypoints.containsKey(it)
+			}
+			if (!gameTestEntrypoints.empty) {
+				throw new GradleException("${modProject.path} production fabric.mod.json contains test-only entrypoints ${gameTestEntrypoints}; put them in src/gametest/resources/fabric.mod.json")
+			}
 
 			def contact = metadata.contact ?: [:]
 			if (contact.homepage != expectedRepositoryUrl || contact.sources != expectedRepositoryUrl || contact.issues != "${expectedRepositoryUrl}/issues") {
@@ -57,7 +64,7 @@ tasks.register('validateModLayout') {
 				throw new GradleException("${modProject.path} icon '${iconPath}' does not exist")
 			}
 
-			(metadata.entrypoints ?: [:]).each { environment, entrypoints ->
+			productionEntrypoints.each { environment, entrypoints ->
 				entrypoints.each { entrypoint ->
 					def sourceRoots = sourceRootsFor(modDir, environment, minecraftVersion)
 					def entrypointPath = "${entrypoint.replace('.', '/')}.java"

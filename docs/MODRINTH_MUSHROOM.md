@@ -16,7 +16,8 @@ Mushroom the Yorkie adds one small, loyal dog companion to your Minecraft world.
 - Craft a dog bed from wool and dye so Mushroom has a place to curl up at night.
 - Craft wool-and-dye toys, including a ball and chew toy you can right-click throw for Mushroom to fetch. Dropped toys and vanilla bones also work, including safe open-water fetches.
 - Mushroom barks when he needs to go outside after being indoors too long, then only resets that potty need once per Minecraft day.
-- At night indoors, Mushroom curls up to sleep with closed eyes.
+- At night indoors in a natural day/night dimension, Mushroom curls up to sleep with closed eyes; he stays awake in the Nether.
+- A following Mushroom travels through dimension-changing portals with his owner; tell him to sit if he should stay behind.
 - Double-click a sleeping Mushroom to wake him briefly before he settles back down.
 - Mushroom can bark at and chase peaceful mobs, but treats call him off and teach him to leave nearby passive animals alone.
 - Creative flying support lets Mushroom trail along with loop-de-loops and barrel rolls, and he can hop out of boats before trying to fly.

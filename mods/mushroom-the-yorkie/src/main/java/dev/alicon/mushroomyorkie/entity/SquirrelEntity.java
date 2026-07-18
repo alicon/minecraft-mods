@@ -11,6 +11,8 @@ import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.RandomStrollGoal;
 import net.minecraft.world.entity.ai.goal.TemptGoal;
+import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.entity.ai.navigation.WallClimberNavigation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -20,6 +22,7 @@ import net.minecraft.world.level.Level;
 /** Small woodland squirrel whose first instinct is always to find a nearby tree. */
 public final class SquirrelEntity extends net.minecraft.world.entity.animal.Animal {
 	private boolean foundTree;
+	private boolean treeClimbing;
 
 	/** Creates a squirrel in the supplied world. */
 	public SquirrelEntity(EntityType<? extends SquirrelEntity> entityType, Level level) {
@@ -29,6 +32,11 @@ public final class SquirrelEntity extends net.minecraft.world.entity.animal.Anim
 	/** Attributes tuned so a squirrel can stay just ahead of Mushroom during a playful chase. */
 	public static AttributeSupplier.Builder createAttributes() {
 		return SquirrelAttributes.create();
+	}
+
+	@Override
+	protected PathNavigation createNavigation(Level level) {
+		return new WallClimberNavigation(this, level);
 	}
 
 	@Override
@@ -43,13 +51,22 @@ public final class SquirrelEntity extends net.minecraft.world.entity.animal.Anim
 		this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
 	}
 
-	/** True once this squirrel has reached the safe side of the tree it selected. */
+	/** True once this squirrel has climbed to the safe height on its selected tree. */
 	public boolean hasFoundTree() {
 		return this.foundTree;
 	}
 
 	void setFoundTree(boolean foundTree) {
 		this.foundTree = foundTree;
+	}
+
+	void setTreeClimbing(boolean treeClimbing) {
+		this.treeClimbing = treeClimbing;
+	}
+
+	@Override
+	public boolean onClimbable() {
+		return this.treeClimbing || super.onClimbable();
 	}
 
 	@Override

@@ -24,7 +24,12 @@ final class MushroomOwnerTravelHandler {
 	private static List<? extends MushroomYorkieEntity> followingYorkies(ServerPlayer player, ServerLevel origin) {
 		return origin.getEntities(
 				EntityTypeTest.forClass(MushroomYorkieEntity.class),
-				yorkie -> yorkie.isAlive() && yorkie.isOwnedBy(player) && !yorkie.isOrderedToSit()
+				yorkie -> MushroomOwnerTravelPolicy.shouldFollow(
+						yorkie.isAlive(),
+						// The player has already left origin, so vanilla's level-local owner lookup no longer resolves here.
+						yorkie.belongsTo(player),
+						yorkie.isOrderedToSit()
+				)
 		);
 	}
 }

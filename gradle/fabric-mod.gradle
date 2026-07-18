@@ -61,23 +61,34 @@ loom {
 		}
 	}
 
-	if (project.ext.has('enable_game_tests') && project.ext.enable_game_tests) {
-		runs {
-			gameTestServer {
-				server()
-				name = "${displayName} GameTest Server"
-				runDir = "build/gametest"
-				vmArg "-Dfabric-api.gametest=true"
-				vmArg "-Dfabric-api.gametest.report-file=${project.layout.buildDirectory.get().asFile}/reports/gametest/results.xml"
-				programArg "--nogui"
-			}
-		}
-	}
 }
 
 sourceSets {
 	client {
 		java.srcDir "${versionedSourceRoot}/client/java"
+	}
+}
+
+if (project.ext.has('enable_game_tests') && project.ext.enable_game_tests) {
+	fabricApi {
+		configureTests {
+			createSourceSet = true
+			modId = "${modId}_gametest"
+			enableClientGameTests = false
+			eula = true
+		}
+	}
+
+	sourceSets {
+		gametest {
+			java.setSrcDirs(["${versionedSourceRoot}/gametest/java"])
+		}
+	}
+
+	tasks.register('runGameTestServer') {
+		group = 'verification'
+		description = 'Runs the server-side Fabric GameTests.'
+		dependsOn tasks.named('runGameTest')
 	}
 }
 
@@ -116,9 +127,12 @@ dependencies {
 processResources {
 	inputs.property "version", modVersion
 	inputs.property "minecraft_dependency", "~${activeMinecraftVersion}"
+	inputs.property "loader_dependency", activeLoaderVersion
 
 	filesMatching("fabric.mod.json") {
-		expand "version": modVersion, "minecraft_dependency": "~${activeMinecraftVersion}"
+		expand "version": modVersion,
+				"minecraft_dependency": "~${activeMinecraftVersion}",
+				"loader_dependency": activeLoaderVersion
 	}
 }
 

@@ -46,7 +46,15 @@ final class MushroomNightBehavior {
 	}
 
 	private static boolean isNight(ServerLevel level) {
-		long dayTime = level.getDayTime() % 24_000L;
+		return isNight(level.dimensionType().hasSkyLight(), level.dimensionType().hasFixedTime(), level.getDayTime());
+	}
+
+	static boolean isNight(boolean hasSkyLight, boolean hasFixedTime, long dayTime) {
+		if (!hasSkyLight || hasFixedTime) {
+			return false;
+		}
+
+		dayTime = Math.floorMod(dayTime, 24_000L);
 		return dayTime >= NIGHT_START && dayTime <= NIGHT_END;
 	}
 
