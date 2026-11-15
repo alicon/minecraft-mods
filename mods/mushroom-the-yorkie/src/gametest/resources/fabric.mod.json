@@ -11,6 +11,7 @@
 			"dev.alicon.mushroomyorkie.entity.FetchPersistenceGameTests",
 			"dev.alicon.mushroomyorkie.entity.FetchFlightGameTests",
 			"dev.alicon.mushroomyorkie.entity.FetchTerrainGameTests",
+			"dev.alicon.mushroomyorkie.entity.OutdoorReliefGameTests",
 			"dev.alicon.mushroomyorkie.entity.DomesticCareGameTests",
 			"dev.alicon.mushroomyorkie.entity.SquirrelApproachGameTests"
 		]

@@ -33,11 +33,15 @@ final class MushroomNightBehavior {
 	}
 
 	static boolean shouldAskToGoOutside(MushroomYorkieEntity yorkie, ServerLevel level) {
+		return shouldSeekOutdoorRelief(yorkie, level) && isInside(level, yorkie);
+	}
+
+	// An active outdoor trip keeps the same cancellation rules after crossing the doorway.
+	static boolean shouldSeekOutdoorRelief(MushroomYorkieEntity yorkie, ServerLevel level) {
 		return yorkie.isTame()
 				&& !yorkie.isOrderedToSit()
 				&& !MushroomYorkieStateQueries.ownerIsCreativeFlying(yorkie)
 				&& !shouldSleepAtNight(yorkie, level)
-				&& isInside(level, yorkie)
 				&& yorkie.relief.shouldAskToday(currentDay(level), yorkie.needs.shouldWarnPotty());
 	}
 
