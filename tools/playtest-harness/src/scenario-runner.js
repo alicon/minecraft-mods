@@ -3,16 +3,19 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+// Shared atomic writer also preserves a completed failed report if world reset fails afterward.
+function saveReport(reportFile, report) {
+  if (!reportFile) return;
+  const target = path.resolve(reportFile);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(`${target}.tmp`, `${JSON.stringify(report, null, 2)}\n`);
+  fs.renameSync(`${target}.tmp`, target);
+}
+
 // Persist after every case, including setup errors and partial runs.
 async function runCases(cases, { reportFile, metadata = {}, capture = async () => null, onResult = () => {}, afterSuccess }) {
   const report = { ...metadata, ok: false, complete: false, startedAt: new Date().toISOString(), cases: [] };
-  function save() {
-    if (!reportFile) return;
-    const target = path.resolve(reportFile);
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(`${target}.tmp`, `${JSON.stringify(report, null, 2)}\n`);
-    fs.renameSync(`${target}.tmp`, target);
-  }
+  const save = () => saveReport(reportFile, report);
   save();
   for (const scenario of cases) {
     const result = { name: scenario.name, inputs: scenario.inputs, status: 'running' };
@@ -47,7 +50,11 @@ async function runCases(cases, { reportFile, metadata = {}, capture = async () =
     // Persist the original verdicts before any success-only maintenance. Completion still waits for maintenance.
     save();
     if (report.gameplayOk) {
-      try { report.postRun.observed = await afterSuccess(); report.postRun.status = 'passed'; }
+      try {
+        report.postRun.observed = await afterSuccess();
+        report.postRun.status = report.postRun.observed?.skipped ? 'skipped' : 'passed';
+        if (report.postRun.observed?.skipped) report.postRun.reason = report.postRun.observed.reason;
+      }
       catch (error) {
         report.postRun.status = 'failed'; report.postRun.error = error.message;
         if (error.observed) report.postRun.observed = error.observed;
@@ -62,4 +69,4 @@ async function runCases(cases, { reportFile, metadata = {}, capture = async () =
   return report;
 }
 
-module.exports = { runCases };
+module.exports = { runCases, saveReport };

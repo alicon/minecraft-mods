@@ -130,7 +130,7 @@ function transitionCases({ prepare, command, request, state, entity, advance, ba
   });
   const treeFace = { time: 1000, shelter: 'outside', hunger: 10, sitting: false, flying: false };
   rows.push({
-    name: 'squirrel-clear-tree-face', inputs: treeFace,
+    name: 'squirrel-clear-tree-face', inspectionPet: false, inputs: treeFace,
     setup: async () => {
       await prepare(treeFace);
       await request('/clear-entities', { type: 'mushroom_yorkie:mushroom_yorkie' });

@@ -3,7 +3,7 @@
 const { runCases } = require('./scenario-runner');
 const { OWNER_STATES } = require('./yorkie-inputs');
 const { assertTestWorld } = require('./yorkie-world');
-const { assertInspectionWorld, careForSuccessfulPet } = require('./yorkie-post-run');
+const { assertInspectionWorld, careForSuccessfulPet, withWorldReset } = require('./yorkie-post-run');
 const { randomUUID } = require('node:crypto');
 const TYPE = 'mushroom_yorkie:mushroom_yorkie';
 const SELECTOR = '@e[type=mushroom_yorkie:mushroom_yorkie,tag=matrix_yorkie,limit=1]';
@@ -159,11 +159,9 @@ async function executeMatrix(baseUrl, args) {
   await command('gamerule minecraft:spawn_mobs false');
   await command('gamerule minecraft:advance_time false');
   await command('weather clear');
-  const reportFile = args.reportFile || 'build/playtest-reports/yorkie-matrix.json';
-  let resetAttempted = false;
+  const reportFile = args.reportFile || process.env.BRIDGE_REPORT_FILE || 'build/playtest-reports/yorkie-matrix.json';
   const careContext = { state, request, expectedSave: args.expectedSave, playerUuid: initial.players[0].uuid };
   async function resetWorld() {
-    resetAttempted = true;
     for (const body of [
       { command: 'tick sprint stop' }, { command: 'time set day' }, { command: `gamemode creative ${player}` }
     ]) {
@@ -173,10 +171,12 @@ async function executeMatrix(baseUrl, args) {
     assertInspectionWorld(await state(), careContext);
     await request('/player-abilities', { player, flying: false, mayfly: true });
   }
-  try {
-    return await runCases(selected, {
+  return withWorldReset({
+    reportFile, reset: resetWorld,
+    run: (resetOnce) => runCases(selected, {
       afterSuccess: async () => {
-        await resetWorld();
+        await resetOnce();
+        if (selected.at(-1).inspectionPet === false) return { skipped: true, reason: 'final_fixture_intentionally_has_no_pet' };
         return careForSuccessfulPet({ ...careContext, petUuid: lastFixtureUuid });
       },
       reportFile, metadata: { scenario: 'yorkie-matrix', runId, group: args.group || 'all', provenance, startScreenshot: startScreenshot.file, saveName: initial.saveName, base, expectedSave: args.expectedSave },
@@ -203,10 +203,8 @@ async function executeMatrix(baseUrl, args) {
         return { state: snapshot, cameraState, screenshot: screenshot.file, camera, captureDelayMs: 450 };
       },
       onResult: (result) => console.error(`${result.name}: ${result.status}${result.error ? `: ${result.error}` : ''}`)
-    });
-  } finally {
-    if (!resetAttempted) await resetWorld();
-  }
+    })
+  });
 }
 
 async function runMatrix(baseUrl, args) {

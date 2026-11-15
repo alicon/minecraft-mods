@@ -153,7 +153,11 @@ happens after case observations are persisted, and is recorded separately in
 care, and missing/dead/unowned/untagged pets are never replaced. Every maintenance
 mutation rechecks the copied Overworld and original player. A care/verification
 failure makes overall `ok` false while retaining `gameplayOk`, original case
-statuses and evidence. `complete` stays false until maintenance finishes.
+statuses and evidence. `complete` stays false until maintenance finishes. A final fixture explicitly
+marked pet-free (the standalone squirrel case) records care as skipped; a pet
+unexpectedly missing from another fixture remains a failure. World-reset errors
+preserve the original failed report or interruption. Direct CLI calls also honor
+`BRIDGE_REPORT_FILE`; an explicit `--report-file` takes precedence.
 
 The 144 base cases combine four times (day, dusk, night, dawn), three shelter types
 (open sky, roof only, enclosed room), fed/hungry needs, sit/follow orders,

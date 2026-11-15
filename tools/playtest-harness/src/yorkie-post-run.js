@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const { saveReport } = require('./scenario-runner');
 const { assertTestWorld } = require('./yorkie-world');
 const TYPE = 'mushroom_yorkie:mushroom_yorkie';
 
@@ -59,4 +60,29 @@ async function careForSuccessfulPet(context) {
   } catch (error) { error.observed = observed; throw error; }
 }
 
-module.exports = { assertInspectionWorld, careForSuccessfulPet };
+// Preserve the original exception/report if ordinary world reset also fails after an interrupted or failed run.
+async function withWorldReset({ run, reset, reportFile, onResetError = (error) => console.error(`World reset also failed: ${error.message}`) }) {
+  let attempted = false;
+  let report;
+  let primaryError;
+  const resetOnce = async () => { attempted = true; return reset(); };
+  try { report = await run(resetOnce); return report; }
+  catch (error) { primaryError = error; throw error; }
+  finally {
+    if (!attempted) {
+      try { await resetOnce(); }
+      catch (error) {
+        if (report) {
+          report.worldReset = { status: 'failed', error: error.message };
+          report.ok = false;
+          saveReport(reportFile, report);
+        } else if (primaryError) {
+          primaryError.worldResetError = error.message;
+          onResetError(error);
+        } else throw error;
+      }
+    }
+  }
+}
+
+module.exports = { assertInspectionWorld, careForSuccessfulPet, withWorldReset };

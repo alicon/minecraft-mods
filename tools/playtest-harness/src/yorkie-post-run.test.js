@@ -123,3 +123,27 @@ test('empty native equipment requires explicit successful absence proofs', async
   await assert.rejects(careForSuccessfulPet(bad.context), /missing equipment/);
   assert.equal(mergeCommands(bad).length, 0);
 });
+
+test('an explicitly pet-free fixture can skip care without failing gameplay', async () => {
+  const { transitionCases } = require('./yorkie-transitions');
+  assert.equal(transitionCases({}).find((c) => c.name === 'squirrel-clear-tree-face').inspectionPet, false);
+  const report = await runCases([{ name: 'squirrel', setup: async () => {}, run: async () => ({ tree: true }) }],
+    { afterSuccess: async () => ({ skipped: true, reason: 'final_fixture_intentionally_has_no_pet' }) });
+  assert.equal(report.ok, true); assert.equal(report.postRun.status, 'skipped'); assert.equal(report.gameplayOk, true);
+});
+
+test('world reset failure preserves completed failed case evidence and original interruption', async () => {
+  const { withWorldReset } = require('./yorkie-post-run');
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'matrix-reset-'));
+  try {
+    const reportFile = path.join(folder, 'report.json');
+    const report = await withWorldReset({ reportFile, reset: async () => { throw Error('world changed'); },
+      run: () => runCases([{ name: 'bug', setup: async () => {}, run: async () => { throw Error('behavior'); } }], { reportFile }) });
+    assert.equal(report.ok, false); assert.equal(report.cases[0].error, 'behavior'); assert.equal(report.worldReset.error, 'world changed');
+    assert.equal(JSON.parse(fs.readFileSync(reportFile)).cases[0].error, 'behavior');
+    const original = Error('interrupted'); let secondary;
+    await assert.rejects(withWorldReset({ run: async () => { throw original; }, reset: async () => { throw Error('reset failed'); },
+      onResetError: (error) => { secondary = error; } }), (error) => error === original && error.worldResetError === 'reset failed');
+    assert.equal(secondary.message, 'reset failed');
+  } finally { fs.rmSync(folder, { recursive: true }); }
+});
