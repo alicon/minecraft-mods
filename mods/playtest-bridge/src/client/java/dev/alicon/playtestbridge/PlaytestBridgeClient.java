@@ -33,6 +33,7 @@ public final class PlaytestBridgeClient implements ClientModInitializer {
 			JsonObject response = new JsonObject();
 			response.addProperty("ok", true);
 			response.addProperty("accepted", true);
+			response.addProperty("processId", ProcessHandle.current().pid());
 			response.addProperty("expectedSave", expectedSave);
 			future.complete(response);
 			// Let the bridge deliver its reply before normal client shutdown saves the world.

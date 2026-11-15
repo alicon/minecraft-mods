@@ -24,7 +24,7 @@ final class FetchToyReturner {
 	FetchToyReturnResult tick(ServerLevel level, Player owner, ItemStack carriedToy, FetchToyMovement movement) {
 		this.yorkie.getLookControl().setLookAt(owner, 10.0F, this.yorkie.getMaxHeadXRot());
 		if (this.yorkie.distanceToSqr(owner) <= RETURN_DISTANCE_SQR) {
-			ItemStack returnedStack = carriedToy.isEmpty() ? ItemStack.EMPTY : carriedToy.copyWithCount(1);
+			ItemStack returnedStack = carriedToy.isEmpty() ? ItemStack.EMPTY : carriedToy.copy();
 			UUID droppedToy = FetchToyDelivery.returnToy(level, this.yorkie, owner, returnedStack);
 			this.yorkie.needs.playWithToy();
 			MushroomYorkieSounds.bark(this.yorkie);

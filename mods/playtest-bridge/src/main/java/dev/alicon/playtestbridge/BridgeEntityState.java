@@ -71,6 +71,7 @@ final class BridgeEntityState {
 	static JsonObject entityState(ServerPlayer player, Entity entity) {
 		JsonObject state = new JsonObject();
 		state.addProperty("id", entity.getId());
+		state.addProperty("uuid", entity.getUUID().toString());
 		state.addProperty("type", BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString());
 		state.addProperty("name", entity.getName().getString());
 		state.addProperty("distance", round(player.distanceTo(entity)));
@@ -91,6 +92,7 @@ final class BridgeEntityState {
 		if (entity instanceof LivingEntity living) {
 			state.addProperty("health", round(living.getHealth()));
 			state.addProperty("maxHealth", round(living.getMaxHealth()));
+			state.add("mainHand", itemStack(living.getMainHandItem()));
 		}
 		if (entity instanceof TamableAnimal tameable) {
 			JsonObject tameableState = new JsonObject();

@@ -4,6 +4,7 @@ import java.util.EnumSet;
 import java.util.UUID;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -21,7 +22,6 @@ final class FetchBallGoal extends Goal {
 	private final FetchToyMovement movement;
 	private final FetchToyReturner returner;
 	private ItemEntity toy;
-	private ItemStack carriedToy = ItemStack.EMPTY;
 	private UUID lastReturnedToy;
 	private UUID ignoredToy;
 	private long nextSearchGameTime;
@@ -29,7 +29,6 @@ final class FetchBallGoal extends Goal {
 	private int unreachableTicks;
 	private int fetchChaseTicks;
 	private Vec3 unsafeFetchLookTarget;
-	private boolean carrying;
 	private boolean completed;
 
 	FetchBallGoal(MushroomYorkieEntity yorkie) {
@@ -43,6 +42,12 @@ final class FetchBallGoal extends Goal {
 	public boolean canUse() {
 		if (!(this.yorkie.level() instanceof ServerLevel level) || !(this.yorkie.getOwner() instanceof Player owner) || !this.canFetch(owner)) {
 			return false;
+		}
+
+		// Native hand equipment survives entity save/load, including item components.
+		if (this.hasCarriedToy()) {
+			this.yorkie.creativeRecoveryFlight.block();
+			return true;
 		}
 
 		if (level.getGameTime() < this.nextSearchGameTime) {
@@ -62,7 +67,7 @@ final class FetchBallGoal extends Goal {
 		return !this.completed
 				&& this.yorkie.getOwner() instanceof Player owner
 				&& this.canFetch(owner)
-				&& (this.carrying || (this.toy != null && !this.toy.isRemoved()));
+				&& (this.hasCarriedToy() || (this.toy != null && !this.toy.isRemoved()));
 	}
 
 	@Override
@@ -74,9 +79,7 @@ final class FetchBallGoal extends Goal {
 	public void start() {
 		this.movement.reset();
 		this.returner.reset();
-		this.carrying = false;
 		this.completed = false;
-		this.carriedToy = ItemStack.EMPTY;
 		this.unreachableTicks = 0;
 		this.fetchChaseTicks = 0;
 		this.yorkie.creativeRecoveryFlight.block();
@@ -87,17 +90,16 @@ final class FetchBallGoal extends Goal {
 	public void stop() {
 		// Sitting, sleep, and other higher-priority goals can interrupt the return.
 		// The original item entity is already gone, so preserve its carried stack.
-		if (!this.carriedToy.isEmpty() && this.yorkie.level() instanceof ServerLevel level) {
+		if (this.hasCarriedToy() && this.yorkie.level() instanceof ServerLevel level) {
 			ItemEntity dropped = new ItemEntity(level, this.yorkie.getX(), this.yorkie.getY() + 0.2D,
-					this.yorkie.getZ(), this.carriedToy.copy());
+					this.yorkie.getZ(), this.yorkie.getMainHandItem().copy());
 			dropped.setPickUpDelay(20);
 			level.addFreshEntity(dropped);
+			this.yorkie.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
 			this.lastReturnedToy = dropped.getUUID();
 			this.nextSearchGameTime = level.getGameTime() + RETURN_COOLDOWN_TICKS;
 		}
 		this.toy = null;
-		this.carrying = false;
-		this.carriedToy = ItemStack.EMPTY;
 		this.completed = false;
 		this.movement.reset();
 		this.returner.reset();
@@ -118,7 +120,7 @@ final class FetchBallGoal extends Goal {
 			return;
 		}
 
-		if (this.carrying) {
+		if (this.hasCarriedToy()) {
 			this.returnToOwner(level, owner);
 			return;
 		}
@@ -142,9 +144,10 @@ final class FetchBallGoal extends Goal {
 
 		this.yorkie.getLookControl().setLookAt(this.toy, 10.0F, this.yorkie.getMaxHeadXRot());
 		if (FetchToyChase.canPickUp(this.yorkie, this.toy)) {
-			this.carriedToy = FetchToyChase.pickUp(this.toy);
+			this.yorkie.setItemSlot(EquipmentSlot.MAINHAND, FetchToyChase.pickUp(this.toy));
+			// Vanilla requires a value above 1 for a guaranteed drop without a player kill.
+			this.yorkie.setDropChance(EquipmentSlot.MAINHAND, 2.0F);
 			this.toy = null;
-			this.carrying = true;
 			this.movement.retryNow();
 			this.returner.reset();
 			MushroomYorkieSounds.bark(this.yorkie);
@@ -158,12 +161,17 @@ final class FetchBallGoal extends Goal {
 		}
 	}
 
+	private boolean hasCarriedToy() {
+		return MushroomFetchToyPolicy.isFetchToy(this.yorkie.getMainHandItem());
+	}
+
 	private boolean canFetch(Player owner) {
 		return this.yorkie.isTame()
 				&& owner.level() == this.yorkie.level()
 				&& !this.yorkie.isOrderedToSit()
 				&& !this.yorkie.isMushroomSleeping()
-				&& this.yorkie.scaredRunTicks <= 0;
+				&& this.yorkie.scaredRunTicks <= 0
+				&& (this.yorkie.getMainHandItem().isEmpty() || this.hasCarriedToy());
 	}
 
 	private boolean fetchLooksUnreachable(ServerLevel level, ItemEntity item) {
@@ -240,7 +248,7 @@ final class FetchBallGoal extends Goal {
 	}
 
 	private void returnToOwner(ServerLevel level, Player owner) {
-		FetchToyReturnResult result = this.returner.tick(level, owner, this.carriedToy, this.movement);
+		FetchToyReturnResult result = this.returner.tick(level, owner, this.yorkie.getMainHandItem(), this.movement);
 		if (!result.completed()) {
 			return;
 		}
@@ -249,8 +257,7 @@ final class FetchBallGoal extends Goal {
 			this.lastReturnedToy = result.returnedToy();
 		}
 		this.nextSearchGameTime = level.getGameTime() + RETURN_COOLDOWN_TICKS;
-		this.carrying = false;
-		this.carriedToy = ItemStack.EMPTY;
+		this.yorkie.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
 		this.completed = true;
 	}
 }

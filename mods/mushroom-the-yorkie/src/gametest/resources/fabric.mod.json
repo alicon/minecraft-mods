@@ -8,6 +8,7 @@
 		"fabric-gametest": [
 			"dev.alicon.mushroomyorkie.gametest.MushroomYorkieGameTests",
 			"dev.alicon.mushroomyorkie.entity.FetchInterruptionGameTests",
+			"dev.alicon.mushroomyorkie.entity.FetchPersistenceGameTests",
 			"dev.alicon.mushroomyorkie.entity.DomesticCareGameTests",
 			"dev.alicon.mushroomyorkie.entity.SquirrelApproachGameTests"
 		]

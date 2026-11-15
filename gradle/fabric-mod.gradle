@@ -81,7 +81,7 @@ if (project.ext.has('enable_game_tests') && project.ext.enable_game_tests) {
 
 	sourceSets {
 		gametest {
-			java.setSrcDirs(["${versionedSourceRoot}/gametest/java"])
+			java.setSrcDirs(["src/gametest/java", "${versionedSourceRoot}/gametest/java"])
 		}
 	}
 
