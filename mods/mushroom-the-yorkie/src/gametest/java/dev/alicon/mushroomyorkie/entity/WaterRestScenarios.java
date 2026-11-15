@@ -52,6 +52,16 @@ final class WaterRestScenarios {
 				yorkie.setOnGround(false);
 				yorkie.setSleeping(true);
 				helper.assertTrue(yorkie.isMushroomSleeping(), "Doghouse visual bed anchor was not accepted over its solid floor");
+				yorkie.fallDistance = 12.0F;
+				yorkie.setSleeping(true);
+				helper.assertTrue(yorkie.fallDistance == 0.0F, "Supported doghouse sleep accumulated a lethal synthetic fall");
+				yorkie.setSleeping(false);
+				yorkie.fallDistance = 12.0F;
+				yorkie.setSleeping(true);
+				helper.assertTrue(!yorkie.isMushroomSleeping() && yorkie.fallDistance == 12.0F, "An awake airborne pet gained fall protection from a doghouse");
+				yorkie.setOnGround(true);
+				yorkie.setSleeping(true);
+				yorkie.setOnGround(false);
 				helper.getLevel().setBlockAndUpdate(below.below(), Blocks.WATER.defaultBlockState());
 				yorkie.setSleeping(true);
 				helper.assertTrue(!yorkie.isMushroomSleeping(), "Unsupported doghouse over water allowed sleep");

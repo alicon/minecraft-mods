@@ -14,6 +14,9 @@ final class MushroomSittingPose {
 		yorkie.setSleepingData(sleeping);
 		update(yorkie);
 		if (sleeping) {
+			// A supported virtual bed is repositioned each tick; its small gravity motion is not an actual fall.
+			// canSleep requires grounded entry, or continuation of an already-established supported doghouse rest.
+			yorkie.fallDistance = 0.0F;
 			yorkie.getNavigation().stop();
 			if (yorkie.level() instanceof ServerLevel level) {
 				BlockPos doorPos = MushroomDoorLocator.findNearestDoor(level, yorkie.blockPosition());

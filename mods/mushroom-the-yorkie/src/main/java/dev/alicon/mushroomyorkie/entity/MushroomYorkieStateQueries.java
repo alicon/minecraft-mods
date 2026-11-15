@@ -26,7 +26,7 @@ final class MushroomYorkieStateQueries {
 
 	static boolean canSleep(MushroomYorkieEntity yorkie) {
 		boolean doghouseAnchor = yorkie.level().getBlockState(yorkie.blockPosition()).is(ModBlocks.DOGHOUSE);
-		if ((!yorkie.onGround() && !doghouseAnchor) || isWetForSitting(yorkie)) {
+		if ((!yorkie.onGround() && !(doghouseAnchor && yorkie.isMushroomSleeping())) || isWetForSitting(yorkie)) {
 			return false;
 		}
 		// Partial bank contact can set onGround while the center remains over water. Require support under the feet.

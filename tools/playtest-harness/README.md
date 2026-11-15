@@ -212,7 +212,9 @@ creative and fed/hungry states. A daytime awake control precedes actual nighttim
 approach, three stable sleep observations on the intended spot, and dawn wake-up.
 The doghouse's non-colliding visual bed holds Mushroom a quarter block above its
 solid floor; native support guards preserve this anchor while refusing one over
-unsupported water.
+unsupported water. Dawn checks keep the same pet alive and healthy, catching
+synthetic fall accumulation from the raised visual bed. Awake falling pets do
+not gain sleep-based fall protection.
 
 The Overworld arena clears its footprint to y=319 and verifies the upper volume
 is air, so an old high platform cannot masquerade as outside. Terrain cases also
