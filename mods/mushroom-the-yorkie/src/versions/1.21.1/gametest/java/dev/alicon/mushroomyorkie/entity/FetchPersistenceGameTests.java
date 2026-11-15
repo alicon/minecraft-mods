@@ -68,13 +68,13 @@ public final class FetchPersistenceGameTests {
 		FetchModeChangeScenarios.creativeCopyCannotBeCollectedAsInventory(helper);
 	}
 
-	/** Return overflow as a ground item instead of letting creative inventory discard it. */
+	/** Keep overflow across interruption and reload, then return it when creative inventory has room. */
 	@GameTest(template = "fabric-gametest-api-v1:empty")
 	public void realToySurvivesFullCreativeInventory(GameTestHelper helper) {
 		FetchModeChangeScenarios.realToySurvivesFullCreativeInventory(helper, yorkie -> roundTrip(helper, yorkie));
 	}
 
-	/** Return overflow as a ground item instead of letting creative inventory discard it. */
+	/** Keep overflow across interruption and reload, then return it when creative inventory has room. */
 	@GameTest(template = "fabric-gametest-api-v1:empty")
 	public void realToySurvivesPartialCreativeInventory(GameTestHelper helper) {
 		FetchModeChangeScenarios.realToySurvivesPartialCreativeInventory(helper, yorkie -> roundTrip(helper, yorkie));

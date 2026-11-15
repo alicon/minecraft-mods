@@ -242,7 +242,7 @@ Mushroom the Yorkie:
 - pet-needs effects for bowl meals, normal player food, water, toy play, food bar display, and starvation state
 - lost-Mushroom recovery policy after a full Minecraft day away from the owner
 - daily outdoor relief state and saved passive-mob calm memory
-- headless GameTests verify native carried-toy save/load, named item components, whole-stack return, repeated interruptions without duplication, guaranteed real-toy drops after environmental death, and real-versus-free-copy custody across owner mode changes
+- headless GameTests verify native carried-toy save/load, named item components, whole-stack return, repeated interruptions without duplication, guaranteed real-toy drops after environmental death, and real-versus-free-copy custody across owner mode changes, and full/partial creative-inventory wait-and-resume behavior
 - saved-restart live runner checks the ball, chew toy, or bone across a normal client shutdown and relaunch, including player/carrier identity, jar hashes, and inventory/ground/held-item conservation
 - headless GameTest verifies Mushroom's custom entity can spawn in a Minecraft test world
 
