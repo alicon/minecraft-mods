@@ -147,7 +147,7 @@ async function executeMatrix(baseUrl, args) {
         const settled = entity(await advance());
         check(settled && !settled.custom.curledUpSleeping, 'Pet did not wake at dawn');
         check(!settled.noGravity, 'Pet retained flight after the owner landed nearby');
-        return { tickCount: snapshot.tickCount, pet, afterDawnAndLanding: settled };
+        return { fixture, snapshot, tickCount: snapshot.tickCount, pet, afterDawnAndLanding: settled };
       }
     };
   });
