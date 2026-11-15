@@ -145,7 +145,7 @@ final class SquirrelFindTreeGoal extends Goal {
 			if (approach == null) {
 				continue;
 			}
-			BlockPos climb = findClimbTarget(this.squirrel.level(), candidate);
+			BlockPos climb = findClimbTarget(this.squirrel.level(), candidate, approach);
 			if (climb == null) {
 				continue;
 			}
@@ -160,11 +160,15 @@ final class SquirrelFindTreeGoal extends Goal {
 		}
 	}
 
-	private static BlockPos findClimbTarget(Level level, BlockPos tree) {
+	private static BlockPos findClimbTarget(Level level, BlockPos tree, BlockPos approach) {
 		BlockPos target = null;
 		for (int height = 1; height <= MAX_CLIMB_BLOCKS; height++) {
 			BlockPos trunk = tree.above(height);
-			if (!level.getBlockState(trunk).is(BlockTags.LOGS)) {
+			// A canopy can cover the trunk's upper faces. Stop below it rather than
+			// asking wall-climber navigation to reach a height inside solid leaves.
+			BlockPos climbingSpace = approach.above(height);
+			if (!level.getBlockState(trunk).is(BlockTags.LOGS)
+					|| !level.getBlockState(climbingSpace).isAir()) {
 				break;
 			}
 			if (height >= MIN_CLIMB_BLOCKS) {

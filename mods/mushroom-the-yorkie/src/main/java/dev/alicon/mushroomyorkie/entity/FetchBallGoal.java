@@ -85,6 +85,16 @@ final class FetchBallGoal extends Goal {
 
 	@Override
 	public void stop() {
+		// Sitting, sleep, and other higher-priority goals can interrupt the return.
+		// The original item entity is already gone, so preserve its carried stack.
+		if (!this.carriedToy.isEmpty() && this.yorkie.level() instanceof ServerLevel level) {
+			ItemEntity dropped = new ItemEntity(level, this.yorkie.getX(), this.yorkie.getY() + 0.2D,
+					this.yorkie.getZ(), this.carriedToy.copy());
+			dropped.setPickUpDelay(20);
+			level.addFreshEntity(dropped);
+			this.lastReturnedToy = dropped.getUUID();
+			this.nextSearchGameTime = level.getGameTime() + RETURN_COOLDOWN_TICKS;
+		}
 		this.toy = null;
 		this.carrying = false;
 		this.carriedToy = ItemStack.EMPTY;

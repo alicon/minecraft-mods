@@ -56,10 +56,9 @@ if (( SECONDS >= deadline )); then
 fi
 
 printf 'Bridge loaded expected world: %s\n' "$world_name"
-report_args=()
-if [[ -n "$report_file" ]]; then
-	report_args=(--report-file "$report_file")
-fi
+# Keep two arguments even when the path is empty: macOS Bash 3.2 with
+# nounset rejects expansion of an empty array. The CLI accepts an empty path.
+report_args=(--report-file "$report_file")
 case "$bridge_scenario" in
 	smoke)
 		node "$repo_root/tools/playtest-harness/src/bridge-cli.js" smoke \

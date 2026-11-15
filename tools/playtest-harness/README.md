@@ -129,12 +129,17 @@ the client. Never point it at a family save. Keep only one live scenario run
 active per bridge. It leaves the test arena and report available for inspection;
 it restores daylight and a grounded creative player, not the original save state.
 
-The 96 cases combine four times (day, dusk, night, dawn), three shelter types
+The 96 base cases combine four times (day, dusk, night, dawn), three shelter types
 (open sky, roof only, enclosed room), fed/hungry needs, sit/follow orders,
 and a grounded/flying owner. Each fresh-pet fixture checks sleep, orders,
 gravity, health, need bounds, and the transition back to daylight and landing.
 Grounded cases use a survival owner; flying cases use creative mode. The suite
 does not yet claim coverage of every owner mode or every state transition.
+Eight additional sequences interrupt carried fetches with sit/sleep (bone, ball,
+chew toy) and exercise sleep-to-flight-to-sleep transitions at two hunger levels.
+Replay them by name with `--case fetch-sit-yorkie_ball` or
+`--case sleep-flight-sleep-90`.
+
 Tick sprint advances real server ticks with a bounded wait; this is a fast
 state check, not a substitute for watching animation or movement over normal time.
 
