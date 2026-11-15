@@ -167,8 +167,8 @@ six-block drop for each toy and owner locomotion state. It requires ordinary
 returns in accessible terrain and safe refusal under covered water or a survival
 cliff. A grounded creative cliff attempt may return or safely give up; it must
 conserve the toy, avoid damage, and end near the owner. Flying fetches must return.
-Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, and the water/rest group adds 18, making the full suite 237 cases. Run one group with `--group base`,
-`--group transitions`, `--group terrain`, `--group outdoors`, or `--group water`; combine it with an exact `--case`.
+Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, the water/rest group adds 18, and sleep-spot controls add eight, making the full suite 245 cases. Run one group with `--group base`,
+`--group transitions`, `--group terrain`, `--group outdoors`, `--group water`, or `--group rest`; combine it with an exact `--case`.
 Unknown groups/cases fail instead of running a different suite.
 
 ```shell
@@ -202,6 +202,13 @@ interpolation, then record a separate camera state and aim at the current pet's
 coordinates. After another 150 ms, they capture with the GUI/chat hidden. The
 screenshot is a later visual observation, not the exact assertion tick; both
 states and camera coordinates remain in the report.
+
+The `rest` group adds dog-bed and doghouse controls across survival/grounded
+creative and fed/hungry states. A daytime awake control precedes actual nighttime
+approach, three stable sleep observations on the intended spot, and dawn wake-up.
+The doghouse's non-colliding visual bed holds Mushroom a quarter block above its
+solid floor; native support guards preserve this anchor while refusing one over
+unsupported water.
 
 The Overworld arena clears its footprint to y=319 and verifies the upper volume
 is air, so an old high platform cannot masquerade as outside. Terrain cases also

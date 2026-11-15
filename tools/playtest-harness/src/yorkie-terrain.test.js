@@ -57,3 +57,16 @@ test('water recovery covers modes, hunger, wet sit requests and real builder nap
   assert.equal(rows.filter((row) => row.ownerMode === 'survival').length, 8);
   assert.deepEqual(rows.filter((row) => row.buildNap).map((row) => row.energy), [0, 80]);
 });
+
+
+test('sleep spot controls cover both beds, modes and hunger levels', () => {
+  const { sleepSpotInputs, sleepSpotCases } = require('./yorkie-sleep-spots');
+  const rows = sleepSpotInputs();
+  assert.equal(rows.length, 8);
+  assert.equal(new Set(sleepSpotCases({}).map((row) => row.name)).size, 8);
+  for (const spot of ['dog_bed', 'doghouse']) {
+    for (const ownerMode of ['survival', 'creative']) {
+      assert.deepEqual(rows.filter((row) => row.spot === spot && row.ownerMode === ownerMode).map((row) => row.hunger), [0, 90]);
+    }
+  }
+});
