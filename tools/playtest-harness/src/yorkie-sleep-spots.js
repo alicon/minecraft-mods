@@ -32,7 +32,7 @@ function sleepSpotCases({ prepare, command, request, entity, advance, base, chec
       for (const { pet } of result.observed.trace.slice(-3)) {
         check(pet.custom.curledUpSleeping && pet.tameable.sittingPose, 'Pet did not remain asleep on the intended sleep spot');
         check(Math.abs(pet.position.x - fixture.spot.x - 0.5) < 0.4 && Math.abs(pet.position.z - fixture.spot.z - 0.5) < 0.4
-          && Math.abs(pet.position.y - fixture.spot.y - 0.25) < 0.2, 'Pet slept away from its bed/inside-doghouse anchor');
+          && pet.position.y >= fixture.spot.y - 0.05 && pet.position.y <= fixture.spot.y + 0.35, 'Pet slept away from its bed/inside-doghouse anchor');
         check(!pet.noGravity && !pet.tameable.orderedToSit, 'Sleep spot retained flight or invented a sit order');
       }
       await command('time set day');

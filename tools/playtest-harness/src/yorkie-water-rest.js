@@ -61,6 +61,7 @@ function waterRestCases({ prepare, command, request, entity, advance, base, play
       });
       // After a reachable wet interaction, the owner steps farther onto the bank.
       // A brief airborne hop above the pool is not a completed return to dry land.
+      // A safe night rest on the bank can begin before the ordinary follow distance is reached.
       await command(`tp ${player} ${base.x - 2.5} ${base.y} ${base.z + 0.5}`);
       let recovered;
       for (let ticks = 20; ticks <= 400; ticks += 20) {
@@ -72,10 +73,14 @@ function waterRestCases({ prepare, command, request, entity, advance, base, play
         check(!pet.tameable.orderedToSit, 'Wet sit request left a persistent sit order');
         if (pet.custom.curledUpSleeping) check(pet.onGround, 'Pet started sleeping before landing');
         if (pet.inWater) check(!pet.custom.curledUpSleeping && !pet.tameable.sittingPose, 'Wet pet sat or slept instead of recovering');
-        if (!pet.inWater && pet.distance < 3 && pet.position.x < base.x + 0.8 && Math.abs(pet.position.y - base.y) < 0.3) { recovered = snapshot; break; }
+        if (!pet.inWater && pet.distance < 4 && pet.onGround && pet.position.x < base.x + 1 && Math.abs(pet.position.y - base.y) < 0.3) { recovered = snapshot; break; }
       }
       check(recovered, 'Mushroom did not leave the reachable pool for his owner');
       result.observed.recovered = recovered;
+      const landed = entity(recovered);
+      const underfoot = await request('/block', { x: Math.floor(landed.position.x), y: Math.floor(landed.position.y - 0.05), z: Math.floor(landed.position.z) });
+      result.observed.underfoot = underfoot;
+      check(['minecraft:stone', 'minecraft:oak_planks'].includes(underfoot.block), 'Recovery did not reach the solid bank/room floor');
       const settled = await advance(60);
       const pet = entity(settled);
       result.observed.settled = settled;

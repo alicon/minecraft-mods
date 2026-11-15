@@ -15,4 +15,10 @@ public final class WaterRestGameTests {
 	public void creativeRecoveryReachesDryBank(GameTestHelper helper) {
 		WaterRecoveryScenarios.creativeRecoveryReachesDryBank(helper);
 	}
+
+	/** Approach the top of a low bed instead of stopping on the floor beside it. */
+	@GameTest
+	public void bedApproachPathReachesBed(GameTestHelper helper) {
+		SleepSpotScenarios.bedApproachPathReachesBed(helper);
+	}
 }

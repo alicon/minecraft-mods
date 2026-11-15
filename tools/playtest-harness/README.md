@@ -203,6 +203,10 @@ coordinates. After another 150 ms, they capture with the GUI/chat hidden. The
 screenshot is a later visual observation, not the exact assertion tick; both
 states and camera coordinates remain in the report.
 
+Water recovery also checks the actual solid block under the landed pet. Safe
+nighttime rest may start within four blocks of the owner; it need not reach the
+normal follow distance before sleeping on dry supported ground.
+
 The `rest` group adds dog-bed and doghouse controls across survival/grounded
 creative and fed/hungry states. A daytime awake control precedes actual nighttime
 approach, three stable sleep observations on the intended spot, and dawn wake-up.

@@ -11,7 +11,6 @@ final class SleepAtNightGoal extends Goal {
 	private static final int MOVE_RETRY_TICKS = 40;
 	private static final double BED_REACHED_DISTANCE_SQR = 0.64D;
 	private static final double DOGHOUSE_REACHED_DISTANCE_SQR = 2.25D;
-	private static final double BED_TOP_Y_OFFSET = 0.25D;
 
 	private final MushroomYorkieEntity yorkie;
 	private BlockPos bedPos;
@@ -38,7 +37,7 @@ final class SleepAtNightGoal extends Goal {
 	@Override
 	public void start() {
 		this.bedPos = this.findNearestBed();
-		this.bedTarget = this.bedPos == null ? null : bedCenter(this.bedPos);
+		this.bedTarget = this.bedPos == null ? null : MushroomSleepSpotTargets.center(this.bedPos);
 		this.nextMoveTick = 0;
 		MushroomBehaviorDebugger.debug(this.yorkie, "sleep_start", this.bedPos == null ? "sleep: curling up because it is night inside" : "sleep: heading to dog bed", true);
 		this.yorkie.setSleeping(this.bedPos == null);
@@ -73,12 +72,8 @@ final class SleepAtNightGoal extends Goal {
 			return;
 		}
 
-		this.yorkie.getNavigation().moveTo(this.bedTarget.x, this.bedTarget.y, this.bedTarget.z, 0.7D);
+		MushroomSleepSpotTargets.moveTo(this.yorkie, this.bedPos, 0.7D);
 		this.nextMoveTick = MOVE_RETRY_TICKS;
-	}
-
-	private static Vec3 bedCenter(BlockPos pos) {
-		return Vec3.atBottomCenterOf(pos).add(0.0D, BED_TOP_Y_OFFSET, 0.0D);
 	}
 
 	private double reachedDistanceSqr() {

@@ -12,7 +12,6 @@ final class CreativeProfileGoal extends Goal {
 	private static final int CHECK_IN_TICKS = 20 * 5;
 	private static final int MOVE_RETRY_TICKS = 40;
 	private static final double BED_REACHED_DISTANCE_SQR = 0.64D;
-	private static final double BED_TOP_Y_OFFSET = 0.25D;
 	private static final double CHECK_IN_DISTANCE_SQR = 9.0D;
 
 	private final MushroomYorkieEntity yorkie;
@@ -142,7 +141,7 @@ final class CreativeProfileGoal extends Goal {
 		}
 
 		this.bedPos = MushroomDomesticLocator.findNearestDogBed(level, this.yorkie.blockPosition());
-		this.bedTarget = this.bedPos == null ? null : Vec3.atBottomCenterOf(this.bedPos).add(0.0D, BED_TOP_Y_OFFSET, 0.0D);
+		this.bedTarget = this.bedPos == null ? null : MushroomSleepSpotTargets.center(this.bedPos);
 	}
 
 	private void moveToBed() {
@@ -152,7 +151,7 @@ final class CreativeProfileGoal extends Goal {
 			return;
 		}
 
-		this.yorkie.getNavigation().moveTo(this.bedTarget.x, this.bedTarget.y, this.bedTarget.z, 0.8D);
+		MushroomSleepSpotTargets.moveTo(this.yorkie, this.bedPos, 0.8D);
 		this.nextMoveTick = MOVE_RETRY_TICKS;
 		MushroomBehaviorDebugger.debug(this.yorkie, "creative_profile_bed", "creative profile: heading to dog bed", false);
 	}
