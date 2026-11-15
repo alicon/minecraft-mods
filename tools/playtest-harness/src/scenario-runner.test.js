@@ -48,11 +48,15 @@ test('rejects family saves, wrong identities, and multiplayer', () => {
   assert.throws(() => assertTestWorld({ ...state, players: [{}, {}] }, save));
 });
 
-test('matrix has 96 distinct combinations with both sides of every factor', () => {
+test('matrix separates survival walking, creative walking, and creative flying', () => {
   const rows = matrixInputs();
-  assert.equal(rows.length, 96);
-  assert.equal(new Set(rows.map(JSON.stringify)).size, 96);
+  assert.equal(rows.length, 144);
+  assert.equal(new Set(rows.map(JSON.stringify)).size, 144);
   assert.deepEqual([...new Set(rows.map((row) => row.shelter))].sort(), ['inside', 'outside', 'roof']);
+  assert.equal(rows.filter((row) => row.ownerMode === 'survival' && !row.flying).length, 48);
+  assert.equal(rows.filter((row) => row.ownerMode === 'creative' && !row.flying).length, 48);
+  assert.equal(rows.filter((row) => row.ownerMode === 'creative' && row.flying).length, 48);
+  assert.equal(rows.filter((row) => row.ownerMode === 'survival' && row.flying).length, 0);
 });
 
 test('HTTP-success command rejection cannot silently pass; no-op commands stay valid', () => {
@@ -93,9 +97,10 @@ test('actual bridge CLI exits unsuccessfully when Minecraft rejects command synt
 test('transition suite covers each fetch toy interrupted by both sit and sleep', () => {
   const { transitionCases } = require('./yorkie-transitions');
   const cases = transitionCases({});
-  assert.equal(cases.length, 10);
-  assert.equal(new Set(cases.map((scenario) => scenario.name)).size, 10);
-  assert.equal(cases.filter((scenario) => scenario.name.startsWith('fetch-')).length, 6);
+  assert.equal(cases.length, 13);
+  assert.equal(new Set(cases.map((scenario) => scenario.name)).size, 13);
+  assert.equal(cases.filter((scenario) => /^fetch-(sit|sleep)-/.test(scenario.name)).length, 6);
+  assert.equal(cases.filter((scenario) => scenario.name.startsWith('fetch-owner-mode-')).length, 3);
   assert.equal(cases.filter((scenario) => scenario.name.startsWith('sleep-flight-')).length, 2);
 });
 

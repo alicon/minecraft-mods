@@ -18,7 +18,8 @@ function matrixInputs() {
     for (const shelter of ['outside', 'roof', 'inside'])
       for (const hunger of [0, 90])
         for (const sitting of [false, true])
-          for (const flying of [false, true]) rows.push({ time, shelter, hunger, sitting, flying });
+          for (const owner of [{ ownerMode: 'survival', flying: false }, { ownerMode: 'creative', flying: false }, { ownerMode: 'creative', flying: true }])
+            rows.push({ time, shelter, hunger, sitting, ...owner });
   return rows;
 }
 
@@ -56,6 +57,8 @@ async function executeMatrix(baseUrl, args) {
     throw new Error(`Server failed to advance ${ticks} ticks`);
   }
   async function prepare(inputs) {
+    const ownerMode = inputs.ownerMode || (inputs.flying ? 'creative' : 'survival');
+    check(['survival', 'creative'].includes(ownerMode) && (!inputs.flying || ownerMode === 'creative'), 'Invalid owner mode/flight fixture');
     // Check identity before each destructive fixture reset, not only at startup.
     assertTestWorld(await state(), args.expectedSave);
     await command('tick sprint stop');
@@ -64,6 +67,7 @@ async function executeMatrix(baseUrl, args) {
     await command(`tp ${player} ${base.x} ${base.y + 1} ${base.z}`);
     // Clear the baseline pet in this disposable save so ownership guards do not block taming.
     await request('/clear-entities', { type: TYPE });
+    await request('/clear-entities', { type: 'mushroom_yorkie:squirrel' });
     await request('/clear-entities', { type: 'minecraft:item' });
     await command(`fill ${base.x - 7} ${base.y - 1} ${base.z - 7} ${base.x + 7} ${base.y + 7} ${base.z + 7} minecraft:air`);
     await command(`fill ${base.x - 7} ${base.y - 1} ${base.z - 7} ${base.x + 7} ${base.y - 1} ${base.z + 7} minecraft:grass_block`);
@@ -90,11 +94,13 @@ async function executeMatrix(baseUrl, args) {
     if (inputs.flying) {
       await request('/player-abilities', { player, flying: true, mayfly: true });
       await command(`tp ${player} ${base.x - 1.5} ${base.y + 1.5} ${base.z + 0.5}`);
-    } else {
+    } else if (ownerMode === 'survival') {
       await command(`gamemode survival ${player}`);
     }
     const snapshot = await state();
     check(entity(snapshot), 'Fresh fixture is not observable');
+    check(snapshot.players[0].abilities.creative === (ownerMode === 'creative')
+      && snapshot.players[0].abilities.flying === Boolean(inputs.flying), 'Owner mode/flight fixture did not take effect');
     return snapshot;
   }
   await command('gamerule minecraft:spawn_mobs false');

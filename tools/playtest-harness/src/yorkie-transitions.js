@@ -4,6 +4,23 @@
 function transitionCases({ prepare, command, request, state, entity, advance, base, player, selector, check }) {
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const rows = [];
+  const toys = (snapshot, item) => snapshot.players[0].nearbyEntities.filter((candidate) => candidate.type === 'minecraft:item' && candidate.item?.id === item);
+  async function pickUp(item) {
+    await command(`tp ${selector} ${base.x + 2.5} ${base.y} ${base.z + 0.5}`);
+    await command(`tp ${player} ${base.x - 2.5} ${base.y} ${base.z + 0.5}`);
+    await command(`summon minecraft:item ${base.x + 2.5} ${base.y} ${base.z + 0.5} {Item:{id:"${item}",count:1},PickupDelay:32767}`);
+    for (let tick = 0; tick < 180; tick++) {
+      await command('tick step 1t');
+      await delay(100);
+      const snapshot = await state();
+      if (toys(snapshot, item).length === 0 && entity(snapshot)?.distance > 3
+          && entity(snapshot)?.mainHand?.id === item && entity(snapshot)?.mainHand?.count === 1) return snapshot;
+    }
+    const error = new Error('Could not isolate the carried toy before delivery');
+    error.phase = 'setup';
+    throw error;
+  }
+
   for (const item of ['minecraft:bone', 'mushroom_yorkie:yorkie_ball', 'mushroom_yorkie:yorkie_chew_toy']) {
     for (const interruption of ['sit', 'sleep']) {
       const inputs = { time: 1000, shelter: interruption === 'sleep' ? 'inside' : 'outside', hunger: 10, sitting: false, flying: false };
@@ -16,23 +33,7 @@ function transitionCases({ prepare, command, request, state, entity, advance, ba
         run: async (fixture, result) => {
           await command('tick freeze');
           try {
-            await command(`tp ${selector} ${base.x + 2.5} ${base.y} ${base.z + 0.5}`);
-            await command(`tp ${player} ${base.x - 2.5} ${base.y} ${base.z + 0.5}`);
-            await command(`summon minecraft:item ${base.x + 2.5} ${base.y} ${base.z + 0.5} {Item:{id:"${item}",count:1},PickupDelay:32767}`);
-            const toys = (snapshot) => snapshot.players[0].nearbyEntities.filter((candidate) => candidate.type === 'minecraft:item' && candidate.item?.id === item);
-            let picked;
-            for (let tick = 0; tick < 180; tick++) {
-              await command('tick step 1t');
-              await delay(100);
-              const snapshot = await state();
-              if (toys(snapshot).length === 0 && entity(snapshot)?.distance > 2.5
-                  && entity(snapshot)?.mainHand?.id === item && entity(snapshot)?.mainHand?.count === 1) { picked = snapshot; break; }
-            }
-            if (!picked) {
-              const error = new Error('Could not isolate the carried toy before delivery');
-              error.phase = 'setup';
-              throw error;
-            }
+            const picked = await pickUp(item);
             result.observed = { picked };
             if (interruption === 'sit') await command(`data merge entity ${selector} {Sitting:1b}`);
             else await command('time set night');
@@ -42,13 +43,46 @@ function transitionCases({ prepare, command, request, state, entity, advance, ba
             result.observed.after = after;
             const pet = entity(after);
             check(pet && (interruption === 'sit' ? pet.tameable.orderedToSit : pet.custom.curledUpSleeping), 'Requested interruption did not take effect');
-            check(toys(after).reduce((count, toy) => count + toy.item.count, 0) === 1, 'Interrupted fetch lost or duplicated the toy');
+            check(toys(after, item).reduce((count, toy) => count + toy.item.count, 0) === 1, 'Interrupted fetch lost or duplicated the toy');
             check(pet.mainHand?.id !== item || pet.mainHand.count === 0, 'Interrupted fetch retained a second carried copy');
             return result.observed;
           } finally { await command('tick unfreeze'); }
         }
       });
     }
+  }
+  for (const item of ['minecraft:bone', 'mushroom_yorkie:yorkie_ball', 'mushroom_yorkie:yorkie_chew_toy']) {
+    const inputs = { time: 1000, shelter: 'outside', hunger: 10, sitting: false, flying: false, ownerMode: 'survival' };
+    rows.push({
+      name: `fetch-owner-mode-${item.split(':')[1]}`, inputs,
+      setup: async () => {
+        await prepare(inputs);
+        await request('/command', { command: `clear ${player}` }, true);
+      },
+      run: async (fixture, result) => {
+        await command('tick freeze');
+        try {
+          const picked = await pickUp(item);
+          result.observed = { picked };
+          const inventoryBefore = await request('/command', { command: `clear ${player} ${item} 0` }, true);
+          check(inventoryBefore.result === 0, 'Mode-change fixture inventory was not empty');
+          await command(`gamemode creative ${player}`);
+          await command('tick unfreeze');
+          const afterCreative = await advance(240);
+          result.observed.afterCreative = afterCreative;
+          await command(`gamemode survival ${player}`);
+          const final = await state();
+          const inventory = await request('/command', { command: `clear ${player} ${item} 0` }, true);
+          const pet = entity(final);
+          result.observed.final = final;
+          result.observed.inventory = inventory.result;
+          check(pet && pet.uuid === entity(picked).uuid, 'Carrier changed during the owner mode transition');
+          check(inventory.result === 1 && toys(final, item).length === 0 && pet.mainHand?.id !== item,
+            `Owner mode change lost or duplicated the real toy: inventory=${inventory.result}`);
+          return result.observed;
+        } finally { await command('tick unfreeze'); }
+      }
+    });
   }
   for (const hunger of [0, 90]) {
     const inputs = { time: 18000, shelter: 'inside', hunger, sitting: false, flying: false };
