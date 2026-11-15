@@ -1,6 +1,9 @@
 package dev.alicon.mushroomyorkie.entity;
 
+import dev.alicon.mushroomyorkie.block.ModBlocks;
+import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 
 /** Native rest-state guards must protect both ordinary night sleep and callers requesting a nap. */
@@ -32,6 +35,21 @@ final class WaterRestScenarios {
 				yorkie.setOnGround(true);
 				yorkie.setSleeping(true);
 				var feet = yorkie.blockPosition();
+				var originalPosition = yorkie.position();
+				var below = feet.below();
+				helper.getLevel().setBlockAndUpdate(below, Blocks.WATER.defaultBlockState());
+				yorkie.setPos(feet.getX() + 0.1D, feet.getY(), feet.getZ() + 0.5D);
+				yorkie.setOnGround(true);
+				yorkie.setSleeping(false);
+				helper.assertTrue(!MushroomYorkieStateQueries.isWetForSitting(yorkie), "Edge fixture should have dry feet above water");
+				helper.assertTrue(!MushroomNightBehavior.shouldSleepAtNight(yorkie, helper.getLevel()), "An edge-supported pet could sleep with his center over water");
+				yorkie.setSleeping(true);
+				helper.assertTrue(!yorkie.isMushroomSleeping(), "A nap caller could sleep over an unsupported water edge");
+				assertSupportedSleep(helper, yorkie, below, ModBlocks.DOG_BED, 0.25D);
+				assertSupportedSleep(helper, yorkie, below, Blocks.OAK_SLAB, 0.5D);
+				helper.getLevel().setBlockAndUpdate(below, Blocks.STONE.defaultBlockState());
+				yorkie.setPos(originalPosition);
+				yorkie.setSleeping(true);
 				helper.getLevel().setBlockAndUpdate(feet, Blocks.WATER.defaultBlockState());
 				helper.assertTrue(MushroomYorkieStateQueries.isWetForSitting(yorkie), "Water fixture did not wet the pet");
 				MushroomSittingPose.preventWaterRest(yorkie);
@@ -52,5 +70,13 @@ final class WaterRestScenarios {
 				helper.getLevel().setDayTime(priorTime);
 			}
 		});
+	}
+
+	private static void assertSupportedSleep(GameTestHelper helper, MushroomYorkieEntity yorkie, BlockPos below, Block block, double height) {
+		helper.getLevel().setBlockAndUpdate(below, block.defaultBlockState());
+		yorkie.setPos(below.getX() + 0.5D, below.getY() + height, below.getZ() + 0.5D);
+		yorkie.setOnGround(true);
+		yorkie.setSleeping(true);
+		helper.assertTrue(yorkie.isMushroomSleeping(), "Dry thin support could not sleep: " + block);
 	}
 }
