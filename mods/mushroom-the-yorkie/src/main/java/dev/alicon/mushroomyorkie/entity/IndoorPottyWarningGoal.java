@@ -31,17 +31,26 @@ final class IndoorPottyWarningGoal extends Goal {
 
 	@Override
 	public boolean canContinueToUse() {
-		return this.canUse();
+		return this.yorkie.level() instanceof ServerLevel level
+				&& MushroomNightBehavior.shouldSeekOutdoorRelief(this.yorkie, level)
+				&& !MushroomBehaviorProfiles.keepsRoutineNeedsQuiet(this.yorkie, level);
 	}
 
 	@Override
 	public void start() {
+		this.yorkie.relief.beginTrip();
 		this.refreshTargets();
 		this.nextMoveTick = 0;
 		this.nextTargetSearchTick = this.yorkie.tickCount + TARGET_REFRESH_TICKS;
 		this.circleStep = 0;
 		MushroomOwnerNotice.send(this.yorkie, "message.mushroom_yorkie.notice_potty", MushroomOwnerNotice.MEDIUM_COOLDOWN_TICKS);
 		MushroomBehaviorDebugger.debug(this.yorkie, "potty_warning_start", "potty warning: needs outside", true);
+	}
+
+	@Override
+	public void stop() {
+		this.yorkie.relief.endTrip();
+		this.yorkie.getNavigation().stop();
 	}
 
 	@Override
@@ -54,6 +63,14 @@ final class IndoorPottyWarningGoal extends Goal {
 		LivingEntity owner = this.yorkie.getOwner();
 		if (owner != null) {
 			this.yorkie.getLookControl().setLookAt(owner, 10.0F, this.yorkie.getMaxHeadXRot());
+		}
+
+		if (this.yorkie.level() instanceof ServerLevel level && level.canSeeSky(this.yorkie.blockPosition())) {
+			// Hold the MOVE goal while relief counts consecutive outdoor ticks. Releasing it
+			// here lets FollowOwnerGoal pull Mushroom back through the open door too soon.
+			this.yorkie.getNavigation().stop();
+			MushroomBehaviorDebugger.debug(this.yorkie, "potty_relieving", "potty: staying outside until relief completes", false);
+			return;
 		}
 
 		if (this.yorkie.tickCount % MushroomYorkieEntity.BARK_INTERVAL_TICKS == 0) {

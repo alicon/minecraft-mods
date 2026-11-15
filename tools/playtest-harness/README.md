@@ -167,13 +167,23 @@ six-block drop for each toy and owner locomotion state. It requires ordinary
 returns in accessible terrain and safe refusal under covered water or a survival
 cliff. A grounded creative cliff attempt may return or safely give up; it must
 conserve the toy, avoid damage, and end near the owner. Flying fetches must return.
-Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. This makes the full suite 199 cases. Run one group with `--group base`,
-`--group transitions`, or `--group terrain`; combine it with an exact `--case`.
+Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, making the full suite 219 cases. Run one group with `--group base`,
+`--group transitions`, `--group terrain`, or `--group outdoors`; combine it with an exact `--case`.
 Unknown groups/cases fail instead of running a different suite.
 
 ```shell
 node tools/playtest-harness/src/bridge-cli.js yorkie-matrix --expected-save "<copied save>" --group terrain --report-file build/playtest-reports/terrain.json
 ```
+
+The `outdoors` group checks closed-to-open doors across day/night, fed/hungry,
+sit/follow, and survival/grounded creative owners. Four additional cases start
+near the warning threshold (81 and 90). Following daytime pets must finish
+relief, return to the indoor owner, suppress another trip that day, and complete
+one on the next day. Sit and nighttime sleep remain protected. Native
+`LastReliefDay` and need reset assertions distinguish completion from ordinary
+outdoor meter decay. The fixture verifies both door halves and audits an
+extended clear outdoor approach. Hunger is reset at synthetic day boundaries
+so these care cases do not become starvation tests.
 
 The Overworld arena clears its footprint to y=319 and verifies the upper volume
 is air, so an old high platform cannot masquerade as outside. Terrain cases also

@@ -34,3 +34,15 @@ test('flight landing transitions cover every toy before and after pickup', () =>
   assert.equal(new Set(rows.map((row) => row.name)).size, 6);
   for (const phase of ['chase', 'carrying']) assert.equal(rows.filter((row) => row.inputs.landingPhase === phase).length, 3);
 });
+
+test('outdoor cases cover daily care, sit/sleep controls and warning boundaries', () => {
+  const { outdoorInputs, outdoorCases } = require('./yorkie-outdoor');
+  const rows = outdoorInputs();
+  assert.equal(rows.length, 20);
+  assert.equal(new Set(outdoorCases({}).map((row) => row.name)).size, 20);
+  assert.equal(rows.filter((row) => row.potty === 100).length, 16);
+  for (const potty of [81, 90]) assert.equal(rows.filter((row) => row.potty === potty).length, 2);
+  for (const ownerMode of ['survival', 'creative']) assert.equal(rows.filter((row) => row.ownerMode === ownerMode).length, 10);
+  assert.equal(rows.filter((row) => row.time === 18000).length, 8);
+  assert.equal(rows.filter((row) => row.sitting).length, 8);
+});

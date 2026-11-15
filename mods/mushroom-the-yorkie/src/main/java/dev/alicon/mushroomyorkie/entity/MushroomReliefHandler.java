@@ -11,8 +11,7 @@ final class MushroomReliefHandler {
 	static void tick(MushroomYorkieEntity yorkie, ServerLevel level) {
 		long day = MushroomNightBehavior.currentDay(level);
 		if (!yorkie.isTame()
-				|| !yorkie.needs.shouldWarnPotty()
-				|| !yorkie.relief.shouldAskToday(day, true)
+				|| !yorkie.relief.shouldAskToday(day, yorkie.needs.shouldWarnPotty())
 				|| !level.canSeeSky(yorkie.blockPosition())) {
 			yorkie.relief.resetOutdoorRelief();
 			return;
