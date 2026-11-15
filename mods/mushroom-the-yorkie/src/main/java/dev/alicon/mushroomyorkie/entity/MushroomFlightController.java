@@ -27,7 +27,7 @@ final class MushroomFlightController {
 		boolean flyingToOwner = shouldFlyToOwner(yorkie);
 		yorkie.setNoGravity(flyingToOwner);
 		boolean ownerFlying = MushroomYorkieStateQueries.ownerIsCreativeFlying(yorkie);
-		boolean fetching = ownerFlying && yorkie.fetchFlight.active();
+		boolean fetching = yorkie.fetchFlight.flying();
 		updateFlightTrick(yorkie, flyingToOwner && ownerFlying && !fetching);
 		if (!flyingToOwner) {
 			return;
@@ -68,7 +68,7 @@ final class MushroomFlightController {
 		if (yorkie.isOrderedToSit() || !MushroomYorkieStateQueries.ownerIsCreative(yorkie)) {
 			return false;
 		}
-		if (MushroomYorkieStateQueries.ownerIsCreativeFlying(yorkie)) {
+		if (MushroomYorkieStateQueries.ownerIsCreativeFlying(yorkie) || yorkie.fetchFlight.flying()) {
 			return true;
 		}
 		if (yorkie.creativeRecoveryFlight.blocks()) {

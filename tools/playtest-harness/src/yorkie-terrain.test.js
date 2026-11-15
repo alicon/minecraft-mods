@@ -26,3 +26,11 @@ test('named groups and case replays cannot silently run a different scenario set
   assert.throws(() => selectCases(groups, { group: 'terrani' }), /Unknown matrix group/);
   assert.throws(() => selectCases(groups, { group: 'terrain', case: 'matrix-1' }), /No matching/);
 });
+
+test('flight landing transitions cover every toy before and after pickup', () => {
+  const { flightTransitionCases } = require('./yorkie-flight-transitions');
+  const rows = flightTransitionCases({});
+  assert.equal(rows.length, 6);
+  assert.equal(new Set(rows.map((row) => row.name)).size, 6);
+  for (const phase of ['chase', 'carrying']) assert.equal(rows.filter((row) => row.inputs.landingPhase === phase).length, 3);
+});

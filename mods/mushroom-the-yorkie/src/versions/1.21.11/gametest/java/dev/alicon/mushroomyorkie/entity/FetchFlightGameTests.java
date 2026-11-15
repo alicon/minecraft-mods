@@ -28,4 +28,14 @@ public final class FetchFlightGameTests {
 	public void fractionalOwnerHeightReturns(GameTestHelper helper) {
 		FetchFlightScenarios.fractionalOwnerHeightReturns(helper);
 	}
+	/** An airborne fetch must finish safely when its creative owner lands after pickup. */
+	@GameTest
+	public void landingAfterPickupReturns(GameTestHelper helper) {
+		FetchFlightScenarios.landingAfterPickupReturns(helper);
+	}
+	/** Landing during the chase must retain its safe flight route through pickup and return. */
+	@GameTest
+	public void landingDuringChaseReturns(GameTestHelper helper) {
+		FetchFlightScenarios.landingDuringChaseReturns(helper);
+	}
 }

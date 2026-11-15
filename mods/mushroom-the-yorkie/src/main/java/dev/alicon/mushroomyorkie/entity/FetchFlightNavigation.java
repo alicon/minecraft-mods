@@ -24,6 +24,7 @@ final class FetchFlightNavigation {
 	private int nextPlanTick;
 	private boolean blocked;
 	private boolean ascending;
+	private boolean flightRequested;
 
 	FetchFlightNavigation(MushroomYorkieEntity yorkie) {
 		this.yorkie = yorkie;
@@ -31,10 +32,16 @@ final class FetchFlightNavigation {
 
 	void request(Vec3 target) {
 		this.target = target;
+		this.flightRequested |= MushroomYorkieStateQueries.ownerIsCreativeFlying(this.yorkie);
 	}
 
 	void clear() {
 		this.target = null;
+		this.flightRequested = false;
+		this.replan();
+	}
+
+	void replan() {
 		this.plannedTarget = null;
 		this.path = null;
 		this.blocked = false;
@@ -45,6 +52,11 @@ final class FetchFlightNavigation {
 
 	boolean active() {
 		return this.target != null;
+	}
+
+	// Landing does not revoke an already-started creative fetch route. Lifecycle resets do.
+	boolean flying() {
+		return this.active() && this.flightRequested && MushroomYorkieStateQueries.ownerIsCreative(this.yorkie);
 	}
 
 	boolean blocked() {

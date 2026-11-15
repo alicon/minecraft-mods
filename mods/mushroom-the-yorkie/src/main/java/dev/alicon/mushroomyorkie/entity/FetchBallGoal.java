@@ -183,7 +183,7 @@ final class FetchBallGoal extends Goal {
 	}
 
 	private boolean fetchLooksUnreachable(ServerLevel level, ItemEntity item) {
-		boolean flying = MushroomYorkieStateQueries.ownerIsCreativeFlying(this.yorkie);
+		boolean flying = this.yorkie.fetchFlight.flying();
 		if (FetchToyChase.canPickUp(this.yorkie, item) || (flying ? !this.yorkie.fetchFlight.blocked() : !this.yorkie.getNavigation().isDone())) {
 			this.unreachableTicks = 0;
 			return false;

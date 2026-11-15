@@ -23,12 +23,12 @@ final class FetchToyMovement {
 
 	void retryNow() {
 		this.nextMoveTick = 0;
-		this.yorkie.fetchFlight.clear();
+		this.yorkie.fetchFlight.replan();
 	}
 
 	void moveToward(Vec3 target, double speed) {
 		this.yorkie.fetchFlight.request(target);
-		if (MushroomYorkieStateQueries.ownerIsCreativeFlying(this.yorkie)) {
+		if (this.yorkie.fetchFlight.flying()) {
 			return;
 		}
 		boolean targetShifted = this.lastMoveTarget == null || this.lastMoveTarget.distanceToSqr(target) > MOVE_TARGET_REFRESH_DISTANCE_SQR;

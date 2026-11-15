@@ -167,7 +167,7 @@ six-block drop for each toy and owner locomotion state. It requires ordinary
 returns in accessible terrain and safe refusal under covered water or a survival
 cliff. A grounded creative cliff attempt may return or safely give up; it must
 conserve the toy, avoid damage, and end near the owner. Flying fetches must return.
-This makes the full suite 193 cases. Run one group with `--group base`,
+Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. This makes the full suite 199 cases. Run one group with `--group base`,
 `--group transitions`, or `--group terrain`; combine it with an exact `--case`.
 Unknown groups/cases fail instead of running a different suite.
 

@@ -70,6 +70,38 @@ final class FetchFlightScenarios {
 		}
 	}
 
+	static void landingAfterPickupReturns(GameTestHelper helper) {
+		assertLandingReturns(helper, true);
+	}
+
+	static void landingDuringChaseReturns(GameTestHelper helper) {
+		assertLandingReturns(helper, false);
+	}
+
+	private static void assertLandingReturns(GameTestHelper helper, boolean afterPickup) {
+		Fixture fixture = create(helper, true, 1.5D);
+		try {
+			for (int tick = 0; tick < (afterPickup ? 150 : 3) && fixture.yorkie().getMainHandItem().isEmpty(); tick++) {
+				step(fixture);
+			}
+			helper.assertTrue(fixture.yorkie().getMainHandItem().isEmpty() != afterPickup, "Landing fixture reached the wrong fetch phase");
+			fixture.owner().getAbilities().flying = false;
+			fixture.owner().setPos(fixture.owner().getX(), fixture.owner().getY() - 1.5D, fixture.owner().getZ());
+			for (int tick = 0; tick < 300 && fixture.fetch().canContinueToUse(); tick++) {
+				step(fixture);
+				helper.assertTrue(fixture.yorkie().getMainHandItem().isEmpty() || fixture.yorkie().isNoGravity(),
+						"Owner landing released airborne fetch support before safe return");
+			}
+			helper.assertTrue(fixture.owner().getInventory().countItem(ModItems.YORKIE_BALL) == 1
+					&& fixture.yorkie().getMainHandItem().isEmpty(), "Landed owner never received the carried toy");
+			fixture.fetch().stop();
+			helper.succeed();
+		} finally {
+			fixture.toy().discard();
+			fixture.yorkie().discard();
+		}
+	}
+
 	private static Fixture create(GameTestHelper helper, boolean cliff, double ownerHeight) {
 		if (cliff) {
 			for (int x = 0; x <= 10; x++) {
