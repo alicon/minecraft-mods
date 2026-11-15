@@ -13,7 +13,8 @@ final class SquirrelFindTreeGoal extends Goal {
 	private static final int SEARCH_Y_RADIUS = 5;
 	private static final int MIN_CLIMB_BLOCKS = 2;
 	private static final int MAX_CLIMB_BLOCKS = 4;
-	private static final double REACHED_APPROACH_DISTANCE_SQR = 1.8D;
+	// Reach the selected face before climbing; a loose corner radius can hit a blocked neighbor face.
+	private static final double REACHED_APPROACH_DISTANCE_SQR = 0.36D;
 	private static final Direction[] APPROACH_DIRECTIONS = {
 		Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
 	};
@@ -183,7 +184,9 @@ final class SquirrelFindTreeGoal extends Goal {
 		double closestDistance = Double.MAX_VALUE;
 		for (Direction direction : APPROACH_DIRECTIONS) {
 			BlockPos candidate = tree.relative(direction);
-			if (!isStandable(level, candidate)) {
+			// Standing beside a trunk is insufficient: a low branch can block
+			// this face while another approach still offers a usable climb.
+			if (!isStandable(level, candidate) || findClimbTarget(level, tree, candidate) == null) {
 				continue;
 			}
 
