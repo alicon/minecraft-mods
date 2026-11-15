@@ -6,7 +6,8 @@
 	"environment": "*",
 	"entrypoints": {
 		"fabric-gametest": [
-			"dev.alicon.mushroomyorkie.gametest.MushroomYorkieGameTests"
+			"dev.alicon.mushroomyorkie.gametest.MushroomYorkieGameTests",
+			"dev.alicon.mushroomyorkie.entity.FetchInterruptionGameTests"
 		]
 	},
 	"depends": {

@@ -64,6 +64,7 @@ async function executeMatrix(baseUrl, args) {
     await command(`tp ${player} ${base.x} ${base.y + 1} ${base.z}`);
     // Clear the baseline pet in this disposable save so ownership guards do not block taming.
     await request('/clear-entities', { type: TYPE });
+    await request('/clear-entities', { type: 'minecraft:item' });
     await command(`fill ${base.x - 7} ${base.y - 1} ${base.z - 7} ${base.x + 7} ${base.y + 7} ${base.z + 7} minecraft:air`);
     await command(`fill ${base.x - 7} ${base.y - 1} ${base.z - 7} ${base.x + 7} ${base.y - 1} ${base.z + 7} minecraft:grass_block`);
     if (inputs.shelter === 'inside') {
@@ -100,9 +101,7 @@ async function executeMatrix(baseUrl, args) {
   await command('gamerule minecraft:advance_time false');
   await command('weather clear');
   const inputs = matrixInputs();
-  const selected = args.case ? inputs.filter((row, index) => String(index + 1) === String(args.case)) : inputs;
-  check(selected.length > 0, 'No matching matrix case');
-  const cases = selected.map((row) => {
+  const cases = inputs.map((row) => {
     const number = inputs.indexOf(row) + 1;
     return {
       name: `matrix-${number}`, inputs: row, setup: () => prepare(row),
@@ -131,9 +130,12 @@ async function executeMatrix(baseUrl, args) {
       }
     };
   });
+  cases.push(...require('./yorkie-transitions').transitionCases({ prepare, command, request, state, entity, advance, base, player, selector: SELECTOR, check }));
+  const selected = args.case ? cases.filter((scenario) => scenario.name === args.case || scenario.name === `matrix-${args.case}`) : cases;
+  check(selected.length > 0, 'No matching matrix case');
   const reportFile = args.reportFile || 'build/playtest-reports/yorkie-matrix.json';
   try {
-    return await runCases(cases, {
+    return await runCases(selected, {
       reportFile, metadata: { scenario: 'yorkie-matrix', saveName: initial.saveName, base, expectedSave: args.expectedSave },
       capture: async (scenario) => {
         const snapshot = await state();

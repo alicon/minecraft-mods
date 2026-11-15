@@ -25,7 +25,7 @@ async function runCases(cases, { reportFile, metadata = {}, capture = async () =
       result.observed = await scenario.run(fixture, result);
       result.status = 'passed';
     } catch (error) {
-      result.status = phase === 'setup' ? 'setup_failed' : 'failed';
+      result.status = phase === 'setup' || error.phase === 'setup' ? 'setup_failed' : 'failed';
       result.error = error.message;
       try { result.evidence = await capture(scenario, error); }
       catch (captureError) { result.captureError = captureError.message; }

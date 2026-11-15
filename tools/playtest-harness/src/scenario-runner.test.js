@@ -89,3 +89,22 @@ test('actual bridge CLI exits unsuccessfully when Minecraft rejects command synt
     (error) => error.code === 1 && error.stderr.includes('Minecraft rejected command syntax'));
   } finally { await new Promise((resolve) => server.close(resolve)); }
 });
+
+test('transition suite covers each fetch toy interrupted by both sit and sleep', () => {
+  const { transitionCases } = require('./yorkie-transitions');
+  const cases = transitionCases({});
+  assert.equal(cases.length, 8);
+  assert.equal(new Set(cases.map((scenario) => scenario.name)).size, 8);
+  assert.equal(cases.filter((scenario) => scenario.name.startsWith('fetch-')).length, 6);
+  assert.equal(cases.filter((scenario) => scenario.name.startsWith('sleep-flight-')).length, 2);
+});
+
+test('unmet live fixture preconditions stay distinct from gameplay failures', async () => {
+  const result = await runCases([{
+    name: 'pickup fixture', setup: async () => {}, run: async () => {
+      const error = new Error('pickup was not isolated'); error.phase = 'setup'; throw error;
+    }
+  }], {});
+  assert.equal(result.cases[0].status, 'setup_failed');
+  assert.equal(result.ok, false);
+});

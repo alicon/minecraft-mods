@@ -40,4 +40,26 @@ public final class MushroomYorkieGameTests {
 						+ ", navigationDone=" + squirrel.getNavigation().isDone()
 		));
 	}
+
+	/** A low leaf canopy must not leave squirrels climbing forever toward blocked trunk height. */
+	@GameTest(maxTicks = 240)
+	public void squirrelClimbsBelowCanopy(GameTestHelper helper) {
+		for (int x = 1; x <= 6; x++) {
+			for (int z = 1; z <= 6; z++) {
+				helper.setBlock(x, 0, z, Blocks.STONE);
+				if (x >= 2 && z >= 2) {
+					helper.setBlock(x, 4, z, Blocks.OAK_LEAVES);
+				}
+			}
+		}
+		for (int y = 1; y <= 5; y++) {
+			helper.setBlock(4, y, 4, Blocks.OAK_LOG);
+		}
+		SquirrelEntity squirrel = helper.spawn(ModEntities.SQUIRREL, 1, 1, 4);
+		double startingY = squirrel.getY();
+		helper.succeedWhen(() -> helper.assertTrue(
+				squirrel.hasFoundTree() && squirrel.getY() >= startingY + 1.8D,
+				"Squirrel never settled beneath canopy: " + squirrel.position()
+		));
+	}
 }
