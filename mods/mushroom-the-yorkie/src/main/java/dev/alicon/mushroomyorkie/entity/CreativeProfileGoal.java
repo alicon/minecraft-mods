@@ -31,6 +31,7 @@ final class CreativeProfileGoal extends Goal {
 	public boolean canUse() {
 		return this.yorkie.level() instanceof ServerLevel level
 				&& !this.yorkie.isOrderedToSit()
+				&& !MushroomYorkieStateQueries.isWetForSitting(this.yorkie)
 				&& !MushroomNightBehavior.shouldSleepAtNight(this.yorkie, level)
 				&& MushroomBehaviorProfiles.keepsCreativeBuilderFocus(this.yorkie, level);
 	}

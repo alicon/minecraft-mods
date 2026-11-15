@@ -167,8 +167,8 @@ six-block drop for each toy and owner locomotion state. It requires ordinary
 returns in accessible terrain and safe refusal under covered water or a survival
 cliff. A grounded creative cliff attempt may return or safely give up; it must
 conserve the toy, avoid damage, and end near the owner. Flying fetches must return.
-Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, making the full suite 219 cases. Run one group with `--group base`,
-`--group transitions`, `--group terrain`, or `--group outdoors`; combine it with an exact `--case`.
+Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, and the water/rest group adds 18, making the full suite 237 cases. Run one group with `--group base`,
+`--group transitions`, `--group terrain`, `--group outdoors`, or `--group water`; combine it with an exact `--case`.
 Unknown groups/cases fail instead of running a different suite.
 
 ```shell
@@ -184,6 +184,22 @@ one on the next day. Sit and nighttime sleep remain protected. Native
 outdoor meter decay. The fixture verifies both door halves and audits an
 extended clear outdoor approach. Hunger is reset at synthetic day boundaries
 so these care cases do not become starvation tests.
+
+The `water` group moves an already-resting or awake pet into a contained deep
+pool. Sixteen cases cross day/night, fed/hungry, survival/grounded creative,
+and real empty-hand wet sit requests. Two more trigger creative naps through
+three actual block placements, at energy 0 and 80. Every case checks wet rest
+refusal, the same healthy pet, a real bank landing rather than a surface hop,
+normal gravity afterward, and appropriate dry sleep/nap resumption. The owner
+steps farther onto shore after the reachable interaction. Each fixture resets
+and verifies owner yaw/pitch so an earlier failure camera cannot change flight
+targets and mask a stall.
+
+Failure captures preserve the initial server state, wait 300 ms for client
+interpolation, then record a separate camera state and aim at the current pet's
+coordinates. After another 150 ms, they capture with the GUI/chat hidden. The
+screenshot is a later visual observation, not the exact assertion tick; both
+states and camera coordinates remain in the report.
 
 The Overworld arena clears its footprint to y=319 and verifies the upper volume
 is air, so an old high platform cannot masquerade as outside. Terrain cases also

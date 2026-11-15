@@ -46,3 +46,14 @@ test('outdoor cases cover daily care, sit/sleep controls and warning boundaries'
   assert.equal(rows.filter((row) => row.time === 18000).length, 8);
   assert.equal(rows.filter((row) => row.sitting).length, 8);
 });
+
+test('water recovery covers modes, hunger, wet sit requests and real builder naps', () => {
+  const { waterRestInputs, waterRestCases } = require('./yorkie-water-rest');
+  const rows = waterRestInputs();
+  assert.equal(rows.length, 18);
+  assert.equal(new Set(waterRestCases({}).map((row) => row.name)).size, 18);
+  assert.equal(rows.filter((row) => row.time === 18000).length, 8);
+  assert.equal(rows.filter((row) => row.requestSit).length, 8);
+  assert.equal(rows.filter((row) => row.ownerMode === 'survival').length, 8);
+  assert.deepEqual(rows.filter((row) => row.buildNap).map((row) => row.energy), [0, 80]);
+});

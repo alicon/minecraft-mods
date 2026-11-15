@@ -6,8 +6,8 @@ import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.AABB;
 
-/** Server-only fetch steering. Native flying paths route around floors instead of aiming through them. */
-final class FetchFlightNavigation {
+/** Server-only flight routes shared by fetch and recovery; clear ascent waypoints avoid aiming through floors. */
+final class MushroomFlightRoute {
 	private static final int REPLAN_TICKS = 20;
 	private static final int CLEAR_ASCENT_SEARCH_RADIUS_BLOCKS = 8;
 	private static final double ASCENT_TOLERANCE_BLOCKS = 0.1D;
@@ -26,7 +26,7 @@ final class FetchFlightNavigation {
 	private boolean ascending;
 	private boolean flightRequested;
 
-	FetchFlightNavigation(MushroomYorkieEntity yorkie) {
+	MushroomFlightRoute(MushroomYorkieEntity yorkie) {
 		this.yorkie = yorkie;
 	}
 

@@ -5,8 +5,8 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 
 final class MushroomFlightController {
-	// Fetch waypoints need precise steering; the normal 2.5-block owner orbit stops too far away.
-	private static final double FETCH_FLIGHT_HOVER_DISTANCE_SQ = 0.01D;
+	// Route waypoints need precise steering; the normal 2.5-block owner orbit stops too far away.
+	private static final double ROUTED_FLIGHT_HOVER_DISTANCE_SQ = 0.01D;
 	private static final double CREATIVE_RECOVERY_FLIGHT_DISTANCE_SQ = 12.0D * 12.0D;
 	private static final double CREATIVE_WATER_RECOVERY_DISTANCE_SQ = 4.0D;
 
@@ -20,6 +20,7 @@ final class MushroomFlightController {
 				MushroomBehaviorDebugger.debug(yorkie, "vehicle_dismount", "vehicle: hopped out before creative flight", true);
 			}
 			yorkie.setNoGravity(false);
+			yorkie.creativeRecoveryFlight.clearRoute();
 			updateFlightTrick(yorkie, false);
 			return;
 		}
@@ -30,6 +31,7 @@ final class MushroomFlightController {
 		boolean fetching = yorkie.fetchFlight.flying();
 		updateFlightTrick(yorkie, flyingToOwner && ownerFlying && !fetching);
 		if (!flyingToOwner) {
+			yorkie.creativeRecoveryFlight.clearRoute();
 			return;
 		}
 		MushroomBehaviorDebugger.debug(
@@ -41,16 +43,23 @@ final class MushroomFlightController {
 
 		LivingEntity owner = yorkie.getOwner();
 		if (owner == null || owner.level() != yorkie.level()) {
+			yorkie.creativeRecoveryFlight.clearRoute();
 			return;
 		}
 
 		yorkie.fallDistance = 0.0F;
-		Vec3 target = fetching ? yorkie.fetchFlight.steeringTarget() : owner.position()
-				.add(owner.getLookAngle().scale(-1.4D))
-				.add(0.0D, -0.8D, 0.0D);
+		Vec3 target;
+		if (fetching || ownerFlying) {
+			yorkie.creativeRecoveryFlight.clearRoute();
+			target = fetching ? yorkie.fetchFlight.steeringTarget() : owner.position()
+					.add(owner.getLookAngle().scale(-1.4D)).add(0.0D, -0.8D, 0.0D);
+		} else {
+			// A grounded owner's standing position is clear; the airborne follow offset may lie inside a bank.
+			target = yorkie.creativeRecoveryFlight.steeringTarget(yorkie, owner.position());
+		}
 		Vec3 delta = target.subtract(yorkie.position());
 		faceFlightTarget(yorkie, delta);
-		double hoverDistanceSq = fetching ? FETCH_FLIGHT_HOVER_DISTANCE_SQ : MushroomYorkieEntity.CREATIVE_FLIGHT_FOLLOW_DISTANCE_SQ;
+		double hoverDistanceSq = fetching || !ownerFlying ? ROUTED_FLIGHT_HOVER_DISTANCE_SQ : MushroomYorkieEntity.CREATIVE_FLIGHT_FOLLOW_DISTANCE_SQ;
 		if (delta.lengthSqr() <= hoverDistanceSq) {
 			yorkie.setDeltaMovement(yorkie.getDeltaMovement().scale(0.6D));
 			MushroomBehaviorDebugger.debug(yorkie, "creative_flight_hover", "creative flight: holding position", false);
