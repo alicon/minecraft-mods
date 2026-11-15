@@ -256,6 +256,16 @@ The bridge exposes stable entity `uuid` values across reloads and additive
 `mainHand` state for living entities. Interruption tests
 now observe the carried toy directly and verify the hand clears after a drop.
 
+The restart arena requires the Overworld, clears old overhead blocks through y=319,
+and records an air-volume audit. Use `--flight-return flying` or
+`--flight-return landed` to save after a real six-block ledge pickup. The latter
+lands the creative owner before quitting. Each mode traces the same carrier,
+health, and inventory/ground/hand counts for up to 800 ticks after reload, then
+checks safe settling after delivery. Combine either mode with `--toy` to test
+any fetch toy. These modes are separate from `--full-creative-inventory`.
+Restart reports also record source commit/dirty status; installed jar hashes
+remain the direct evidence for the running gameplay build.
+
 ## Companion Mode
 
 ```shell

@@ -32,7 +32,10 @@ final class FetchFlightNavigation {
 
 	void request(Vec3 target) {
 		this.target = target;
-		this.flightRequested |= MushroomYorkieStateQueries.ownerIsCreativeFlying(this.yorkie);
+		// Vanilla saves airborne gravity state, while this route is intentionally transient.
+		// Rebuild an already-airborne creative fetch after reload, even if the owner landed.
+		this.flightRequested |= MushroomYorkieStateQueries.ownerIsCreativeFlying(this.yorkie)
+				|| this.yorkie.isNoGravity() && MushroomYorkieStateQueries.ownerIsCreative(this.yorkie);
 	}
 
 	void clear() {

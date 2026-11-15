@@ -26,6 +26,8 @@ def guard_world(state, expected):
         raise ValueError('A disposable test save prefix is required')
     if not state.get('singleplayer') or len(state.get('players', [])) != 1:
         raise ValueError('Exactly one player in a single-player world is required')
+    if 'minecraft:overworld' not in state['players'][0].get('dimension', ''):
+        raise ValueError('The restart arena requires the Overworld')
 
 
 def toy_counts(state, toy):
@@ -106,7 +108,12 @@ def execute(args, bridge):
     run_id = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8]
     report_file = Path(args.report_file).resolve() if args.report_file else ROOT / 'build/playtest-reports' / f'fetch-restart-{run_id}.json'
     report = {'scenario': 'fetch-across-saved-restart', 'runId': run_id, 'expectedSave': args.expected_save,
-              'toy': args.toy, 'fullCreativeInventory': args.full_creative_inventory, 'spawnedToyCount': 1, 'complete': False, 'ok': False, 'stage': 'preflight'}
+              'toy': args.toy, 'fullCreativeInventory': args.full_creative_inventory, 'flightReturn': args.flight_return, 'spawnedToyCount': 1, 'complete': False, 'ok': False, 'stage': 'preflight'}
+    try:
+        report['sourceCommit'] = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+        report['sourceDirty'] = bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip())
+    except (OSError, subprocess.CalledProcessError):
+        report['sourceUnavailable'] = True
     save = lambda: write_report(report_file, report)
     save()
     try:
@@ -139,8 +146,12 @@ def execute(args, bridge):
         command(f'tp {name} 0.5 201 0.5')
         for entity in (YORKIE, 'mushroom_yorkie:squirrel', 'minecraft:item'):
             bridge.request('/clear-entities', {'type': entity})
-        command('fill -5 199 -5 15 205 5 minecraft:air')
+        command('fill -5 199 -5 15 319 5 minecraft:air')
         command('fill -5 199 -5 15 199 5 minecraft:grass_block')
+        sky = bridge.request('/count-blocks', {'x1': -5, 'y1': 206, 'z1': -5, 'x2': 15, 'y2': 319, 'z2': 5})
+        report['fixtureAudit'] = sky
+        if sky['counts'].get('minecraft:air') != sky['volume']:
+            raise RuntimeError('Old overhead blocks invalidate restart fixture')
         command('time set day')
         command(f'tp {name} 0.5 200 0.5')
         command(f'summon {YORKIE} 8.5 200 0.5 {{PersistenceRequired:1b}}')
@@ -148,9 +159,26 @@ def execute(args, bridge):
         if not tamed['target']['tameable']['ownedByPlayer'] or 'mainHand' not in tamed['target']:
             raise ValueError('Fixture requires an owned pet and bridge mainHand observation')
         command(f'clear {name}')
-        command(f'gamemode survival {name}')
         command('tick freeze')
-        command(f'summon minecraft:item 8.5 200 0.5 {{Item:{{id:"{args.toy}",count:1}},PickupDelay:32767}}')
+        if args.flight_return:
+            # Begin on the platform, observe a real flight pickup six blocks below,
+            # then save before the safe ascent can complete.
+            command('fill -5 191 -5 15 198 5 minecraft:air')
+            command('fill 7 194 -1 9 199 1 minecraft:air')
+            command('fill 7 193 -1 9 193 1 minecraft:stone')
+            for y, expected in ((199, 'minecraft:air'), (193, 'minecraft:stone')):
+                block = bridge.request('/block', {'x': 8, 'y': y, 'z': 0})
+                if block['block'] != expected:
+                    raise RuntimeError('Below-ledge restart fixture does not match its intended geometry')
+            bridge.request('/player-abilities', {'player': name, 'flying': True, 'mayfly': True})
+            command(f'tp {name} 0.5 201.5 0.5')
+            command(f'tp @e[type={YORKIE},limit=1] 3.5 200 0.5')
+            command(f'data merge entity @e[type={YORKIE},limit=1] {{Hunger:0,Potty:0,Mood:60,Energy:80,Health:12.0f}}')
+            toy_y = 194
+        else:
+            command(f'gamemode survival {name}')
+            toy_y = 200
+        command(f'summon minecraft:item 8.5 {toy_y} 0.5 {{Item:{{id:"{args.toy}",count:1}},PickupDelay:32767}}')
         report['stage'] = 'waiting_for_pickup'
         save()
         for _ in range(180):
@@ -166,13 +194,17 @@ def execute(args, bridge):
         inventory = command(f'clear {name} {args.toy} 0').get('result', 0)
         if inventory != 0:
             raise RuntimeError('Fixture inventory is not empty')
+        if args.flight_return == 'landed':
+            bridge.request('/player-abilities', {'player': name, 'flying': False, 'mayfly': True})
+            command(f'tp {name} 0.5 200 0.5')
+            snapshot = state()
         if args.full_creative_inventory:
             command(f'gamemode creative {name}')
             for section, count in (('hotbar', 9), ('inventory', 27)):
                 for slot in range(count):
                     command(f'item replace entity {name} {section}.{slot} with minecraft:stone 64')
             snapshot = state()
-        report.update(stage='carried', beforeQuit=snapshot, carrierUuid=pet['uuid'], inventoryBeforeQuit=inventory)
+        report.update(stage='carried', beforeQuit=snapshot, carrierUuid=pet['uuid'], carrierHealthBeforeQuit=pet['health'], inventoryBeforeQuit=inventory)
         save()
         offset = game_log.stat().st_size
         accepted = bridge.request('/quit', {'expectedSave': args.expected_save})
@@ -213,8 +245,10 @@ def execute(args, bridge):
         report.update(stage='reloaded', bootstrapLog=str(launch_log))
         save()
         snapshot = state()
-        if snapshot['players'][0]['uuid'] != report['playerUuid'] or snapshot['players'][0]['abilities']['creative'] != args.full_creative_inventory:
+        if snapshot['players'][0]['uuid'] != report['playerUuid'] or snapshot['players'][0]['abilities']['creative'] != bool(args.full_creative_inventory or args.flight_return):
             raise RuntimeError('Reloaded owner identity or expected game mode changed')
+        if args.flight_return and snapshot['players'][0]['abilities']['flying'] != (args.flight_return == 'flying'):
+            raise RuntimeError('Reloaded owner flight state does not match the selected scenario')
         if installed_jars(profile) != report['installedJarHashes']:
             raise RuntimeError('Installed jars changed during the restart scenario')
         report['immediatelyAfterReload'] = snapshot
@@ -232,7 +266,33 @@ def execute(args, bridge):
                 time.sleep(.1)
             raise RuntimeError('Post-reload game ticks did not advance')
 
-        snapshot = advance(240)
+        if args.flight_return:
+            report['returnTrace'] = []
+            for ticks in range(20, 801, 20):
+                snapshot = advance(20)
+                carrier = next((e for e in snapshot['players'][0]['nearbyEntities'] if e.get('uuid') == report['carrierUuid']), None)
+                inventory = command(f'clear {name} {args.toy} 0').get('result', 0)
+                ground, held = toy_counts(snapshot, args.toy)
+                report['returnTrace'].append({'ticks': ticks, 'inventory': inventory, 'ground': ground, 'held': held, 'carrier': carrier})
+                save()
+                if carrier is None:
+                    raise RuntimeError('Airborne carrier disappeared or left the observation area after reload')
+                if carrier['health'] < report['carrierHealthBeforeQuit']:
+                    raise RuntimeError('Airborne return damaged Mushroom after reload')
+                if inventory + ground + held != 1:
+                    raise RuntimeError('Airborne return lost or duplicated the observable toy')
+                if inventory == 1:
+                    break
+            if inventory == 1:
+                snapshot = advance(40)
+                report['settledAfterReturn'] = snapshot
+                carrier = next((e for e in snapshot['players'][0]['nearbyEntities'] if e.get('uuid') == report['carrierUuid']), None)
+                if carrier is None or carrier['health'] < report['carrierHealthBeforeQuit']:
+                    raise RuntimeError('Airborne carrier did not remain safe after delivery')
+                if args.flight_return == 'landed' and carrier['noGravity']:
+                    raise RuntimeError('Landed-owner fetch retained flight after delivery')
+        else:
+            snapshot = advance(240)
         if args.full_creative_inventory:
             inventory = command(f'clear {name} {args.toy} 0').get('result', 0)
             ground, held = toy_counts(snapshot, args.toy)
@@ -283,7 +343,9 @@ def main():
     parser.add_argument('--host', default='127.0.0.1')
     parser.add_argument('--port', type=int, default=57321)
     parser.add_argument('--instance-id')
-    parser.add_argument('--full-creative-inventory', action='store_true', help='Verify held overflow across restart/sit, then free space and finish delivery')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--full-creative-inventory', action='store_true', help='Verify held overflow across restart/sit, then free space and finish delivery')
+    mode.add_argument('--flight-return', choices=('flying', 'landed'), help='Save after a below-ledge flight pickup with the creative owner still flying or already landed')
     parser.add_argument('--report-file')
     args = parser.parse_args()
     return run(args)
