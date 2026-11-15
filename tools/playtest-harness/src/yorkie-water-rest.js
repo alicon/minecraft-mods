@@ -70,6 +70,7 @@ function waterRestCases({ prepare, command, request, entity, advance, base, play
         check(pet?.uuid === original.uuid, 'Water recovery lost or replaced the pet');
         check(pet.health >= original.health && pet.health === pet.maxHealth, 'Water recovery damaged Mushroom');
         check(!pet.tameable.orderedToSit, 'Wet sit request left a persistent sit order');
+        if (pet.custom.curledUpSleeping) check(pet.onGround, 'Pet started sleeping before landing');
         if (pet.inWater) check(!pet.custom.curledUpSleeping && !pet.tameable.sittingPose, 'Wet pet sat or slept instead of recovering');
         if (!pet.inWater && pet.distance < 3 && pet.position.x < base.x + 0.8 && Math.abs(pet.position.y - base.y) < 0.3) { recovered = snapshot; break; }
       }
@@ -80,7 +81,7 @@ function waterRestCases({ prepare, command, request, entity, advance, base, play
       result.observed.settled = settled;
       check(pet?.uuid === original.uuid && !pet.inWater && pet.health === pet.maxHealth, 'Pet did not remain safe and dry after recovery');
       check(pet.custom.curledUpSleeping === (inputs.time === 18000 || inputs.buildNap), 'Dry sleep/nap did not resume at the appropriate time');
-      check(!pet.noGravity && !pet.tameable.orderedToSit, 'Water recovery retained flight or a refused sit order');
+      check(pet.onGround && !pet.noGravity && !pet.tameable.orderedToSit, 'Water recovery did not land or retained flight/a refused sit order');
       return result.observed;
     }
   }));

@@ -190,7 +190,8 @@ pool. Sixteen cases cross day/night, fed/hungry, survival/grounded creative,
 and real empty-hand wet sit requests. Two more trigger creative naps through
 three actual block placements, at energy 0 and 80. Every case checks wet rest
 refusal, the same healthy pet, a real bank landing rather than a surface hop,
-normal gravity afterward, and appropriate dry sleep/nap resumption. The owner
+normal gravity afterward, and appropriate dry sleep/nap resumption. Bridge
+entity state includes `onGround`; sleeping during an airborne hop fails. The owner
 steps farther onto shore after the reachable interaction. Each fixture resets
 and verifies owner yaw/pitch so an earlier failure camera cannot change flight
 targets and mask a stall.

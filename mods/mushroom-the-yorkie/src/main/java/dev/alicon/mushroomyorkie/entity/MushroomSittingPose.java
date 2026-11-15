@@ -9,8 +9,8 @@ final class MushroomSittingPose {
 	}
 
 	static void setSleeping(MushroomYorkieEntity yorkie, boolean sleeping) {
-		// Night sleep and creative naps share this guard, including callers already active on entering water.
-		sleeping = sleeping && !MushroomYorkieStateQueries.isWetForSitting(yorkie);
+		// Night sleep and creative naps must wait for a dry landing, including callers already active on entering water.
+		sleeping = sleeping && MushroomYorkieStateQueries.canSleep(yorkie);
 		yorkie.setSleepingData(sleeping);
 		update(yorkie);
 		if (sleeping) {

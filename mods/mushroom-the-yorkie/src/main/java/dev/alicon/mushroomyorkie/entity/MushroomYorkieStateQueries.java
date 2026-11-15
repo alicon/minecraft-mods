@@ -18,6 +18,11 @@ final class MushroomYorkieStateQueries {
 		return owner instanceof Player player && player.isCreative() && owner.level() == yorkie.level();
 	}
 
+	static boolean canSleep(MushroomYorkieEntity yorkie) {
+		// A jump can briefly clear the water flag before reaching land; do not stop recovery midair.
+		return yorkie.onGround() && !isWetForSitting(yorkie);
+	}
+
 	static boolean isWetForSitting(MushroomYorkieEntity yorkie) {
 		return yorkie.isInWater() || yorkie.level().getFluidState(yorkie.blockPosition()).is(FluidTags.WATER);
 	}
