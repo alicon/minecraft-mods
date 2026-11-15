@@ -79,6 +79,14 @@ Run Mushroom's headless Minecraft GameTests:
 
 GameTests boot a scripted Minecraft server from the CLI. They are slower than unit tests, so keep them focused on behavior that needs a real world, entity registry, or server tick loop.
 
+## Survival-mode GameTest players
+
+Minecraft's built-in mock server player hardcodes creative mode, even after
+`setGameMode(SURVIVAL)`. Use the shared `SurvivalGameTestPlayers` fixture for
+inventory-consumption or return tests that depend on survival behavior. Shared
+fixtures live in `src/gametest/java`; version-specific annotations and save/load
+adapters stay under `src/versions/<version>/gametest/java`. They remain test-only.
+
 ## Local Playtest Harness
 
 The Mineflayer harness in `tools/playtest-harness/` can join a local dev server, dedicated test server, or single-player LAN world. Use it for player-like smoke checks, live bot companionship, and artifact capture that is faster than repeating manual setup by hand.
@@ -234,6 +242,8 @@ Mushroom the Yorkie:
 - pet-needs effects for bowl meals, normal player food, water, toy play, food bar display, and starvation state
 - lost-Mushroom recovery policy after a full Minecraft day away from the owner
 - daily outdoor relief state and saved passive-mob calm memory
+- headless GameTests verify native carried-toy save/load, named item components, whole-stack return, repeated interruptions without duplication, and guaranteed toy drops after environmental death
+- saved-restart live runner checks the ball, chew toy, or bone across a normal client shutdown and relaunch, including player/carrier identity, jar hashes, and inventory/ground/held-item conservation
 - headless GameTest verifies Mushroom's custom entity can spawn in a Minecraft test world
 
 Cops and Robbers:

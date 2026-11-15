@@ -25,7 +25,8 @@ function transitionCases({ prepare, command, request, state, entity, advance, ba
               await command('tick step 1t');
               await delay(100);
               const snapshot = await state();
-              if (toys(snapshot).length === 0 && entity(snapshot)?.distance > 2.5) { picked = snapshot; break; }
+              if (toys(snapshot).length === 0 && entity(snapshot)?.distance > 2.5
+                  && entity(snapshot)?.mainHand?.id === item && entity(snapshot)?.mainHand?.count === 1) { picked = snapshot; break; }
             }
             if (!picked) {
               const error = new Error('Could not isolate the carried toy before delivery');
@@ -42,6 +43,7 @@ function transitionCases({ prepare, command, request, state, entity, advance, ba
             const pet = entity(after);
             check(pet && (interruption === 'sit' ? pet.tameable.orderedToSit : pet.custom.curledUpSleeping), 'Requested interruption did not take effect');
             check(toys(after).reduce((count, toy) => count + toy.item.count, 0) === 1, 'Interrupted fetch lost or duplicated the toy');
+            check(pet.mainHand?.id !== item || pet.mainHand.count === 0, 'Interrupted fetch retained a second carried copy');
             return result.observed;
           } finally { await command('tick unfreeze'); }
         }

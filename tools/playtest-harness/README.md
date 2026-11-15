@@ -179,6 +179,35 @@ npm --prefix tools/playtest-harness test
 The runner/safety tests use Node's built-in test runner and need no dependency
 installation. CI runs them separately from the Gradle builds.
 
+## Fetch across a saved restart
+
+```shell
+make bridge-yorkie-fetch-restart PLAYTEST_WORLD="Mushroom Abel Noelle 20261115-075437"
+```
+
+This destructive test requires Python 3, the updated bridge and Mushroom jars,
+exact copied-save matching, and one player. It clears test inventory/items/pets,
+creates one toy, observes it in Mushroom's native `mainHand`, saves and quits,
+verifies fresh save-completion logs and the returned client `processId` exiting,
+relaunches the same profile, then checks that exactly one toy reaches the owner.
+Both jar hashes and the player/carrier identities must stay unchanged across the restart.
+Normal command refusals and bootstrap errors remain distinct from failed toy
+conservation; partial reports survive each stage. A startup error is not proof
+of item loss—inspect the recorded `failedStage` and bootstrap log before retrying.
+
+Default report names include a unique run ID. Set `BRIDGE_REPORT_FILE` to choose
+an explicit path. Direct invocation also accepts `--toy minecraft:bone` or
+`--toy mushroom_yorkie:yorkie_chew_toy`, and `--instance-id` for a non-default
+Modrinth profile. Do not run another mutating bridge scenario concurrently.
+
+```shell
+python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+```
+
+The bridge exposes stable entity `uuid` values across reloads and additive
+`mainHand` state for living entities. Interruption tests
+now observe the carried toy directly and verify the hand clears after a drop.
+
 ## Companion Mode
 
 ```shell

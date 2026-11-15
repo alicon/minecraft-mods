@@ -433,3 +433,8 @@ print-vars:
 
 bridge-quit:
 	$(HARNESS) run bridge -- quit --host "$(BRIDGE_HOST)" --port "$(BRIDGE_PORT)" --expected-save "$(PLAYTEST_WORLD)"
+
+.PHONY: bridge-yorkie-fetch-restart
+
+bridge-yorkie-fetch-restart:
+	python3 scripts/playtest-fetch-restart.py --expected-save "$(PLAYTEST_WORLD)" --host "$(BRIDGE_HOST)" --port "$(BRIDGE_PORT)" $(if $(BRIDGE_REPORT_FILE),--report-file "$(BRIDGE_REPORT_FILE)",)
