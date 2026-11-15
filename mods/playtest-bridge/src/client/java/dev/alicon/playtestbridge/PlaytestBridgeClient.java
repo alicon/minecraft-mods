@@ -8,6 +8,7 @@ import java.util.regex.Pattern;
 import net.fabricmc.api.ClientModInitializer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
+import net.minecraft.world.level.storage.LevelResource;
 
 /** Client entrypoint that exposes local screenshot capture to the playtest bridge. */
 public final class PlaytestBridgeClient implements ClientModInitializer {
@@ -16,7 +17,32 @@ public final class PlaytestBridgeClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		BridgeClientHooks.registerScreenshotProvider(this::captureScreenshot);
+		BridgeClientHooks.registerQuitProvider(this::requestQuit);
 		PlaytestBridge.LOGGER.info("Playtest bridge client screenshot hook initialized");
+	}
+
+	private CompletableFuture<JsonObject> requestQuit(String expectedSave) {
+		CompletableFuture<JsonObject> future = new CompletableFuture<>();
+		Minecraft client = Minecraft.getInstance();
+		client.execute(() -> {
+			var server = client.getSingleplayerServer();
+			if (server == null || !expectedSave.equals(server.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize().getFileName().toString())) {
+				future.completeExceptionally(new IllegalStateException("loaded client save changed before quit"));
+				return;
+			}
+			JsonObject response = new JsonObject();
+			response.addProperty("ok", true);
+			response.addProperty("accepted", true);
+			response.addProperty("expectedSave", expectedSave);
+			future.complete(response);
+			// Let the bridge deliver its reply before normal client shutdown saves the world.
+			CompletableFuture.delayedExecutor(500, TimeUnit.MILLISECONDS).execute(() -> client.execute(() -> {
+				if (client.getSingleplayerServer() == server) {
+					client.stop();
+				}
+			}));
+		});
+		return future;
 	}
 
 	private CompletableFuture<JsonObject> captureScreenshot(String name, boolean resume, boolean hideGui, boolean clearChat) {

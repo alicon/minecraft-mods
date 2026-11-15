@@ -3423,7 +3423,7 @@ function printBridgeUsage() {
   console.log(`Usage: node src/bridge-cli.js [action] [options]
 
 Actions:
-  health, state, smoke, chat, command, look, give, summon, teleport
+  health, state, quit (--expected-save <copied save>), smoke, chat, command, look, give, summon, teleport
 	  player-abilities, use-entity, clear-entities
 	  set-block-near-entity, set-block, block, use-block, count-blocks, terrain-scan
 	  yorkie-matrix (--expected-save <copied save>), yorkie-smoke, yorkie-water-smoke, yorkie-adventure-smoke, yorkie-home-squirrel, yorkie-visual-sweep, yorkie-biome-scout, yorkie-natural-gallery
@@ -3454,6 +3454,8 @@ async function main() {
   let result;
   if (action === 'health') {
     result = await requestJson(baseUrl, '/health');
+  } else if (action === 'quit') {
+    result = await requestJson(baseUrl, '/quit', 'POST', { expectedSave: option(args, 'expectedSave', 'PLAYTEST_WORLD', '') });
   } else if (action === 'state') {
     result = await requestJson(baseUrl, '/state');
   } else if (action === 'smoke') {

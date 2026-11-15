@@ -58,6 +58,20 @@ make bridge-cops-structures-smoke BRIDGE_SCREENSHOT_NAME=cops-structures.png
 make bridge-cops-visual-sweep BRIDGE_SCREENSHOT_NAME=cops-visual
 ```
 
+For a normal saved client shutdown before installing rebuilt jars:
+
+```shell
+make bridge-quit PLAYTEST_WORLD="Mushroom Abel Noelle 20261115-075437"
+```
+
+The quit endpoint requires the exact loaded disposable save name, a single-player
+world, and exactly one connected player. It uses Minecraft's client stop path;
+the integrated server does not implement `/stop`. The reply means the request was
+accepted, **not that the save is complete**. Before installing jars or relaunching,
+verify the game process has exited and that new log lines after the request contain
+`All dimensions are saved`. If that confirmation is missing, inspect the shutdown
+rather than treating a vanished bridge as proof of a successful save.
+
 The bridge is intentionally bound to `127.0.0.1` and should only be installed in local development profiles.
 Screenshots close the active client screen before capture by default. Set `BRIDGE_SCREENSHOT_RESUME=0` to keep the current screen visible. Set `BRIDGE_SCREENSHOT_HIDE_GUI=1` and `BRIDGE_SCREENSHOT_CLEAR_CHAT=1` for clean visual inspection captures.
 Set `BRIDGE_REPORT_FILE=build/playtest-reports/<name>.json` on any bridge scenario target to persist the full JSON result, including every step payload and screenshot path, outside the terminal output.
