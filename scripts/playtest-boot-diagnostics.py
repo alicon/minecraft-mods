@@ -5,27 +5,38 @@ import datetime
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import time
 import uuid
 
 
+def console_write_threads(thread_dump):
+    """Return critical game threads observed writing through the Log4j console, not a claim about the pipe consumer."""
+    observed = []
+    for section in re.split(r'(?m)(?=^")', thread_dump):
+        header = re.match(r'^"([^"]+)"', section)
+        if not header:
+            continue
+        name = header.group(1)
+        if name not in {'Server thread', 'Render thread'} and not re.fullmatch(r'Worker-ResourceReload-\d+', name):
+            continue
+        stack = section.split('\n\n', 1)[0]
+        writing = 'java.io.FileOutputStream.write' in stack or 'sun.nio.ch.FileDispatcherImpl.write' in stack
+        console = 'java.io.PrintStream.' in stack or 'org.apache.logging.log4j.core.appender.ConsoleAppender.' in stack
+        if writing and console and 'org.apache.logging.log4j' in stack and name not in observed:
+            observed.append(name)
+    return observed
+
+
 def classify_console_write(thread_dump, stdout_type):
-    lines = thread_dump.splitlines()
-    start = next((index for index, line in enumerate(lines) if line.startswith('"Server thread"')), None)
-    if start is None:
-        return 'server_thread_not_observed'
-    stack = []
-    for line in lines[start + 1:]:
-        if not line.strip() or line.startswith('"'):
-            break
-        stack.append(line)
-    stack = '\n'.join(stack)
-    writing = 'java.io.FileOutputStream.write' in stack or 'sun.nio.ch.FileDispatcherImpl.write' in stack
-    if writing and 'org.apache.logging.log4j' in stack:
-        return 'suspected_console_backpressure' if stdout_type.upper() == 'PIPE' else 'server_logging_write_observed'
-    return 'no_console_write_observed'
+    observed = console_write_threads(thread_dump)
+    if observed:
+        if stdout_type.upper() == 'PIPE':
+            return 'suspected_console_backpressure'
+        return 'server_logging_write_observed' if 'Server thread' in observed else 'client_logging_write_observed'
+    return 'no_console_write_observed' if re.search(r'(?m)^"Server thread"', thread_dump) else 'server_thread_not_observed'
 
 
 def capture(arguments, timeout=10):
@@ -80,10 +91,11 @@ def diagnose(profile, expected_save, report_file):
                 else:
                     dump_file = report_file.with_suffix('.threads.txt')
                     dump_file.write_text(dump)
-                    report.update(status=classify_console_write(dump, process['stdoutType']), threadDump=str(dump_file))
+                    report.update(status=classify_console_write(dump, process['stdoutType']),
+                                  consoleWriteThreads=console_write_threads(dump), threadDump=str(dump_file))
             else:
                 report['status'] = 'jcmd_unavailable'
-    report['interpretation'] = ('A logging write to stdout PIPE was observed; launcher backpressure is a hypothesis. '
+    report['interpretation'] = ('A critical game thread was observed in a Log4j console write while stdout is a PIPE; launcher backpressure is a hypothesis. '
                                 'Inspect the local thread dump and launcher consumer. The game was left running.'
                                 if report['status'] == 'suspected_console_backpressure' else
                                 'This snapshot does not establish console backpressure or world-load failure. '

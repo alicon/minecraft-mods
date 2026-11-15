@@ -147,6 +147,11 @@ Use `make bridge-quit PLAYTEST_WORLD="<copied save>"` for a normal client shutdo
 and verify new save-completion log lines plus process exit before installing jars.
 An accepted quit response is not save-completion evidence.
 
+Startup diagnostics recognize Log4j writes on the server, render thread and
+resource-reload workers. A stdout pipe write is a backpressure hypothesis; the
+report records the observed threads and leaves every process running. Healthy
+frame waits and unrelated file writes are not evidence of console blockage.
+
 Restart Minecraft after installing `playtest-bridge`. The bridge binds to `127.0.0.1:57321` by default and is intended only for local development profiles.
 Bridge state and terrain-scan seeds are exact signed decimal strings; keep that
 type in reproduction reports rather than converting to JavaScript numbers.
