@@ -108,6 +108,7 @@ async function requestJson(baseUrl, path, method = 'GET', body = null) {
   if (!response.ok) {
     throw new Error(`${method} ${path} failed with ${response.status}: ${text}`);
   }
+  require('./command-result').checkCommandParsed(parsed);
   return parsed;
 }
 
@@ -350,9 +351,9 @@ async function runYorkieSmoke(baseUrl, args) {
   await step('prepare world', async () => {
     await command('time set day');
     await command('weather clear');
-    await command('gamerule doMobSpawning false');
-    await command('gamerule doDaylightCycle false');
-    await command('gamerule doMobLoot false');
+    await command('gamerule minecraft:spawn_mobs false');
+    await command('gamerule minecraft:advance_time false');
+    await command('gamerule minecraft:mob_drops false');
     await clearEntities('cops_robbers:bank_robber');
     await clearEntities('cops_robbers:police_cruiser');
     await clearEntities(yorkieType);
@@ -1131,8 +1132,8 @@ async function runYorkieHomeSquirrel(baseUrl, args) {
   async function prepareScene() {
     await checkedCommand(`gamemode creative ${playerName}`);
     await requestJson(baseUrl, '/player-abilities', 'POST', { player: playerName, flying: false, mayfly: true });
-    await command('gamerule doMobSpawning false');
-    await command('gamerule doDaylightCycle false');
+    await command('gamerule minecraft:spawn_mobs false');
+    await command('gamerule minecraft:advance_time false');
     await command('weather clear');
     await clearEntities(yorkieType);
     await clearEntities(squirrelType);
@@ -1519,10 +1520,10 @@ async function runYorkieVisualSweep(baseUrl, args) {
     await step(`prepare ${name}`, async () => {
       await command('time set noon');
       await command('weather clear');
-      await command('gamerule doMobSpawning false');
-      await command('gamerule doDaylightCycle false');
-      await command('gamerule doMobLoot false');
-      await command('gamerule sendCommandFeedback false');
+      await command('gamerule minecraft:spawn_mobs false');
+      await command('gamerule minecraft:advance_time false');
+      await command('gamerule minecraft:mob_drops false');
+      await command('gamerule minecraft:send_command_feedback false');
       await checkedCommand(`gamemode creative ${playerName}`);
       await playerAbilities({ flying: false, mayfly: true });
       await command(`clear ${playerName}`);
@@ -2040,7 +2041,7 @@ async function runYorkieBiomeScout(baseUrl, args) {
   await stepResult('prepare biome scout', async () => {
     await command('time set noon');
     await command('weather clear');
-    await command('gamerule doDaylightCycle false');
+    await command('gamerule minecraft:advance_time false');
     await checkedCommand(`gamemode spectator ${playerName}`);
     return {
       saveName: initialState.saveName,
@@ -2312,10 +2313,10 @@ async function runYorkieNaturalGallery(baseUrl, args) {
     return step(`prepare ${name}`, async () => {
       await command('time set noon');
       await command('weather clear');
-      await command('gamerule doMobSpawning false');
-      await command('gamerule doDaylightCycle false');
-      await command('gamerule doMobLoot false');
-      await command('gamerule sendCommandFeedback false');
+      await command('gamerule minecraft:spawn_mobs false');
+      await command('gamerule minecraft:advance_time false');
+      await command('gamerule minecraft:mob_drops false');
+      await command('gamerule minecraft:send_command_feedback false');
       await checkedCommand(`gamemode spectator ${playerName}`);
       await checkedCommand(`tp ${playerName} ${location.x + 0.5} 180 ${location.z + 0.5}`);
       await sleep(2400);
@@ -2818,8 +2819,8 @@ async function runCopsSmoke(baseUrl, args) {
     await command('time set day');
     await command('weather clear');
     await command('difficulty easy');
-    await command('gamerule doMobSpawning false');
-    await command('gamerule doDaylightCycle false');
+    await command('gamerule minecraft:spawn_mobs false');
+    await command('gamerule minecraft:advance_time false');
     await command(`gamemode creative ${playerName}`);
     await command(`clear ${playerName}`);
     await clearEntities(robberType);
@@ -3056,8 +3057,8 @@ async function runCopsStructuresSmoke(baseUrl, args) {
     await command('time set day');
     await command('weather clear');
     await command('difficulty easy');
-    await command('gamerule doMobSpawning false');
-    await command('gamerule doDaylightCycle false');
+    await command('gamerule minecraft:spawn_mobs false');
+    await command('gamerule minecraft:advance_time false');
     await command(`gamemode creative ${playerName}`);
     await command(`clear ${playerName}`);
     await clearEntities(robberType);
@@ -3317,8 +3318,8 @@ async function runCopsVisualSweep(baseUrl, args) {
   await step('prepare visual stage', async () => {
     await command('time set noon');
     await command('weather clear');
-    await command('gamerule doMobSpawning false');
-    await command('gamerule doDaylightCycle false');
+    await command('gamerule minecraft:spawn_mobs false');
+    await command('gamerule minecraft:advance_time false');
     await checkedCommand(`gamemode creative ${playerName}`);
     await command(`clear ${playerName}`);
     for (const type of [robberType, cruiserType, fireTruckType, copType, firemanType, tellerType]) {
@@ -3424,7 +3425,7 @@ Actions:
   health, state, smoke, chat, command, look, give, summon, teleport
 	  player-abilities, use-entity, clear-entities
 	  set-block-near-entity, set-block, block, use-block, count-blocks, terrain-scan
-	  yorkie-smoke, yorkie-water-smoke, yorkie-adventure-smoke, yorkie-home-squirrel, yorkie-visual-sweep, yorkie-biome-scout, yorkie-natural-gallery
+	  yorkie-matrix (--expected-save <copied save>), yorkie-smoke, yorkie-water-smoke, yorkie-adventure-smoke, yorkie-home-squirrel, yorkie-visual-sweep, yorkie-biome-scout, yorkie-natural-gallery
 	  cops-smoke, cops-structures-smoke, cops-visual-sweep, screenshot
 
 Common options:
@@ -3583,6 +3584,9 @@ async function main() {
     putOptional(body, 'radius', optionNumber(args, 'radius', 'BRIDGE_RADIUS', 48));
     putOptional(body, 'step', optionNumber(args, 'step', 'BRIDGE_STEP', 8));
     result = await requestJson(baseUrl, '/terrain-scan', 'POST', body);
+  } else if (action === 'yorkie-matrix') {
+    result = await require('./yorkie-matrix').runMatrix(baseUrl, args);
+    if (!result.ok) process.exitCode = 1;
   } else if (action === 'yorkie-smoke') {
     result = await runYorkieSmoke(baseUrl, args);
   } else if (action === 'yorkie-water-smoke') {

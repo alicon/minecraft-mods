@@ -9,6 +9,18 @@ permissions:
   contents: read
 
 jobs:
+  harness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Check harness syntax and regression tests
+        run: |
+          npm --prefix tools/playtest-harness run check
+          npm --prefix tools/playtest-harness test
+
   build:
     runs-on: ubuntu-latest
     strategy:

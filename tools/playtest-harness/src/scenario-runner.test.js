@@ -1,0 +1,91 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { runCases } = require('./scenario-runner');
+const { matrixInputs, assertTestWorld } = require('./yorkie-matrix');
+
+test('continues after failures and persists evidence and complete report', async () => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'yorkie-tests-'));
+  const reportFile = path.join(folder, 'report.json');
+  try {
+    let executed = false;
+    const result = await runCases([
+      { name: 'bad setup', setup: async () => { throw Error('missing fixture'); }, run: async () => assert.fail() },
+      { name: 'behavior failure', setup: async () => {}, run: async () => { throw Error('wrong behavior'); } },
+      { name: 'next case', setup: async () => {}, run: async () => { executed = true; return { alive: true }; } }
+    ], { reportFile, capture: async () => ({ screenshot: 'evidence.png' }) });
+    assert.equal(executed, true);
+    assert.deepEqual(result.summary, { setup_failed: 1, failed: 1, passed: 1 });
+    assert.equal(result.ok, false);
+    assert.equal(result.complete, true);
+    assert.equal(JSON.parse(fs.readFileSync(reportFile)).cases[1].evidence.screenshot, 'evidence.png');
+  } finally { fs.rmSync(folder, { recursive: true }); }
+});
+
+test('records evidence and cleanup errors without hiding original failure', async () => {
+  const result = await runCases([{
+    name: 'failure', setup: async () => {}, run: async () => { throw Error('behavior'); },
+    cleanup: async () => { throw Error('cleanup'); }
+  }], { capture: async () => { throw Error('capture'); } });
+  assert.equal(result.cases[0].error, 'behavior');
+  assert.equal(result.cases[0].captureError, 'capture');
+  assert.equal(result.cases[0].cleanupError, 'cleanup');
+  assert.equal(result.ok, false);
+});
+
+test('rejects family saves, wrong identities, and multiplayer', () => {
+  const save = 'Mushroom Matrix Test';
+  const state = { saveName: save, singleplayer: true, players: [{}] };
+  assert.doesNotThrow(() => assertTestWorld(state, save));
+  assert.throws(() => assertTestWorld(state, 'different'));
+  assert.throws(() => assertTestWorld(state));
+  assert.throws(() => assertTestWorld({ ...state, saveName: 'Family' }, 'Family'));
+  assert.throws(() => assertTestWorld({ ...state, singleplayer: false }, save));
+  assert.throws(() => assertTestWorld({ ...state, players: [{}, {}] }, save));
+});
+
+test('matrix has 96 distinct combinations with both sides of every factor', () => {
+  const rows = matrixInputs();
+  assert.equal(rows.length, 96);
+  assert.equal(new Set(rows.map(JSON.stringify)).size, 96);
+  assert.deepEqual([...new Set(rows.map((row) => row.shelter))].sort(), ['inside', 'outside', 'roof']);
+});
+
+test('HTTP-success command rejection cannot silently pass; no-op commands stay valid', () => {
+  const { checkCommandParsed } = require('./command-result');
+  assert.throws(() => checkCommandParsed({ ok: true, callbackSeen: false, command: 'invalid' }), /rejected command syntax/);
+  assert.doesNotThrow(() => checkCommandParsed({ ok: true, callbackSeen: true, success: false, result: 0 }));
+  assert.doesNotThrow(() => checkCommandParsed({ ok: true }));
+});
+
+test('matrix rejects concurrent bridge owners and releases lock after failure', async () => {
+  const { withBridgeLock } = require('./bridge-lock');
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'yorkie-lock-test-'));
+  try {
+    await assert.rejects(withBridgeLock('http://localhost:57321', async () => {
+      await assert.rejects(withBridgeLock('http://127.0.0.1:57321', async () => assert.fail(), folder), /Another scenario owns/);
+      throw Error('failed run');
+    }, folder), /failed run/);
+    assert.equal(await withBridgeLock('http://127.0.0.1:57321', async () => 'released', folder), 'released');
+  } finally { fs.rmSync(folder, { recursive: true }); }
+});
+
+test('actual bridge CLI exits unsuccessfully when Minecraft rejects command syntax', async () => {
+  const http = require('node:http');
+  const { promisify } = require('node:util');
+  const execFile = promisify(require('node:child_process').execFile);
+  const server = http.createServer((req, res) => {
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify({ ok: true, callbackSeen: false, command: 'bad command' }));
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    await assert.rejects(execFile(process.execPath, [path.join(__dirname, 'bridge-cli.js'),
+      'command', '--command', 'bad command', '--port', String(server.address().port)], { timeout: 5000 }),
+    (error) => error.code === 1 && error.stderr.includes('Minecraft rejected command syntax'));
+  } finally { await new Promise((resolve) => server.close(resolve)); }
+});
