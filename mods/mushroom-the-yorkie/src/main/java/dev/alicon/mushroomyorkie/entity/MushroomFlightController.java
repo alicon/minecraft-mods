@@ -5,6 +5,8 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 
 final class MushroomFlightController {
+	// Fetch waypoints need precise steering; the normal 2.5-block owner orbit stops too far away.
+	private static final double FETCH_FLIGHT_HOVER_DISTANCE_SQ = 0.01D;
 	private static final double CREATIVE_RECOVERY_FLIGHT_DISTANCE_SQ = 12.0D * 12.0D;
 	private static final double CREATIVE_WATER_RECOVERY_DISTANCE_SQ = 4.0D;
 
@@ -25,14 +27,15 @@ final class MushroomFlightController {
 		boolean flyingToOwner = shouldFlyToOwner(yorkie);
 		yorkie.setNoGravity(flyingToOwner);
 		boolean ownerFlying = MushroomYorkieStateQueries.ownerIsCreativeFlying(yorkie);
-		updateFlightTrick(yorkie, flyingToOwner && ownerFlying);
+		boolean fetching = yorkie.fetchFlight.flying();
+		updateFlightTrick(yorkie, flyingToOwner && ownerFlying && !fetching);
 		if (!flyingToOwner) {
 			return;
 		}
 		MushroomBehaviorDebugger.debug(
 				yorkie,
-				ownerFlying ? "creative_flight" : "creative_recovery_flight",
-				ownerFlying ? "creative flight: following flying owner" : "creative flight: recovering to creative owner",
+				fetching ? "creative_fetch_flight" : ownerFlying ? "creative_flight" : "creative_recovery_flight",
+				fetching ? "creative flight: following fetch route" : ownerFlying ? "creative flight: following flying owner" : "creative flight: recovering to creative owner",
 				false
 		);
 
@@ -42,14 +45,15 @@ final class MushroomFlightController {
 		}
 
 		yorkie.fallDistance = 0.0F;
-		Vec3 target = owner.position()
+		Vec3 target = fetching ? yorkie.fetchFlight.steeringTarget() : owner.position()
 				.add(owner.getLookAngle().scale(-1.4D))
 				.add(0.0D, -0.8D, 0.0D);
 		Vec3 delta = target.subtract(yorkie.position());
 		faceFlightTarget(yorkie, delta);
-		if (delta.lengthSqr() <= MushroomYorkieEntity.CREATIVE_FLIGHT_FOLLOW_DISTANCE_SQ) {
+		double hoverDistanceSq = fetching ? FETCH_FLIGHT_HOVER_DISTANCE_SQ : MushroomYorkieEntity.CREATIVE_FLIGHT_FOLLOW_DISTANCE_SQ;
+		if (delta.lengthSqr() <= hoverDistanceSq) {
 			yorkie.setDeltaMovement(yorkie.getDeltaMovement().scale(0.6D));
-			MushroomBehaviorDebugger.debug(yorkie, "creative_flight_hover", "creative flight: hovering near owner", false);
+			MushroomBehaviorDebugger.debug(yorkie, "creative_flight_hover", "creative flight: holding position", false);
 			return;
 		}
 
@@ -64,7 +68,7 @@ final class MushroomFlightController {
 		if (yorkie.isOrderedToSit() || !MushroomYorkieStateQueries.ownerIsCreative(yorkie)) {
 			return false;
 		}
-		if (MushroomYorkieStateQueries.ownerIsCreativeFlying(yorkie)) {
+		if (MushroomYorkieStateQueries.ownerIsCreativeFlying(yorkie) || yorkie.fetchFlight.flying()) {
 			return true;
 		}
 		if (yorkie.creativeRecoveryFlight.blocks()) {

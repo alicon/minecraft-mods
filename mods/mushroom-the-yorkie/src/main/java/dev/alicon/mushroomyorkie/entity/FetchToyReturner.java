@@ -30,9 +30,11 @@ final class FetchToyReturner {
 			if (!delivery.carriedRemainder().isEmpty()) {
 				this.yorkie.setItemSlot(EquipmentSlot.MAINHAND, delivery.carriedRemainder());
 				this.yorkie.getNavigation().stop();
+				movement.reset();
 				MushroomOwnerNotice.send(this.yorkie, "message.mushroom_yorkie.notice_fetch_inventory_full", MushroomOwnerNotice.SHORT_COOLDOWN_TICKS);
 				return FetchToyReturnResult.IN_PROGRESS;
 			}
+			movement.reset();
 			this.yorkie.needs.playWithToy();
 			MushroomYorkieSounds.bark(this.yorkie);
 			MushroomBehaviorDebugger.debug(this.yorkie, "fetch_return", "fetch: brought the toy back", true);

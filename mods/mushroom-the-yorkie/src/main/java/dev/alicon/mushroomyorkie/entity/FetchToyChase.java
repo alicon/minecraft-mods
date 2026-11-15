@@ -49,7 +49,7 @@ final class FetchToyChase {
 	}
 
 	static Vec3 moveTarget(ServerLevel level, MushroomYorkieEntity yorkie, ItemEntity item) {
-		if (MushroomYorkieStateQueries.ownerIsCreativeFlying(yorkie)) {
+		if (MushroomYorkieStateQueries.ownerIsCreativeFlying(yorkie) || yorkie.fetchFlight.flying()) {
 			return item.position();
 		}
 

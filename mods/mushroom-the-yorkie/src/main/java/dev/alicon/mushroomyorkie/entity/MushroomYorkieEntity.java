@@ -54,6 +54,7 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	final MushroomTrustState trust = new MushroomTrustState();
 	final MushroomOwnerPresenceState ownerPresence = new MushroomOwnerPresenceState();
 	final MushroomCreativeFlightRecovery creativeRecoveryFlight = new MushroomCreativeFlightRecovery();
+	final FetchFlightNavigation fetchFlight = new FetchFlightNavigation(this);
 	private final MushroomSleepInteractionTracker sleepInteractions = new MushroomSleepInteractionTracker();
 	int nightWakeTicks;
 	int scaredRunTicks;

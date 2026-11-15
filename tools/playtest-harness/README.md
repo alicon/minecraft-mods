@@ -162,6 +162,27 @@ branch blocks the nearest face (`--case squirrel-clear-tree-face`).
 Replay them by name with `--case fetch-sit-yorkie_ball` or
 `--case sleep-flight-sleep-90`, or `--case starving-night-food-bowl`, or `--case fetch-owner-mode-yorkie_ball`.
 
+The terrain group adds 36 cases: dry ground, open water, covered water, and a
+six-block drop for each toy and owner locomotion state. It requires ordinary
+returns in accessible terrain and safe refusal under covered water or a survival
+cliff. A grounded creative cliff attempt may return or safely give up; it must
+conserve the toy, avoid damage, and end near the owner. Flying fetches must return.
+Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. This makes the full suite 199 cases. Run one group with `--group base`,
+`--group transitions`, or `--group terrain`; combine it with an exact `--case`.
+Unknown groups/cases fail instead of running a different suite.
+
+```shell
+node tools/playtest-harness/src/bridge-cli.js yorkie-matrix --expected-save "<copied save>" --group terrain --report-file build/playtest-reports/terrain.json
+```
+
+The Overworld arena clears its footprint to y=319 and verifies the upper volume
+is air, so an old high platform cannot masquerade as outside. Terrain cases also
+reset below-floor water/pit remnants, freeze setup, count inventory/ground/held
+toys, and preserve health/position traces. Reports include source revision/dirty
+state and installed Mushroom/bridge jar hashes. A dirty revision does not capture
+uncommitted source. Unique run IDs keep start/failure screenshots from overwriting
+earlier evidence.
+
 Tick sprint advances real server ticks with a bounded wait; this is a fast
 state check, not a substitute for watching animation or movement over normal time.
 

@@ -3,7 +3,10 @@ package dev.alicon.mushroomyorkie.entity;
 import com.mojang.authlib.GameProfile;
 import io.netty.channel.embedded.EmbeddedChannel;
 import java.util.UUID;
+import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.server.level.ClientInformation;
@@ -18,7 +21,12 @@ final class SurvivalGameTestPlayers {
 
 	static ServerPlayer create(GameTestHelper helper) {
 		var level = helper.getLevel();
-		GameProfile profile = new GameProfile(UUID.randomUUID(), "fetch-survival");
+		// These fetch assertions run synchronously in one shared test level. Old loose
+		// fixtures must not redirect the next goal's 32-block search or pollute its counts.
+		level.getEntitiesOfClass(ItemEntity.class, new AABB(helper.absolutePos(BlockPos.ZERO)).inflate(40),
+				item -> MushroomFetchToyPolicy.isFetchToy(item.getItem())).forEach(ItemEntity::discard);
+		UUID id = UUID.randomUUID();
+		GameProfile profile = new GameProfile(id, "fetch-" + id.toString().replace("-", "").substring(0, 10));
 		ServerPlayer player = new ServerPlayer(level.getServer(), level, profile, ClientInformation.createDefault());
 		Connection connection = new Connection(PacketFlow.SERVERBOUND);
 		new EmbeddedChannel(connection);
