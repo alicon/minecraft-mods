@@ -179,6 +179,28 @@ npm --prefix tools/playtest-harness test
 The runner/safety tests use Node's built-in test runner and need no dependency
 installation. CI runs them separately from the Gradle builds.
 
+## Quiet command feedback and boot diagnostics
+
+Bridge command replies include bounded plain-text `feedback` and a
+`feedbackTruncated` flag. Results still use `callbackSeen`, `success`, and
+`result`: a valid no-op is different from rejected syntax. The CLI includes
+native error text when it rejects syntax. Routine command feedback stays in the
+HTTP reply instead of the launcher console and operator chat. Commands that
+explicitly send chat, player notifications, or asynchronous game logs can still
+produce output. This reduces traffic; it does not repair an upstream launcher
+that stops draining its pipe.
+
+If autoplay times out, it saves a local diagnostic JSON report and, when
+available, a Java thread dump. With `BRIDGE_REPORT_FILE`, the diagnostic is saved
+beside that report as `<name>.boot-diagnostics.json`; otherwise it gets a unique
+name under `build/playtest-reports`. Diagnostics use `ps` process names and
+`lsof` open-log matching to select the Java process for this profile, never
+command-line arguments that might contain credentials. `JAVA_HOME/bin/jcmd` or
+`jcmd` on PATH captures threads. Missing tools are recorded as diagnostic limits.
+A server logging write to a stdout pipe is reported as suspected backpressure,
+not a confirmed cause or proof that the world failed to load. The diagnostic
+never kills or relaunches a process; inspect it before attempting another launch.
+
 ## Fetch across a saved restart
 
 ```shell
