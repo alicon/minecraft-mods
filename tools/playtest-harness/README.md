@@ -20,6 +20,12 @@ Fabric modded LAN worlds can reject Mineflayer with a message that the server re
 
 ## Fabric Bridge
 
+The bridge scenarios target Minecraft 1.21.11. Use its namespaced gamerules
+(`minecraft:advance_time`, `minecraft:spawn_mobs`, `minecraft:mob_drops`), not
+the older camelCase names. The CLI rejects command parse failures even when
+the bridge's HTTP response succeeds. A valid command that changes zero blocks
+is distinct from rejected syntax.
+
 For real modded worlds, install the `playtest-bridge` jar in the same profile as the other local test mods:
 
 ```shell
@@ -107,6 +113,45 @@ The launcher uses `open -g` by default to avoid intentionally activating Modrint
 It also sets `pauseOnLostFocus:false` by default so singleplayer test worlds keep ticking in the background. Set `PLAYTEST_DISABLE_PAUSE_ON_LOST_FOCUS=0` to leave that profile option unchanged.
 If Modrinth was not already running, the launcher re-opens the deep link after a short cold-start delay. Set `MODRINTH_STARTUP_RETRY_SECONDS=0` to disable that retry.
 Set `PLAYTEST_SCREENSHOT_DELAY_SECONDS=0` to skip the default post-smoke screenshot delay.
+
+## Mushroom state matrix
+
+Run the matrix only in a disposable copy, with exactly one player connected:
+
+```shell
+make bridge-yorkie-matrix PLAYTEST_WORLD="Mushroom Abel Noelle 20261115-075437" BRIDGE_REPORT_FILE=build/playtest-reports/yorkie-matrix.json
+```
+
+It requires an exact save-name match and a disposable prefix (`Codex `,
+`Mushroom Matrix `, or `Mushroom Abel Noelle `). It replaces loaded Yorkies,
+builds a high-altitude arena, changes player mode/time/gamerules, and resumes
+the client. Never point it at a family save. Keep only one live scenario run
+active per bridge. It leaves the test arena and report available for inspection;
+it restores daylight and a grounded creative player, not the original save state.
+
+The 96 cases combine four times (day, dusk, night, dawn), three shelter types
+(open sky, roof only, enclosed room), fed/hungry needs, sit/follow orders,
+and a grounded/flying owner. Each fresh-pet fixture checks sleep, orders,
+gravity, health, need bounds, and the transition back to daylight and landing.
+Grounded cases use a survival owner; flying cases use creative mode. The suite
+does not yet claim coverage of every owner mode or every state transition.
+Tick sprint advances real server ticks with a bounded wait; this is a fast
+state check, not a substitute for watching animation or movement over normal time.
+
+Each case is independent and failures do not skip later cases. Reports are
+atomically saved after each case, including failed setup, last observed state,
+and screenshots on failure. An interrupted report has `complete: false`.
+Treat setup failures as harness problems until investigated.
+
+Replay one numbered case directly:
+
+```shell
+node tools/playtest-harness/src/bridge-cli.js yorkie-matrix --expected-save "Mushroom Abel Noelle 20261115-075437" --case 19 --report-file build/playtest-reports/replay-19.json
+npm --prefix tools/playtest-harness test
+```
+
+The runner/safety tests use Node's built-in test runner and need no dependency
+installation. CI runs them separately from the Gradle builds.
 
 ## Companion Mode
 

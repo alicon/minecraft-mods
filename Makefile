@@ -116,6 +116,7 @@ help:
 		'  make bridge-use-block                  Use an item on an absolute block.' \
 		'  make bridge-count-blocks               Count blocks in an absolute box.' \
 		'  make bridge-terrain-scan               Sample biome, surface, water, and tree signals around a coordinate.' \
+		'  make bridge-yorkie-matrix              Run the state matrix in PLAYTEST_WORLD.' \
 		'  make bridge-yorkie-smoke               Run the Mushroom Yorkie bridge scenario.' \
 		'  make bridge-yorkie-water-smoke         Run Yorkie water/fetch bridge checks.' \
 		'  make bridge-yorkie-adventure-smoke     Run Yorkie flight/water bridge checks.' \
@@ -357,6 +358,9 @@ bridge-count-blocks:
 
 bridge-terrain-scan:
 	$(HARNESS) run bridge -- terrain-scan --host "$(BRIDGE_HOST)" --port "$(BRIDGE_PORT)" --player "$(BRIDGE_PLAYER)" --x "$(BRIDGE_X)" --z "$(BRIDGE_Z)" --radius "$(BRIDGE_RADIUS)" --step "$(BRIDGE_STEP)"
+
+bridge-yorkie-matrix:
+	$(HARNESS) run bridge -- yorkie-matrix --host "$(BRIDGE_HOST)" --port "$(BRIDGE_PORT)" --expected-save "$(PLAYTEST_WORLD)" --report-file "$(BRIDGE_REPORT_FILE)"
 
 bridge-yorkie-smoke:
 	$(HARNESS) run bridge -- yorkie-smoke --host "$(BRIDGE_HOST)" --port "$(BRIDGE_PORT)" --screenshot-name "$(BRIDGE_SCREENSHOT_NAME)" --report-file "$(BRIDGE_REPORT_FILE)"

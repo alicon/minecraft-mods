@@ -187,6 +187,14 @@ If Modrinth was not already running, the launcher re-opens the deep link after a
 Set `PLAYTEST_SCREENSHOT_DELAY_SECONDS=0` to skip the default post-smoke screenshot delay.
 Set `BRIDGE_REPORT_FILE=build/playtest-reports/<name>.json` to save the full bridge scenario result for later debugging instead of relying only on terminal output.
 
+## State-combination testing
+
+The [Mushroom state matrix](../tools/playtest-harness/README.md#mushroom-state-matrix)
+checks 96 combinations in a disposable live world and preserves partial failure
+reports. Run `npm --prefix tools/playtest-harness test` for the harness's runner,
+command-rejection, and save-safety regression tests. These tests also run in CI.
+Gameplay assertions still need the live Minecraft client and bridge.
+
 ## Current Automated Coverage
 
 NARwhal Together:

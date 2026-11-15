@@ -9,6 +9,7 @@
     "node": ">=18"
   },
   "scripts": {
+    "test": "node --test src/*.test.js",
     "start": "node src/cli.js",
     "list": "node src/cli.js --list",
     "bridge": "node src/bridge-cli.js",
