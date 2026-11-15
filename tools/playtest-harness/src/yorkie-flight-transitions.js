@@ -35,8 +35,20 @@ function flightTransitionCases(context) {
             observed = await observe(5, 'before-landing');
           }
         }
-        check(phase === 'carrying' ? observed.held === 1 : observed.held === 0 && observed.inventory === 0,
-          'Could not observe the requested fetch phase before landing');
+        if (phase === 'chase') {
+          // A single tick can precede goal startup. Require actual movement away from
+          // the owner toward this fixture's toy, not ordinary owner-follow flight.
+          for (let ticks = 1; ticks < 100 && observed.pet.position.x <= original.position.x + 0.25 && !observed.held; ticks++) {
+            observed = await observe(1, 'before-landing');
+          }
+        }
+        const ready = phase === 'carrying' ? observed.held === 1
+          : observed.held === 0 && observed.inventory === 0 && observed.pet.position.x > original.position.x + 0.25;
+        if (!ready) {
+          const error = new Error('Could not observe the requested fetch phase before landing');
+          error.phase = 'setup';
+          throw error;
+        }
         result.observed.beforeLanding = observed.snapshot;
         await request('/player-abilities', { player, flying: false, mayfly: true });
         await command(`tp ${player} ${base.x - 2.5} ${base.y} ${base.z + 0.5}`);
