@@ -31,7 +31,9 @@ function fixture(options = {}) {
         changed = true; pet.health = 12; pet.custom.needs = { hunger: 0, potty: 0 };
         return { success: true };
       }
-      if (command.endsWith(' UUID')) return { success: !options.untagged };
+      if (command.includes('if entity @s[type=')) return { success: !options.untagged };
+      if (command.startsWith('execute unless data')) return { success: !options.absenceError, result: 1 };
+      if (options.emptyEquipment) return { success: false };
       return { success: true, feedbackTruncated: !!options.truncated,
         feedback: [changed && options.changeEquipment ? 'different bone' : 'bone count2 custom_name="Carry me"'] };
     }
@@ -109,4 +111,15 @@ test('care checks world again immediately before its only mutation', async () =>
   const f = fixture({ switchWorld: true });
   await assert.rejects(careForSuccessfulPet(f.context), /expected-save/);
   assert.equal(mergeCommands(f).length, 0);
+});
+
+
+test('empty native equipment requires explicit successful absence proofs', async () => {
+  const f = fixture({ emptyEquipment: true }); f.pet.mainHand = { id: 'minecraft:air', count: 0, empty: true };
+  const result = await careForSuccessfulPet(f.context);
+  assert.deepEqual(result.equipment.before, { equipment: null, HandItems: null });
+  assert.equal(mergeCommands(f).length, 1);
+  const bad = fixture({ emptyEquipment: true, absenceError: true }); bad.pet.mainHand = { empty: true };
+  await assert.rejects(careForSuccessfulPet(bad.context), /missing equipment/);
+  assert.equal(mergeCommands(bad).length, 0);
 });
