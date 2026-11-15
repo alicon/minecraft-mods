@@ -3,16 +3,19 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+// Shared atomic writer also preserves a completed failed report if world reset fails afterward.
+function saveReport(reportFile, report) {
+  if (!reportFile) return;
+  const target = path.resolve(reportFile);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(`${target}.tmp`, `${JSON.stringify(report, null, 2)}\n`);
+  fs.renameSync(`${target}.tmp`, target);
+}
+
 // Persist after every case, including setup errors and partial runs.
-async function runCases(cases, { reportFile, metadata = {}, capture = async () => null, onResult = () => {} }) {
+async function runCases(cases, { reportFile, metadata = {}, capture = async () => null, onResult = () => {}, afterSuccess }) {
   const report = { ...metadata, ok: false, complete: false, startedAt: new Date().toISOString(), cases: [] };
-  function save() {
-    if (!reportFile) return;
-    const target = path.resolve(reportFile);
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(`${target}.tmp`, `${JSON.stringify(report, null, 2)}\n`);
-    fs.renameSync(`${target}.tmp`, target);
-  }
+  const save = () => saveReport(reportFile, report);
   save();
   for (const scenario of cases) {
     const result = { name: scenario.name, inputs: scenario.inputs, status: 'running' };
@@ -38,13 +41,32 @@ async function runCases(cases, { reportFile, metadata = {}, capture = async () =
     }
     onResult(result);
   }
-  report.complete = true;
-  report.finishedAt = new Date().toISOString();
+  report.gameplayComplete = true;
   report.summary = {};
   for (const result of report.cases) report.summary[result.status] = (report.summary[result.status] || 0) + 1;
-  report.ok = report.cases.length > 0 && report.cases.every((result) => result.status === 'passed');
+  report.gameplayOk = report.cases.length > 0 && report.cases.every((result) => result.status === 'passed');
+  if (afterSuccess) {
+    report.postRun = { status: report.gameplayOk ? 'running' : 'skipped', startedAt: new Date().toISOString() };
+    // Persist the original verdicts before any success-only maintenance. Completion still waits for maintenance.
+    save();
+    if (report.gameplayOk) {
+      try {
+        report.postRun.observed = await afterSuccess();
+        report.postRun.status = report.postRun.observed?.skipped ? 'skipped' : 'passed';
+        if (report.postRun.observed?.skipped) report.postRun.reason = report.postRun.observed.reason;
+      }
+      catch (error) {
+        report.postRun.status = 'failed'; report.postRun.error = error.message;
+        if (error.observed) report.postRun.observed = error.observed;
+      }
+    } else report.postRun.reason = 'gameplay_failed';
+    report.postRun.finishedAt = new Date().toISOString();
+  }
+  report.ok = report.gameplayOk && report.postRun?.status !== 'failed';
+  report.complete = true;
+  report.finishedAt = new Date().toISOString();
   save();
   return report;
 }
 
-module.exports = { runCases };
+module.exports = { runCases, saveReport };
