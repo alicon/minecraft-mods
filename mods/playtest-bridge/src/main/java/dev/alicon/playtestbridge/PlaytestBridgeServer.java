@@ -145,7 +145,11 @@ final class PlaytestBridgeServer {
 				sendJson(exchange, 200, runOnServerThread(() -> BridgeWorldActions.terrainScan(this.playerFromBody(body), body)));
 			} else if ("POST".equals(method) && "/screenshot".equals(path)) {
 				JsonObject body = readBody(exchange);
-				sendJson(exchange, 200, this.screenshot(body));
+				sendJson(exchange, 200, BridgeClientRequests.screenshot(body));
+			} else if ("POST".equals(method) && "/quit".equals(path)) {
+				JsonObject body = readBody(exchange);
+				JsonObject snapshot = runOnServerThread(this::state);
+				sendJson(exchange, 200, BridgeClientRequests.quit(snapshot, body));
 			} else {
 				sendError(exchange, 404, "Unknown bridge endpoint");
 			}
@@ -307,14 +311,6 @@ final class PlaytestBridgeServer {
 		return BridgeWorldActions.block(player, body);
 	}
 
-	private JsonObject screenshot(JsonObject body) throws Exception {
-		String name = optionalString(body, "name", "");
-		boolean resume = optionalBoolean(body, "resume", true);
-		boolean hideGui = optionalBoolean(body, "hideGui", false);
-		boolean clearChat = optionalBoolean(body, "clearChat", false);
-		return BridgeClientHooks.captureScreenshot(name, resume, hideGui, clearChat).get(SERVER_TASK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-	}
-
 	private EntityHitResult findEntityHit(ServerPlayer player, ServerLevel level, Vec3 start, Vec3 end, double distance) {
 		AABB area = player.getBoundingBox().expandTowards(player.getLookAngle().scale(distance)).inflate(1.0D);
 		Entity closestEntity = null;
@@ -398,18 +394,6 @@ final class PlaytestBridgeServer {
 			throw new IllegalArgumentException(name + " must be between " + min + " and " + max);
 		}
 		return value;
-	}
-
-	private boolean optionalBoolean(JsonObject object, String name, boolean fallback) {
-		if (!object.has(name) || object.get(name).isJsonNull()) {
-			return fallback;
-		}
-		String value = object.get(name).getAsString().toLowerCase(Locale.ROOT);
-		return switch (value) {
-			case "1", "true", "yes", "on" -> true;
-			case "0", "false", "no", "off" -> false;
-			default -> throw new IllegalArgumentException(name + " must be true or false");
-		};
 	}
 
 	private double requiredDouble(JsonObject object, String name) {

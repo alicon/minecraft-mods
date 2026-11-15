@@ -428,3 +428,8 @@ print-vars:
 	@printf 'MOD_JAR=%s\n' "$(MOD_JAR)"
 	@printf 'MODRINTH_PROFILE=%s\n' "$(MODRINTH_PROFILE)"
 	@printf 'LIVE_TEST_MODS_DIR=%s\n' "$(LIVE_TEST_MODS_DIR)"
+
+.PHONY: bridge-quit bridge-yorkie-matrix
+
+bridge-quit:
+	$(HARNESS) run bridge -- quit --host "$(BRIDGE_HOST)" --port "$(BRIDGE_PORT)" --expected-save "$(PLAYTEST_WORLD)"

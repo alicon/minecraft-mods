@@ -108,3 +108,23 @@ test('unmet live fixture preconditions stay distinct from gameplay failures', as
   assert.equal(result.cases[0].status, 'setup_failed');
   assert.equal(result.ok, false);
 });
+
+test('quit CLI forwards the exact expected save to the guarded endpoint', async () => {
+  const http = require('node:http');
+  const { promisify } = require('node:util');
+  const execFile = promisify(require('node:child_process').execFile);
+  let observed;
+  const server = http.createServer(async (req, res) => {
+    let text = ''; for await (const chunk of req) text += chunk;
+    observed = { path: req.url, method: req.method, body: JSON.parse(text) };
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify({ ok: true, accepted: true }));
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const result = await execFile(process.execPath, [path.join(__dirname, 'bridge-cli.js'),
+      'quit', '--expected-save', 'Codex Quit Test', '--port', String(server.address().port)], { timeout: 5000 });
+    assert.equal(JSON.parse(result.stdout).accepted, true);
+    assert.deepEqual(observed, { path: '/quit', method: 'POST', body: { expectedSave: 'Codex Quit Test' } });
+  } finally { await new Promise((resolve) => server.close(resolve)); }
+});

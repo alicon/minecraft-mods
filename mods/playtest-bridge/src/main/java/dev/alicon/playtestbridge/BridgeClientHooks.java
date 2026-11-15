@@ -5,6 +5,7 @@ import java.util.concurrent.CompletableFuture;
 
 final class BridgeClientHooks {
 	private static volatile ScreenshotProvider screenshotProvider;
+	private static volatile QuitProvider quitProvider;
 
 	private BridgeClientHooks() {
 	}
@@ -21,6 +22,23 @@ final class BridgeClientHooks {
 			return future;
 		}
 		return provider.captureScreenshot(name, resume, hideGui, clearChat);
+	}
+
+	static void registerQuitProvider(QuitProvider provider) {
+		quitProvider = provider;
+	}
+
+	static CompletableFuture<JsonObject> requestQuit(String expectedSave) {
+		QuitProvider provider = quitProvider;
+		if (provider == null) {
+			return CompletableFuture.failedFuture(new IllegalStateException("quit provider is available only in a Minecraft client"));
+		}
+		return provider.quit(expectedSave);
+	}
+
+	@FunctionalInterface
+	interface QuitProvider {
+		CompletableFuture<JsonObject> quit(String expectedSave);
 	}
 
 	@FunctionalInterface
