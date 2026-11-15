@@ -260,8 +260,11 @@ name under `build/playtest-reports`. Diagnostics use `ps` process names and
 `lsof` open-log matching to select the Java process for this profile, never
 command-line arguments that might contain credentials. `JAVA_HOME/bin/jcmd` or
 `jcmd` on PATH captures threads. Missing tools are recorded as diagnostic limits.
-A server logging write to a stdout pipe is reported as suspected backpressure,
-not a confirmed cause or proof that the world failed to load. The diagnostic
+A Log4j console write on the server, render thread or a resource-reload worker
+while stdout is a pipe is reported as suspected backpressure. `consoleWriteThreads` names
+the observed critical threads, including stalls before the server exists. This is
+not a confirmed cause or proof that the world failed to load. Other worker
+writes and non-console file writes do not implicate launcher backpressure. The diagnostic
 never kills or relaunches a process; inspect it before attempting another launch.
 
 ## Fetch across a saved restart
