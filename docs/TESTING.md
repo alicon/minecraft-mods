@@ -136,6 +136,9 @@ and verify new save-completion log lines plus process exit before installing jar
 An accepted quit response is not save-completion evidence.
 
 Restart Minecraft after installing `playtest-bridge`. The bridge binds to `127.0.0.1:57321` by default and is intended only for local development profiles.
+Bridge state and terrain-scan seeds are exact signed decimal strings; keep that
+type in reproduction reports rather than converting to JavaScript numbers.
+
 Screenshots close the active client screen before capture by default; set `BRIDGE_SCREENSHOT_RESUME=0` to keep the current screen visible. Set `BRIDGE_SCREENSHOT_HIDE_GUI=1` and `BRIDGE_SCREENSHOT_CLEAR_CHAT=1` for clean visual inspection captures.
 
 Launch Modrinth directly into an existing save:

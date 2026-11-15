@@ -20,6 +20,10 @@ Fabric modded LAN worlds can reject Mineflayer with a message that the server re
 
 ## Fabric Bridge
 
+World `seed` fields in bridge state and terrain scans are signed decimal strings.
+Keep them as strings when saving reports or recreating worlds: JavaScript numbers
+cannot preserve the full Minecraft 64-bit seed range.
+
 The bridge scenarios target Minecraft 1.21.11. Use its namespaced gamerules
 (`minecraft:advance_time`, `minecraft:spawn_mobs`, `minecraft:mob_drops`), not
 the older camelCase names. The CLI rejects command parse failures even when

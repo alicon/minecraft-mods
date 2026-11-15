@@ -215,7 +215,7 @@ final class BridgeWorldActions {
 		BlockPos center = new BlockPos(centerX, centerY, centerZ);
 		JsonObject response = new JsonObject();
 		response.addProperty("ok", true);
-		response.addProperty("seed", level.getSeed());
+		response.addProperty("seed", BridgeWorldMetadata.seed(level.getSeed()));
 		response.add("center", BridgeEntityState.blockPosition(center));
 		response.addProperty("centerBiome", biomeId(level, center));
 		response.addProperty("centerTopBlock", blockId(level.getBlockState(center.below())));

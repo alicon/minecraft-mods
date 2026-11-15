@@ -12,7 +12,6 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -175,13 +174,7 @@ final class PlaytestBridgeServer {
 		JsonObject state = this.health();
 		state.addProperty("motd", this.server.getMotd());
 		state.addProperty("tickCount", this.server.getTickCount());
-		state.addProperty("seed", this.server.overworld().getSeed());
-		Path savePath = this.server.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
-		state.addProperty("savePath", savePath.toString());
-		Path saveName = savePath.getFileName();
-		if (saveName != null) {
-			state.addProperty("saveName", saveName.toString());
-		}
+		BridgeWorldMetadata.addTo(state, this.server.overworld().getSeed(), this.server.getWorldPath(LevelResource.ROOT));
 
 		JsonArray players = new JsonArray();
 		for (ServerPlayer player : this.server.getPlayerList().getPlayers()) {
