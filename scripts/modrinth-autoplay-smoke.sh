@@ -52,6 +52,13 @@ done
 if (( SECONDS >= deadline )); then
 	printf 'Timed out waiting for Modrinth/Minecraft to load world: %s\n' "$world_name" >&2
 	printf 'Last bridge state:\n%s\n' "${state_json:-<none>}" >&2
+	diagnostic_file=""
+	if [[ -n "$report_file" ]]; then
+		diagnostic_file="${report_file%.json}.boot-diagnostics.json"
+	fi
+	python3 "$repo_root/scripts/playtest-boot-diagnostics.py" \
+		--profile "${MODRINTH_PROFILE:-$HOME/Library/Application Support/ModrinthApp/profiles/Dad’s Minecraft}" \
+		--expected-save "$world_name" --report-file "$diagnostic_file" >&2 || true
 	exit 1
 fi
 

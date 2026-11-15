@@ -417,17 +417,20 @@ final class PlaytestBridgeServer {
 
 	private JsonObject runCommand(String command) {
 		CommandResult result = new CommandResult();
+		BridgeCommandOutput output = new BridgeCommandOutput();
 		CommandResultCallback callback = (success, value) -> {
 			result.callbackSeen = true;
 			result.success = success;
 			result.result = value;
 		};
 		CommandSourceStack source = this.server.createCommandSourceStack()
+				.withSource(output)
 				.withPermission(PermissionSet.ALL_PERMISSIONS)
 				.withCallback(callback);
 		this.server.getCommands().performPrefixedCommand(source, "/" + command);
 
 		JsonObject response = commandResponse(command);
+		output.appendTo(response);
 		response.addProperty("callbackSeen", result.callbackSeen);
 		if (result.callbackSeen) {
 			response.addProperty("success", result.success);

@@ -80,13 +80,13 @@ test('actual bridge CLI exits unsuccessfully when Minecraft rejects command synt
   const execFile = promisify(require('node:child_process').execFile);
   const server = http.createServer((req, res) => {
     res.setHeader('content-type', 'application/json');
-    res.end(JSON.stringify({ ok: true, callbackSeen: false, command: 'bad command' }));
+    res.end(JSON.stringify({ ok: true, callbackSeen: false, command: 'bad command', feedback: ['Unknown command at position 0'] }));
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   try {
     await assert.rejects(execFile(process.execPath, [path.join(__dirname, 'bridge-cli.js'),
       'command', '--command', 'bad command', '--port', String(server.address().port)], { timeout: 5000 }),
-    (error) => error.code === 1 && error.stderr.includes('Minecraft rejected command syntax'));
+    (error) => error.code === 1 && error.stderr.includes('Minecraft rejected command syntax') && error.stderr.includes('Unknown command at position 0'));
   } finally { await new Promise((resolve) => server.close(resolve)); }
 });
 
