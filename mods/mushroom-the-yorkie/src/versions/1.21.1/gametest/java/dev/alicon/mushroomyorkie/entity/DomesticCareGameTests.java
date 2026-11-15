@@ -4,6 +4,7 @@ import dev.alicon.mushroomyorkie.block.ModBlocks;
 import dev.alicon.mushroomyorkie.pet.PetNeeds;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.level.block.Blocks;
 
 /** Emergency bowl care must coexist with sleep, sit orders, and the daily meal limit. */
 public final class DomesticCareGameTests {
@@ -16,7 +17,10 @@ public final class DomesticCareGameTests {
 		owner.setPos(yorkie.getX() - 2, yorkie.getY(), yorkie.getZ());
 		yorkie.claimFor(owner);
 		yorkie.needs = new PetNeeds(100, 10, 80, 80);
+		helper.setBlock(3, 1, 3, Blocks.STONE);
+		yorkie.setOnGround(true);
 		yorkie.setSleeping(true);
+		helper.assertTrue(yorkie.isMushroomSleeping(), "Urgent meal fixture did not start asleep");
 		helper.setBlock(4, 2, 3, ModBlocks.DOG_FOOD_BOWL);
 		DomesticCareGoal urgent = new DomesticCareGoal(yorkie, true);
 		yorkie.setMushroomOrderedToSit(true);

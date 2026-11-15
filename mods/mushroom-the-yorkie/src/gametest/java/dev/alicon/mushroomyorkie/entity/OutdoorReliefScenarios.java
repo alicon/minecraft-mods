@@ -3,7 +3,6 @@ package dev.alicon.mushroomyorkie.entity;
 import dev.alicon.mushroomyorkie.pet.PetNeeds;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.world.level.block.Blocks;
 
 /** A real roof/open doorway distinguishes an unfinished outdoor trip from ordinary owner following. */
 final class OutdoorReliefScenarios {
@@ -21,21 +20,7 @@ final class OutdoorReliefScenarios {
 	private static void startFixture(GameTestHelper helper, boolean decay) {
 		long priorTime = helper.getLevel().getDayTime();
 		helper.getLevel().setDayTime(1000);
-		for (int x = 0; x <= 12; x++) {
-			for (int z = 0; z <= 8; z++) {
-				helper.setBlock(x, 1, z, Blocks.STONE);
-				if (x <= 4 && z <= 4) {
-					helper.setBlock(x, 5, z, Blocks.STONE);
-					if (x == 0 || x == 4 || z == 0 || z == 4) {
-						for (int y = 2; y <= 4; y++) {
-							helper.setBlock(x, y, z, Blocks.STONE);
-						}
-					}
-				}
-			}
-		}
-		helper.setBlock(4, 2, 2, Blocks.AIR);
-		helper.setBlock(4, 3, 2, Blocks.AIR);
+		RoomGameTestFixture.build(helper, 12, 8, true);
 		MushroomYorkieEntity yorkie = helper.spawn(ModEntities.MUSHROOM_YORKIE, 2, 2, 2);
 		yorkie.setNoAi(true);
 		yorkie.setOnGround(true);
@@ -48,6 +33,7 @@ final class OutdoorReliefScenarios {
 
 	private static void assertTrip(GameTestHelper helper, MushroomYorkieEntity yorkie, long priorTime, boolean decay) {
 		yorkie.setOnGround(true);
+		helper.getLevel().setDayTime(1000);
 		try {
 			helper.assertTrue(!helper.getLevel().canSeeSky(yorkie.blockPosition()), "Fixture pet was not indoors");
 			IndoorPottyWarningGoal goal = new IndoorPottyWarningGoal(yorkie);

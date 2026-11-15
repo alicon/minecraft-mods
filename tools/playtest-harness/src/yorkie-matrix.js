@@ -79,7 +79,7 @@ async function executeMatrix(baseUrl, args) {
     await command('tick sprint stop');
     await command(`gamemode creative ${player}`);
     await request('/player-abilities', { player, flying: false, mayfly: true });
-    await command(`tp ${player} ${base.x} ${base.y + 1} ${base.z}`);
+    await command(`tp ${player} ${base.x} ${base.y + 1} ${base.z} 0 0`);
     // Clear the baseline pet in this disposable save so ownership guards do not block taming.
     await request('/clear-entities', { type: TYPE });
     await request('/clear-entities', { type: 'mushroom_yorkie:squirrel' });
@@ -115,7 +115,10 @@ async function executeMatrix(baseUrl, args) {
     const sky = await request('/count-blocks', { x1: base.x - 7, y1: base.y + 5, z1: base.z - 7, x2: base.x + 7, y2: 319, z2: base.z + 7 });
     check(sky.counts['minecraft:air'] === sky.volume, 'Old overhead blocks invalidate the shelter fixture');
     const snapshot = await state();
-    snapshot.fixtureAudit = { upperAirVolume: sky, ownerMode, flying: Boolean(inputs.flying) };
+    const yaw = (await command(`data get entity ${player} Rotation[0]`)).result;
+    const pitch = (await command(`data get entity ${player} Rotation[1]`)).result;
+    check(yaw === 0 && pitch === 0, 'Fixture owner view was not reset after earlier camera movement');
+    snapshot.fixtureAudit = { upperAirVolume: sky, ownerMode, flying: Boolean(inputs.flying), ownerView: { yaw, pitch } };
     check(entity(snapshot), 'Fresh fixture is not observable');
     check(snapshot.players[0].abilities.creative === (ownerMode === 'creative')
       && snapshot.players[0].abilities.flying === Boolean(inputs.flying), 'Owner mode/flight fixture did not take effect');
@@ -152,7 +155,7 @@ async function executeMatrix(baseUrl, args) {
     };
   });
   const context = { prepare, command, request, state, entity, advance, base, player, selector: SELECTOR, check };
-  const groups = { base: cases, transitions: [...require('./yorkie-transitions').transitionCases(context), ...require('./yorkie-flight-transitions').flightTransitionCases(context)], terrain: require('./yorkie-terrain').terrainCases(context), outdoors: require('./yorkie-outdoor').outdoorCases(context) };
+  const groups = { base: cases, transitions: [...require('./yorkie-transitions').transitionCases(context), ...require('./yorkie-flight-transitions').flightTransitionCases(context)], terrain: require('./yorkie-terrain').terrainCases(context), outdoors: require('./yorkie-outdoor').outdoorCases(context), water: require('./yorkie-water-rest').waterRestCases(context), rest: require('./yorkie-sleep-spots').sleepSpotCases(context) };
   const selected = selectCases(groups, args);
   await command('gamerule minecraft:spawn_mobs false');
   await command('gamerule minecraft:advance_time false');
@@ -163,8 +166,25 @@ async function executeMatrix(baseUrl, args) {
       reportFile, metadata: { scenario: 'yorkie-matrix', runId, group: args.group || 'all', provenance, startScreenshot: startScreenshot.file, saveName: initial.saveName, base, expectedSave: args.expectedSave },
       capture: async (scenario) => {
         const snapshot = await state();
-        const screenshot = await request('/screenshot', { name: `yorkie-${runId}-${scenario.name}-failure.png`, resume: true, hideGui: false });
-        return { state: snapshot, screenshot: screenshot.file };
+        assertTestWorld(snapshot, args.expectedSave);
+        check(snapshot.players[0].dimension.includes('minecraft:overworld'), 'Failure capture requires the original Overworld fixture');
+        // Let client interpolation catch up before choosing a visual target.
+        await delay(300);
+        const cameraState = await state();
+        assertTestWorld(cameraState, args.expectedSave);
+        const target = entity(cameraState) || cameraState.players[0].nearbyEntities.find((candidate) => candidate.type === 'mushroom_yorkie:squirrel');
+        let camera;
+        if (target) {
+          const point = { ...target.position, y: target.position.y + 0.25 };
+          try {
+            // Resolve rotation from server coordinates; entity-look packets can use a stale client entity position.
+            await command(`execute as ${player} at @s anchored eyes facing ${point.x} ${point.y} ${point.z} run tp @s ~ ~ ~ ~ ~`);
+            camera = { targetUuid: target.uuid, point };
+          } catch (error) { camera = { targetUuid: target.uuid, point, error: error.message }; }
+        }
+        await delay(150);
+        const screenshot = await request('/screenshot', { name: `yorkie-${runId}-${scenario.name}-failure.png`, resume: true, hideGui: true, clearChat: true });
+        return { state: snapshot, cameraState, screenshot: screenshot.file, camera, captureDelayMs: 450 };
       },
       onResult: (result) => console.error(`${result.name}: ${result.status}${result.error ? `: ${result.error}` : ''}`)
     });

@@ -9,9 +9,14 @@ final class MushroomSittingPose {
 	}
 
 	static void setSleeping(MushroomYorkieEntity yorkie, boolean sleeping) {
+		// Night sleep and creative naps must wait for a dry landing, including callers already active on entering water.
+		sleeping = sleeping && MushroomYorkieStateQueries.canSleep(yorkie);
 		yorkie.setSleepingData(sleeping);
 		update(yorkie);
 		if (sleeping) {
+			// A supported virtual bed is repositioned each tick; its small gravity motion is not an actual fall.
+			// canSleep requires grounded entry, or continuation of an already-established supported doghouse rest.
+			yorkie.fallDistance = 0.0F;
 			yorkie.getNavigation().stop();
 			if (yorkie.level() instanceof ServerLevel level) {
 				BlockPos doorPos = MushroomDoorLocator.findNearestDoor(level, yorkie.blockPosition());
@@ -30,11 +35,15 @@ final class MushroomSittingPose {
 		update(yorkie);
 	}
 
-	static void preventWaterSitting(MushroomYorkieEntity yorkie) {
-		if (yorkie.isOrderedToSit() && MushroomYorkieStateQueries.isWetForSitting(yorkie)) {
-			yorkie.setMushroomOrderedToSit(false);
-			yorkie.setSleeping(false);
-			MushroomBehaviorDebugger.debug(yorkie, "water_follow", "ordered: follow forced because Mushroom is in water", true);
+	static void preventWaterRest(MushroomYorkieEntity yorkie) {
+		if (!MushroomYorkieStateQueries.isWetForSitting(yorkie)) {
+			return;
+		}
+		boolean resting = yorkie.isOrderedToSit() || yorkie.isMushroomSleeping() || yorkie.isInSittingPose();
+		yorkie.setMushroomOrderedToSit(false);
+		yorkie.setSleeping(false);
+		if (resting) {
+			MushroomBehaviorDebugger.debug(yorkie, "water_follow", "water: waking and following instead of sitting or sleeping", true);
 		}
 	}
 
