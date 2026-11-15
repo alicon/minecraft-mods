@@ -77,6 +77,8 @@ Run Mushroom's headless Minecraft GameTests:
 ./gradlew :mushroom-the-yorkie:runGameTestServer
 ```
 
+Fetch GameTests cover active flight steering, interruption returning to normal following, toy returns from below a platform, fractional owner heights, and shoreline path endpoints within pickup reach. Flight fixtures run the real fetch goal, flight controller, and native collision movement in server order. Live terrain cases additionally exercise full entity ticks, all three toys, and independent survival/creative walking/creative flying owner states.
+
 GameTests boot a scripted Minecraft server from the CLI. They are slower than unit tests, so keep them focused on behavior that needs a real world, entity registry, or server tick loop.
 
 ## Survival-mode GameTest players
@@ -205,7 +207,7 @@ Set `BRIDGE_REPORT_FILE=build/playtest-reports/<name>.json` to save the full bri
 ## State-combination testing
 
 The [Mushroom state matrix](../tools/playtest-harness/README.md#mushroom-state-matrix)
-checks 144 combinations and thirteen interruption/owner-mode/flight/feeding/tree-approach sequences in a disposable live world and preserves partial failure
+checks 144 combinations, thirteen interruption/owner-mode/flight/feeding/tree-approach sequences, and 36 terrain cases in a disposable live world and preserves partial failure
 reports. Run `npm --prefix tools/playtest-harness test` for the harness's runner,
 command-rejection, and save-safety regression tests. These tests also run in CI.
 Gameplay assertions still need the live Minecraft client and bridge.

@@ -183,7 +183,8 @@ final class FetchBallGoal extends Goal {
 	}
 
 	private boolean fetchLooksUnreachable(ServerLevel level, ItemEntity item) {
-		if (MushroomYorkieStateQueries.ownerIsCreativeFlying(this.yorkie) || FetchToyChase.canPickUp(this.yorkie, item) || !this.yorkie.getNavigation().isDone()) {
+		boolean flying = MushroomYorkieStateQueries.ownerIsCreativeFlying(this.yorkie);
+		if (FetchToyChase.canPickUp(this.yorkie, item) || (flying ? !this.yorkie.fetchFlight.blocked() : !this.yorkie.getNavigation().isDone())) {
 			this.unreachableTicks = 0;
 			return false;
 		}
@@ -237,6 +238,7 @@ final class FetchBallGoal extends Goal {
 		this.unsafeFetchLookTarget = item.position();
 		this.ignoreToy(item);
 		this.yorkie.getNavigation().stop();
+		this.movement.reset();
 		MushroomOwnerNotice.send(this.yorkie, noticeKey, MushroomOwnerNotice.SHORT_COOLDOWN_TICKS);
 		MushroomBehaviorDebugger.debug(this.yorkie, debugKey, debugMessage, true);
 	}

@@ -1,5 +1,7 @@
 'use strict';
 
+const { FETCH_TOYS } = require('./yorkie-inputs');
+
 // Additional sequences share the matrix's disposable-save guard and fresh fixtures.
 function transitionCases({ prepare, command, request, state, entity, advance, base, player, selector, check }) {
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -21,7 +23,7 @@ function transitionCases({ prepare, command, request, state, entity, advance, ba
     throw error;
   }
 
-  for (const item of ['minecraft:bone', 'mushroom_yorkie:yorkie_ball', 'mushroom_yorkie:yorkie_chew_toy']) {
+  for (const item of FETCH_TOYS) {
     for (const interruption of ['sit', 'sleep']) {
       const inputs = { time: 1000, shelter: interruption === 'sleep' ? 'inside' : 'outside', hunger: 10, sitting: false, flying: false };
       rows.push({
@@ -51,7 +53,7 @@ function transitionCases({ prepare, command, request, state, entity, advance, ba
       });
     }
   }
-  for (const item of ['minecraft:bone', 'mushroom_yorkie:yorkie_ball', 'mushroom_yorkie:yorkie_chew_toy']) {
+  for (const item of FETCH_TOYS) {
     const inputs = { time: 1000, shelter: 'outside', hunger: 10, sitting: false, flying: false, ownerMode: 'survival' };
     rows.push({
       name: `fetch-owner-mode-${item.split(':')[1]}`, inputs,

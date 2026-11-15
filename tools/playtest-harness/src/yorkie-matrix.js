@@ -1,6 +1,8 @@
 'use strict';
 
 const { runCases } = require('./scenario-runner');
+const { OWNER_STATES } = require('./yorkie-inputs');
+const { randomUUID } = require('node:crypto');
 const TYPE = 'mushroom_yorkie:mushroom_yorkie';
 const SELECTOR = '@e[type=mushroom_yorkie:mushroom_yorkie,tag=matrix_yorkie,limit=1]';
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -18,9 +20,17 @@ function matrixInputs() {
     for (const shelter of ['outside', 'roof', 'inside'])
       for (const hunger of [0, 90])
         for (const sitting of [false, true])
-          for (const owner of [{ ownerMode: 'survival', flying: false }, { ownerMode: 'creative', flying: false }, { ownerMode: 'creative', flying: true }])
+          for (const owner of OWNER_STATES)
             rows.push({ time, shelter, hunger, sitting, ...owner });
   return rows;
+}
+
+function selectCases(groups, args) {
+  check(!args.group || Object.hasOwn(groups, args.group), `Unknown matrix group: ${args.group}`);
+  const grouped = args.group ? groups[args.group] : Object.values(groups).flat();
+  const selected = args.case ? grouped.filter((scenario) => scenario.name === args.case || scenario.name === `matrix-${args.case}`) : grouped;
+  check(selected.length > 0, 'No matching matrix case');
+  return selected;
 }
 
 async function executeMatrix(baseUrl, args) {
@@ -37,7 +47,10 @@ async function executeMatrix(baseUrl, args) {
   }
   const initial = await request('/state');
   assertTestWorld(initial, args.expectedSave);
-  await request('/screenshot', { name: 'yorkie-matrix-start.png', resume: true });
+  check(initial.players[0].dimension.includes('minecraft:overworld'), 'Matrix arena requires the Overworld');
+  const runId = `${Date.now()}-${randomUUID().slice(0, 8)}`;
+  const startScreenshot = await request('/screenshot', { name: `yorkie-matrix-${runId}-start.png`, resume: true });
+  const provenance = require('./bridge-provenance').provenance(initial.savePath);
   const player = initial.players[0].name;
   const base = { x: Math.floor(initial.players[0].position.x), y: 220, z: Math.floor(initial.players[0].position.z) };
   const command = (text) => request('/command', { command: text }, /^(fill|setblock) /.test(text));
@@ -60,7 +73,9 @@ async function executeMatrix(baseUrl, args) {
     const ownerMode = inputs.ownerMode || (inputs.flying ? 'creative' : 'survival');
     check(['survival', 'creative'].includes(ownerMode) && (!inputs.flying || ownerMode === 'creative'), 'Invalid owner mode/flight fixture');
     // Check identity before each destructive fixture reset, not only at startup.
-    assertTestWorld(await state(), args.expectedSave);
+    const current = await state();
+    assertTestWorld(current, args.expectedSave);
+    check(current.players[0].dimension.includes('minecraft:overworld'), 'Matrix arena requires the Overworld');
     await command('tick sprint stop');
     await command(`gamemode creative ${player}`);
     await request('/player-abilities', { player, flying: false, mayfly: true });
@@ -69,7 +84,7 @@ async function executeMatrix(baseUrl, args) {
     await request('/clear-entities', { type: TYPE });
     await request('/clear-entities', { type: 'mushroom_yorkie:squirrel' });
     await request('/clear-entities', { type: 'minecraft:item' });
-    await command(`fill ${base.x - 7} ${base.y - 1} ${base.z - 7} ${base.x + 7} ${base.y + 7} ${base.z + 7} minecraft:air`);
+    await command(`fill ${base.x - 7} ${base.y - 1} ${base.z - 7} ${base.x + 7} 319 ${base.z + 7} minecraft:air`);
     await command(`fill ${base.x - 7} ${base.y - 1} ${base.z - 7} ${base.x + 7} ${base.y - 1} ${base.z + 7} minecraft:grass_block`);
     if (inputs.shelter === 'inside') {
       await command(`fill ${base.x - 4} ${base.y - 1} ${base.z - 4} ${base.x + 4} ${base.y + 4} ${base.z + 4} minecraft:oak_planks hollow`);
@@ -97,15 +112,15 @@ async function executeMatrix(baseUrl, args) {
     } else if (ownerMode === 'survival') {
       await command(`gamemode survival ${player}`);
     }
+    const sky = await request('/count-blocks', { x1: base.x - 7, y1: base.y + 5, z1: base.z - 7, x2: base.x + 7, y2: 319, z2: base.z + 7 });
+    check(sky.counts['minecraft:air'] === sky.volume, 'Old overhead blocks invalidate the shelter fixture');
     const snapshot = await state();
+    snapshot.fixtureAudit = { upperAirVolume: sky, ownerMode, flying: Boolean(inputs.flying) };
     check(entity(snapshot), 'Fresh fixture is not observable');
     check(snapshot.players[0].abilities.creative === (ownerMode === 'creative')
       && snapshot.players[0].abilities.flying === Boolean(inputs.flying), 'Owner mode/flight fixture did not take effect');
     return snapshot;
   }
-  await command('gamerule minecraft:spawn_mobs false');
-  await command('gamerule minecraft:advance_time false');
-  await command('weather clear');
   const inputs = matrixInputs();
   const cases = inputs.map((row) => {
     const number = inputs.indexOf(row) + 1;
@@ -136,16 +151,19 @@ async function executeMatrix(baseUrl, args) {
       }
     };
   });
-  cases.push(...require('./yorkie-transitions').transitionCases({ prepare, command, request, state, entity, advance, base, player, selector: SELECTOR, check }));
-  const selected = args.case ? cases.filter((scenario) => scenario.name === args.case || scenario.name === `matrix-${args.case}`) : cases;
-  check(selected.length > 0, 'No matching matrix case');
+  const context = { prepare, command, request, state, entity, advance, base, player, selector: SELECTOR, check };
+  const groups = { base: cases, transitions: require('./yorkie-transitions').transitionCases(context), terrain: require('./yorkie-terrain').terrainCases(context) };
+  const selected = selectCases(groups, args);
+  await command('gamerule minecraft:spawn_mobs false');
+  await command('gamerule minecraft:advance_time false');
+  await command('weather clear');
   const reportFile = args.reportFile || 'build/playtest-reports/yorkie-matrix.json';
   try {
     return await runCases(selected, {
-      reportFile, metadata: { scenario: 'yorkie-matrix', saveName: initial.saveName, base, expectedSave: args.expectedSave },
+      reportFile, metadata: { scenario: 'yorkie-matrix', runId, group: args.group || 'all', provenance, startScreenshot: startScreenshot.file, saveName: initial.saveName, base, expectedSave: args.expectedSave },
       capture: async (scenario) => {
         const snapshot = await state();
-        const screenshot = await request('/screenshot', { name: `yorkie-${scenario.name}-failure.png`, resume: true, hideGui: false });
+        const screenshot = await request('/screenshot', { name: `yorkie-${runId}-${scenario.name}-failure.png`, resume: true, hideGui: false });
         return { state: snapshot, screenshot: screenshot.file };
       },
       onResult: (result) => console.error(`${result.name}: ${result.status}${result.error ? `: ${result.error}` : ''}`)
@@ -162,4 +180,4 @@ async function runMatrix(baseUrl, args) {
   return require('./bridge-lock').withBridgeLock(baseUrl, () => executeMatrix(baseUrl, args));
 }
 
-module.exports = { runMatrix, matrixInputs, assertTestWorld };
+module.exports = { runMatrix, matrixInputs, assertTestWorld, selectCases };
