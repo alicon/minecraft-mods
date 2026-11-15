@@ -135,10 +135,11 @@ and a grounded/flying owner. Each fresh-pet fixture checks sleep, orders,
 gravity, health, need bounds, and the transition back to daylight and landing.
 Grounded cases use a survival owner; flying cases use creative mode. The suite
 does not yet claim coverage of every owner mode or every state transition.
-Eight additional sequences interrupt carried fetches with sit/sleep (bone, ball,
-chew toy) and exercise sleep-to-flight-to-sleep transitions at two hunger levels.
+Nine additional sequences interrupt carried fetches with sit/sleep (bone, ball,
+chew toy) exercise sleep-to-flight-to-sleep transitions at two hunger levels, and verify
+that a starving pet eats an available nighttime meal and settles back to sleep.
 Replay them by name with `--case fetch-sit-yorkie_ball` or
-`--case sleep-flight-sleep-90`.
+`--case sleep-flight-sleep-90`, or `--case starving-night-food-bowl`.
 
 Tick sprint advances real server ticks with a bounded wait; this is a fast
 state check, not a substitute for watching animation or movement over normal time.

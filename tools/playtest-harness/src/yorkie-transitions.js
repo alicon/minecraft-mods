@@ -71,6 +71,25 @@ function transitionCases({ prepare, command, request, state, entity, advance, ba
       }
     });
   }
+  const nightCare = { time: 18000, shelter: 'inside', hunger: 100, sitting: false, flying: false };
+  rows.push({
+    name: 'starving-night-food-bowl', inputs: nightCare,
+    setup: async () => {
+      await prepare(nightCare);
+      await command(`setblock ${base.x + 1} ${base.y} ${base.z} mushroom_yorkie:dog_food_bowl`);
+    },
+    run: async (fixture, result) => {
+      const snapshot = await advance(620);
+      const pet = entity(snapshot);
+      result.observed = { snapshot };
+      check(pet && pet.custom.needs.hunger < 100, 'Starving pet ignored the adjacent food bowl through the night');
+      check(pet.health === pet.maxHealth, 'Pet took starvation damage despite available food');
+      check(pet.custom.curledUpSleeping, 'Pet did not settle back to sleep after its urgent meal');
+      const bowl = await request('/block', { x: base.x + 1, y: base.y, z: base.z });
+      check(bowl.block === 'mushroom_yorkie:dog_bowl', 'Food bowl was not consumed');
+      return { snapshot, bowl };
+    }
+  });
   return rows;
 }
 

@@ -14,6 +14,7 @@ final class DomesticCareGoal extends Goal {
 	private static final double USE_DISTANCE_SQR = 2.25D;
 
 	private final MushroomYorkieEntity yorkie;
+	private final boolean urgentFoodOnly;
 	private BlockPos targetPos;
 	private BowlUse targetUse;
 	private long nextSearchGameTime;
@@ -21,7 +22,12 @@ final class DomesticCareGoal extends Goal {
 	private boolean completed;
 
 	DomesticCareGoal(MushroomYorkieEntity yorkie) {
+		this(yorkie, false);
+	}
+
+	DomesticCareGoal(MushroomYorkieEntity yorkie, boolean urgentFoodOnly) {
 		this.yorkie = yorkie;
+		this.urgentFoodOnly = urgentFoodOnly;
 		this.setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
 	}
 
@@ -38,7 +44,7 @@ final class DomesticCareGoal extends Goal {
 
 		long day = MushroomNightBehavior.currentDay(level);
 		for (BowlUse use : BowlUse.values()) {
-			if (use.isNeededBy(this.yorkie, day)) {
+			if ((!this.urgentFoodOnly || use == BowlUse.FOOD) && use.isNeededBy(this.yorkie, day)) {
 				BlockPos bowl = use.findNearest(level, this.yorkie.blockPosition());
 				if (bowl != null) {
 					this.targetPos = bowl;
@@ -70,6 +76,9 @@ final class DomesticCareGoal extends Goal {
 	public void start() {
 		this.nextMoveTick = 0;
 		this.completed = false;
+		if (this.urgentFoodOnly) {
+			this.yorkie.setSleeping(false);
+		}
 		MushroomBehaviorDebugger.debug(this.yorkie, "domestic_bowl_start", "domestic care: heading to " + this.targetUse.debugName(), true);
 	}
 
@@ -111,7 +120,8 @@ final class DomesticCareGoal extends Goal {
 				&& owner instanceof Player
 				&& owner.level() == this.yorkie.level()
 				&& !this.yorkie.isOrderedToSit()
-				&& !this.yorkie.isMushroomSleeping()
+				&& (this.urgentFoodOnly || !this.yorkie.isMushroomSleeping())
+				&& (!this.urgentFoodOnly || this.yorkie.needs.isStarving())
 				&& this.yorkie.scaredRunTicks <= 0
 				&& !MushroomBehaviorProfiles.keepsRoutineNeedsQuiet(this.yorkie, level)
 				&& !this.yorkie.trust.wasScoldedToday(level);
