@@ -217,7 +217,11 @@ The [Mushroom state matrix](../tools/playtest-harness/README.md#mushroom-state-m
 checks 144 combinations, nineteen interruption/owner-mode/flight/feeding/tree-approach sequences, 36 terrain cases, 20 outdoor-care sequences, 18 water/rest sequences, and eight sleep-spot controls in a disposable live world and preserves partial failure
 reports. Run `npm --prefix tools/playtest-harness test` for the harness's runner,
 command-rejection, and save-safety regression tests. These tests also run in CI.
-Gameplay assertions still need the live Minecraft client and bridge.
+Gameplay assertions still need the live Minecraft client and bridge. Successful
+matrix runs persist their original case observations before separately feeding
+and healing the same tagged pet for inspection. The postRun record is maintenance,
+not gameplay evidence; its failure cannot turn a case failure into a pass. Failed
+or interrupted runs never receive this care.
 
 ## Current Automated Coverage
 

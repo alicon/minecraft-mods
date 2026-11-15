@@ -3622,7 +3622,8 @@ async function main() {
     throw new Error(`Unknown bridge action: ${action}`);
   }
 
-  writeReportFile(option(args, 'reportFile', 'BRIDGE_REPORT_FILE', ''), result);
+  // Matrix owns atomic incremental reports, including its post-run phase.
+  if (action !== 'yorkie-matrix') writeReportFile(option(args, 'reportFile', 'BRIDGE_REPORT_FILE', ''), result);
   console.log(JSON.stringify(result, null, 2));
 }
 

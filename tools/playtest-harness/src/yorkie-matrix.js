@@ -2,17 +2,14 @@
 
 const { runCases } = require('./scenario-runner');
 const { OWNER_STATES } = require('./yorkie-inputs');
+const { assertTestWorld } = require('./yorkie-world');
+const { assertInspectionWorld, careForSuccessfulPet } = require('./yorkie-post-run');
 const { randomUUID } = require('node:crypto');
 const TYPE = 'mushroom_yorkie:mushroom_yorkie';
 const SELECTOR = '@e[type=mushroom_yorkie:mushroom_yorkie,tag=matrix_yorkie,limit=1]';
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 function check(value, message) { if (!value) throw new Error(message); }
 
-function assertTestWorld(state, expectedSave) {
-  check(expectedSave && state.saveName === expectedSave, 'Exact --expected-save is required and must match the loaded save');
-  check(/^(Mushroom Abel Noelle |Codex |Mushroom Matrix )/.test(expectedSave), 'Refusing a save without a disposable-test prefix');
-  check(state.singleplayer && state.players.length === 1, 'Matrix requires a single-player local test world');
-}
 
 function matrixInputs() {
   const rows = [];
@@ -69,6 +66,7 @@ async function executeMatrix(baseUrl, args) {
     }
     throw new Error(`Server failed to advance ${ticks} ticks`);
   }
+  let lastFixtureUuid;
   async function prepare(inputs) {
     const ownerMode = inputs.ownerMode || (inputs.flying ? 'creative' : 'survival');
     check(['survival', 'creative'].includes(ownerMode) && (!inputs.flying || ownerMode === 'creative'), 'Invalid owner mode/flight fixture');
@@ -120,6 +118,7 @@ async function executeMatrix(baseUrl, args) {
     check(yaw === 0 && pitch === 0, 'Fixture owner view was not reset after earlier camera movement');
     snapshot.fixtureAudit = { upperAirVolume: sky, ownerMode, flying: Boolean(inputs.flying), ownerView: { yaw, pitch } };
     check(entity(snapshot), 'Fresh fixture is not observable');
+    lastFixtureUuid = entity(snapshot).uuid;
     check(snapshot.players[0].abilities.creative === (ownerMode === 'creative')
       && snapshot.players[0].abilities.flying === Boolean(inputs.flying), 'Owner mode/flight fixture did not take effect');
     return snapshot;
@@ -161,8 +160,25 @@ async function executeMatrix(baseUrl, args) {
   await command('gamerule minecraft:advance_time false');
   await command('weather clear');
   const reportFile = args.reportFile || 'build/playtest-reports/yorkie-matrix.json';
+  let resetAttempted = false;
+  const careContext = { state, request, expectedSave: args.expectedSave, playerUuid: initial.players[0].uuid };
+  async function resetWorld() {
+    resetAttempted = true;
+    for (const body of [
+      { command: 'tick sprint stop' }, { command: 'time set day' }, { command: `gamemode creative ${player}` }
+    ]) {
+      assertInspectionWorld(await state(), careContext);
+      await request('/command', body);
+    }
+    assertInspectionWorld(await state(), careContext);
+    await request('/player-abilities', { player, flying: false, mayfly: true });
+  }
   try {
     return await runCases(selected, {
+      afterSuccess: async () => {
+        await resetWorld();
+        return careForSuccessfulPet({ ...careContext, petUuid: lastFixtureUuid });
+      },
       reportFile, metadata: { scenario: 'yorkie-matrix', runId, group: args.group || 'all', provenance, startScreenshot: startScreenshot.file, saveName: initial.saveName, base, expectedSave: args.expectedSave },
       capture: async (scenario) => {
         const snapshot = await state();
@@ -189,10 +205,7 @@ async function executeMatrix(baseUrl, args) {
       onResult: (result) => console.error(`${result.name}: ${result.status}${result.error ? `: ${result.error}` : ''}`)
     });
   } finally {
-    await command('tick sprint stop');
-    await command('time set day');
-    await command(`gamemode creative ${player}`);
-    await request('/player-abilities', { player, flying: false, mayfly: true });
+    if (!resetAttempted) await resetWorld();
   }
 }
 

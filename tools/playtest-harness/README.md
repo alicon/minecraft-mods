@@ -146,6 +146,14 @@ builds a high-altitude arena, changes player mode/time/gamerules, and resumes
 the client. Never point it at a family save. Keep only one live scenario run
 active per bridge. It leaves the test arena and report available for inspection;
 it restores daylight and a grounded creative player, not the original save state.
+After a successful run it feeds/heals only the original tagged matrix pet, retaining
+its UUID, harness and native equipment (including item components). This care
+happens after case observations are persisted, and is recorded separately in
+`postRun`; it cannot change gameplay verdicts. Failed/interrupted runs get no pet
+care, and missing/dead/unowned/untagged pets are never replaced. Every maintenance
+mutation rechecks the copied Overworld and original player. A care/verification
+failure makes overall `ok` false while retaining `gameplayOk`, original case
+statuses and evidence. `complete` stays false until maintenance finishes.
 
 The 144 base cases combine four times (day, dusk, night, dawn), three shelter types
 (open sky, roof only, enclosed room), fed/hungry needs, sit/follow orders,
