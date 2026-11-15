@@ -149,9 +149,11 @@ and a grounded/flying owner. Each fresh-pet fixture checks sleep, orders,
 gravity, health, need bounds, and the transition back to daylight and landing.
 Grounded cases use a survival owner; flying cases use creative mode. The suite
 does not yet claim coverage of every owner mode or every state transition.
-Nine additional sequences interrupt carried fetches with sit/sleep (bone, ball,
+Ten additional sequences interrupt carried fetches with sit/sleep (bone, ball,
 chew toy) exercise sleep-to-flight-to-sleep transitions at two hunger levels, and verify
 that a starving pet eats an available nighttime meal and settles back to sleep.
+The final case checks that a squirrel uses a clear climbing face when a low
+branch blocks the nearest face (`--case squirrel-clear-tree-face`).
 Replay them by name with `--case fetch-sit-yorkie_ball` or
 `--case sleep-flight-sleep-90`, or `--case starving-night-food-bowl`.
 

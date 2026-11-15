@@ -90,6 +90,26 @@ function transitionCases({ prepare, command, request, state, entity, advance, ba
       return { snapshot, bowl };
     }
   });
+  const treeFace = { time: 1000, shelter: 'outside', hunger: 10, sitting: false, flying: false };
+  rows.push({
+    name: 'squirrel-clear-tree-face', inputs: treeFace,
+    setup: async () => {
+      await prepare(treeFace);
+      await request('/clear-entities', { type: 'mushroom_yorkie:mushroom_yorkie' });
+      await request('/clear-entities', { type: 'mushroom_yorkie:squirrel' });
+      await command(`fill ${base.x + 3} ${base.y} ${base.z + 3} ${base.x + 3} ${base.y + 4} ${base.z + 3} minecraft:oak_log`);
+      await command(`setblock ${base.x + 3} ${base.y + 2} ${base.z + 2} minecraft:oak_leaves[persistent=true]`);
+      await command(`summon mushroom_yorkie:squirrel ${base.x + 3.5} ${base.y} ${base.z + 0.5} {NoAI:1b,PersistenceRequired:1b}`);
+    },
+    run: async (fixture, result) => {
+      await command('data merge entity @e[type=mushroom_yorkie:squirrel,limit=1] {NoAI:0b}');
+      const snapshot = await advance(120);
+      result.observed = { snapshot };
+      const squirrel = snapshot.players[0].nearbyEntities.find((candidate) => candidate.type === 'mushroom_yorkie:squirrel');
+      check(squirrel?.custom.foundTree, 'Squirrel did not use the clear side of a tree with its nearest climbing face blocked');
+      return { snapshot };
+    }
+  });
   return rows;
 }
 
