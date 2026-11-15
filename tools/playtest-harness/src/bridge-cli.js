@@ -58,7 +58,6 @@ function optionNumber(args, key, envName, fallback) {
   if (!Number.isFinite(parsed)) {
     throw new Error(`${key} must be a finite number`);
   }
-  require('./command-result').checkCommandParsed(parsed);
   return parsed;
 }
 
@@ -109,6 +108,7 @@ async function requestJson(baseUrl, path, method = 'GET', body = null) {
   if (!response.ok) {
     throw new Error(`${method} ${path} failed with ${response.status}: ${text}`);
   }
+  require('./command-result').checkCommandParsed(parsed);
   return parsed;
 }
 

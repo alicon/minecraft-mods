@@ -73,3 +73,19 @@ test('matrix rejects concurrent bridge owners and releases lock after failure', 
     assert.equal(await withBridgeLock('http://127.0.0.1:57321', async () => 'released', folder), 'released');
   } finally { fs.rmSync(folder, { recursive: true }); }
 });
+
+test('actual bridge CLI exits unsuccessfully when Minecraft rejects command syntax', async () => {
+  const http = require('node:http');
+  const { promisify } = require('node:util');
+  const execFile = promisify(require('node:child_process').execFile);
+  const server = http.createServer((req, res) => {
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify({ ok: true, callbackSeen: false, command: 'bad command' }));
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    await assert.rejects(execFile(process.execPath, [path.join(__dirname, 'bridge-cli.js'),
+      'command', '--command', 'bad command', '--port', String(server.address().port)], { timeout: 5000 }),
+    (error) => error.code === 1 && error.stderr.includes('Minecraft rejected command syntax'));
+  } finally { await new Promise((resolve) => server.close(resolve)); }
+});
