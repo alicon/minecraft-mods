@@ -1215,7 +1215,8 @@ async function runYorkieHomeSquirrel(baseUrl, args) {
       },
       8000
     );
-		const camera = { x: atTree.position.x + 3.0, y: atTree.position.y + 0.35, z: atTree.position.z - 3.2 };
+		// Player position is feet; keep the spectator eye below low canopy leaves.
+		const camera = { x: atTree.position.x + 3.0, y: atTree.position.y - 1.2, z: atTree.position.z - 3.2 };
     const target = { x: atTree.position.x, y: atTree.position.y + 0.55, z: atTree.position.z };
     const file = await cameraShot('chasing-squirrel', camera, target);
 		await checkedCommand(`gamemode survival ${playerName}`);
