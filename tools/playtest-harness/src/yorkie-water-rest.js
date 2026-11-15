@@ -10,13 +10,16 @@ function waterRestInputs() {
         for (const owner of OWNER_STATES.filter((state) => !state.flying))
           rows.push({ time, hunger, requestSit, ...owner, shelter: 'inside', sitting: false, energy: 80, buildNap: false });
   for (const energy of [0, 80]) rows.push({ time: 1000, hunger: 0, requestSit: false, ownerMode: 'creative', flying: false, shelter: 'inside', sitting: false, energy, buildNap: true });
+  for (const time of [1000, 18000])
+    for (const owner of OWNER_STATES.filter((state) => !state.flying))
+      rows.push({ time, hunger: 0, potty: 100, requestSit: false, ...owner, shelter: 'inside', sitting: false, energy: 80, buildNap: false });
   return rows;
 }
 
 function waterRestCases({ prepare, command, request, entity, advance, base, player, selector, check }) {
   return waterRestInputs().map((inputs) => ({
     name: inputs.buildNap ? `water-builder-nap-energy-${inputs.energy}`
-      : `water-${inputs.time === 1000 ? 'day' : 'night'}-${inputs.ownerMode}-${inputs.hunger === 0 ? 'fed' : 'hungry'}-${inputs.requestSit ? 'sit' : 'follow'}`,
+      : `water-${inputs.time === 1000 ? 'day' : 'night'}-${inputs.ownerMode}-${inputs.hunger === 0 ? 'fed' : 'hungry'}-${inputs.requestSit ? 'sit' : 'follow'}${inputs.potty ? '-urgent-potty' : ''}`,
     inputs,
     setup: async () => {
       const prepared = await prepare(inputs);
@@ -47,6 +50,9 @@ function waterRestCases({ prepare, command, request, entity, advance, base, play
       }
       const rested = await advance(inputs.buildNap ? 760 : 40);
       check(entity(rested)?.custom.curledUpSleeping === (inputs.time === 18000 || inputs.buildNap), 'Initial night-sleep/creative-nap state was not established');
+      check(typeof entity(rested)?.custom.relief?.tripActive === 'boolean', 'Bridge does not expose outdoor-trip diagnostics');
+      // Establish sleep first; urgent need must not change the routine solely because recovery prevents sleep.
+      if (inputs.potty) await command(`data merge entity ${selector} {Potty:${inputs.potty}}`);
       await command(`tp ${selector} ${base.x + 2.5} ${base.y - 2.8} ${base.z + 0.5}`);
       const wet = await advance(3);
       check(entity(wet)?.inWater, 'Pool fixture did not actually submerge Mushroom');
@@ -56,6 +62,7 @@ function waterRestCases({ prepare, command, request, entity, advance, base, play
       result.observed = { fixture, trace: [] };
       const original = entity(fixture.wet);
       check(!original.custom.curledUpSleeping && !original.tameable.sittingPose, 'Submerged pet retained sleep/rest pose');
+      if (inputs.time === 18000) check(original.custom.relief?.tripActive === false, 'Nighttime water entry started an unrelated outside trip');
       if (inputs.requestSit) result.observed.interaction = await request('/use-entity', {
         type: 'mushroom_yorkie:mushroom_yorkie', radius: 16, item: 'minecraft:air', count: 1
       });
@@ -73,6 +80,7 @@ function waterRestCases({ prepare, command, request, entity, advance, base, play
         check(!pet.tameable.orderedToSit, 'Wet sit request left a persistent sit order');
         if (pet.custom.curledUpSleeping) check(pet.onGround, 'Pet started sleeping before landing');
         if (pet.inWater) check(!pet.custom.curledUpSleeping && !pet.tameable.sittingPose, 'Wet pet sat or slept instead of recovering');
+        if (inputs.time === 18000) check(pet.custom.relief?.tripActive === false, 'Nighttime recovery started an unrelated outside trip');
         if (!pet.inWater && pet.distance < 4 && pet.onGround && pet.position.x < base.x + 1 && Math.abs(pet.position.y - base.y) < 0.3) { recovered = snapshot; break; }
       }
       check(recovered, 'Mushroom did not leave the reachable pool for his owner');
