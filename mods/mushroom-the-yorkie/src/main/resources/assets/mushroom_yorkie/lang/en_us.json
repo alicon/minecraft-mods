@@ -26,6 +26,7 @@
 	"message.mushroom_yorkie.notice_creative_checkin": "%s wonders if you're done building.",
 	"message.mushroom_yorkie.notice_creative_nap": "%s is taking a nap nearby.",
 	"message.mushroom_yorkie.notice_fetch_tricky": "%s says that toy is too tricky.",
+	"message.mushroom_yorkie.notice_fetch_inventory_full": "%s is holding your toy. Make room in your inventory.",
 	"message.mushroom_yorkie.notice_fetch_unreachable": "%s can't reach the toy.",
 	"message.mushroom_yorkie.notice_hungry_critical": "%s is really hungry.",
 	"message.mushroom_yorkie.notice_hungry_soon": "%s could use a snack soon.",

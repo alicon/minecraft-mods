@@ -147,19 +147,20 @@ the client. Never point it at a family save. Keep only one live scenario run
 active per bridge. It leaves the test arena and report available for inspection;
 it restores daylight and a grounded creative player, not the original save state.
 
-The 96 base cases combine four times (day, dusk, night, dawn), three shelter types
+The 144 base cases combine four times (day, dusk, night, dawn), three shelter types
 (open sky, roof only, enclosed room), fed/hungry needs, sit/follow orders,
-and a grounded/flying owner. Each fresh-pet fixture checks sleep, orders,
+and three owner states (survival walking, creative walking, creative flying). Each fresh-pet fixture checks sleep, orders,
 gravity, health, need bounds, and the transition back to daylight and landing.
-Grounded cases use a survival owner; flying cases use creative mode. The suite
-does not yet claim coverage of every owner mode or every state transition.
-Ten additional sequences interrupt carried fetches with sit/sleep (bone, ball,
+Each fixture verifies the owner mode and flight flags. The suite does not claim
+every state transition. Thirteen additional sequences interrupt carried fetches with sit/sleep (bone, ball,
 chew toy) exercise sleep-to-flight-to-sleep transitions at two hunger levels, and verify
 that a starving pet eats an available nighttime meal and settles back to sleep.
-The final case checks that a squirrel uses a clear climbing face when a low
+Three fetch cases switch from survival pickup to grounded creative delivery and
+back, checking exact toy conservation for the ball, bone, and chew toy. The
+squirrel case checks that a squirrel uses a clear climbing face when a low
 branch blocks the nearest face (`--case squirrel-clear-tree-face`).
 Replay them by name with `--case fetch-sit-yorkie_ball` or
-`--case sleep-flight-sleep-90`, or `--case starving-night-food-bowl`.
+`--case sleep-flight-sleep-90`, or `--case starving-night-food-bowl`, or `--case fetch-owner-mode-yorkie_ball`.
 
 Tick sprint advances real server ticks with a bounded wait; this is a fast
 state check, not a substitute for watching animation or movement over normal time.
@@ -220,7 +221,11 @@ of item loss—inspect the recorded `failedStage` and bootstrap log before retry
 Default report names include a unique run ID. Set `BRIDGE_REPORT_FILE` to choose
 an explicit path. Direct invocation also accepts `--toy minecraft:bone` or
 `--toy mushroom_yorkie:yorkie_chew_toy`, and `--instance-id` for a non-default
-Modrinth profile. Do not run another mutating bridge scenario concurrently.
+Modrinth profile. Add `--full-creative-inventory` to switch the carrying owner to
+creative, fill the inventory, save/restart, verify the toy stays held through a
+sit interruption, then free space and verify delivery. This catches vanilla
+creative auto-pickup deleting overflow that was dropped under the owner.
+Do not run another mutating bridge scenario concurrently.
 
 ```shell
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'

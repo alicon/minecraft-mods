@@ -1,5 +1,6 @@
 package dev.alicon.mushroomyorkie.entity;
 
+import dev.alicon.mushroomyorkie.item.YorkieFetchToyStacks;
 import java.util.EnumSet;
 import java.util.UUID;
 import net.minecraft.server.level.ServerLevel;
@@ -90,13 +91,19 @@ final class FetchBallGoal extends Goal {
 	public void stop() {
 		// Sitting, sleep, and other higher-priority goals can interrupt the return.
 		// The original item entity is already gone, so preserve its carried stack.
-		if (this.hasCarriedToy() && this.yorkie.level() instanceof ServerLevel level) {
-			ItemEntity dropped = new ItemEntity(level, this.yorkie.getX(), this.yorkie.getY() + 0.2D,
-					this.yorkie.getZ(), this.yorkie.getMainHandItem().copy());
-			dropped.setPickUpDelay(20);
-			level.addFreshEntity(dropped);
+		boolean keepForSpace = this.hasCarriedToy() && !YorkieFetchToyStacks.isFreeCreativeCopy(this.yorkie.getMainHandItem())
+				&& this.yorkie.getOwner() instanceof Player owner
+				&& FetchToyDelivery.shouldWaitForCreativeSpace(owner, this.yorkie.getMainHandItem());
+		if (this.hasCarriedToy() && !keepForSpace && this.yorkie.level() instanceof ServerLevel level) {
+			ItemStack carried = this.yorkie.getMainHandItem();
+			if (!YorkieFetchToyStacks.isFreeCreativeCopy(carried)) {
+				ItemEntity dropped = new ItemEntity(level, this.yorkie.getX(), this.yorkie.getY() + 0.2D,
+						this.yorkie.getZ(), carried.copy());
+				dropped.setPickUpDelay(20);
+				level.addFreshEntity(dropped);
+				this.lastReturnedToy = dropped.getUUID();
+			}
 			this.yorkie.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
-			this.lastReturnedToy = dropped.getUUID();
 			this.nextSearchGameTime = level.getGameTime() + RETURN_COOLDOWN_TICKS;
 		}
 		this.toy = null;
@@ -145,8 +152,9 @@ final class FetchBallGoal extends Goal {
 		this.yorkie.getLookControl().setLookAt(this.toy, 10.0F, this.yorkie.getMaxHeadXRot());
 		if (FetchToyChase.canPickUp(this.yorkie, this.toy)) {
 			this.yorkie.setItemSlot(EquipmentSlot.MAINHAND, FetchToyChase.pickUp(this.toy));
-			// Vanilla requires a value above 1 for a guaranteed drop without a player kill.
-			this.yorkie.setDropChance(EquipmentSlot.MAINHAND, 2.0F);
+			// Real possessions always drop, including environmental deaths; free copies never do.
+			this.yorkie.setDropChance(EquipmentSlot.MAINHAND,
+					YorkieFetchToyStacks.isFreeCreativeCopy(this.yorkie.getMainHandItem()) ? 0.0F : 2.0F);
 			this.toy = null;
 			this.movement.retryNow();
 			this.returner.reset();

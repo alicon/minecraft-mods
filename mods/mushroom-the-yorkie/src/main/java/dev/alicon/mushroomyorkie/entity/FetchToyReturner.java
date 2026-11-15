@@ -2,6 +2,7 @@ package dev.alicon.mushroomyorkie.entity;
 
 import java.util.UUID;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
@@ -25,11 +26,17 @@ final class FetchToyReturner {
 		this.yorkie.getLookControl().setLookAt(owner, 10.0F, this.yorkie.getMaxHeadXRot());
 		if (this.yorkie.distanceToSqr(owner) <= RETURN_DISTANCE_SQR) {
 			ItemStack returnedStack = carriedToy.isEmpty() ? ItemStack.EMPTY : carriedToy.copy();
-			UUID droppedToy = FetchToyDelivery.returnToy(level, this.yorkie, owner, returnedStack);
+			FetchToyDelivery.Delivery delivery = FetchToyDelivery.returnToy(level, this.yorkie, owner, returnedStack);
+			if (!delivery.carriedRemainder().isEmpty()) {
+				this.yorkie.setItemSlot(EquipmentSlot.MAINHAND, delivery.carriedRemainder());
+				this.yorkie.getNavigation().stop();
+				MushroomOwnerNotice.send(this.yorkie, "message.mushroom_yorkie.notice_fetch_inventory_full", MushroomOwnerNotice.SHORT_COOLDOWN_TICKS);
+				return FetchToyReturnResult.IN_PROGRESS;
+			}
 			this.yorkie.needs.playWithToy();
 			MushroomYorkieSounds.bark(this.yorkie);
 			MushroomBehaviorDebugger.debug(this.yorkie, "fetch_return", "fetch: brought the toy back", true);
-			return new FetchToyReturnResult(true, droppedToy);
+			return new FetchToyReturnResult(true, delivery.droppedToy());
 		}
 
 		if (!this.yorkie.isNoGravity() && !this.yorkie.creativeRecoveryFlight.hasRequest()) {

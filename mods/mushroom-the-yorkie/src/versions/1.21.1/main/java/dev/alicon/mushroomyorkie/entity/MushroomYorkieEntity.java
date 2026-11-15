@@ -1,5 +1,6 @@
 package dev.alicon.mushroomyorkie.entity;
 
+import dev.alicon.mushroomyorkie.item.YorkieFetchToyStacks;
 import dev.alicon.mushroomyorkie.pet.PetNeeds;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -247,6 +248,12 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	@Override
 	protected net.minecraft.sounds.SoundEvent getAmbientSound() {
 		return null;
+	}
+
+	@Override
+	public void die(DamageSource damageSource) {
+		YorkieFetchToyStacks.discardFreeCopyOnDeath(this);
+		super.die(damageSource);
 	}
 
 	@Override

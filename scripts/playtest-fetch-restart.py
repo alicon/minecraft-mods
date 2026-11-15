@@ -106,7 +106,7 @@ def execute(args, bridge):
     run_id = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8]
     report_file = Path(args.report_file).resolve() if args.report_file else ROOT / 'build/playtest-reports' / f'fetch-restart-{run_id}.json'
     report = {'scenario': 'fetch-across-saved-restart', 'runId': run_id, 'expectedSave': args.expected_save,
-              'toy': args.toy, 'spawnedToyCount': 1, 'complete': False, 'ok': False, 'stage': 'preflight'}
+              'toy': args.toy, 'fullCreativeInventory': args.full_creative_inventory, 'spawnedToyCount': 1, 'complete': False, 'ok': False, 'stage': 'preflight'}
     save = lambda: write_report(report_file, report)
     save()
     try:
@@ -166,6 +166,12 @@ def execute(args, bridge):
         inventory = command(f'clear {name} {args.toy} 0').get('result', 0)
         if inventory != 0:
             raise RuntimeError('Fixture inventory is not empty')
+        if args.full_creative_inventory:
+            command(f'gamemode creative {name}')
+            for section, count in (('hotbar', 9), ('inventory', 27)):
+                for slot in range(count):
+                    command(f'item replace entity {name} {section}.{slot} with minecraft:stone 64')
+            snapshot = state()
         report.update(stage='carried', beforeQuit=snapshot, carrierUuid=pet['uuid'], inventoryBeforeQuit=inventory)
         save()
         offset = game_log.stat().st_size
@@ -207,24 +213,46 @@ def execute(args, bridge):
         report.update(stage='reloaded', bootstrapLog=str(launch_log))
         save()
         snapshot = state()
-        if snapshot['players'][0]['uuid'] != report['playerUuid'] or snapshot['players'][0]['abilities']['creative']:
-            raise RuntimeError('Reloaded owner identity or survival mode changed')
+        if snapshot['players'][0]['uuid'] != report['playerUuid'] or snapshot['players'][0]['abilities']['creative'] != args.full_creative_inventory:
+            raise RuntimeError('Reloaded owner identity or expected game mode changed')
         if installed_jars(profile) != report['installedJarHashes']:
             raise RuntimeError('Installed jars changed during the restart scenario')
         report['immediatelyAfterReload'] = snapshot
         if not any(e.get('uuid') == report['carrierUuid'] for e in snapshot['players'][0]['nearbyEntities']):
             raise RuntimeError('Original carrier is not observable after reload')
         command('tick unfreeze')
-        before = state()['tickCount']
-        command('tick sprint 240t')
-        deadline = time.monotonic() + 20
-        while time.monotonic() < deadline:
-            snapshot = state()
-            if snapshot['tickCount'] >= before + 240:
-                break
-            time.sleep(.1)
-        else:
+        def advance(ticks):
+            before = state()['tickCount']
+            command(f'tick sprint {ticks}t')
+            deadline = time.monotonic() + 20
+            while time.monotonic() < deadline:
+                snapshot = state()
+                if snapshot['tickCount'] >= before + ticks:
+                    return snapshot
+                time.sleep(.1)
             raise RuntimeError('Post-reload game ticks did not advance')
+
+        snapshot = advance(240)
+        if args.full_creative_inventory:
+            inventory = command(f'clear {name} {args.toy} 0').get('result', 0)
+            ground, held = toy_counts(snapshot, args.toy)
+            report.update(stage='holding_for_inventory_space', whileFullAfterReload=snapshot,
+                          inventoryWhileFull=inventory, groundWhileFull=ground, heldWhileFull=held)
+            save()
+            if (inventory, ground, held) != (0, 0, 1):
+                raise RuntimeError('Real toy was not safely held through full creative inventory and restart')
+            command(f'data merge entity {report["carrierUuid"]} {{Sitting:1b}}')
+            sitting = advance(40)
+            report['whileFullSitting'] = sitting
+            save()
+            carrier = next(e for e in sitting['players'][0]['nearbyEntities'] if e.get('uuid') == report['carrierUuid'])
+            if toy_counts(sitting, args.toy) != (0, 1) or not carrier['tameable']['orderedToSit']:
+                raise RuntimeError('Full-inventory sit interruption lost the held toy')
+            command(f'data merge entity {report["carrierUuid"]} {{Sitting:0b}}')
+            command(f'item replace entity {name} inventory.0 with minecraft:air')
+            report['stage'] = 'inventory_space_freed'
+            save()
+            snapshot = advance(180)
         inventory = command(f'clear {name} {args.toy} 0').get('result', 0)
         ground, held = toy_counts(snapshot, args.toy)
         total = inventory + ground + held
@@ -255,6 +283,7 @@ def main():
     parser.add_argument('--host', default='127.0.0.1')
     parser.add_argument('--port', type=int, default=57321)
     parser.add_argument('--instance-id')
+    parser.add_argument('--full-creative-inventory', action='store_true', help='Verify held overflow across restart/sit, then free space and finish delivery')
     parser.add_argument('--report-file')
     args = parser.parse_args()
     return run(args)

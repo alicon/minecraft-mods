@@ -24,7 +24,7 @@ final class YorkieBallThrower {
 			return stack;
 		}
 
-		ItemStack thrownStack = stack.copyWithCount(1);
+		ItemStack thrownStack = YorkieFetchToyStacks.thrownCopy(stack, player.isCreative());
 		Vec3 look = player.getLookAngle();
 		Vec3 start = player.position()
 				.add(0.0D, player.getEyeHeight() - 0.2D, 0.0D)
@@ -32,7 +32,11 @@ final class YorkieBallThrower {
 		Vec3 velocity = look.scale(THROW_SPEED).add(0.0D, UPWARD_ARC, 0.0D);
 		ItemEntity ball = new ItemEntity(serverLevel, start.x, start.y, start.z, thrownStack, velocity.x, velocity.y, velocity.z);
 		ball.setThrower(player);
-		ball.setPickUpDelay(20);
+		if (player.isCreative()) {
+			ball.setNeverPickUp();
+		} else {
+			ball.setPickUpDelay(20);
+		}
 		serverLevel.addFreshEntity(ball);
 
 		if (!player.isCreative()) {
