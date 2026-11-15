@@ -1,6 +1,7 @@
 package dev.alicon.mushroomyorkie.entity;
 
 import dev.alicon.mushroomyorkie.item.ModItems;
+import java.util.function.UnaryOperator;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.MoverType;
@@ -99,6 +100,43 @@ final class FetchFlightScenarios {
 		} finally {
 			fixture.toy().discard();
 			fixture.yorkie().discard();
+		}
+	}
+
+	static void airborneReturnSurvivesReload(GameTestHelper helper, UnaryOperator<MushroomYorkieEntity> roundTrip, boolean landed) {
+		Fixture fixture = create(helper, true, 1.5D);
+		MushroomYorkieEntity restored = null;
+		try {
+			for (int tick = 0; tick < 150 && fixture.yorkie().getMainHandItem().isEmpty(); tick++) {
+				step(fixture);
+			}
+			helper.assertTrue(!fixture.yorkie().getMainHandItem().isEmpty() && fixture.yorkie().isNoGravity(),
+					"Reload fixture did not reach an airborne carried return");
+			if (landed) {
+				fixture.owner().getAbilities().flying = false;
+				fixture.owner().setPos(fixture.owner().getX(), fixture.owner().getY() - 1.5D, fixture.owner().getZ());
+			}
+			restored = roundTrip.apply(fixture.yorkie());
+			helper.assertTrue(restored.isNoGravity(), "Native serialization did not preserve airborne state");
+			FetchBallGoal fetch = new FetchBallGoal(restored);
+			helper.assertTrue(fetch.canUse(), "Reloaded airborne toy could not resume");
+			fetch.start();
+			Fixture resumed = new Fixture(restored, fixture.owner(), fetch, fixture.toy());
+			for (int tick = 0; tick < 300 && fetch.canContinueToUse(); tick++) {
+				step(resumed);
+				helper.assertTrue(restored.getMainHandItem().isEmpty() || restored.isNoGravity(),
+						"Reload released airborne return support: landed=" + landed);
+			}
+			helper.assertTrue(fixture.owner().getInventory().countItem(ModItems.YORKIE_BALL) == 1
+					&& restored.getMainHandItem().isEmpty() && fixture.toy().isRemoved(), "Reloaded airborne toy never returned");
+			fetch.stop();
+			helper.succeed();
+		} finally {
+			fixture.toy().discard();
+			fixture.yorkie().discard();
+			if (restored != null) {
+				restored.discard();
+			}
 		}
 	}
 

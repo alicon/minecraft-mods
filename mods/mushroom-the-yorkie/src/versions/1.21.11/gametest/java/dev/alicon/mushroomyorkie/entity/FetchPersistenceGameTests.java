@@ -82,6 +82,18 @@ public final class FetchPersistenceGameTests {
 		FetchModeChangeScenarios.realToySurvivesPartialCreativeInventory(helper, yorkie -> roundTrip(helper, yorkie));
 	}
 
+	/** Resume safe ascent after saving a carried toy with its creative owner already landed. */
+	@GameTest
+	public void airborneReturnSurvivesSavedLanding(GameTestHelper helper) {
+		FetchFlightScenarios.airborneReturnSurvivesReload(helper, yorkie -> roundTrip(helper, yorkie), true);
+	}
+
+	/** Preserve safe return when the owner remains in flight across the same save/load. */
+	@GameTest
+	public void airborneReturnSurvivesFlyingReload(GameTestHelper helper) {
+		FetchFlightScenarios.airborneReturnSurvivesReload(helper, yorkie -> roundTrip(helper, yorkie), false);
+	}
+
 	private static MushroomYorkieEntity roundTrip(GameTestHelper helper, MushroomYorkieEntity yorkie) {
 		TagValueOutput output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, helper.getLevel().registryAccess());
 		yorkie.saveWithoutId(output);

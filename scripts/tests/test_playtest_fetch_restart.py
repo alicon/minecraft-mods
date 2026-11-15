@@ -12,14 +12,21 @@ API = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'playtest-fetch-r
 
 class RestartHarnessTests(unittest.TestCase):
     def test_world_guard_rejects_other_saves_and_multiplayer(self):
-        state = {'saveName': 'Codex Test', 'singleplayer': True, 'players': [{}]}
+        state = {'saveName': 'Codex Test', 'singleplayer': True, 'players': [{'dimension': 'minecraft:overworld'}]}
         API['guard_world'](state, 'Codex Test')
         for changed, expected in [(state, ''), (state, 'Other'),
                                   ({**state, 'saveName': 'Family'}, 'Family'),
                                   ({**state, 'singleplayer': False}, 'Codex Test'),
-                                  ({**state, 'players': [{}, {}]}, 'Codex Test')]:
+                                  ({**state, 'players': [{}, {}]}, 'Codex Test'),
+                                  ({**state, 'players': [{'dimension': 'minecraft:the_nether'}]}, 'Codex Test')]:
             with self.assertRaises(ValueError):
                 API['guard_world'](changed, expected)
+
+    def test_incompatible_restart_modes_reject_before_live_access(self):
+        script = Path(__file__).resolve().parents[1] / 'playtest-fetch-restart.py'
+        result = subprocess.run(['python3', str(script), '--expected-save', 'Codex Test', '--full-creative-inventory', '--flight-return', 'landed'], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('not allowed with argument', result.stderr)
 
     def test_conservation_counts_expose_duplicate_ground_and_carried_toys(self):
         toy = 'mushroom_yorkie:yorkie_ball'
