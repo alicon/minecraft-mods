@@ -614,8 +614,9 @@ The four `squirrel-hurt-*` transition cases cover climbing/perched squirrels
 and two attack-source directions. A creative flying owner supplies a controlled
 native `player_attack` damage command from within ordinary reach and a clear
 authored line of sight. This is not a client mouse attack. The original full-AI
-squirrel must receive native momentum, actually move within ten native ticks,
-release climbing and regain a stable perch within 400 ticks. Ordinary observed
+squirrel must receive new attacker-directed momentum, release its observed climb
+flag on the first tick, move away within two ticks, and regain a stable perch
+within 400 ticks. Perched hits must accumulate ordinary fall distance. Observed
 landing damage is retained for perched hits; unrelated damage, healing, missing
 identity, skipped ticks and unexpected position jumps fail. Every trace is saved
 before assertions and cleanup unfreezes the world. No squirrel care runs.

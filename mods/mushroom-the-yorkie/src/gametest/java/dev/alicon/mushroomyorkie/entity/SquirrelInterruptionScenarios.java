@@ -54,7 +54,10 @@ final class SquirrelInterruptionScenarios {
 		private int ticks, stableTicks, interruptedAt = -1, recoveredAt = -1;
 		private float postAttackHealth;
 		private Vec3 attackPosition;
+		private Vec3 attackDirection;
 		private double largestAttackDisplacement;
+		private double earlyAwayDisplacement;
+		private double largestFallDistance;
 		private boolean normalFallObserved;
 		private float previousHealth, fallHealthLoss, minimumHealth = Float.MAX_VALUE;
 
@@ -127,12 +130,20 @@ final class SquirrelInterruptionScenarios {
 					if (this.stableTicks >= (this.perched ? 40 : 1)) this.interrupt();
 				} else {
 					if (this.attacker != null) {
+						int sinceHit = this.ticks - this.interruptedAt;
+						if (sinceHit == 1) this.helper.assertTrue(!this.squirrel.onClimbable()
+								&& !this.squirrel.isNoGravity() && !this.squirrel.hasFoundTree(), "Hit did not release climbing on the first native tick");
+						if (sinceHit <= 2) this.earlyAwayDisplacement = Math.max(this.earlyAwayDisplacement,
+								this.squirrel.position().subtract(this.attackPosition).dot(this.attackDirection));
+						if (sinceHit == 2) this.helper.assertTrue(this.earlyAwayDisplacement > 0.05D,
+								"Native hit did not immediately move away from its attacker");
 						this.largestAttackDisplacement = Math.max(this.largestAttackDisplacement, Math.hypot(
 								this.squirrel.getX() - this.attackPosition.x, this.squirrel.getZ() - this.attackPosition.z));
 						if (this.ticks - this.interruptedAt >= 10) this.helper.assertTrue(this.largestAttackDisplacement > 0.1D,
 								"Native attack impulse was cancelled before physical displacement");
 					}
 					this.normalFallObserved |= !this.squirrel.isNoGravity() && this.squirrel.getDeltaMovement().y < -0.2D;
+					this.largestFallDistance = Math.max(this.largestFallDistance, this.squirrel.fallDistance);
 					if (this.perched && !this.closeFace) {
 						this.helper.assertTrue(this.squirrel.getHealth() <= this.previousHealth, "Attack recovery gained health");
 						if (this.squirrel.getHealth() < this.previousHealth) {
@@ -151,6 +162,9 @@ final class SquirrelInterruptionScenarios {
 					this.stableTicks = recovered ? this.stableTicks + 1 : 0;
 					if (recovered && this.recoveredAt < 0) this.recoveredAt = this.ticks;
 					if (this.stableTicks >= 40) {
+						if (this.perched && !this.closeFace) this.helper.assertTrue(this.normalFallObserved && this.largestFallDistance >= 3.0F,
+								"Perched hit never accumulated ordinary native fall distance");
+						if (this.roundTrip != null) this.helper.assertTrue(this.fallHealthLoss > 0, "Saved hit suppressed its expected native landing damage");
 						this.helper.assertTrue(Math.hypot(this.squirrel.getX() - this.origin.x - 4.5D,
 								this.squirrel.getZ() - this.origin.z - 4.5D) < 1.5D, "Squirrel recovered on an unrelated tree");
 						this.save(true);
@@ -197,12 +211,17 @@ final class SquirrelInterruptionScenarios {
 				this.attacker.setYRot((float) Math.toDegrees(Math.atan2(-direction.x, direction.z)));
 				this.attacker.setSprinting(true);
 				float before = this.squirrel.getHealth();
+				this.helper.assertTrue(this.squirrel.onClimbable(), "Attack target is not actually climbing or perched");
+				Vec3 beforeVelocity = this.squirrel.getDeltaMovement();
 				this.attackPosition = this.squirrel.position();
+				this.attackDirection = new Vec3(direction.x, 0, direction.z).normalize();
 				this.report.addProperty("attackStrength", this.attacker.getAttackStrengthScale(0));
 				this.report.addProperty("attackerNativeTick", this.attacker.tickCount);
 				this.attacker.attack(this.squirrel);
 				this.postAttackHealth = this.squirrel.getHealth();
 				this.previousHealth = this.postAttackHealth;
+				this.helper.assertTrue(this.squirrel.getDeltaMovement().subtract(beforeVelocity).dot(this.attackDirection) > 0.1D
+						&& this.squirrel.hurtTime > 0 && this.squirrel.getLastDamageSource().getMsgId().equals("player"), "Native hit did not supply new attacker-directed momentum");
 				this.helper.assertTrue(Math.hypot(this.squirrel.getDeltaMovement().x, this.squirrel.getDeltaMovement().z) > 0.1D,
 						"Native sprint attack did not supply a horizontal impulse");
 				this.helper.assertTrue(this.postAttackHealth < before, "Native attack caused no damage");
@@ -243,6 +262,8 @@ final class SquirrelInterruptionScenarios {
 			this.report.addProperty("passed", complete && !this.report.has("error"));
 			this.report.addProperty("interruptedAt", this.interruptedAt);
 			this.report.addProperty("largestAttackDisplacement", this.largestAttackDisplacement);
+			this.report.addProperty("earlyAwayDisplacement", this.earlyAwayDisplacement);
+			this.report.addProperty("largestFallDistance", this.largestFallDistance);
 			this.report.addProperty("normalFallObserved", this.normalFallObserved);
 			this.report.addProperty("fallHealthLoss", this.fallHealthLoss);
 			this.report.addProperty("minimumHealth", this.minimumHealth);
