@@ -2,7 +2,7 @@
 
 const { runCases } = require('./scenario-runner');
 const { OWNER_STATES } = require('./yorkie-inputs');
-const { assertTestWorld } = require('./yorkie-world');
+const { assertTestWorld, assertLivingTestOwner } = require('./yorkie-world');
 const { assertInspectionWorld, careForSuccessfulPet, withWorldReset } = require('./yorkie-post-run');
 const { randomUUID } = require('node:crypto');
 const TYPE = 'mushroom_yorkie:mushroom_yorkie';
@@ -44,6 +44,7 @@ async function executeMatrix(baseUrl, args) {
   }
   const initial = await request('/state');
   assertTestWorld(initial, args.expectedSave);
+  assertLivingTestOwner(initial, args.expectedSave);
   check(initial.players[0].dimension.includes('minecraft:overworld'), 'Matrix arena requires the Overworld');
   const runId = `${Date.now()}-${randomUUID().slice(0, 8)}`;
   const startScreenshot = await request('/screenshot', { name: `yorkie-matrix-${runId}-start.png`, resume: true });
@@ -63,6 +64,7 @@ async function executeMatrix(baseUrl, args) {
     // Check identity before each destructive fixture reset, not only at startup.
     const current = await state();
     assertTestWorld(current, args.expectedSave);
+    assertLivingTestOwner(current, args.expectedSave);
     check(current.players[0].dimension.includes('minecraft:overworld'), 'Matrix arena requires the Overworld');
     await command('tick sprint stop');
     await command('tick unfreeze');

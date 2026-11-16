@@ -8,4 +8,10 @@ function assertTestWorld(state, expectedSave) {
   check(state.singleplayer && state.players.length === 1, 'Matrix requires a single-player local test world');
 }
 
-module.exports = { assertTestWorld };
+function assertLivingTestOwner(state, expectedSave) {
+  assertTestWorld(state, expectedSave);
+  check(Number.isFinite(state.players[0].health) && state.players[0].health > 0,
+    'Test owner is dead or has unavailable health; preserve the failed report and use explicit native respawn before new fixture setup');
+}
+
+module.exports = { assertTestWorld, assertLivingTestOwner };

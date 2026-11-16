@@ -15,6 +15,16 @@ final class BridgeClientRequests {
 				bool(body, "hideGui", false), bool(body, "clearChat", false)).get(10, TimeUnit.SECONDS);
 	}
 
+	static JsonObject respawn(JsonObject state, JsonObject body) throws Exception {
+		var future = BridgeClientHooks.respawn(BridgeRespawnRequest.parse(state, body));
+		try {
+			return future.get(5, TimeUnit.SECONDS);
+		} catch (Exception failure) {
+			future.cancel(false);
+			throw failure;
+		}
+	}
+
 	static JsonObject quit(JsonObject state, JsonObject body) throws Exception {
 		String expectedSave = validateQuit(state, body);
 		return BridgeClientHooks.requestQuit(expectedSave).get(10, TimeUnit.SECONDS);

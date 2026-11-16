@@ -10,6 +10,22 @@ import org.junit.jupiter.api.Test;
 
 class BridgeInputControllerTest {
 	@Test
+	void recoveryWaitsUntilInputOwnershipIsTerminal() {
+		Fixture fixture = new Fixture();assertTrue(fixture.controller.allowsRecovery());
+		fixture.start(2);assertFalse(fixture.controller.allowsRecovery());
+		fixture.tick();fixture.tick();assertFalse(fixture.controller.allowsRecovery());
+		fixture.tick();assertTrue(fixture.controller.allowsRecovery());
+	}
+
+	@Test
+	void unconfirmedTerminalReleaseStillRefusesRecovery() {
+		Fixture fixture = new Fixture();fixture.target.ignoreRelease = true;fixture.start(1);
+		for (int tick = 0; tick < 7; tick++) fixture.tick();
+		assertEquals("release_unconfirmed", fixture.status().get("outcome").getAsString());
+		assertFalse(fixture.controller.allowsRecovery());
+	}
+
+	@Test
 	void completesOnlyAfterTheExactBurstAndANeutralTick() {
 		Fixture fixture = new Fixture();
 		fixture.start(3);

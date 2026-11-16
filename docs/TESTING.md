@@ -22,6 +22,26 @@ Prefer the narrowest useful command while iterating, then run broader checks bef
 
 ## Automated CLI Checks
 
+Matrix setup refuses a dead test owner before screenshots or fixture mutations.
+Preserve the original failure first. For an already-dead owner in the disposable
+Overworld test save, explicitly run:
+
+```shell
+npm --prefix tools/playtest-harness run bridge -- respawn --expected-save "Codex Test Copy" --player-uuid "<original owner UUID>" --report-file build/playtest-reports/owner-respawn.json
+```
+
+This sends Minecraft's native respawn request after exact save/player checks,
+then waits for the same account to be alive on the server. It refuses a living
+owner, hardcore worlds, changed context, active input and an existing output report. Recovery
+does not alter the original scenario verdict or prove gameplay passed. It does
+not heal a running fixture. Screenshots retain a dead player's screen even when
+resume was requested. Check current state before retrying an uncertain request.
+The attempted request is saved before dispatch. A response/confirmation failure
+exits nonzero and retains an uncertain outcome plus a final read-only snapshot
+when available. An earlier input operation with unconfirmed release blocks
+recovery until a normal client restart; mapped movement controls must also be
+released. This command does not clear keys on the user's behalf.
+
 Run all verification:
 
 ```shell

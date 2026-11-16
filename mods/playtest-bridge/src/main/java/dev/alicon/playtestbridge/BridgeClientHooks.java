@@ -7,6 +7,7 @@ final class BridgeClientHooks {
 	private static volatile ScreenshotProvider screenshotProvider;
 	private static volatile QuitProvider quitProvider;
 	private static volatile InputProvider inputProvider;
+	private static volatile RespawnProvider respawnProvider;
 
 	private BridgeClientHooks() {
 	}
@@ -46,6 +47,22 @@ final class BridgeClientHooks {
 		return provider == null
 				? CompletableFuture.failedFuture(new IllegalStateException("input provider requires a Minecraft client"))
 				: provider.input(request);
+	}
+
+	@FunctionalInterface
+	interface RespawnProvider {
+		CompletableFuture<JsonObject> respawn(BridgeRespawnRequest request);
+	}
+
+	static void registerRespawnProvider(RespawnProvider provider) {
+		respawnProvider = provider;
+	}
+
+	static CompletableFuture<JsonObject> respawn(BridgeRespawnRequest request) {
+		RespawnProvider provider = respawnProvider;
+		return provider == null
+				? CompletableFuture.failedFuture(new IllegalStateException("respawn requires a Minecraft client"))
+				: provider.respawn(request);
 	}
 
 	@FunctionalInterface

@@ -1,5 +1,13 @@
 # Minecraft Playtest Harness
 
+If a disposable test owner dies, preserve the failed scenario before recovery.
+Matrix setup refuses dead owners. Use `npm run bridge -- respawn --expected-save
+"Codex Test Copy" --player-uuid "<original UUID>" --report-file
+../../build/playtest-reports/owner-respawn.json` from this directory to request
+ordinary native respawn. The command holds the bridge lock, refuses living or
+changed players, preserves its own report and requires a living server owner
+after acknowledgement. This explicit recovery does not change earlier verdicts.
+
 Mineflayer-based harness for local playtesting this mods workspace. The first pass focuses on a bot that can join your local/LAN world, follow a player, open a browser viewer, and run command-backed smoke scenarios for mod entities.
 
 ## Install
