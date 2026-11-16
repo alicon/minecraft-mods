@@ -17,6 +17,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -33,11 +34,28 @@ final class BridgeEntityState {
 		state.addProperty("health", player.getHealth());
 		state.addProperty("food", player.getFoodData().getFoodLevel());
 		state.addProperty("shiftKeyDown", player.isShiftKeyDown());
+		state.addProperty("onGround", player.onGround());
+		state.addProperty("inWater", player.isInWater());
+		state.addProperty("inWaterOrBubble", inWaterOrBubble(player));
+		state.addProperty("onClimbable", player.onClimbable());
+		state.addProperty("hasEffects", !player.getActiveEffects().isEmpty());
+		state.addProperty("hurtTime", player.hurtTime);
+		state.addProperty("crouching", player.isCrouching());
+		state.addProperty("pose", player.getPose().name());
+		state.addProperty("horizontalCollision", player.horizontalCollision);
+		state.addProperty("verticalCollision", player.verticalCollision);
+		state.addProperty("stepHeight", player.maxUpStep());
+		state.add("velocity", position(player.getDeltaMovement()));
 		state.addProperty("dimension", player.level().dimension().toString());
 		if (player.level() instanceof ServerLevel level) {
 			state.addProperty("biome", biomeId(level, player.blockPosition()));
 		}
 		state.add("position", position(player.position()));
+		JsonObject precise = new JsonObject();
+		precise.addProperty("x", player.getX());
+		precise.addProperty("y", player.getY());
+		precise.addProperty("z", player.getZ());
+		state.add("positionPrecise", precise);
 		state.add("abilities", playerAbilities(player));
 		if (player.getVehicle() != null) {
 			state.add("vehicle", entityRef(player.getVehicle()));
@@ -53,6 +71,10 @@ final class BridgeEntityState {
 		abilities.addProperty("flying", player.getAbilities().flying);
 		abilities.addProperty("mayfly", player.getAbilities().mayfly);
 		return abilities;
+	}
+
+	static boolean inWaterOrBubble(LivingEntity entity) {
+		return entity.isInWater() || entity.level().getBlockStates(entity.getBoundingBox()).anyMatch(state -> state.is(Blocks.BUBBLE_COLUMN));
 	}
 
 	static JsonArray nearbyEntities(ServerPlayer player) {

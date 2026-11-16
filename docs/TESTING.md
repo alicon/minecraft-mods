@@ -406,6 +406,22 @@ native Shift press/release, a client exit and the original server player on foot
 with its shift flag released. A pending server acknowledgement, another vehicle
 or missing source cannot pass on key acknowledgement alone. These controls do
 not add matrix cases until explicit gameplay sequences use them.
+The `jump` input mode holds the native jump key for 2–5 client ticks, optionally
+with directional input. It requires a grounded, dry, on-foot, non-creative owner,
+with no recent hurt, climbing or active effects. The native launch witness needs
+an owned grounded press, upward velocity, airborne rise over 0.05 blocks and no
+vertical collision at launch. A later rise after release cannot create that
+witness. The starting client/server heights must agree within 0.125 blocks.
+The server-origin snapshot must be fresh within one second, and a receipt's
+server observation interval must fall inside the recorded input ownership window
+to confirm accepted airborne rise. Later reads cannot supply missing proof.
+Minecraft accepts player movement packets; this server observation confirms its
+accepted position, rather than separately computing player physics. The driver
+retains both observations even if the player later lands. A safe landing and any
+later collision still need scenario assertions. Read-only player ground/water,
+climb/effect/hurt state, crouch/pose, collision, step-height, velocity and precise
+position fields help diagnose blocked movement.
+
 Nearby living-entity snapshots also retain native air, accumulated fall distance,
 hurt timer and recent damage type for diagnosing a health change. These fields
 do not change damage rules, and unavailable retained history cannot identify the

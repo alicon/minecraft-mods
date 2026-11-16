@@ -6,9 +6,11 @@ import java.util.UUID;
 
 /** Closed request shape for short native input bursts in an identified disposable world. */
 record BridgeInputRequest(String action, String expectedSave, String playerUuid, String operationId,
-		String mode, int ticks, boolean forward, boolean backward, boolean left, boolean right, String vehicleUuid) {
+		String mode, int ticks, boolean forward, boolean backward, boolean left, boolean right, String vehicleUuid,
+		double jumpServerOriginY, long jumpServerSampleMillis, boolean jumpServerReady) {
 	static final int MAX_TICKS = 100;
 	static final int MAX_DISMOUNT_TICKS = 5;
+	static final int MAX_JUMP_TICKS = 5;
 	private static final Set<String> COMMON = Set.of("action", "expectedSave", "playerUuid", "operationId");
 	private static final Set<String> START = Set.of("mode", "ticks", "forward", "backward", "left", "right", "vehicleUuid");
 
@@ -33,15 +35,15 @@ record BridgeInputRequest(String action, String expectedSave, String playerUuid,
 		String id = text(body, "operationId");
 		UUID.fromString(id);
 		if (!action.equals("start")) {
-			return new BridgeInputRequest(action, save, playerUuid, id, "", 0, false, false, false, false, null);
+			return new BridgeInputRequest(action, save, playerUuid, id, "", 0, false, false, false, false, null, 0, 0, false);
 		}
 		String mode = text(body, "mode");
-		if (!Set.of("walk", "boat", "dismount").contains(mode)) throw new IllegalArgumentException("input mode must be walk, boat or dismount");
+		if (!Set.of("walk", "boat", "dismount", "jump").contains(mode)) throw new IllegalArgumentException("input mode must be walk, boat, dismount or jump");
 		String vehicleUuid = null;
-		if (!mode.equals("walk")) {
+		if (mode.equals("boat") || mode.equals("dismount")) {
 			vehicleUuid = text(body, "vehicleUuid");
 			UUID.fromString(vehicleUuid);
-		} else if (body.has("vehicleUuid")) throw new IllegalArgumentException("walk input cannot target a vehicle");
+		} else if (body.has("vehicleUuid")) throw new IllegalArgumentException("on-foot input cannot target a vehicle");
 		if (!state.has("worldFrozen") || state.get("worldFrozen").getAsBoolean()) {
 			throw new IllegalArgumentException("client input requires running world ticks");
 		}
@@ -62,7 +64,57 @@ record BridgeInputRequest(String action, String expectedSave, String playerUuid,
 		if (mode.equals("dismount") && (ticks < 2 || ticks > MAX_DISMOUNT_TICKS || forward || backward || left || right)) {
 			throw new IllegalArgumentException("dismount input requires 2 to " + MAX_DISMOUNT_TICKS + " ticks without directional controls");
 		}
-		return new BridgeInputRequest(action, save, playerUuid, id, mode, ticks, forward, backward, left, right, vehicleUuid);
+		if (mode.equals("jump")) {
+			if (ticks < 2 || ticks > MAX_JUMP_TICKS) throw new IllegalArgumentException("jump input requires 2 to " + MAX_JUMP_TICKS + " ticks");
+		}
+		double jumpOrigin = 0;long sampleMillis = 0;boolean ready = false;
+		if (mode.equals("jump")) {
+			try {
+				validateJumpStart(players.get(0).getAsJsonObject());
+				jumpOrigin = players.get(0).getAsJsonObject().getAsJsonObject("positionPrecise").get("y").getAsDouble();
+				sampleMillis = Long.parseLong(text(state, "inputObservationEndMillis"));ready = true;
+			} catch (RuntimeException invalidPhysics) {
+				// An identical retry must still return its original receipt while airborne.
+				// A new operation validates these facts before binding or writing any keys.
+				ready = false;
+			}
+		}
+		return new BridgeInputRequest(action, save, playerUuid, id, mode, ticks, forward, backward, left, right, vehicleUuid, jumpOrigin, sampleMillis, ready);
+	}
+
+	void validateNewStart() {
+		if (this.mode.equals("jump") && !this.jumpServerReady) {
+			throw new IllegalArgumentException("jump requires fresh grounded, dry, on-foot non-creative owner physics without hurt, climbing or effects");
+		}
+	}
+
+	boolean sameControls(BridgeInputRequest other) {
+		return this.action.equals(other.action) && this.expectedSave.equals(other.expectedSave) && this.playerUuid.equals(other.playerUuid)
+				&& this.operationId.equals(other.operationId) && this.mode.equals(other.mode) && this.ticks == other.ticks
+				&& this.forward == other.forward && this.backward == other.backward && this.left == other.left && this.right == other.right
+				&& java.util.Objects.equals(this.vehicleUuid, other.vehicleUuid);
+	}
+
+	private static void validateJumpStart(JsonObject player) {
+		JsonObject abilities = player.has("abilities") && player.get("abilities").isJsonObject() ? player.getAsJsonObject("abilities") : null;
+		var health = player.get("health");
+		var position = player.getAsJsonObject("positionPrecise");
+		var hurt = player.get("hurtTime");
+		if (player.has("vehicle") || !knownFlag(player, "onGround", true) || !knownFlag(player, "inWater", false)
+				|| !knownFlag(player, "inWaterOrBubble", false) || !knownFlag(player, "onClimbable", false) || !knownFlag(player, "hasEffects", false)
+				|| !knownFlag(player, "shiftKeyDown", false) || !knownFlag(abilities, "creative", false)
+				|| !knownFlag(abilities, "spectator", false) || !knownFlag(abilities, "flying", false)
+				|| health == null || !health.isJsonPrimitive() || !health.getAsJsonPrimitive().isNumber()
+				|| !Double.isFinite(health.getAsDouble()) || health.getAsDouble() <= 0 || hurt == null || hurt.getAsInt() != 0
+				|| position == null || !position.has("y") || !Double.isFinite(position.get("y").getAsDouble())) {
+			throw new IllegalArgumentException("jump requires a grounded, dry, on-foot non-creative living owner with released Shift");
+		}
+	}
+
+	private static boolean knownFlag(JsonObject object, String key, boolean expected) {
+		if (object == null) return false;
+		var value = object.get(key);
+		return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isBoolean() && value.getAsBoolean() == expected;
 	}
 
 	private static boolean flag(JsonObject object, String key) {
@@ -93,6 +145,10 @@ record BridgeInputRequest(String action, String expectedSave, String playerUuid,
 		result.addProperty("backward", this.backward);
 		result.addProperty("left", this.left);
 		result.addProperty("right", this.right);
+		if (this.mode.equals("jump")) {
+			result.addProperty("jumpServerOriginY", this.jumpServerOriginY);
+			result.addProperty("jumpServerSampleMillis", Long.toString(this.jumpServerSampleMillis));
+		}
 		return result;
 	}
 }

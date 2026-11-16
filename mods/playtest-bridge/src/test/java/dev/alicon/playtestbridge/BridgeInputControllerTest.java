@@ -10,6 +10,50 @@ import org.junit.jupiter.api.Test;
 
 class BridgeInputControllerTest {
 	@Test
+	void identicalJumpRetryReturnsTheBoundReceiptAfterTheOwnerBecomesAirborne() {
+		Fixture fixture = new Fixture();var body = BridgeInputRequestTest.jumpBody();
+		fixture.id = fixture.controller.request(BridgeInputRequest.parse(BridgeInputRequestTest.jumpState(), body)).get("operationId").getAsString();
+		fixture.tick();
+		var changed = BridgeInputRequestTest.jumpState();changed.addProperty("inputObservationEndMillis", "50");
+		changed.getAsJsonArray("players").get(0).getAsJsonObject().addProperty("onGround", false);
+		var retry = BridgeInputRequest.parse(changed, body);
+		assertFalse(retry.jumpServerReady());
+		assertEquals(1, fixture.controller.request(retry).get("appliedClientTicks").getAsInt());
+		assertEquals(1, fixture.target.binds);
+		var different = body.deepCopy();different.addProperty("forward", false);
+		assertThrows(IllegalArgumentException.class, () -> fixture.controller.request(BridgeInputRequest.parse(changed, different)));
+		fixture.tick();fixture.tick();assertEquals(2, fixture.target.applied);
+	}
+
+	@Test
+	void unsupportedNewJumpDoesNotBindOrWriteKeys() {
+		Fixture fixture = new Fixture();var state = BridgeInputRequestTest.jumpState();
+		state.getAsJsonArray("players").get(0).getAsJsonObject().addProperty("onGround", false);
+		assertThrows(IllegalArgumentException.class, () -> fixture.controller.request(BridgeInputRequest.parse(state, BridgeInputRequestTest.jumpBody())));
+		assertEquals(0, fixture.target.binds);assertEquals(0, fixture.target.applied);
+	}
+
+	@Test
+	void nativeJumpWaitsForActionConfirmationAfterReleasingItsKeys() {
+		Fixture fixture = new Fixture();fixture.target.ready = false;
+		fixture.id = fixture.controller.request(BridgeInputRequest.parse(BridgeInputRequestTest.jumpState(), BridgeInputRequestTest.jumpBody())).get("operationId").getAsString();
+		fixture.tick();fixture.tick();fixture.tick();
+		assertEquals("releasing", fixture.status().get("phase").getAsString());
+		assertTrue(fixture.status().get("controlsReleased").getAsBoolean());assertFalse(fixture.target.held);
+		fixture.target.ready = true;fixture.tick();
+		assertEquals("completed", fixture.status().get("outcome").getAsString());assertEquals(2, fixture.target.applied);
+	}
+
+	@Test
+	void nativeJumpCanBeCancelledDuringItsPress() {
+		Fixture fixture = new Fixture();
+		fixture.id = fixture.controller.request(BridgeInputRequest.parse(BridgeInputRequestTest.jumpState(), BridgeInputRequestTest.jumpBody())).get("operationId").getAsString();
+		fixture.tick();fixture.controller.cancel(fixture.id, "cancelled");fixture.tick();
+		assertEquals("cancelled", fixture.status().get("outcome").getAsString());assertFalse(fixture.target.held);
+		assertEquals(1, fixture.target.applied);assertTrue(fixture.status().get("controlsReleased").getAsBoolean());
+	}
+
+	@Test
 	void recoveryWaitsUntilInputOwnershipIsTerminal() {
 		Fixture fixture = new Fixture();assertTrue(fixture.controller.allowsRecovery());
 		fixture.start(2);assertFalse(fixture.controller.allowsRecovery());
@@ -214,7 +258,7 @@ class BridgeInputControllerTest {
 		}
 
 		BridgeInputRequest command(String action, String id) {
-			return new BridgeInputRequest(action, "Codex Input Test", BridgeInputRequestTest.PLAYER, id, "", 0, false, false, false, false, null);
+			return new BridgeInputRequest(action, "Codex Input Test", BridgeInputRequestTest.PLAYER, id, "", 0, false, false, false, false, null, 0, 0, false);
 		}
 
 		JsonObject status() { return this.controller.request(this.command("status", this.id)); }
@@ -224,11 +268,11 @@ class BridgeInputControllerTest {
 	private static final class FakeTarget implements BridgeInputController.Target {
 		private boolean held, failSample, ignoreRelease;
 		private boolean ready = true, staleNeutral;
-		private int applied;
+		private int applied, binds;
 		private final java.util.List<Boolean> forces = new java.util.ArrayList<>();
 		private String invalid;
 
-		@Override public void bind(BridgeInputRequest request) { this.invalid = null; }
+		@Override public void bind(BridgeInputRequest request) { this.invalid = null;this.binds++; }
 		@Override public String invalidContext() { return this.invalid; }
 		@Override public void apply(BridgeInputRequest request) { this.held = true;this.applied++; }
 		@Override public void release(boolean forceCachedInput) { this.forces.add(forceCachedInput);if (!this.ignoreRelease) this.held = false; }
