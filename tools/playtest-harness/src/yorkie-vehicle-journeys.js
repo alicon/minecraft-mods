@@ -116,9 +116,10 @@ function journeyCases(context) {
         // fixture in frozen native steps, without uncontrolled wall-clock drift.
         // Offshore travel stops before the bank so the empty hull can depart.
         if (inputs.offshore && !stopped && distance >= targetDistance) {
+          observed.stopDisplacement = distance;
           await drive(ticks, true);
           stopped = true;
-        } else if (distance < targetDistance && ticks % 5 === 0 && ticks < 30) await drive(ticks);
+        } else if (!stopped && distance < targetDistance && ticks % 5 === 0 && ticks < 30) await drive(ticks);
       }
       const traveled = vehicleIn(last);
       observed.displacement = Math.hypot(traveled.position.x - start.x, traveled.position.z - start.z);
