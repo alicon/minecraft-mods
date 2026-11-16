@@ -88,6 +88,7 @@ case "$bridge_scenario" in
 		node "$repo_root/tools/playtest-harness/src/bridge-cli.js" yorkie-smoke \
 			--host "$bridge_host" \
 			--port "$bridge_port" \
+			--expected-save "$world_name" \
 			--screenshot-name "$screenshot_name" \
 			"${report_args[@]}"
 		;;

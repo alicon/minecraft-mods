@@ -12,7 +12,7 @@ function saveReport(reportFile, report) {
   fs.renameSync(`${target}.tmp`, target);
 }
 
-// Persist after every case, including setup errors and partial runs.
+// Persist after every case, including setup errors and partial runs. A long case can use its third run argument to checkpoint observations.
 async function runCases(cases, { reportFile, metadata = {}, capture = async () => null, onResult = () => {}, afterSuccess }) {
   const report = { ...metadata, ok: false, complete: false, startedAt: new Date().toISOString(), cases: [] };
   const save = () => saveReport(reportFile, report);
@@ -25,7 +25,7 @@ async function runCases(cases, { reportFile, metadata = {}, capture = async () =
     try {
       const fixture = await scenario.setup();
       phase = 'assertion';
-      result.observed = await scenario.run(fixture, result);
+      result.observed = await scenario.run(fixture, result, save);
       result.status = 'passed';
     } catch (error) {
       result.status = phase === 'setup' || error.phase === 'setup' ? 'setup_failed' : 'failed';

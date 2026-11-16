@@ -225,6 +225,12 @@ and healing the same tagged pet for inspection. The postRun record is maintenanc
 not gameplay evidence; its failure cannot turn a case failure into a pass. Failed
 or interrupted runs never receive this care.
 
+The standalone `yorkie-smoke` also requires the exact copied save and a single local
+Overworld player. It checkpoints original steps and, only after success, feeds/heals
+the same tagged live pet for inspection. Raw observations stay unchanged; maintenance
+has a separate verdict and preserves UUID, harness, leash and native possessions.
+Missing/dead/unverified fixtures and failed/interrupted runs are never repaired by care.
+
 ## Current Automated Coverage
 
 NARwhal Together:

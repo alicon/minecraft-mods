@@ -117,7 +117,7 @@ help:
 		'  make bridge-count-blocks               Count blocks in an absolute box.' \
 		'  make bridge-terrain-scan               Sample biome, surface, water, and tree signals around a coordinate.' \
 		'  make bridge-yorkie-matrix              Run the state matrix in PLAYTEST_WORLD.' \
-		'  make bridge-yorkie-smoke               Run the Mushroom Yorkie bridge scenario.' \
+		'  make bridge-yorkie-smoke               Run the Mushroom Yorkie scenario in PLAYTEST_WORLD.' \
 		'  make bridge-yorkie-water-smoke         Run Yorkie water/fetch bridge checks.' \
 		'  make bridge-yorkie-adventure-smoke     Run Yorkie flight/water bridge checks.' \
 		'  make bridge-yorkie-home-squirrel       Verify doghouse sleep and bounded squirrel chasing.' \
@@ -363,7 +363,7 @@ bridge-yorkie-matrix:
 	$(HARNESS) run bridge -- yorkie-matrix --host "$(BRIDGE_HOST)" --port "$(BRIDGE_PORT)" --expected-save "$(PLAYTEST_WORLD)" --report-file "$(BRIDGE_REPORT_FILE)"
 
 bridge-yorkie-smoke:
-	$(HARNESS) run bridge -- yorkie-smoke --host "$(BRIDGE_HOST)" --port "$(BRIDGE_PORT)" --screenshot-name "$(BRIDGE_SCREENSHOT_NAME)" --report-file "$(BRIDGE_REPORT_FILE)"
+	$(HARNESS) run bridge -- yorkie-smoke --host "$(BRIDGE_HOST)" --port "$(BRIDGE_PORT)" --expected-save "$(PLAYTEST_WORLD)" --screenshot-name "$(BRIDGE_SCREENSHOT_NAME)" --report-file "$(BRIDGE_REPORT_FILE)"
 
 bridge-yorkie-water-smoke:
 	$(HARNESS) run bridge -- yorkie-water-smoke --host "$(BRIDGE_HOST)" --port "$(BRIDGE_PORT)" --screenshot-name "$(BRIDGE_SCREENSHOT_NAME)" --report-file "$(BRIDGE_REPORT_FILE)"
