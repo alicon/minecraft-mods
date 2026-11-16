@@ -81,6 +81,7 @@ final class NightRecoveryScenarios {
 			} finally {
 				// Adjacent native fixtures are within the 18-block domestic search radius.
 				helper.setBlock(7, 2, 2, Blocks.AIR);
+				helper.setBlock(6, 2, 2, Blocks.AIR);
 				yorkie.discard();
 				helper.getLevel().setDayTime(priorTime);
 			}
