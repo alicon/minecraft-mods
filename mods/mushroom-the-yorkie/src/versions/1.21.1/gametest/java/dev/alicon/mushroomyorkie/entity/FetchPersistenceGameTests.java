@@ -81,13 +81,13 @@ public final class FetchPersistenceGameTests {
 	}
 
 	/** Resume safe ascent after saving a carried toy with its creative owner already landed. */
-	@GameTest(template = "fabric-gametest-api-v1:empty")
+	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena")
 	public void airborneReturnSurvivesSavedLanding(GameTestHelper helper) {
 		FetchFlightScenarios.airborneReturnSurvivesReload(helper, yorkie -> roundTrip(helper, yorkie), true);
 	}
 
 	/** Preserve safe return when the owner remains in flight across the same save/load. */
-	@GameTest(template = "fabric-gametest-api-v1:empty")
+	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena")
 	public void airborneReturnSurvivesFlyingReload(GameTestHelper helper) {
 		FetchFlightScenarios.airborneReturnSurvivesReload(helper, yorkie -> roundTrip(helper, yorkie), false);
 	}

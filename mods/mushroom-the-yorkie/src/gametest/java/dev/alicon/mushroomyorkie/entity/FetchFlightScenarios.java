@@ -1,6 +1,7 @@
 package dev.alicon.mushroomyorkie.entity;
 
 import dev.alicon.mushroomyorkie.item.ModItems;
+import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerPlayer;
@@ -8,6 +9,7 @@ import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.Vec3;
 
 /** Exercises real fetch goals and flight steering in their server order, with deterministic native movement. */
 final class FetchFlightScenarios {
@@ -140,7 +142,34 @@ final class FetchFlightScenarios {
 		}
 	}
 
+	static void invalidFootprintDoesNotLeakFixtures(GameTestHelper helper) {
+		Fixture[] created = new Fixture[1];
+		RuntimeException failure = null;
+		try {
+			try {
+				create(helper, false, 1.5D, fixture -> created[0] = fixture);
+			} catch (RuntimeException error) {
+				failure = error;
+			}
+			helper.assertTrue(failure != null && failure.getMessage().startsWith("Fetch toy extends outside declared horizontal fixture"),
+					"Small-template negative control did not reject its invalid footprint");
+			helper.assertTrue(created[0] != null && created[0].yorkie().isRemoved() && created[0].toy().isRemoved()
+					&& helper.getLevel().getServer().getPlayerList().getPlayer(created[0].owner().getUUID()) == null,
+					"Rejected fixture leaked its original pet, toy or owner");
+			helper.succeed();
+		} finally {
+			// Keep the negative control isolated even if the cleanup regression fails.
+			if (created[0] != null) {
+				discardFixture(helper, created[0]);
+			}
+		}
+	}
+
 	private static Fixture create(GameTestHelper helper, boolean cliff, double ownerHeight) {
+		return create(helper, cliff, ownerHeight, fixture -> { });
+	}
+
+	private static Fixture create(GameTestHelper helper, boolean cliff, double ownerHeight, Consumer<Fixture> observe) {
 		if (cliff) {
 			for (int x = 0; x <= 10; x++) {
 				for (int z = 0; z <= 6; z++) {
@@ -164,9 +193,46 @@ final class FetchFlightScenarios {
 		yorkie.claimFor(owner);
 		ItemEntity toy = helper.spawnItem(ModItems.YORKIE_BALL, cliff ? 7 : 8, cliff ? -4 : 2, 3);
 		FetchBallGoal fetch = new FetchBallGoal(yorkie);
-		helper.assertTrue(fetch.canUse(), "Flight fixture did not find the toy");
-		fetch.start();
-		return new Fixture(yorkie, owner, fetch, toy);
+		Fixture fixture = new Fixture(yorkie, owner, fetch, toy);
+		try {
+			observe.accept(fixture);
+			// Vertical out-of-bounds is intentional for below-platform returns. The
+			// declared horizontal footprint must include every spawn and cliff block.
+			assertHorizontalBounds(helper, "toy", toy.position());
+			assertHorizontalBounds(helper, "pet", yorkie.position());
+			assertHorizontalBounds(helper, "owner", owner.position());
+			if (cliff) {
+				assertHorizontalBounds(helper, "cliff floor", helper.absoluteVec(new Vec3(0.0D, 1.0D, 0.0D)));
+				assertHorizontalBounds(helper, "cliff floor", helper.absoluteVec(new Vec3(10.0D, 1.0D, 6.0D)));
+			}
+			boolean canFetch = fetch.canUse();
+			helper.assertTrue(canFetch, "Flight fixture did not find the toy: pet=" + yorkie.position()
+					+ ", toy=" + toy.position() + ", removed=" + toy.isRemoved()
+					+ ", toyChunkLoaded=" + helper.getLevel().hasChunkAt(toy.blockPosition())
+					+ ", ownerResolved=" + (yorkie.getOwner() == owner) + ", sameLevel=" + (owner.level() == yorkie.level())
+					+ ", tame=" + yorkie.isTame() + ", hand=" + yorkie.getMainHandItem() + ", sitting=" + yorkie.isOrderedToSit()
+					+ ", sleeping=" + yorkie.isMushroomSleeping() + ", scared=" + yorkie.scaredRunTicks
+					+ ", exactToyQueryCount=" + helper.getLevel().getEntitiesOfClass(ItemEntity.class, toy.getBoundingBox(), item -> item.getUUID().equals(toy.getUUID())).size());
+			fetch.start();
+			return fixture;
+		} catch (RuntimeException error) {
+			discardFixture(helper, fixture);
+			throw error;
+		}
+	}
+
+	private static void assertHorizontalBounds(GameTestHelper helper, String label, Vec3 position) {
+		var bounds = helper.getBounds();
+		helper.assertTrue(position.x >= bounds.minX && position.x < bounds.maxX
+				&& position.z >= bounds.minZ && position.z < bounds.maxZ,
+				"Fetch " + label + " extends outside declared horizontal fixture: position=" + position + ", bounds=" + bounds);
+	}
+
+	private static void discardFixture(GameTestHelper helper, Fixture fixture) {
+		fixture.toy().discard();
+		fixture.yorkie().discard();
+		helper.getLevel().getServer().getPlayerList().remove(fixture.owner());
+		fixture.owner().discard();
 	}
 
 	private static void step(Fixture fixture) {
