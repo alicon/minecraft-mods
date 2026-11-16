@@ -133,3 +133,17 @@ test('quit CLI forwards the exact expected save to the guarded endpoint', async 
     assert.deepEqual(observed, { path: '/quit', method: 'POST', body: { expectedSave: 'Codex Quit Test' } });
   } finally { await new Promise((resolve) => server.close(resolve)); }
 });
+
+test('a long case can persist partial observations before completion', async () => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'case-progress-'));
+  try {
+    const reportFile = path.join(folder, 'report.json');
+    await runCases([{ name: 'long', setup: async () => {}, run: async (fixture, result, checkpoint) => {
+      result.observed = { step: 1 }; checkpoint();
+      const saved = JSON.parse(fs.readFileSync(reportFile));
+      assert.equal(saved.complete, false); assert.equal(saved.cases[0].status, 'running');
+      assert.equal(saved.cases[0].observed.step, 1);
+      return { step: 2 };
+    } }], { reportFile });
+  } finally { fs.rmSync(folder, { recursive: true }); }
+});

@@ -15,7 +15,7 @@ function fixture(options = {}) {
   const commands = [];
   const pet = { uuid: PET, type: 'mushroom_yorkie:mushroom_yorkie', health: 6, maxHealth: 12,
     tameable: { ownedByPlayer: true }, mainHand: { id: 'minecraft:bone', count: 2 },
-    custom: { harness: true, needs: { hunger: 90, potty: 30 } } };
+    custom: { harness: true, needs: { hunger: 90, potty: 30 } }, leash: { leashed: true, holderId: 19, holderName: 'owner' } };
   const snapshot = { saveName: 'Codex Care Test', singleplayer: true, players: [{ uuid: 'owner', dimension: 'minecraft:overworld', nearbyEntities: [pet] }] };
   return { commands, snapshot, pet, context: {
     expectedSave: snapshot.saveName, playerUuid: 'owner', petUuid: PET,
@@ -23,6 +23,10 @@ function fixture(options = {}) {
       const result = structuredClone(snapshot);
       reads++;
       if (options.switchWorld && reads === 2) result.saveName = 'Family';
+      if (options.diesBeforeMerge && reads === 2) result.players[0].nearbyEntities[0].health = 0;
+      if (options.ownerChanges && reads === 2) result.players[0].nearbyEntities[0].tameable.ownedByPlayer = false;
+      if (options.pendingNativeLeash && changed && reads === 3) result.players[0].nearbyEntities[0].leash = { leashed: false };
+      if (options.worldDuringLeashRestore && changed && reads === 4) result.saveName = 'Family';
       return result;
     },
     request: async (route, { command }) => {
@@ -61,7 +65,7 @@ test('success-only care follows persisted original verdicts and preserves pet/it
     assert.equal(report.postRun.observed.after.players[0].nearbyEntities[0].custom.needs.hunger, 0);
     assert.equal(f.pet.uuid, PET); assert.equal(f.pet.mainHand.count, 2); assert.equal(f.pet.custom.harness, true);
     assert.equal(mergeCommands(f).length, 1);
-    assert(mergeCommands(f)[0].includes(`execute as ${PET} if entity @s[type=mushroom_yorkie:mushroom_yorkie,tag=matrix_yorkie]`));
+    assert(mergeCommands(f)[0].includes(`execute as ${PET} if entity @s[type=mushroom_yorkie:mushroom_yorkie,tag=matrix_yorkie,nbt=!{Health:0.0f}]`));
     assert.deepEqual(JSON.parse(fs.readFileSync(reportFile)), JSON.parse(JSON.stringify(report)));
   } finally { fs.rmSync(folder, { recursive: true }); }
 });
@@ -146,4 +150,35 @@ test('world reset failure preserves completed failed case evidence and original 
       onResetError: (error) => { secondary = error; } }), (error) => error === original && error.worldResetError === 'reset failed');
     assert.equal(secondary.message, 'reset failed');
   } finally { fs.rmSync(folder, { recursive: true }); }
+});
+
+
+test('care rechecks live ownership immediately before its mutation', async () => {
+  for (const option of ['diesBeforeMerge', 'ownerChanges']) {
+    const f = fixture({ [option]: true });
+    await assert.rejects(careForSuccessfulPet(f.context), /changed before care/);
+    assert.equal(mergeCommands(f).length, 0);
+  }
+});
+
+test('care refuses unrecognized selector tags before native commands', async () => {
+  const f = fixture();
+  await assert.rejects(careForSuccessfulPet({ ...f.context, fixtureTag: 'arbitrary' }), /Unsupported care fixture tag/);
+  assert.equal(f.commands.length, 0);
+});
+
+
+test('native delayed leash restoration is observed without reattaching or changing the holder', async () => {
+  const f = fixture({ pendingNativeLeash: true });
+  const r = await careForSuccessfulPet(f.context);
+  assert.equal(r.leashRestore.initial.players[0].nearbyEntities[0].leash.leashed, false);
+  assert.equal(r.leashRestore.polls.length, 1);
+  assert.deepEqual(r.after.players[0].nearbyEntities[0].leash, f.pet.leash);
+  assert.equal(mergeCommands(f).length, 1);
+});
+
+test('a changed world during leash hydration fails instead of retrying there', async () => {
+  const f = fixture({ pendingNativeLeash: true, worldDuringLeashRestore: true });
+  await assert.rejects(careForSuccessfulPet(f.context), /expected-save/);
+  assert.equal(mergeCommands(f).length, 1);
 });

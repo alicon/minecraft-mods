@@ -55,7 +55,7 @@ make bridge-set-block BRIDGE_X=0 BRIDGE_Y=100 BRIDGE_Z=0 BRIDGE_BLOCK=minecraft:
 make bridge-use-block BRIDGE_X=0 BRIDGE_Y=99 BRIDGE_Z=0 BRIDGE_ITEM=cops_robbers:bank_kit
 make bridge-count-blocks BRIDGE_X1=-8 BRIDGE_Y1=100 BRIDGE_Z1=-8 BRIDGE_X2=8 BRIDGE_Y2=106 BRIDGE_Z2=8
 make bridge-screenshot BRIDGE_SCREENSHOT_NAME=playtest.png
-make bridge-yorkie-smoke BRIDGE_SCREENSHOT_NAME=yorkie-smoke.png
+make bridge-yorkie-smoke PLAYTEST_WORLD="Mushroom Abel Noelle 20261115-075437" BRIDGE_SCREENSHOT_NAME=yorkie-smoke.png
 make bridge-yorkie-home-squirrel BRIDGE_SCREENSHOT_NAME=yorkie-home-squirrel
 make bridge-cops-smoke BRIDGE_SCREENSHOT_NAME=cops-smoke.png
 make bridge-cops-structures-smoke BRIDGE_SCREENSHOT_NAME=cops-structures.png
@@ -110,6 +110,21 @@ make modrinth-autoplay-yorkie-natural-gallery PLAYTEST_TEMPLATE_WORLD="New World
 ```
 
 It covers duplicate-claim blocking, treat taming, owner commands, harness/lead behavior, exact food and toy effects, sheltered nighttime sleep/wake, dog food and water bowl use, same-day bowl refill rejection, outdoor potty relief, exact shelter cleanup, screenshot capture, and positive leash attach.
+The `yorkie-smoke` command now requires the exact disposable save via `--expected-save`
+(or `PLAYTEST_WORLD`), plus a single local player in the Overworld. The copied-world
+launcher passes its actual save name automatically. It shares the matrix's bridge lock,
+checks the same world/player before every step and mutating request, and checkpoints partial observations.
+Its report retains the original flat `steps`/`screenshot` fields alongside the runner's
+case record and separate `gameplayOk`/`postRun` verdicts. On success only, it feeds/heals
+the same living owned `runtime_smoke_yorkie` fixture after the original observations
+are saved. Harness, leash holder, UUID and native item components must be preserved.
+Saved leash data may need a native entity tick to restore its holder; care observes this
+with a bounded read-only wait and never attaches a replacement leash. Failed/interrupted
+runs and dead/missing/unverified pets receive no care or replacement. A care error fails
+overall `ok` while preserving gameplay results. The default report is
+`build/playtest-reports/yorkie-smoke.json`; `--report-file` or `BRIDGE_REPORT_FILE` can override it.
+Care is a one-time inspection step, not immunity from later hunger decay.
+
 The focused home-and-squirrel scenario proves visible doghouse sleep, squirrel tree seeking, Mushroom's chase and 30-second return, and the early return when a tree-less squirrel crosses the 24-block player limit. It also saves clean doghouse and squirrel-chase screenshots.
 The visual sweep captures clean gallery scenes for sitting, a fence-tied leash walk, sleep, water, fetch, flying, food and water bowls, wants-outside messaging, sheep chasing, and hostile spider defense.
 The biome scout samples real worldgen coordinates in an existing save, records seed/coordinates/biomes, and captures candidate staging screenshots for natural outdoor gallery refreshes.
@@ -147,7 +162,7 @@ the client. Never point it at a family save. Keep only one live scenario run
 active per bridge. It leaves the test arena and report available for inspection;
 it restores daylight and a grounded creative player, not the original save state.
 After a successful run it feeds/heals only the original tagged matrix pet, retaining
-its UUID, harness and native equipment (including item components). This care
+its UUID, harness, leash and native equipment (including item components). This care
 happens after case observations are persisted, and is recorded separately in
 `postRun`; it cannot change gameplay verdicts. Failed/interrupted runs get no pet
 care, and missing/dead/unowned/untagged pets are never replaced. Every maintenance

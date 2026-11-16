@@ -225,7 +225,7 @@ async function blockAt(baseUrl, position) {
   return requestJson(baseUrl, '/block', 'POST', position);
 }
 
-async function runYorkieSmoke(baseUrl, args) {
+async function runYorkieSmoke(baseUrl, args, { beforeStep, onStep }) {
   const yorkieType = option(args, 'type', 'YORKIE_ENTITY', 'mushroom_yorkie:mushroom_yorkie');
   const radius = optionNumber(args, 'radius', 'YORKIE_RADIUS', 12);
   const screenshotName = option(
@@ -236,22 +236,35 @@ async function runYorkieSmoke(baseUrl, args) {
   );
   const steps = [];
 
+  async function smokeRequest(route, method = 'GET', body) {
+    if (method !== 'GET') await beforeStep();
+    return requestJson(baseUrl, route, method, body);
+  }
+
   async function step(name, run) {
-    const value = await run();
-    steps.push({ name, ok: true, value });
-    return value;
+    try {
+      await beforeStep();
+      const value = await run();
+      steps.push({ name, ok: true, value });
+      onStep(steps);
+      return value;
+    } catch (error) {
+      steps.push({ name, ok: false, error: error.message });
+      onStep(steps);
+      throw error;
+    }
   }
 
   async function command(commandText) {
-    return requestJson(baseUrl, '/command', 'POST', { command: commandText });
+    return smokeRequest( '/command', 'POST', { command: commandText });
   }
 
   async function clearEntities(type) {
-    return requestJson(baseUrl, '/clear-entities', 'POST', { type });
+    return smokeRequest( '/clear-entities', 'POST', { type });
   }
 
   async function useYorkie(body) {
-    return requestJson(baseUrl, '/use-entity', 'POST', {
+    return smokeRequest( '/use-entity', 'POST', {
       type: yorkieType,
       radius,
       ...body
@@ -259,7 +272,7 @@ async function runYorkieSmoke(baseUrl, args) {
   }
 
   async function setBlockNearYorkie(body) {
-    return requestJson(baseUrl, '/set-block-near-entity', 'POST', {
+    return smokeRequest( '/set-block-near-entity', 'POST', {
       type: yorkieType,
       radius,
       ...body
@@ -276,7 +289,7 @@ async function runYorkieSmoke(baseUrl, args) {
     if (replace) {
       body.replace = replace;
     }
-    return requestJson(baseUrl, '/set-block', 'POST', body);
+    return smokeRequest( '/set-block', 'POST', body);
   }
 
   async function mergeYorkieData(nbt) {
@@ -287,7 +300,7 @@ async function runYorkieSmoke(baseUrl, args) {
   async function buildFlatArena(options = {}) {
     const radius = options.radius || 6;
     const yOffset = options.yOffset || 0;
-    const state = await requestJson(baseUrl, '/state');
+    const state = await smokeRequest( '/state');
     const player = state.players.find((candidate) => candidate.name === playerName);
     requireCondition(player, `Could not find player state for ${playerName}`);
     const base = {
@@ -346,7 +359,7 @@ async function runYorkieSmoke(baseUrl, args) {
     return placements;
   }
 
-  const playerName = singlePlayerName(await requestJson(baseUrl, '/state'));
+  const playerName = singlePlayerName(await smokeRequest( '/state'));
   let placedShelterBlocks = [];
   await step('prepare world', async () => {
     await command('time set day');
@@ -359,7 +372,7 @@ async function runYorkieSmoke(baseUrl, args) {
     await clearEntities(yorkieType);
     const arena = await buildFlatArena({ radius: 6 });
     const cleared = await clearEntities(yorkieType);
-    const chat = await requestJson(baseUrl, '/chat', 'POST', { message: 'Mushroom Yorkie runtime smoke starting.' });
+    const chat = await smokeRequest( '/chat', 'POST', { message: 'Mushroom Yorkie runtime smoke starting.' });
     return { arena, cleared, chat };
   });
 
@@ -397,7 +410,7 @@ async function runYorkieSmoke(baseUrl, args) {
   });
 
   await step('summon yorkie', async () => {
-    await command(`execute at ${playerName} run summon ${yorkieType} ^ ^ ^3`);
+    await command(`execute at ${playerName} run summon ${yorkieType} ^ ^ ^3 {Tags:["runtime_smoke_yorkie"]}`);
     return waitForEntity(baseUrl, yorkieType);
   });
 
@@ -625,7 +638,7 @@ async function runYorkieSmoke(baseUrl, args) {
   });
   requireCondition(outdoorRelief.relieved.custom.needs.potty <= 10, 'Yorkie did not relieve himself under open sky');
 
-  const screenshot = await step('screenshot', async () => requestJson(baseUrl, '/screenshot', 'POST', {
+  const screenshot = await step('screenshot', async () => smokeRequest( '/screenshot', 'POST', {
     name: screenshotName,
     resume: true,
     hideGui: true,
@@ -647,6 +660,7 @@ async function runYorkieSmoke(baseUrl, args) {
     ok: true,
     scenario: 'yorkie-smoke',
     entity: yorkieType,
+    inspectionPetUuid: tamed.target.uuid,
     screenshot: screenshot.file,
     steps
   };
@@ -3594,7 +3608,8 @@ async function main() {
     result = await require('./yorkie-matrix').runMatrix(baseUrl, args);
     if (!result.ok) process.exitCode = 1;
   } else if (action === 'yorkie-smoke') {
-    result = await runYorkieSmoke(baseUrl, args);
+    result = await require('./yorkie-smoke-runner').runRuntimeSmoke(baseUrl, args, hooks => runYorkieSmoke(baseUrl, args, hooks));
+    if (!result.ok) process.exitCode = 1;
   } else if (action === 'yorkie-water-smoke') {
     result = await runYorkieWaterSmoke(baseUrl, args);
   } else if (action === 'yorkie-adventure-smoke') {
@@ -3626,7 +3641,7 @@ async function main() {
   }
 
   // Scenario suites own atomic incremental reports, including any post-run phase.
-  if (!['yorkie-matrix', 'yorkie-crafting'].includes(action)) writeReportFile(option(args, 'reportFile', 'BRIDGE_REPORT_FILE', ''), result);
+  if (!['yorkie-matrix', 'yorkie-crafting', 'yorkie-smoke'].includes(action)) writeReportFile(option(args, 'reportFile', 'BRIDGE_REPORT_FILE', ''), result);
   console.log(JSON.stringify(result, null, 2));
 }
 
