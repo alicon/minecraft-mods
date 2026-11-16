@@ -26,13 +26,31 @@ test('journey bank staging reaches a short valid boat trip without relaxing surv
     assert.equal(Math.floor(owner.x), base.x + 4, 'Owner must stand on the audited dry doorway column');
     assert.equal(Math.floor(owner.z), base.z);
     assertVehicleReach({ distance: distance(owner, pet) }, 'survival');
-    // Ordinary dock spawn is base.x - 0.5; two blocks east is the minimum
-    // accepted travel. Include the full allowed floating-height range.
-    for (const y of [base.y - 0.8, base.y + 0.2])
-      assertVehicleReach({ distance: distance(owner, { x: base.x + 1.5, y, z: base.z + 0.5 }) }, 'survival');
+    if (!offshore) {
+      // Ordinary dock spawn is base.x - 0.5; two blocks east is the minimum
+      // accepted travel. Check conservative passenger vertical offsets there.
+      for (const y of [base.y - 0.8, base.y + 0.8])
+        assertVehicleReach({ distance: distance(owner, { x: base.x + 1.5, y, z: base.z + 0.5 }) }, 'survival');
+    }
     assert.throws(() => assertVehicleReach({ distance: distance(owner, { ...pet, x: base.x }) }, 'survival'), e => e.phase === 'setup');
   }
   assert.deepEqual(journeyOwnerPosition({ layout: 'rail' }, base, { position: { x: -60.2 } }), { x: -60.2, y: 220, z: 104.5 });
+});
+
+test('journey takeoff stays outside the nighttime bank doorway lintel', () => {
+  const { journeyOwnerPosition } = require('./yorkie-vehicle-journeys');
+  const base = { x: -61, y: 220, z: 106 };
+  for (const offshore of [false, true]) {
+    const ground = journeyOwnerPosition({ layout: 'water', offshore }, base);
+    const flight = journeyOwnerPosition({ layout: 'water', offshore }, base, undefined, { flying: true });
+    // The room's wall at x=base+4 has a solid lintel at y=base+3.
+    // A standing player's width/height would overlap it above the bank point.
+    assert(ground.x - 0.3 < base.x + 5 && ground.x + 0.3 > base.x + 4);
+    assert(flight.y + 1.8 > base.y + 3);
+    assert(flight.x - 0.3 >= base.x + 5, 'Flying player must fully clear the wall');
+    assert.deepEqual(flight, { x: base.x + 6, y: base.y + 2, z: base.z + 0.5 });
+  }
+  assert.deepEqual(journeyOwnerPosition({ layout: 'rail' }, base, { position: { x: -60.2 } }, { flying: true }), { x: -60.2, y: 222, z: 104.5 });
 });
 
 test('lost owner flight is a fixture failure rather than a trapped-pet verdict', () => {

@@ -305,7 +305,8 @@ not establish movement. These inputs do not simulate player rowing.
 Boat bank-exit cases have a real dock doorway, a controlled shore-facing passenger
 yaw, and an owner on the inner quarter of the first dry bank column. This keeps
 short valid trips within survival reach; actual support and reach are still
-checked before the action. They do not claim an offshore sit
+checked before the action. The elevated takeoff point stays outside the nighttime
+doorway lintel. They do not claim an offshore sit
 order should make a dog walk off its safe boat platform. Offshore controls
 explicitly move the empty boat away after dismount, then witness actual water entry.
 Survival controls observe a native fall; creative controls explicitly place the

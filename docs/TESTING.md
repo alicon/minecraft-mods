@@ -335,7 +335,8 @@ dock and rail controls sample every five ticks. Short travel is a setup failure,
 even when the movement command succeeded.
 Dock owners stand on the inner quarter of the first dry bank column, within
 survival reach of a short valid trip. Actual support and reach remain setup guards;
-the fixture does not move the pet or hull to satisfy them.
+the fixture does not move the pet or hull to satisfy them. Elevated takeoff keeps
+the original point outside the nighttime doorway lintel.
 The `native-shore` group separately uses ordinary native keyboard exit and walking,
 with empty-hand pet help at survival reach. It verifies floor/headroom, pool
 water/walls/bottom and a half-block bank step before movement, and watches fixture boundaries while keys

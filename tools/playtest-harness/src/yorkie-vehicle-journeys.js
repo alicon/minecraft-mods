@@ -6,12 +6,14 @@ const { readWorldTime } = require('./yorkie-clock');
 const { advanceJourneyOrder } = require('./yorkie-journey-order');
 const { exerciseMountedCare } = require('./yorkie-vehicle-care');
 
-function journeyOwnerPosition(inputs, base, traveled) {
+function journeyOwnerPosition(inputs, base, traveled, { flying = false } = {}) {
   // The first dry bank column has a nighttime doorway. Stay on its inner
   // quarter so even a boat that only just met the travel minimum is in reach.
+  // The elevated flight point must stay outside the nighttime doorway lintel.
+  const y = base.y + (flying ? 2 : 0);
   return inputs.layout === 'water'
-    ? { x: base.x + 4.25, y: base.y, z: base.z + 0.5 }
-    : { x: traveled.position.x, y: base.y, z: base.z - 1.5 };
+    ? { x: base.x + (flying ? 6 : 4.25), y, z: base.z + 0.5 }
+    : { x: traveled.position.x, y, z: base.z - 1.5 };
 }
 
 function journeyInputs() {
@@ -215,7 +217,7 @@ function journeyCases(context) {
           }
         } else {
           observed.flightSetup = [];
-          await enableFlight(observed.flightSetup, save, { ...owner, y: base.y + 2 });
+          await enableFlight(observed.flightSetup, save, journeyOwnerPosition(inputs, base, traveled, { flying: true }));
           for (let tick = 1; tick <= 5; tick++) {
             const pet = await observe(await frozenStep(1), `takeoff-dismount-${tick}`, { flying: true, afterDismount: true });
             if (!pet.vehicle) break;
