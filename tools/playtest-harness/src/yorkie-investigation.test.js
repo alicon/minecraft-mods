@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { investigateCases, investigationEnabled } = require('./yorkie-investigation');
+const { investigateCases, investigationEnabled, retainInterruptedInvestigation } = require('./yorkie-investigation');
 const { runCases } = require('./scenario-runner');
 
 test('investigation is opt-in and refuses ambiguous flag values', () => {
@@ -78,6 +78,26 @@ test('successful investigation preserves fixture cleanup and separate success ca
   assert.equal(report.cases[0].investigativeCleanup, undefined);
 });
 
+test('runner interruption retains the original error and freezes even after a prior success reset', async () => {
+  const { withWorldReset } = require('./yorkie-post-run');
+  for (const enabled of [false, true]) {
+    const events = [], original = Error('report writer failed');
+    let interrupted = false;
+    await assert.rejects(withWorldReset({
+      run: reset => retainInterruptedInvestigation(async () => { await reset();throw original; },
+        () => { interrupted = true;return reset(); }, enabled),
+      reset: async () => { events.push(interrupted ? 'freeze' : 'ordinary reset');return { worldFrozen: interrupted }; }
+    }), error => error === original);
+    assert.deepEqual(events, enabled ? ['ordinary reset', 'freeze'] : ['ordinary reset']);
+    assert.equal(original.investigativeWorldReset?.worldFrozen, enabled ? true : undefined);
+  }
+  const original = Error('original runner failure');
+  await assert.rejects(retainInterruptedInvestigation(async () => { throw original; },
+    async () => { throw Error('identity changed; cannot freeze'); }, true), error => error === original);
+  assert.equal(original.worldResetError, 'identity changed; cannot freeze');
+  assert.equal(original.investigativeWorldReset, undefined);
+});
+
 test('real matrix CLI forwards investigate, retains failures and rejects ambiguous values before requests', async () => {
   const http = require('node:http'), fs = require('node:fs'), os = require('node:os'), path = require('node:path');
   const execFile = require('node:util').promisify(require('node:child_process').execFile);
@@ -105,6 +125,8 @@ test('real matrix CLI forwards investigate, retains failures and rejects ambiguo
   try {
     await assert.rejects(execFile(process.execPath, [...args, '--investigate=false'], { timeout: 5000 }), /boolean flag/);
     assert.equal(requests.length, 0);
+    await assert.rejects(execFile(process.execPath, [args[0], 'health', '--investigate', '--port', String(server.address().port)], { timeout: 5000 }), /only supported by yorkie-matrix/);
+    assert.equal(requests.length, 0);
     for (const failScreenshot of [false, true]) {
       frozen = false;captureFails = failScreenshot;requests.length = 0;
       const file = path.join(directory, `report-${failScreenshot}.json`);
@@ -123,6 +145,16 @@ test('real matrix CLI forwards investigate, retains failures and rejects ambiguo
       assert(!commands.some(c => c === 'tick unfreeze' || c.startsWith('gamemode ') || c === 'time set day'));
       assert(!requests.some(r => r.route === '/clear-entities'));
     }
+    frozen = false;requests.length = 0;
+    // An existing directory makes the real atomic report rename throw before
+    // a case can start. Retention must not depend on having a returned report.
+    const unusableReport = path.join(directory, 'unusable-report.json');fs.mkdirSync(unusableReport);
+    await assert.rejects(execFile(process.execPath, [...args, '--investigate', '--report-file', unusableReport], { timeout: 10000 }),
+      error => error.code === 1 && /retained frozen after runner interruption/.test(error.stderr));
+    assert.equal(frozen, true);
+    const crashCommands = requests.filter(r => r.route === '/command').map(r => r.body.command);
+    assert.equal(crashCommands.filter(c => c === 'tick freeze').length, 1);
+    assert(!crashCommands.some(c => c === 'tick unfreeze' || c.startsWith('gamemode ') || c === 'time set day' || c === 'tick sprint stop'));
   } finally {
     await new Promise(resolve => server.close(resolve));
     fs.rmSync(directory, { recursive: true });
