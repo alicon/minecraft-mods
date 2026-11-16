@@ -266,7 +266,7 @@ Set `BRIDGE_REPORT_FILE=build/playtest-reports/<name>.json` to save the full bri
 ## State-combination testing
 
 The [Mushroom state matrix](../tools/playtest-harness/README.md#mushroom-state-matrix)
-checks 144 combinations, 26 interruption/owner-mode/flight/feeding/tree-approach sequences, 36 terrain cases, 20 outdoor-care sequences, 22 water/rest sequences, eight sleep-spot controls, 100 dry vehicle cases (96 full-entity sequences plus four controlled boarding-refusal challenges), and 112 controlled water/rail journeys (including 16 actual offshore immersion controls) in a disposable live world and preserves partial failure
+checks 144 combinations, 31 interruption/owner-mode/flight/feeding/tree-approach sequences, 36 terrain cases, 20 outdoor-care sequences, 22 water/rest sequences, eight sleep-spot controls, 100 dry vehicle cases (96 full-entity sequences plus four controlled boarding-refusal challenges), and 112 controlled water/rail journeys (including 16 actual offshore immersion controls) in a disposable live world and preserves partial failure
 reports. Run `npm --prefix tools/playtest-harness test` for the harness's runner,
 command-rejection, and save-safety regression tests. These tests also run in CI.
 Gameplay assertions still need the live Minecraft client and bridge. Matrix
@@ -298,6 +298,18 @@ success flags. Set `MUSHROOM_SQUIRREL_TRACE_DIR=/absolute/output/directory` alon
 `MUSHROOM_GAME_TEST_SEED=0` to save optional per-tick route reports. The trace reads
 selected goal/path/movement state through test-only reflection and never changes
 it. CI runs the behavioral assertions without writing optional trace files.
+Five additional live squirrel controls check an enclosed nearer tree with an
+accessible farther tree, the same nearer tree without its enclosure, the farther
+tree alone, a route enclosed after walking starts, and an enclosed face with
+another usable face. They share the per-tick observer and check which tree the
+original squirrel reaches. Route closure verifies ground progress and body
+clearance before adding the wall; invalid staging is a setup failure. Native
+controls also require normal avoidance and berry tempting when no tree is
+reachable, including known enclosed-tree threats. A stationary Mushroom fixture
+has NoAI only to isolate squirrel avoidance; the squirrel keeps full AI, gravity,
+collision and damage. Optional native traces include ordinary-goal positions,
+path targets, reachability and per-process path identities. Repeated path
+requests do not prove repeated full planning; vanilla can retain one cached path.
 Successful matrix runs persist their original case observations before separately feeding
 and healing the same tagged pet for inspection. The postRun record is maintenance,
 not gameplay evidence; its failure cannot turn a case failure into a pass. Failed

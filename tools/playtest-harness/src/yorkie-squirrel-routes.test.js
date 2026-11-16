@@ -49,7 +49,7 @@ test('all eight live starts remain distinct and skip pet inspection care', () =>
 });
 
 // Synthetic transport controls verify failure handling, not squirrel physics.
-for (const fault of ['health', 'missing', 'tick-skip', 'unfrozen', 'timeout', 'none']) {
+for (const fault of ['health', 'missing', 'tick-skip', 'unfrozen', 'timeout', 'wrong-tree', 'none']) {
   test(`live squirrel runner preserves evidence and unfreezes after ${fault}`, async () => {
     let clock = 0, frozen = false;
     const context = {
@@ -71,13 +71,18 @@ for (const fault of ['health', 'missing', 'tick-skip', 'unfrozen', 'timeout', 'n
         }] }]
       })
     };
-    const report = await runCases([squirrelRouteCases(context)[0]], {});
+    const row = squirrelRouteCases(context)[0];
+    if (fault === 'wrong-tree') {
+      const setup = row.setup;
+      row.setup = async () => ({ ...await setup(), expectedTree: { x: 100, z: 100 } });
+    }
+    const report = await runCases([row], {});
     assert.equal(frozen, false);
     assert.equal(report.complete, true);
     assert.equal(report.cases[0].status, fault === 'none' ? 'passed' : 'failed');
     const observed = report.cases[0].observed;
     assert.equal(observed.fixture.uuid, 'original');
-    assert.equal(observed.trace.length, fault === 'timeout' ? 400 : fault === 'none' ? 40 : 1);
+    assert.equal(observed.trace.length, fault === 'timeout' ? 400 : ['none', 'wrong-tree'].includes(fault) ? 40 : 1);
     if (fault !== 'none') assert(report.cases[0].error);
   });
 }

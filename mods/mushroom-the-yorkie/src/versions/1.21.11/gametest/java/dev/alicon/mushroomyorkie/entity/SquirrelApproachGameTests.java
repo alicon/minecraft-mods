@@ -60,6 +60,60 @@ public final class SquirrelApproachGameTests {
 		SquirrelRouteScenarios.removeClimbedTree(helper);
 	}
 
+	/** A blocked nearby tree must not hide a farther reachable tree. */
+	@GameTest(maxTicks = 340)
+	public void squirrelChoosesReachableAlternative(GameTestHelper helper) {
+		SquirrelReachabilityScenarios.alternativeTree(helper, true);
+	}
+
+	/** With the barrier removed, keep the nearer tree as the control. */
+	@GameTest(maxTicks = 340)
+	public void squirrelKeepsOpenNearestTree(GameTestHelper helper) {
+		SquirrelReachabilityScenarios.alternativeTree(helper, false);
+	}
+
+	/** Prove the alternative tree itself is reachable with native movement. */
+	@GameTest(maxTicks = 340)
+	public void squirrelReachesFartherTreeAlone(GameTestHelper helper) {
+		SquirrelReachabilityScenarios.fartherTreeOnly(helper);
+	}
+
+	/** Reach another face of the same tree when the nearest face is enclosed. */
+	@GameTest(maxTicks = 340)
+	public void squirrelSkipsBlockedFace(GameTestHelper helper) {
+		SquirrelReachabilityScenarios.blockedFaceOnly(helper);
+	}
+
+	/** Without a reachable tree, normal avoidance must still move away from Mushroom. */
+	@GameTest(structure = "mushroom_yorkie_gametest:fetch_arena", maxTicks = 160)
+	public void squirrelFleesWithoutTree(GameTestHelper helper) {
+		SquirrelOtherGoalScenarios.flee(helper);
+	}
+
+	/** Without a tree, a squirrel can still walk to a player holding berries. */
+	@GameTest(structure = "mushroom_yorkie_gametest:fetch_arena", maxTicks = 160)
+	public void squirrelAcceptsTemptingWithoutTree(GameTestHelper helper) {
+		SquirrelOtherGoalScenarios.tempt(helper);
+	}
+
+	/** A wall built ahead during approach must trigger a reachable alternative. */
+	@GameTest(maxTicks = 340)
+	public void squirrelReplansClosedApproach(GameTestHelper helper) {
+		SquirrelReachabilityScenarios.closeDuringApproach(helper);
+	}
+
+	/** An enclosed tree must not suppress normal avoidance of Mushroom. */
+	@GameTest(structure = "mushroom_yorkie_gametest:fetch_arena", maxTicks = 160)
+	public void squirrelFleesWhenTreeUnreachable(GameTestHelper helper) {
+		SquirrelOtherGoalScenarios.fleeBlockedTree(helper);
+	}
+
+	/** A known enclosed tree must not draw the squirrel away from a player holding berries. */
+	@GameTest(structure = "mushroom_yorkie_gametest:fetch_arena", maxTicks = 160)
+	public void squirrelAcceptsTemptingWithUnreachableTree(GameTestHelper helper) {
+		SquirrelOtherGoalScenarios.temptBlockedTree(helper);
+	}
+
 	/** Select a clear climbing face when a low branch blocks the nearest standable approach. */
 	@GameTest(maxTicks = 240)
 	public void squirrelUsesAnotherTreeFace(GameTestHelper helper) {
@@ -73,11 +127,7 @@ public final class SquirrelApproachGameTests {
 		}
 		helper.setBlock(4, 3, 3, Blocks.OAK_LEAVES);
 		SquirrelEntity squirrel = helper.spawn(ModEntities.SQUIRREL, 4, 1, 1);
-		squirrel.setNoAi(true);
-		helper.assertTrue(new SquirrelFindTreeGoal(squirrel).canUse(),
-				"Squirrel rejected a tree with clear side faces because the nearest face is blocked");
 		double initialY = squirrel.getY();
-		squirrel.setNoAi(false);
 		helper.succeedWhen(() -> helper.assertTrue(squirrel.hasFoundTree() && squirrel.getY() >= initialY + 3.8D,
 				"Squirrel never reached the clear tree face: " + squirrel.position()));
 	}

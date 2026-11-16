@@ -17,6 +17,8 @@ final class SquirrelFindTreeGoal extends Goal {
 	private static final double REACHED_APPROACH_DISTANCE_SQR = 0.09D;
 	// Wall contact needs slower horizontal steering than the run to the tree.
 	private static final double CLIMB_SPEED = 0.45D;
+	// A nearby tree gets at most ten seconds of approach, even if terrain changes.
+	private static final int MAX_APPROACH_TICKS = 200;
 	private static final Direction[] APPROACH_DIRECTIONS = {
 		Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
 	};
@@ -28,6 +30,8 @@ final class SquirrelFindTreeGoal extends Goal {
 	private boolean climbing;
 	private int nextSearchTick;
 	private int nextMoveTick;
+	private int approachTicks;
+	private boolean approachFailed;
 
 	SquirrelFindTreeGoal(SquirrelEntity squirrel) {
 		this.squirrel = squirrel;
@@ -36,6 +40,11 @@ final class SquirrelFindTreeGoal extends Goal {
 
 	@Override
 	public boolean canUse() {
+		// Native ground pathfinding cannot assess a newly spawned airborne mob.
+		// Wait for its real landing without consuming the search cooldown.
+		if (!this.squirrel.onGround()) {
+			return false;
+		}
 		if (this.nextSearchTick-- > 0) {
 			return false;
 		}
@@ -48,6 +57,8 @@ final class SquirrelFindTreeGoal extends Goal {
 	@Override
 	public boolean canContinueToUse() {
 		return this.treePos != null
+				&& !this.approachFailed
+				&& (this.climbing || this.approachTicks < MAX_APPROACH_TICKS)
 				&& this.approachPos != null
 				&& this.climbPos != null
 				&& this.squirrel.level().getBlockState(this.treePos).is(BlockTags.LOGS)
@@ -67,6 +78,8 @@ final class SquirrelFindTreeGoal extends Goal {
 		this.squirrel.setTreeClimbing(false);
 		this.squirrel.setNoGravity(false);
 		this.nextMoveTick = 0;
+		this.approachTicks = 0;
+		this.approachFailed = false;
 	}
 
 	@Override
@@ -89,6 +102,7 @@ final class SquirrelFindTreeGoal extends Goal {
 				this.climbPos.getZ() + 0.5D
 		);
 		if (!this.climbing) {
+			this.approachTicks++;
 			if (!this.reachedApproach()) {
 				this.moveToApproach();
 				return;
@@ -127,21 +141,28 @@ final class SquirrelFindTreeGoal extends Goal {
 
 	private void moveToApproach() {
 		var navigation = this.squirrel.getNavigation();
-		Vec3 target = Vec3.atBottomCenterOf(this.approachPos);
-		// Native path completion allows more slack than a clean climbing face.
-		// Finish only this short, collision-checked final step at climbing speed.
-		if (navigation.isDone() && this.squirrel.distanceToSqr(target) <= 1.0D) {
-			this.squirrel.getMoveControl().setWantedPosition(target.x, target.y, target.z, CLIMB_SPEED);
-			return;
-		}
-		if (this.nextMoveTick-- > 0 && !this.squirrel.getNavigation().isDone()) {
-			return;
+		if (--this.nextMoveTick <= 0) {
+			// Recheck changed terrain, including during the last short step. A
+			// cached reachable path does not prove a new wall can be crossed.
+			navigation.stop();
+			var path = navigation.createPath(this.approachPos, 0);
+			if (path == null || !path.canReach()) {
+				this.approachFailed = true;
+				this.nextSearchTick = 0;
+				return;
+			}
+			navigation.moveTo(path, 1.35D);
+			this.nextMoveTick = 10;
 		}
 
-		// A path ending one block short can stop at the blocked corner. Reach
-		// the actual standable face before handing control to the climb.
-		navigation.moveTo(navigation.createPath(this.approachPos, 0), 1.35D);
-		this.nextMoveTick = 10;
+		// Native completion allows more slack than a clean climbing face.
+		// Finish this collision-checked final step only on a verified path.
+		Vec3 target = Vec3.atBottomCenterOf(this.approachPos);
+		var path = navigation.getPath();
+		if (navigation.isDone() && path != null && path.canReach()
+				&& path.getTarget().equals(this.approachPos) && this.squirrel.distanceToSqr(target) <= 1.0D) {
+			this.squirrel.getMoveControl().setWantedPosition(target.x, target.y, target.z, CLIMB_SPEED);
+		}
 	}
 
 	private void findNearestTree() {
@@ -157,8 +178,12 @@ final class SquirrelFindTreeGoal extends Goal {
 			if (!this.squirrel.level().getBlockState(candidate).is(BlockTags.LOGS)) {
 				continue;
 			}
+			double distance = candidate.distSqr(origin);
+			if (distance >= nearestDistance) {
+				continue;
+			}
 
-			BlockPos approach = findApproach(this.squirrel.level(), candidate, origin);
+			BlockPos approach = this.findApproach(candidate, origin);
 			if (approach == null) {
 				continue;
 			}
@@ -167,13 +192,10 @@ final class SquirrelFindTreeGoal extends Goal {
 				continue;
 			}
 
-			double distance = candidate.distSqr(origin);
-			if (distance < nearestDistance) {
-				this.treePos = candidate.immutable();
-				this.approachPos = approach;
-				this.climbPos = climb;
-				nearestDistance = distance;
-			}
+			this.treePos = candidate.immutable();
+			this.approachPos = approach;
+			this.climbPos = climb;
+			nearestDistance = distance;
 		}
 	}
 
@@ -195,7 +217,8 @@ final class SquirrelFindTreeGoal extends Goal {
 		return target;
 	}
 
-	private static BlockPos findApproach(Level level, BlockPos tree, BlockPos origin) {
+	private BlockPos findApproach(BlockPos tree, BlockPos origin) {
+		Level level = this.squirrel.level();
 		BlockPos closest = null;
 		double closestDistance = Double.MAX_VALUE;
 		for (Direction direction : APPROACH_DIRECTIONS) {
@@ -208,6 +231,12 @@ final class SquirrelFindTreeGoal extends Goal {
 
 			double distance = candidate.distSqr(origin);
 			if (distance < closestDistance) {
+				// A standable face behind a wall is not a usable escape route.
+				// Require the native path to reach this exact face, not a partial endpoint.
+				var path = this.squirrel.getNavigation().createPath(candidate, 0);
+				if (path == null || !path.canReach()) {
+					continue;
+				}
 				closest = candidate.immutable();
 				closestDistance = distance;
 			}

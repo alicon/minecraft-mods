@@ -1,14 +1,12 @@
 package dev.alicon.mushroomyorkie.entity;
 
-import com.google.gson.GsonBuilder;
+import static dev.alicon.mushroomyorkie.entity.SquirrelTraceReports.point;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import dev.alicon.mushroomyorkie.MushroomTheYorkie;
-import java.io.IOException;
 import java.lang.reflect.Field;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.entity.Mob;
@@ -26,14 +24,20 @@ final class SquirrelRouteProbe {
 	private final JsonArray frames = new JsonArray();
 	private final Path output;
 	private final String label;
+	private final Vec3 expectedTree;
 	private Vec3 previous;
 	private int ticks, stableTicks, firstCling = -1;
 	private double climbingDistance, peakY, largestDrop;
 
 	SquirrelRouteProbe(GameTestHelper helper, SquirrelEntity squirrel, String label, long seed) {
+		this(helper, squirrel, label, seed, null);
+	}
+
+	SquirrelRouteProbe(GameTestHelper helper, SquirrelEntity squirrel, String label, long seed, Vec3 expectedTree) {
 		this.helper = helper;
 		this.squirrel = squirrel;
 		this.label = label;
+		this.expectedTree = expectedTree;
 		this.origin = helper.absoluteVec(Vec3.ZERO);
 		this.previous = squirrel.position();
 		this.peakY = squirrel.getY();
@@ -57,6 +61,7 @@ final class SquirrelRouteProbe {
 		this.report.addProperty("worldSeed", Long.toString(helper.getLevel().getSeed()));
 		this.report.add("origin", point(this.origin));
 		this.report.add("start", point(squirrel.position().subtract(this.origin)));
+		if (expectedTree != null) this.report.add("expectedTree", point(expectedTree.subtract(this.origin)));
 		this.report.add("frames", this.frames);
 		this.save(false);
 	}
@@ -89,6 +94,7 @@ final class SquirrelRouteProbe {
 			frame.addProperty("navigationDone", this.squirrel.getNavigation().isDone());
 			var path = this.squirrel.getNavigation().getPath();
 			frame.addProperty("path", path == null ? "none" : path.toString());
+			frame.addProperty("pathIdentity", path == null ? "none" : Integer.toUnsignedString(System.identityHashCode(path)));
 			if (path != null && path.getEndNode() != null) {
 				var node = path.getEndNode();
 				frame.add("pathEnd", point(new Vec3(node.x, node.y, node.z).subtract(this.origin)));
@@ -107,6 +113,10 @@ final class SquirrelRouteProbe {
 			if (clinging && this.firstCling < 0) this.firstCling = this.ticks;
 			this.stableTicks = clinging ? this.stableTicks + 1 : 0;
 			if (this.stableTicks >= 40) {
+				if (this.expectedTree != null) {
+					this.helper.assertTrue(Math.hypot(position.x - this.expectedTree.x, position.z - this.expectedTree.z) < 1.5D,
+							"Squirrel reached a different tree than the reachable fixture control");
+				}
 				this.helper.assertTrue(this.firstCling <= 100,
 						"Squirrel took too long to reach the nearby tree: " + this.firstCling + " ticks");
 				this.helper.assertTrue(this.climbingDistance <= 3.0D,
@@ -144,15 +154,7 @@ final class SquirrelRouteProbe {
 		this.report.addProperty("firstCling", this.firstCling);
 		this.report.addProperty("climbingDistance", this.climbingDistance);
 		this.report.addProperty("largestDrop", this.largestDrop);
-		if (this.output == null) return;
-		try {
-			Files.createDirectories(this.output.getParent());
-			Path temporary = this.output.resolveSibling(this.output.getFileName() + ".tmp");
-			Files.writeString(temporary, new GsonBuilder().setPrettyPrinting().create().toJson(this.report) + "\n");
-			Files.move(temporary, this.output, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-		} catch (IOException failure) {
-			throw new IllegalStateException("Could not preserve native squirrel route evidence", failure);
-		}
+		SquirrelTraceReports.save(this.output, this.report);
 	}
 
 	private static Field field(String name) throws NoSuchFieldException {
@@ -161,11 +163,4 @@ final class SquirrelRouteProbe {
 		return field;
 	}
 
-	private static JsonObject point(Vec3 point) {
-		JsonObject value = new JsonObject();
-		value.addProperty("x", point.x);
-		value.addProperty("y", point.y);
-		value.addProperty("z", point.z);
-		return value;
-	}
 }

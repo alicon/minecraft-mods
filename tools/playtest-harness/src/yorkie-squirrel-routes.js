@@ -36,7 +36,8 @@ class ClimbRouteObservation {
   }
 }
 
-function squirrelRouteCases({ prepare, command, request, state, base, check }) {
+function squirrelRouteCases(context) {
+  const { prepare, command, request, state, base, check } = context;
   const starts = [
     ['clear-tree-face', 3.5, 0.5], ['north-left', 2.8, 0.5], ['north-inner-left', 3.2, 0.5],
     ['north-inner-right', 3.8, 0.5], ['north-right', 4.2, 0.5], ['north-far-right', 4.5, 0.5],
@@ -60,33 +61,38 @@ function squirrelRouteCases({ prepare, command, request, state, base, check }) {
         check(squirrel && squirrel.health === squirrel.maxHealth, 'Fresh healthy squirrel fixture is not observable');
         return { uuid: squirrel.uuid, position: squirrel.position };
       },
-      run: async (fixture, result, save) => {
-        await command(`data merge entity ${fixture.uuid} {NoAI:0b}`);
-        const route = new ClimbRouteObservation(base.y);
-        const observed = result.observed = { fixture, trace: [], route };
-        let stableTicks = 0;
-        for (let ticks = 1; ticks <= 400; ticks++) {
-          const snapshot = await advanceWorldTicks(command, state, 1, 'step');
-          const squirrel = snapshot.players[0].nearbyEntities.find(e => e.uuid === fixture.uuid);
-          observed.trace.push({ ticks, squirrel, tickAudit: snapshot.tickAudit });
-          save();
-          check(snapshot.worldFrozen === true, 'Squirrel observation world became unfrozen');
-          check(snapshot.tickAudit.elapsedTicks === 1, 'Squirrel observation skipped native world ticks');
-          check(squirrel && squirrel.health === squirrel.maxHealth, 'Tree approach lost or damaged the original squirrel');
-          route.sample(squirrel.position);
-          const clinging = squirrel.custom.foundTree && squirrel.noGravity && squirrel.position.y >= base.y + 3.8;
-          if (clinging && observed.completedAtTicks === undefined) observed.completedAtTicks = ticks;
-          stableTicks = clinging ? stableTicks + 1 : 0;
-          if (stableTicks >= 40) {
-            route.assertSmooth(observed.completedAtTicks);
-            return observed;
-          }
-        }
-        throw new Error('Squirrel did not finish a healthy climb and remain clinging for 40 ticks within 400 ticks');
-      },
+      run: (fixture, result, save) => observeSquirrelClimb(context, fixture, result, save),
       cleanup: () => command('tick unfreeze')
     };
   });
 }
 
-module.exports = { ClimbRouteObservation, squirrelRouteCases };
+async function observeSquirrelClimb({ command, state, base, check }, fixture, result, save, afterSample = async () => {}) {
+  await command(`data merge entity ${fixture.uuid} {NoAI:0b}`);
+  const route = new ClimbRouteObservation(base.y);
+  const observed = result.observed = { fixture, trace: [], route };
+  let stableTicks = 0;
+  for (let ticks = 1; ticks <= 400; ticks++) {
+    const snapshot = await advanceWorldTicks(command, state, 1, 'step');
+    const squirrel = snapshot.players[0].nearbyEntities.find(e => e.uuid === fixture.uuid);
+    observed.trace.push({ ticks, squirrel, tickAudit: snapshot.tickAudit });
+    save();
+    check(snapshot.worldFrozen === true, 'Squirrel observation world became unfrozen');
+    check(snapshot.tickAudit.elapsedTicks === 1, 'Squirrel observation skipped native world ticks');
+    check(squirrel && squirrel.health === squirrel.maxHealth, 'Tree approach lost or damaged the original squirrel');
+    route.sample(squirrel.position);
+    await afterSample(ticks, squirrel);
+    const clinging = squirrel.custom.foundTree && squirrel.noGravity && squirrel.position.y >= base.y + 3.8;
+    if (clinging && observed.completedAtTicks === undefined) observed.completedAtTicks = ticks;
+    stableTicks = clinging ? stableTicks + 1 : 0;
+    if (stableTicks >= 40) {
+      route.assertSmooth(observed.completedAtTicks);
+      if (fixture.expectedTree) check(Math.hypot(squirrel.position.x - fixture.expectedTree.x,
+        squirrel.position.z - fixture.expectedTree.z) < 1.5, 'Squirrel clung to a different tree than the reachable fixture control');
+      return observed;
+    }
+  }
+  throw new Error('Squirrel did not finish a healthy climb and remain clinging for 40 ticks within 400 ticks');
+}
+
+module.exports = { ClimbRouteObservation, squirrelRouteCases, observeSquirrelClimb };
