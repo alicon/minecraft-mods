@@ -158,6 +158,12 @@ function journeyCases(context) {
             // before horizontal travel. The east-bank obstruction stays in play.
             observed.departureMotion = await command(`data merge entity ${fixture.vehicleUuid} {Motion:[0.4d,-0.08d,0.0d]}`);
             for (let tick = 1; tick <= 24; tick++) {
+              if (tick === 3) {
+                // Model a downward slip after the hull starts leaving. Without
+                // it, creative recovery can catch mere foot contact before the
+                // body ever enters water, which cannot validate immersion.
+                observed.entryMotion = await command(`data merge entity ${fixture.petUuid} {Motion:[0.0d,-0.25d,0.0d]}`);
+              }
               await observe(await frozenStep(1), `offshore-immersion-${tick}`, { afterDismount: true });
             }
             const afterDeparture = vehicleIn(await state()).position;
@@ -167,8 +173,14 @@ function journeyCases(context) {
               error.phase = 'setup';
               throw error;
             }
-            check(observed.wetOrderRelease && observed.trace.some(frame => frame.pet.inWater && !frame.pet.vehicle && !frame.pet.tameable.orderedToSit),
-              'Offshore control did not observe genuine pet immersion and order release');
+            const immersed = observed.trace.findIndex(frame => frame.stage.startsWith('offshore-immersion') && frame.pet.inWater && !frame.pet.vehicle);
+            if (immersed < 0) {
+              const error = new Error('Offshore fixture did not establish actual pet immersion');
+              error.phase = 'setup';
+              throw error;
+            }
+            check(observed.wetOrderRelease && observed.trace.slice(immersed).some(frame => !frame.pet.tameable.orderedToSit),
+              'Offshore immersion did not release the sit order');
           }
         } else {
           observed.flightSetup = [];

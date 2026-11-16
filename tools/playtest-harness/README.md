@@ -234,7 +234,8 @@ owner help, creative takeoff/landing, or mounted survival feeding/harness change
 Boat bank-exit cases have a real dock doorway, a controlled shore-facing passenger
 yaw, and an owner standing clear of the exit. They do not claim an offshore sit
 order should make a dog walk off its safe boat platform. Offshore controls
-explicitly move the empty boat away after dismount, witness actual water entry,
+explicitly move the empty boat away after dismount and apply a controlled downward
+slip to the pet, then witness actual water entry,
 then require safe return and released sitting. Departure includes a small native
 downward bob before drifting toward the bank; a boat that never actually departs
 is a setup failure. The bank obstruction remains part of the recovery challenge.
