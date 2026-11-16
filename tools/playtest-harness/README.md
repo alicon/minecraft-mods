@@ -258,6 +258,11 @@ motion do not prove natural walking approaches, player rowing or reload behavior
 Those remain tracked in issue #45. A case that fails before its travel/end-state
 checks is not counted as completing that journey.
 
+The clear-tree-face squirrel transition records movement every 20 ticks for up
+to 400 ticks, then requires 40 ticks of stable clinging by the same healthy
+squirrel. Its completion time is retained. This tests a completed safe climb
+rather than assuming all valid approaches finish at a single fixed tick.
+
 The `outdoors` group checks closed-to-open doors across day/night, fed/hungry,
 sit/follow, and survival/grounded creative owners. Four additional cases start
 near the warning threshold (81 and 90). Following daytime pets must finish

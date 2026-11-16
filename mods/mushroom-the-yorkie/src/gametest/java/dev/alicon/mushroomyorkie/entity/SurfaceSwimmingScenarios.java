@@ -19,9 +19,9 @@ final class SurfaceSwimmingScenarios {
 		var owner = SurvivalGameTestPlayers.createWithoutToyCleanup(helper);
 		owner.setPos(helper.absoluteVec(new Vec3(9.0D, 4.0D, 3.5D)));
 		MushroomYorkieEntity yorkie = helper.spawn(ModEntities.MUSHROOM_YORKIE, 3, 3, 3);
+		long seed = GameTestSeeds.apply(yorkie, "surface-under-deck");
 		yorkie.setPos(helper.absoluteVec(new Vec3(3.5D, 3.8D, 3.5D)));
 		yorkie.claimFor(owner);
-		double distanceBefore = yorkie.distanceToSqr(owner);
 		Runnable cleanup = () -> {
 			yorkie.discard();
 			if (helper.getLevel().getServer().getPlayerList().getPlayer(owner.getUUID()) == owner) {
@@ -38,16 +38,6 @@ final class SurfaceSwimmingScenarios {
 				throw failure;
 			}
 		});
-		helper.runAfterDelay(80, () -> {
-			try {
-				helper.assertTrue(yorkie.getHealth() == yorkie.getMaxHealth() && yorkie.getAirSupply() == yorkie.getMaxAirSupply(),
-						"Ordinary under-deck surface following lost health or breathing");
-				helper.assertTrue(yorkie.distanceToSqr(owner) < distanceBefore - 1.0D && !yorkie.waterEscape.active(),
-						"Under-deck swimmer did not keep following toward its owner");
-				helper.succeed();
-			} finally {
-				cleanup.run();
-			}
-		});
+		new BoatBankRecoveryProbe(helper, yorkie, owner, false, false, seed, cleanup).start();
 	}
 }

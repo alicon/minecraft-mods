@@ -101,10 +101,21 @@ Boat-bank escape controls compare a swimmer trapped beneath a boat with the same
 clear bank without a boat, including a close grounded creative owner. They require
 dry support, restored air and normal close following. A breathing surface swimmer
 beneath a low deck keeps ordinary following; only submerged stalled movement
-triggers escape. These use full native ticks and real air/health. Native
+triggers escape. A farther creative control requires an observed flight-to-escape
+handoff. These tests sample every world tick, retain minimum air and largest
+movement, and observe at least 200 ticks with 40 consecutive settled ticks within a 400-tick
+bound. First recovery and later water re-entry are recorded separately. Native
 dismount controls also seed old movement/steering and require owner help to clear
 it for boats, chest boats and carts. Live dock sequences separately check the
 complete landing and settling behavior.
+
+Water movement fixtures record each entity's RNG seed. Use
+`MUSHROOM_GAME_TEST_SEED=42 ./gradlew :mushroom-the-yorkie:runGameTestServer`
+to replay that RNG stream. This does not pin the complete world or structure
+origin; retained positions and source versions remain part of the evidence. The
+far creative fixture keeps its owner well ashore so normal boarding restoration
+after the ten-second grace does not confound the recovery observation. Boat
+support alone does not satisfy the bank check; the feet need block support.
 
 Vehicle GameTests reproduce owner-assisted and creative-flight reboarding in boats
 and minecarts on both targets. They prove the grace period, retained sit order,
@@ -257,6 +268,10 @@ run in the Node suite; snapshots include a tickAudit for completed waits. Journe
 interactions also verify actual supported owner placement and ordinary
 interaction reach. The bridge's decimal-coordinate teleport avoids native integer
 coordinate auto-centering; invalid placement/reach is a setup failure.
+The clear-tree-face squirrel sequence samples progress up to 400 ticks, checks
+the original healthy squirrel reaches the safe height, then requires 40 more
+ticks of stable clinging. A single sample at 120 ticks can miss a valid slower
+route around the blocked side; the observed completion time remains in the report.
 Successful matrix runs persist their original case observations before separately feeding
 and healing the same tagged pet for inspection. The postRun record is maintenance,
 not gameplay evidence; its failure cannot turn a case failure into a pass. Failed

@@ -9,9 +9,10 @@ preserved. Ordinary gravity, collision and fall damage still apply.
 When his eyes are submerged and he makes no progress for 20 ticks beneath a
 boat or other low overhang, Mushroom searches up to three blocks for a reachable
 clear water column. He swims around the obstruction, resumes following once he
-can breathe, and replans a stalled escape. Native collisions, buoyancy and damage
+can breathe, and replans a stalled escape. Four failed columns or an 80-tick attempt release control
+for a 40-tick cooldown before another attempt. Native collisions, buoyancy and damage
 remain active. This also helps stalled recovery near a grounded creative owner;
-owner-directed flight and active fetch retain control.
+owner-directed flight and airborne fetch retain control.
 
 ## Gameplay Configuration
 

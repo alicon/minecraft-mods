@@ -2,7 +2,7 @@ package dev.alicon.mushroomyorkie.entity;
 
 import net.minecraft.world.phys.Vec3;
 
-/** Frees a stalled submerged swimmer; surface swimming, owner flight and fetch retain control. */
+/** Frees a stalled submerged swimmer; surface swimming, owner flight and fetch flight retain control. */
 final class MushroomWaterEscape {
 	private static final double CLEAR_RISE_BLOCKS = 1.0D;
 	private static final double SEARCH_RADIUS_BLOCKS = 3.0D;
@@ -16,11 +16,11 @@ final class MushroomWaterEscape {
 	// This is planning tolerance only; actual movement keeps full native collision.
 	private static final double CONTACT_TOLERANCE_BLOCKS = 0.0001D;
 	private final MushroomYorkieEntity yorkie;
+	private final WaterEscapeAttempts attempts = new WaterEscapeAttempts();
 	private Vec3 approach;
 	private int nextPlanTick;
 	private boolean escaping;
 	private Vec3 progressAnchor;
-	private Vec3 failedApproach;
 	private int stalledTicks;
 
 	MushroomWaterEscape(MushroomYorkieEntity yorkie) {
@@ -33,8 +33,11 @@ final class MushroomWaterEscape {
 			this.approach = null;
 			this.escaping = false;
 			this.progressAnchor = null;
-			this.failedApproach = null;
+			this.attempts.clearRoute();
 			this.stalledTicks = 0;
+			return;
+		}
+		if (this.attempts.coolingDown(this.yorkie.tickCount)) {
 			return;
 		}
 		if (this.progressAnchor == null || this.yorkie.position().distanceToSqr(this.progressAnchor) >= PROGRESS_DISTANCE_SQ) {
@@ -43,14 +46,30 @@ final class MushroomWaterEscape {
 		} else {
 			this.stalledTicks++;
 		}
-		boolean clearAbove = this.canReach(this.yorkie.position());
-		if (!this.escaping && (clearAbove || this.stalledTicks < STALLED_TICKS)) {
+		boolean clearAbove = this.clearAbove();
+		if (!this.escaping && clearAbove) {
+			this.attempts.clearRoute();
+			return;
+		}
+		if (!this.escaping && this.stalledTicks < STALLED_TICKS) {
+			return;
+		}
+		if (!this.attempts.continueEpisode(this.yorkie.tickCount)) {
+			this.escaping = false;
+			this.approach = null;
+			this.stalledTicks = 0;
 			return;
 		}
 		if (this.escaping && this.stalledTicks >= STALLED_TICKS) {
-			this.failedApproach = this.approach;
+			Vec3 failed = this.approach == null ? this.yorkie.position() : this.approach;
+			this.attempts.fail(failed.x, failed.z, this.yorkie.tickCount);
 			this.approach = null;
 			this.stalledTicks = 0;
+			if (this.attempts.coolingDown(this.yorkie.tickCount)) {
+				this.escaping = false;
+				return;
+			}
+			clearAbove = this.clearAbove();
 		}
 		if (this.approach != null) {
 			this.approach = new Vec3(this.approach.x, this.yorkie.getY(), this.approach.z);
@@ -85,7 +104,7 @@ final class MushroomWaterEscape {
 			for (int direction = 0; direction < 8; direction++) {
 				double angle = direction * Math.PI / 4;
 				Vec3 candidate = this.yorkie.position().add(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
-				if ((this.failedApproach == null || candidate.distanceToSqr(this.failedApproach) >= PROGRESS_DISTANCE_SQ) && this.canReach(candidate)) {
+				if (this.attempts.allows(candidate.x, candidate.z) && this.canReach(candidate)) {
 					return candidate;
 				}
 			}
@@ -94,7 +113,15 @@ final class MushroomWaterEscape {
 	}
 
 	private boolean canReach(Vec3 point) {
-		return MushroomClearAscent.canReach(this.yorkie, this.yorkie.getBoundingBox().deflate(CONTACT_TOLERANCE_BLOCKS), point, CLEAR_RISE_BLOCKS);
+		Vec3 delta = point.subtract(this.yorkie.position());
+		var box = this.yorkie.getBoundingBox();
+		return this.yorkie.level().noCollision(this.yorkie, box.deflate(CONTACT_TOLERANCE_BLOCKS).expandTowards(delta))
+				&& this.yorkie.level().noCollision(this.yorkie, box.move(delta).expandTowards(0, CLEAR_RISE_BLOCKS, 0));
+	}
+
+	private boolean clearAbove() {
+		return this.attempts.allows(this.yorkie.getX(), this.yorkie.getZ())
+				&& MushroomClearAscent.canReach(this.yorkie, this.yorkie.position(), CLEAR_RISE_BLOCKS);
 	}
 
 	boolean active() {

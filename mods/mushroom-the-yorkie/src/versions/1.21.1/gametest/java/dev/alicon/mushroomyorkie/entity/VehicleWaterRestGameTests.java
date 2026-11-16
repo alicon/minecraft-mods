@@ -6,26 +6,31 @@ import net.minecraft.world.entity.EntityType;
 
 /** Version-specific registration for water passenger rest controls. */
 public final class VehicleWaterRestGameTests {
+	/** Stalled automatic creative flight can hand control to a physical water escape. */
+	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 450)
+	public void farCreativeBoatBankSwimmerEscapes(GameTestHelper helper) {
+		BoatBankEscapeScenarios.farCreativeEscapeBank(helper, EntityType.BOAT);
+	}
 	/** Close grounded creative owners still need a safe escape from boat obstructions. */
-	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 200)
+	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 450)
 	public void closeCreativeBoatBankSwimmerEscapes(GameTestHelper helper) {
 		BoatBankEscapeScenarios.closeCreativeEscapeBank(helper, EntityType.BOAT);
 	}
 
 	/** A breathing swimmer keeps normal following beneath a low deck. */
-	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 120)
+	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 450)
 	public void surfaceSwimmerFollowsUnderDeck(GameTestHelper helper) {
 		SurfaceSwimmingScenarios.followUnderDeck(helper);
 	}
 
 	/** A swimmer must get around a floating boat to reach its owner's bank. */
-	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 200)
+	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 450)
 	public void boatBankSwimmerEscapes(GameTestHelper helper) {
 		BoatBankEscapeScenarios.escapeBank(helper, EntityType.BOAT);
 	}
 
 	/** The same bank remains reachable when no boat blocks the surface. */
-	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 200)
+	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 450)
 	public void clearBankSwimmerEscapes(GameTestHelper helper) {
 		BoatBankEscapeScenarios.escapeBank(helper, null);
 	}

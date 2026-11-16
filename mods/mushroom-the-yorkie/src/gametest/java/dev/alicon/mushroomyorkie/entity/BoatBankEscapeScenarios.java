@@ -9,24 +9,33 @@ import net.minecraft.world.level.GameType;
 
 /** Native collision regression for a small swimmer beneath a boat against a reachable bank. */
 final class BoatBankEscapeScenarios {
+	private enum OwnerMode { SURVIVAL, CLOSE_CREATIVE, FAR_CREATIVE }
 
 	private BoatBankEscapeScenarios() {
 	}
 
 	static void escapeBank(GameTestHelper helper, EntityType<?> boatType) {
-		escapeBank(helper, boatType, false);
+		escapeBank(helper, boatType, OwnerMode.SURVIVAL);
 	}
 
 	static void closeCreativeEscapeBank(GameTestHelper helper, EntityType<?> boatType) {
-		escapeBank(helper, boatType, true);
+		escapeBank(helper, boatType, OwnerMode.CLOSE_CREATIVE);
 	}
 
-	private static void escapeBank(GameTestHelper helper, EntityType<?> boatType, boolean creative) {
+	static void farCreativeEscapeBank(GameTestHelper helper, EntityType<?> boatType) {
+		escapeBank(helper, boatType, OwnerMode.FAR_CREATIVE);
+	}
+
+	private static void escapeBank(GameTestHelper helper, EntityType<?> boatType, OwnerMode mode) {
 		buildPool(helper);
 		var owner = SurvivalGameTestPlayers.createWithoutToyCleanup(helper);
-		owner.setGameMode(creative ? GameType.CREATIVE : GameType.SURVIVAL);
-		owner.setPos(helper.absoluteVec(new Vec3(creative ? 8.5D : 9.0D, 4.0D, 3.5D)));
+		owner.setGameMode(mode == OwnerMode.SURVIVAL ? GameType.SURVIVAL : GameType.CREATIVE);
+		// Far recovery ends clear of the hull before normal boarding resumes at
+		// tick200. The separate vehicle controls deliberately test that restoration.
+		double ownerX = mode == OwnerMode.FAR_CREATIVE ? 10.5D : mode == OwnerMode.CLOSE_CREATIVE ? 8.5D : 9.0D;
+		owner.setPos(helper.absoluteVec(new Vec3(ownerX, 4.0D, 3.5D)));
 		MushroomYorkieEntity yorkie = helper.spawn(ModEntities.MUSHROOM_YORKIE, 6, 3, 3);
+		long seed = GameTestSeeds.apply(yorkie, "bank-" + mode);
 		yorkie.setPos(helper.absoluteVec(new Vec3(6.79D, 3.06D, 3.5D)));
 		yorkie.claimFor(owner);
 		Entity boat = boatType == null ? null : helper.spawn(boatType, 6, 3, 3);
@@ -49,27 +58,7 @@ final class BoatBankEscapeScenarios {
 		};
 		boolean scheduled = false;
 		try {
-			helper.runAfterDelay(2, () -> {
-				if (!yorkie.isInWater() || yorkie.isPassenger()) {
-					cleanup.run();
-					helper.assertTrue(false, "Boat-bank control must begin with a genuinely wet unmounted pet");
-				}
-			});
-			helper.runAfterDelay(160, () -> {
-				try {
-					helper.assertTrue(yorkie.getHealth() == yorkie.getMaxHealth(), "Boat-bank recovery damaged Mushroom");
-					helper.assertTrue(!yorkie.isInWater() && yorkie.onGround()
-							&& yorkie.getY() >= helper.absoluteVec(new Vec3(0, 4, 0)).y,
-							"Mushroom did not escape the boat-bank swim trap: position=" + yorkie.position()
-									+ ", air=" + yorkie.getAirSupply() + ", boat=" + (boat == null ? "absent" : boat.position())
-									+ ", escape=" + yorkie.waterEscape);
-					helper.assertTrue(yorkie.getAirSupply() == yorkie.getMaxAirSupply() && yorkie.distanceToSqr(owner) < 4.0D && !yorkie.isNoGravity(),
-							"Recovery did not restore breathing and ordinary close following");
-					helper.succeed();
-				} finally {
-					cleanup.run();
-				}
-			});
+			new BoatBankRecoveryProbe(helper, yorkie, owner, boat != null, mode == OwnerMode.FAR_CREATIVE, seed, cleanup).start();
 			scheduled = true;
 		} finally {
 			if (!scheduled) {
