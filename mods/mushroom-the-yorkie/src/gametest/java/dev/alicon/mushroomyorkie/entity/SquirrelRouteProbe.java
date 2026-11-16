@@ -28,6 +28,10 @@ final class SquirrelRouteProbe {
 	private Vec3 previous;
 	private int ticks, stableTicks, firstCling = -1;
 	private double climbingDistance, peakY, largestDrop;
+	private boolean requiresContinuousApproach, seenApproach;
+	private int approachAirborneTicks;
+	private Field approachAge;
+	private int previousApproachAge = -1;
 
 	SquirrelRouteProbe(GameTestHelper helper, SquirrelEntity squirrel, String label, long seed) {
 		this(helper, squirrel, label, seed, null);
@@ -70,6 +74,17 @@ final class SquirrelRouteProbe {
 		this.helper.runAfterDelay(1, this::tick);
 	}
 
+	SquirrelRouteProbe requireContinuousApproach() {
+		try {
+			this.approachAge = field("approachTicks");
+		} catch (NoSuchFieldException failure) {
+			throw new IllegalStateException("Native approach age inspection is unavailable", failure);
+		}
+		this.requiresContinuousApproach = true;
+		this.report.addProperty("requiresContinuousApproach", true);
+		return this;
+	}
+
 	private void tick() {
 		this.ticks++;
 		try {
@@ -101,18 +116,33 @@ final class SquirrelRouteProbe {
 			}
 			BlockPos approachPos = (BlockPos) this.approach.get(this.goal);
 			BlockPos climbPos = (BlockPos) this.climb.get(this.goal);
+			int currentApproachAge = this.approachAge == null ? -1 : this.approachAge.getInt(this.goal);
+			if (this.approachAge != null) frame.addProperty("approachTicks", currentApproachAge);
 			if (approachPos != null) frame.add("approach", point(Vec3.atBottomCenterOf(approachPos).subtract(this.origin)));
 			if (climbPos != null) frame.add("climb", point(Vec3.atCenterOf(climbPos).subtract(this.origin)));
 			var movement = this.squirrel.getMoveControl();
 			frame.addProperty("hasWanted", movement.hasWanted());
 			frame.add("wanted", point(new Vec3(movement.getWantedX(), movement.getWantedY(), movement.getWantedZ()).subtract(this.origin)));
 			this.frames.add(frame);
+			if (this.requiresContinuousApproach) {
+				this.helper.assertTrue(!this.seenApproach || approachPos != null,
+						"Squirrel released a reachable stepped approach");
+				this.helper.assertTrue(!this.seenApproach || currentApproachAge >= this.previousApproachAge,
+						"Squirrel restarted a reachable stepped approach");
+				if (approachPos != null) this.previousApproachAge = currentApproachAge;
+				this.seenApproach |= approachPos != null;
+				if (approachPos != null && !isClimbing && !this.squirrel.onGround() && position.y > this.origin.y + 1.2D) {
+					this.approachAirborneTicks++;
+				}
+			}
 			this.helper.assertTrue(this.squirrel.isAlive() && this.squirrel.getHealth() == this.squirrel.getMaxHealth(), "Squirrel route lost health");
 			boolean clinging = this.squirrel.hasFoundTree() && this.squirrel.isNoGravity()
 					&& position.y >= this.origin.y + 4.8D;
 			if (clinging && this.firstCling < 0) this.firstCling = this.ticks;
 			this.stableTicks = clinging ? this.stableTicks + 1 : 0;
 			if (this.stableTicks >= 40) {
+				this.helper.assertTrue(!this.requiresContinuousApproach || this.approachAirborneTicks > 0,
+						"Stepped fixture never observed an airborne ground approach");
 				if (this.expectedTree != null) {
 					this.helper.assertTrue(Math.hypot(position.x - this.expectedTree.x, position.z - this.expectedTree.z) < 1.5D,
 							"Squirrel reached a different tree than the reachable fixture control");
@@ -154,6 +184,7 @@ final class SquirrelRouteProbe {
 		this.report.addProperty("firstCling", this.firstCling);
 		this.report.addProperty("climbingDistance", this.climbingDistance);
 		this.report.addProperty("largestDrop", this.largestDrop);
+		this.report.addProperty("approachAirborneTicks", this.approachAirborneTicks);
 		SquirrelTraceReports.save(this.output, this.report);
 	}
 

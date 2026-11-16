@@ -131,6 +131,7 @@ function transitionCases(context) {
   });
   rows.push(...require('./yorkie-squirrel-routes').squirrelRouteCases(context));
   rows.push(...require('./yorkie-squirrel-reachability').squirrelReachabilityCases(context));
+  rows.push(...require('./yorkie-squirrel-reachability').squirrelStepCases(context));
   return rows;
 }
 

@@ -6,8 +6,10 @@ const { advanceWorldTicks } = require('./yorkie-clock');
 // Observe real movement, not goal internals. A small contact hop is normal;
 // repeated circling or losing more than one block of height is not.
 class ClimbRouteObservation {
-  constructor(floorY) {
+  constructor(floorY, expectedTree) {
     this.floorY = floorY;
+    this.expectedTree = expectedTree;
+    this.startRule = expectedTree ? 'half-block rise within 1.25 horizontal blocks of expected tree' : 'half-block rise';
     this.distance = 0;
     this.largestDrop = 0;
     this.started = false;
@@ -15,7 +17,8 @@ class ClimbRouteObservation {
 
   sample(position) {
     assert(['x', 'y', 'z'].every(axis => Number.isFinite(position?.[axis])), 'Invalid squirrel position');
-    if (!this.started && position.y >= this.floorY + 0.5) {
+    const nearTree = !this.expectedTree || Math.hypot(position.x - this.expectedTree.x, position.z - this.expectedTree.z) <= 1.25;
+    if (!this.started && nearTree && position.y >= this.floorY + 0.5) {
       this.started = true;
       this.peakY = position.y;
     }
@@ -59,7 +62,7 @@ function squirrelRouteCases(context) {
         check(snapshot.worldFrozen === true, 'Squirrel fixture world did not freeze');
         const squirrel = snapshot.players[0].nearbyEntities.find(e => e.type === 'mushroom_yorkie:squirrel');
         check(squirrel && squirrel.health === squirrel.maxHealth, 'Fresh healthy squirrel fixture is not observable');
-        return { uuid: squirrel.uuid, position: squirrel.position };
+        return { uuid: squirrel.uuid, position: squirrel.position, expectedTree: { x: base.x + 3.5, z: base.z + 3.5 } };
       },
       run: (fixture, result, save) => observeSquirrelClimb(context, fixture, result, save),
       cleanup: () => command('tick unfreeze')
@@ -69,7 +72,7 @@ function squirrelRouteCases(context) {
 
 async function observeSquirrelClimb({ command, state, base, check }, fixture, result, save, afterSample = async () => {}) {
   await command(`data merge entity ${fixture.uuid} {NoAI:0b}`);
-  const route = new ClimbRouteObservation(base.y);
+  const route = new ClimbRouteObservation(base.y, fixture.expectedTree);
   const observed = result.observed = { fixture, trace: [], route };
   let stableTicks = 0;
   for (let ticks = 1; ticks <= 400; ticks++) {
@@ -86,9 +89,9 @@ async function observeSquirrelClimb({ command, state, base, check }, fixture, re
     if (clinging && observed.completedAtTicks === undefined) observed.completedAtTicks = ticks;
     stableTicks = clinging ? stableTicks + 1 : 0;
     if (stableTicks >= 40) {
-      route.assertSmooth(observed.completedAtTicks);
       if (fixture.expectedTree) check(Math.hypot(squirrel.position.x - fixture.expectedTree.x,
         squirrel.position.z - fixture.expectedTree.z) < 1.5, 'Squirrel clung to a different tree than the reachable fixture control');
+      route.assertSmooth(observed.completedAtTicks);
       return observed;
     }
   }

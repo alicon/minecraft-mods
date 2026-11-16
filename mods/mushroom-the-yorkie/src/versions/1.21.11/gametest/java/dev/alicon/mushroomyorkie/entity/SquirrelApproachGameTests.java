@@ -2,6 +2,9 @@ package dev.alicon.mushroomyorkie.entity;
 
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.level.storage.TagValueInput;
+import net.minecraft.world.level.storage.TagValueOutput;
 import net.minecraft.world.level.block.Blocks;
 
 /** A blocked nearby trunk face must not hide an otherwise usable tree. */
@@ -114,6 +117,36 @@ public final class SquirrelApproachGameTests {
 		SquirrelOtherGoalScenarios.temptBlockedTree(helper);
 	}
 
+	/** Keep the native approach across a one-block rise and drop starting at x5. */
+	@GameTest(structure = "mushroom_yorkie_gametest:fetch_arena", maxTicks = 340)
+	public void squirrelApproachesAcrossStep5(GameTestHelper helper) {
+		SquirrelUnevenApproachScenarios.step(helper, 5);
+	}
+
+	/** Keep the native approach across a one-block rise and drop starting at x6. */
+	@GameTest(structure = "mushroom_yorkie_gametest:fetch_arena", maxTicks = 340)
+	public void squirrelApproachesAcrossStep6(GameTestHelper helper) {
+		SquirrelUnevenApproachScenarios.step(helper, 6);
+	}
+
+	/** Keep the native approach across a one-block rise and drop starting at x7. */
+	@GameTest(structure = "mushroom_yorkie_gametest:fetch_arena", maxTicks = 340)
+	public void squirrelApproachesAcrossStep7(GameTestHelper helper) {
+		SquirrelUnevenApproachScenarios.step(helper, 7);
+	}
+
+	/** Waiting for native ground contact must not preserve an unowned saved no-gravity flag. */
+	@GameTest(maxTicks = 340)
+	public void squirrelResumesSavedPerch(GameTestHelper helper) {
+		SquirrelReloadApproachScenarios.savedPerch(helper, squirrel -> roundTrip(helper, squirrel));
+	}
+
+	/** A saved no-gravity flag cannot keep the squirrel aloft after its tree is removed. */
+	@GameTest(maxTicks = 340)
+	public void squirrelReleasesRemovedSavedPerch(GameTestHelper helper) {
+		SquirrelReloadApproachScenarios.removedSavedPerch(helper, squirrel -> roundTrip(helper, squirrel));
+	}
+
 	/** Select a clear climbing face when a low branch blocks the nearest standable approach. */
 	@GameTest(maxTicks = 240)
 	public void squirrelUsesAnotherTreeFace(GameTestHelper helper) {
@@ -130,5 +163,16 @@ public final class SquirrelApproachGameTests {
 		double initialY = squirrel.getY();
 		helper.succeedWhen(() -> helper.assertTrue(squirrel.hasFoundTree() && squirrel.getY() >= initialY + 3.8D,
 				"Squirrel never reached the clear tree face: " + squirrel.position()));
+	}
+
+	private static SquirrelEntity roundTrip(GameTestHelper helper, SquirrelEntity squirrel) {
+		var output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, helper.getLevel().registryAccess());
+		squirrel.saveWithoutId(output);
+		var data = output.buildResult();
+		squirrel.discard();
+		SquirrelEntity restored = new SquirrelEntity(ModEntities.SQUIRREL, helper.getLevel());
+		restored.load(TagValueInput.create(ProblemReporter.DISCARDING, helper.getLevel().registryAccess(), data));
+		helper.getLevel().addFreshEntity(restored);
+		return restored;
 	}
 }

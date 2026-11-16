@@ -5,6 +5,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
@@ -12,7 +13,7 @@ final class SquirrelFindTreeGoal extends Goal {
 	private static final int SEARCH_RADIUS = 20;
 	private static final int SEARCH_Y_RADIUS = 5;
 	private static final int MIN_CLIMB_BLOCKS = 2;
-	private static final int MAX_CLIMB_BLOCKS = 4;
+	static final int MAX_CLIMB_BLOCKS = 4;
 	// Reach the selected face before climbing; a loose corner radius can hit a blocked neighbor face.
 	private static final double REACHED_APPROACH_DISTANCE_SQR = 0.09D;
 	// Wall contact needs slower horizontal steering than the run to the tree.
@@ -24,6 +25,7 @@ final class SquirrelFindTreeGoal extends Goal {
 	};
 
 	private final SquirrelEntity squirrel;
+	private final GroundPathNavigation reachabilityProbe;
 	private BlockPos treePos;
 	private BlockPos approachPos;
 	private BlockPos climbPos;
@@ -32,14 +34,33 @@ final class SquirrelFindTreeGoal extends Goal {
 	private int nextMoveTick;
 	private int approachTicks;
 	private boolean approachFailed;
+	private boolean recoveredCling;
 
 	SquirrelFindTreeGoal(SquirrelEntity squirrel) {
 		this.squirrel = squirrel;
+		// Selection queries must not overwrite another goal's navigation target
+		// or stuck timer. This ordinary ground navigator is queried, never ticked.
+		this.reachabilityProbe = new GroundPathNavigation(squirrel, squirrel.level());
 		this.setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
 	}
 
 	@Override
 	public boolean canUse() {
+		this.recoveredCling = false;
+		// Native NoGravity survives saving but the selected goal does not. A
+		// physically intact perch can be reclaimed without a fall/re-approach.
+		if (this.squirrel.isNoGravity() && !this.squirrel.hasFoundTree()) {
+			var perch = SquirrelPerchRecovery.find(this.squirrel);
+			if (perch != null) {
+				this.treePos = perch.tree();
+				this.approachPos = perch.approach();
+				this.climbPos = perch.climb();
+				this.recoveredCling = true;
+				return true;
+			}
+			// A missing/blocked tree cannot grant permanent hovering.
+			this.squirrel.setNoGravity(false);
+		}
 		// Native ground pathfinding cannot assess a newly spawned airborne mob.
 		// Wait for its real landing without consuming the search cooldown.
 		if (!this.squirrel.onGround()) {
@@ -73,10 +94,10 @@ final class SquirrelFindTreeGoal extends Goal {
 
 	@Override
 	public void start() {
-		this.climbing = false;
-		this.squirrel.setFoundTree(false);
-		this.squirrel.setTreeClimbing(false);
-		this.squirrel.setNoGravity(false);
+		this.climbing = this.recoveredCling;
+		this.squirrel.setFoundTree(this.recoveredCling);
+		this.squirrel.setTreeClimbing(this.recoveredCling);
+		this.squirrel.setNoGravity(this.recoveredCling);
 		this.nextMoveTick = 0;
 		this.approachTicks = 0;
 		this.approachFailed = false;
@@ -84,6 +105,7 @@ final class SquirrelFindTreeGoal extends Goal {
 
 	@Override
 	public void stop() {
+		this.recoveredCling = false;
 		this.treePos = null;
 		this.approachPos = null;
 		this.climbPos = null;
@@ -140,6 +162,11 @@ final class SquirrelFindTreeGoal extends Goal {
 	}
 
 	private void moveToApproach() {
+		// Ground navigation cannot plan while airborne. Keep the valid approach
+		// and its movement across a real jump/drop, then refresh after landing.
+		if (!this.squirrel.onGround()) {
+			return;
+		}
 		var navigation = this.squirrel.getNavigation();
 		if (--this.nextMoveTick <= 0) {
 			// Recheck changed terrain, including during the last short step. A
@@ -166,6 +193,7 @@ final class SquirrelFindTreeGoal extends Goal {
 	}
 
 	private void findNearestTree() {
+		this.reachabilityProbe.setCanFloat(this.squirrel.getNavigation().canFloat());
 		BlockPos origin = this.squirrel.blockPosition();
 		BlockPos min = origin.offset(-SEARCH_RADIUS, -SEARCH_Y_RADIUS, -SEARCH_RADIUS);
 		BlockPos max = origin.offset(SEARCH_RADIUS, SEARCH_Y_RADIUS, SEARCH_RADIUS);
@@ -199,7 +227,7 @@ final class SquirrelFindTreeGoal extends Goal {
 		}
 	}
 
-	private static BlockPos findClimbTarget(Level level, BlockPos tree, BlockPos approach) {
+	static BlockPos findClimbTarget(Level level, BlockPos tree, BlockPos approach) {
 		BlockPos target = null;
 		for (int height = 1; height <= MAX_CLIMB_BLOCKS; height++) {
 			BlockPos trunk = tree.above(height);
@@ -233,8 +261,8 @@ final class SquirrelFindTreeGoal extends Goal {
 			if (distance < closestDistance) {
 				// A standable face behind a wall is not a usable escape route.
 				// Require the native path to reach this exact face, not a partial endpoint.
-				var path = this.squirrel.getNavigation().createPath(candidate, 0);
-				if (path == null || !path.canReach()) {
+				var path = this.reachabilityProbe.createPath(candidate, 0);
+				if (path == null || !path.canReach() || !path.getTarget().equals(candidate)) {
 					continue;
 				}
 				closest = candidate.immutable();
@@ -244,7 +272,7 @@ final class SquirrelFindTreeGoal extends Goal {
 		return closest;
 	}
 
-	private static boolean isStandable(Level level, BlockPos pos) {
+	static boolean isStandable(Level level, BlockPos pos) {
 		BlockPos floor = pos.below();
 		return level.getBlockState(pos).isAir()
 				&& level.getBlockState(pos.above()).isAir()

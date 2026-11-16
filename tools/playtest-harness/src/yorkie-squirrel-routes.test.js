@@ -13,8 +13,25 @@ test('native contact hop can settle before a smooth climb', () => {
   route.assertSmooth(60);
 });
 
+test('walking across a raised platform is approach travel until actual tree contact', () => {
+  const route = new ClimbRouteObservation(20, { x: 10, z: 0 });
+  for (let x = 0; x < 9; x++) route.sample({ x, y: 21, z: 0 });
+  assert.equal(route.started, false);
+  for (const y of [20, 20.6, 21.2, 20.6, 23.8]) route.sample({ x: 9.31, y, z: 0 });
+  route.assertSmooth(90);
+  assert(route.distance < 2);
+});
+
+test('a half-block rise just off a trunk corner begins climb observation', () => {
+  const route = new ClimbRouteObservation(20, { x: 10, z: 0 });
+  route.sample({ x: 10.8, y: 20.6, z: 0.8 });
+  assert.equal(route.started, true);
+  route.sample({ x: 10.7, y: 24, z: 0.7 });
+  route.assertSmooth(60);
+});
+
 test('eventual successful ascent does not hide a circling route', () => {
-  const route = new ClimbRouteObservation(20);
+  const route = new ClimbRouteObservation(20, { x: 0.5, z: 0.5 });
   for (const [x, z] of [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]) route.sample({ x, y: 21, z });
   route.sample({ x: 0, y: 24, z: 0 });
   assert.throws(() => route.assertSmooth(60), /circled/);

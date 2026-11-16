@@ -60,4 +60,42 @@ function squirrelReachabilityCases(context) {
   });
 }
 
-module.exports = { squirrelReachabilityCases };
+function squirrelStepCases(context) {
+  const { prepare, request, command, state, base, player, check } = context;
+  return [5, 6, 7].map(stepX => {
+    const inputs = { time: 1000, shelter: 'outside', hunger: 10, sitting: false, flying: false, ownerMode: 'creative', stepX };
+    return {
+      name: `squirrel-step-${stepX}`, inspectionPet: false, inputs,
+      setup: async () => {
+        await prepare(inputs);
+        await request('/clear-entities', { type: 'mushroom_yorkie:mushroom_yorkie' });
+        await request('/clear-entities', { type: 'mushroom_yorkie:squirrel' });
+        await command('tick freeze');
+        // Keep the owner outside the raised strip before adding solid blocks.
+        await command(`tp ${player} ${base.x - 6.5} ${base.y} ${base.z + 4.5}`);
+        await command(`fill ${base.x + stepX - 7} ${base.y} ${base.z - 7} ${base.x + 3} ${base.y} ${base.z + 7} minecraft:stone`);
+        await command(`fill ${base.x + 5} ${base.y} ${base.z} ${base.x + 5} ${base.y + 4} ${base.z} minecraft:oak_log`);
+        await command(`summon mushroom_yorkie:squirrel ${base.x - 4.5} ${base.y} ${base.z + 0.5} {NoAI:1b,PersistenceRequired:1b}`);
+        const snapshot = await state();
+        check(snapshot.worldFrozen === true, 'Stepped fixture world did not freeze');
+        const squirrel = snapshot.players[0].nearbyEntities.find(e => e.type === 'mushroom_yorkie:squirrel');
+        check(squirrel && squirrel.health === squirrel.maxHealth && Math.abs(squirrel.position.x - base.x + 4.5) < 0.01
+          && Math.abs(squirrel.position.y - base.y) < 0.01 && Math.abs(squirrel.position.z - base.z - 0.5) < 0.01,
+        'Fresh stepped-route squirrel is missing or outside its authored position');
+        return { uuid: squirrel.uuid, position: squirrel.position, expectedTree: { x: base.x + 5.5, z: base.z + 0.5 } };
+      },
+      run: async (fixture, result, save) => {
+        const observed = await observeSquirrelClimb(context, fixture, result, save, async (ticks, squirrel) => {
+          if (!squirrel.onGround && squirrel.position.y > base.y + 0.2 && squirrel.position.x < base.x + 4) {
+            result.observed.airborneOnApproach = (result.observed.airborneOnApproach || 0) + 1;
+          }
+        });
+        check(observed.airborneOnApproach > 0, 'Stepped route did not observe a real airborne ground approach');
+        return observed;
+      },
+      cleanup: () => command('tick unfreeze')
+    };
+  });
+}
+
+module.exports = { squirrelReachabilityCases, squirrelStepCases };
