@@ -38,8 +38,8 @@ final class BridgeInputController {
 		return this.snapshot();
 	}
 
-	boolean isActive() {
-		return this.current != null && !this.current.complete;
+	boolean allowsRecovery() {
+		return this.current == null || this.current.complete && this.current.releaseConfirmed;
 	}
 
 	void startTick() {

@@ -26,7 +26,12 @@ final class BridgeClientRespawn {
 					}
 					if (!player.isDeadOrDying()) throw new IllegalStateException("respawn requires a dead client player");
 					if (server.isHardcore()) throw new IllegalStateException("native fixture recovery refuses hardcore worlds");
-					if (inputs.isActive()) throw new IllegalStateException("client input is still active");
+					if (!inputs.allowsRecovery()) throw new IllegalStateException("client input is active or its release is unconfirmed");
+					var keys = client.options;
+					if (keys.keyUp.isDown() || keys.keyDown.isDown() || keys.keyLeft.isDown() || keys.keyRight.isDown()
+							|| keys.keyShift.isDown() || keys.keyJump.isDown() || keys.keySprint.isDown()) {
+						throw new IllegalStateException("release movement controls before native respawn");
+					}
 					if (this.requestedPlayer == player) throw new IllegalStateException("native respawn is already requested");
 					player.respawn();
 					this.requestedPlayer = player;

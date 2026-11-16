@@ -18,6 +18,7 @@ async function respawnNativeOwner(context, { timeoutMs = 5000, pollMs = 50, onOb
     assert(observed.before.players[0].health === 0, 'Native respawn requires a dead owner');
     onObservation(observed);
     observed.attempted = true;
+    onObservation(observed);
     observed.acknowledgement = await context.request('/respawn', { expectedSave: context.expectedSave, playerUuid: context.playerUuid });
     onObservation(observed);
     const ack = observed.acknowledgement;
@@ -25,9 +26,10 @@ async function respawnNativeOwner(context, { timeoutMs = 5000, pollMs = 50, onOb
       && ack.playerUuid === context.playerUuid, 'Respawn acknowledgement has the wrong identity');
     const deadline = performance.now() + timeoutMs;
     do {
-      const snapshot = await context.state();
+      const snapshot = await context.state({ timeoutMs: Math.max(1, deadline - performance.now()) });
       observed.snapshots.push(snapshot);
       onObservation(observed);
+      assert(performance.now() <= deadline, 'Native respawn confirmation exceeded the bounded wait');
       assertInspectionWorld(snapshot, context);
       assert(snapshot.players[0].dimension === observed.before.players[0].dimension, 'Respawn changed the test dimension');
       assert(snapshot.hardcore === false && snapshot.players[0].abilities?.spectator === false, 'Respawn must retain a non-hardcore, non-spectator owner');
@@ -39,6 +41,14 @@ async function respawnNativeOwner(context, { timeoutMs = 5000, pollMs = 50, onOb
     } while (performance.now() < deadline);
     throw new Error('Native respawn was not confirmed alive within the bounded wait; do not retry without checking current state');
   } catch (error) {
+    if (observed.attempted) {
+      // An acknowledgement failure cannot prove that the native packet was not sent.
+      observed.outcome = 'uncertain';
+      onObservation(observed);
+      try { observed.afterError = await context.state(); }
+      catch (stateError) { observed.afterErrorReadFailure = stateError.message; }
+      onObservation(observed);
+    }
     error.observed = observed;
     throw error;
   }
@@ -50,14 +60,14 @@ async function runNativeRespawn(baseUrl, args) {
   const reportFile = args.reportFile || `build/playtest-reports/native-owner-respawn-${Date.now()}.json`;
   assert(!fs.existsSync(reportFile), 'Refusing to overwrite an existing recovery report');
   return withBridgeLock(baseUrl, async () => {
-    const request = async (route, body) => {
+    const request = async (route, body, { timeoutMs = 30000 } = {}) => {
       const response = await fetch(baseUrl + route, { method: body ? 'POST' : 'GET', headers: body ? { 'content-type': 'application/json' } : {},
-        body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(10000) });
+        body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(Math.max(1, Math.ceil(timeoutMs))) });
       const result = await response.json();
       assert(response.ok && result.ok !== false, `${route}: ${JSON.stringify(result)}`);
       return result;
     };
-    const state = () => request('/state');
+    const state = options => request('/state', undefined, options);
     const initial = await state();
     const context = { request, state, expectedSave: args.expectedSave, playerUuid: args.playerUuid };
     assertInspectionWorld(initial, context);

@@ -3478,6 +3478,7 @@ async function main() {
       playerUuid: option(args, 'playerUuid', 'BRIDGE_PLAYER_UUID', ''),
       reportFile: option(args, 'reportFile', 'BRIDGE_REPORT_FILE', '')
     });
+    if (!result.ok) process.exitCode = 1;
   } else if (action === 'state') {
     result = await requestJson(baseUrl, '/state');
   } else if (action === 'smoke') {

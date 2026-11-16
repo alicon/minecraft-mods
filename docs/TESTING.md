@@ -36,6 +36,11 @@ owner, hardcore worlds, changed context, active input and an existing output rep
 does not alter the original scenario verdict or prove gameplay passed. It does
 not heal a running fixture. Screenshots retain a dead player's screen even when
 resume was requested. Check current state before retrying an uncertain request.
+The attempted request is saved before dispatch. A response/confirmation failure
+exits nonzero and retains an uncertain outcome plus a final read-only snapshot
+when available. An earlier input operation with unconfirmed release blocks
+recovery until a normal client restart; mapped movement controls must also be
+released. This command does not clear keys on the user's behalf.
 
 Run all verification:
 

@@ -58,3 +58,33 @@ test('matrix preflight rejects a dead owner while leaving read-only snapshots us
   assert.throws(() => assertLivingTestOwner(snapshot(), expectedSave), /explicit native respawn/);
   assertLivingTestOwner(snapshot(20), expectedSave);
 });
+
+test('persist the attempted request before dispatch, and retain a final snapshot on transport error', async () => {
+  const context = fixture([snapshot()]);let lastSaved;
+  context.request = async () => { assert.equal(lastSaved.attempted, true); throw new Error('transport failed'); };
+  await assert.rejects(respawnNativeOwner(context, { onObservation: value => { lastSaved = structuredClone(value); } }), error => {
+    assert.equal(error.message, 'transport failed');
+    assert.equal(error.observed.outcome, 'uncertain');
+    assert.equal(error.observed.afterError.players[0].health, 0);
+    return true;
+  });
+});
+
+test('the public CLI exits nonzero on refused recovery and retains the failed report', async () => {
+  const http = require('node:http'), fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+  const { execFile } = require('node:child_process');
+  const calls = [], directory = fs.mkdtempSync(path.join(os.tmpdir(), 'native-respawn-cli-'));
+  const reportFile = path.join(directory, 'refused.json');
+  const server = http.createServer((request, response) => {
+    calls.push(request.url);response.setHeader('content-type', 'application/json');response.end(JSON.stringify({ ok: true, ...snapshot(20) }));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const result = await new Promise(resolve => execFile(process.execPath, [path.join(__dirname, 'bridge-cli.js'), 'respawn',
+      '--port', String(server.address().port), '--expected-save', expectedSave, '--player-uuid', playerUuid, '--report-file', reportFile],
+      { timeout: 10000 }, (error, stdout, stderr) => resolve({ error, stdout, stderr })));
+    assert.equal(result.error?.code, 1);assert.equal(JSON.parse(result.stdout).ok, false);
+    const report = JSON.parse(fs.readFileSync(reportFile, 'utf8'));assert.equal(report.ok, false);
+    assert.match(report.cases[0].error, /dead owner/);assert(calls.every(route => route === '/state'));
+  } finally { await new Promise(resolve => server.close(resolve));fs.rmSync(directory, { recursive: true }); }
+});
