@@ -141,7 +141,8 @@ function vehicleCases({ prepare, command, request, state, entity, advance, base,
           // the pet still; the real boat ticks and attempts automatic boarding.
           await command(`data merge entity ${fixture.petUuid} {NoAI:1b}`);
           await command('tick unfreeze');
-          inspect(await advance(80), 'past-vanilla-cooldown');
+          const waiting = inspect(await advance(80), 'past-vanilla-cooldown');
+          check(!waiting.vehicle, 'Mushroom boarded before the controlled contact challenge');
           await command('tick freeze');
           const carrier = (await state()).players[0].nearbyEntities.find(e => e.uuid === fixture.vehicleUuid);
           check(carrier, 'Reboarding challenge lost its original boat');
