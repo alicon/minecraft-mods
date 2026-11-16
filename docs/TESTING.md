@@ -79,6 +79,8 @@ Run Mushroom's headless Minecraft GameTests:
 
 Fetch GameTests cover active flight steering, interruption returning to normal following, toy returns from below a platform, fractional owner heights, landing during chase/return, airborne return across native save/load, and shoreline path endpoints within pickup reach. Flight fixtures run the real fetch goal, flight controller, and native collision movement in server order. Live terrain cases additionally exercise full entity ticks, all three toys, and independent survival/creative walking/creative flying owner states.
 
+Crafting GameTests load every Mushroom recipe and check exact output/count through both native recipe matching and the crafting menu. Vanilla lime/yellow wool and modern copper-nugget controls protect the recipes that previously overlapped the mod. The 1.21.1 build converts modern ingredient strings to the older object schema from the same source definitions; native crafting runs in CI for both targets.
+
 Water GameTests check clearing existing sleep/pose on entering water, refusing new wet sleep/sit requests, refusing airborne or overhanging-edge sleep/nap until supported landing, retaining sleep on thin dog beds/slabs and the supported doghouse visual bed, resuming dry nighttime sleep, preventing synthetic fall accumulation during supported doghouse sleep without protecting an awake falling pet, requiring the low-bed approach path to end on the bed rather than adjacent floor, and reaching a dry bank with the grounded creative recovery controller and native collision movement. Night recovery controls keep the sheltered routine quiet while wet or airborne, preserve daytime/outdoor trips and daily limits, and exercise doghouse priority and dusk cancellation. The live water group adds full entity ticks, day/night, hunger, real wet interactions, and creative naps triggered by actual block placement.
 
 GameTests boot a scripted Minecraft server from the CLI. They are slower than unit tests, so keep them focused on behavior that needs a real world, entity registry, or server tick loop.
@@ -333,7 +335,7 @@ Mushroom the Yorkie:
 - [ ] Yorkie Harness can be put on and removed by the owner without losing the item.
 - [ ] A tamed, following Mushroom can catch a nearby surface structure scent, show kid-readable follow/lost/found messages, come back when the player loses him, lead close enough to stay visible, and celebrate at the destination.
 - [ ] In creative mode, a tamed Mushroom does not start structure scenting, but still follows, sits, accepts treats, and uses creative flying support.
-- [ ] Copper can craft a Dog Bowl; Dog Bowl plus Yorkie Treat creates a Dog Food Bowl; Dog Bowl plus Water Bucket creates a Dog Water Bowl.
+- [ ] Three copper ingots in a V shape craft a Dog Bowl; Dog Bowl plus Yorkie Treat creates a Dog Food Bowl; Dog Bowl plus Water Bucket creates a Dog Water Bowl.
 - [ ] Mushroom eats one placed Dog Food Bowl per Minecraft day, drinks one placed Dog Water Bowl per Minecraft day, and each filled bowl becomes an empty Dog Bowl.
 - [ ] Owner can feed Mushroom normal edible player food, and his food bar improves.
 - [ ] Mushroom's food bar drains while following and drains much more slowly while sitting.

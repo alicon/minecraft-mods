@@ -3,7 +3,8 @@
 	"category": "misc",
 	"ingredients": [
 		"minecraft:white_wool",
-		"minecraft:lime_dye"
+		"minecraft:lime_dye",
+		"minecraft:string"
 	],
 	"result": {
 		"count": 1,

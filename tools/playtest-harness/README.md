@@ -382,3 +382,26 @@ HARNESS_AUTH=microsoft HARNESS_USERNAME=you@example.com
 ```
 
 Mineflayer caches Microsoft auth tokens locally after the first login.
+
+## Live crafting checks
+
+```shell
+node tools/playtest-harness/src/bridge-cli.js yorkie-crafting \
+  --expected-save 'Mushroom Abel Noelle 20261115-075437' \
+  --report-file build/playtest-reports/yorkie-crafting.json
+```
+
+This guarded, read-only suite checks all nine mod recipes, vanilla copper nuggets and dyed wool,
+empty input, and rejected malformed/unknown-item grids. It records the native selected output,
+quantity and every matching recipe, so a mod craft cannot silently overlap another recipe.
+Vanilla controls also reject any matching Mushroom recipe, even when the selected output is vanilla.
+Reports are saved incrementally, including failed checks. This command does not replace items,
+change the player's inventory, reset pets, or apply post-run care.
+
+The bridge's `POST /crafting-check` accepts integer `width`/`height` from 1 to 3 and `slots` in
+row order, with one namespaced item ID or null per slot. Each occupied slot represents one item.
+For example, a bowl uses `{"width":3,"height":2,"slots":["minecraft:copper_ingot",null,"minecraft:copper_ingot",null,"minecraft:copper_ingot",null]}`.
+The response reports `mode: read_only_recipe_resolution`, `matched`, `selectedRecipe`, `result`
+and `matchingRecipes`. A rejected grid returns `ok:false` with an error. This queries loaded
+server recipes; it does not open a UI or consume inventory ingredients. Separate headless native
+tests verify actual crafting-menu output on both Minecraft targets.
