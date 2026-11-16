@@ -13,8 +13,25 @@ test('native contact hop can settle before a smooth climb', () => {
   route.assertSmooth(60);
 });
 
+test('walking across a raised platform is approach travel until actual tree contact', () => {
+  const route = new ClimbRouteObservation(20, { x: 10, z: 0 });
+  for (let x = 0; x < 9; x++) route.sample({ x, y: 21, z: 0 });
+  assert.equal(route.started, false);
+  for (const y of [20, 20.6, 21.2, 20.6, 23.8]) route.sample({ x: 9.31, y, z: 0 });
+  route.assertSmooth(90);
+  assert(route.distance < 2);
+});
+
+test('a half-block rise just off a trunk corner begins climb observation', () => {
+  const route = new ClimbRouteObservation(20, { x: 10, z: 0 });
+  route.sample({ x: 10.8, y: 20.6, z: 0.8 });
+  assert.equal(route.started, true);
+  route.sample({ x: 10.7, y: 24, z: 0.7 });
+  route.assertSmooth(60);
+});
+
 test('eventual successful ascent does not hide a circling route', () => {
-  const route = new ClimbRouteObservation(20);
+  const route = new ClimbRouteObservation(20, { x: 0.5, z: 0.5 });
   for (const [x, z] of [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]) route.sample({ x, y: 21, z });
   route.sample({ x: 0, y: 24, z: 0 });
   assert.throws(() => route.assertSmooth(60), /circled/);
@@ -49,7 +66,7 @@ test('all eight live starts remain distinct and skip pet inspection care', () =>
 });
 
 // Synthetic transport controls verify failure handling, not squirrel physics.
-for (const fault of ['health', 'missing', 'tick-skip', 'unfrozen', 'timeout', 'none']) {
+for (const fault of ['health', 'missing', 'tick-skip', 'unfrozen', 'timeout', 'wrong-tree', 'none']) {
   test(`live squirrel runner preserves evidence and unfreezes after ${fault}`, async () => {
     let clock = 0, frozen = false;
     const context = {
@@ -71,13 +88,18 @@ for (const fault of ['health', 'missing', 'tick-skip', 'unfrozen', 'timeout', 'n
         }] }]
       })
     };
-    const report = await runCases([squirrelRouteCases(context)[0]], {});
+    const row = squirrelRouteCases(context)[0];
+    if (fault === 'wrong-tree') {
+      const setup = row.setup;
+      row.setup = async () => ({ ...await setup(), expectedTree: { x: 100, z: 100 } });
+    }
+    const report = await runCases([row], {});
     assert.equal(frozen, false);
     assert.equal(report.complete, true);
     assert.equal(report.cases[0].status, fault === 'none' ? 'passed' : 'failed');
     const observed = report.cases[0].observed;
     assert.equal(observed.fixture.uuid, 'original');
-    assert.equal(observed.trace.length, fault === 'timeout' ? 400 : fault === 'none' ? 40 : 1);
+    assert.equal(observed.trace.length, fault === 'timeout' ? 400 : ['none', 'wrong-tree'].includes(fault) ? 40 : 1);
     if (fault !== 'none') assert(report.cases[0].error);
   });
 }
