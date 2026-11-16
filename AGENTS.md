@@ -32,6 +32,10 @@ Each checkpoint should make continuation possible without the chat:
 
 Use verified account attribution for agent-authored issue bodies and comments.
 Do not close an issue merely because a session ends or a partial pass succeeds.
+In pull request descriptions, avoid closing keywords next to unresolved issue
+references, including negated phrases such as "does not resolve #123". GitHub
+still treats those as closing links. Check the PR's closing-issue references
+before merging and verify the intended issue states afterward.
 
 ## Safe live testing
 

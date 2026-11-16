@@ -3438,6 +3438,7 @@ function printBridgeUsage() {
 
 Actions:
   health, state, quit (--expected-save <copied save>), smoke, chat, command, look, give, summon, teleport
+	  respawn (--expected-save <copied save>, --player-uuid <original owner UUID>)
 	  player-abilities, use-entity, clear-entities
 	  set-block-near-entity, set-block, block, use-block, count-blocks, terrain-scan
 	  client-input (--expected-save <copied save>, --mode walk|boat|dismount, --ticks <1-100; dismount 2-5>, --forward true)
@@ -3471,6 +3472,12 @@ async function main() {
     result = await requestJson(baseUrl, '/health');
   } else if (action === 'quit') {
     result = await requestJson(baseUrl, '/quit', 'POST', { expectedSave: option(args, 'expectedSave', 'PLAYTEST_WORLD', '') });
+  } else if (action === 'respawn') {
+    result = await require('./native-respawn').runNativeRespawn(baseUrl, {
+      expectedSave: option(args, 'expectedSave', 'PLAYTEST_WORLD', ''),
+      playerUuid: option(args, 'playerUuid', 'BRIDGE_PLAYER_UUID', ''),
+      reportFile: option(args, 'reportFile', 'BRIDGE_REPORT_FILE', '')
+    });
   } else if (action === 'state') {
     result = await requestJson(baseUrl, '/state');
   } else if (action === 'smoke') {
@@ -3662,7 +3669,7 @@ async function main() {
   }
 
   // Scenario suites own atomic incremental reports, including any post-run phase.
-  if (!['yorkie-matrix', 'yorkie-crafting', 'yorkie-smoke', 'client-input', 'yorkie-squirrel-restart'].includes(action)) writeReportFile(option(args, 'reportFile', 'BRIDGE_REPORT_FILE', ''), result);
+  if (!['yorkie-matrix', 'yorkie-crafting', 'yorkie-smoke', 'client-input', 'respawn', 'yorkie-squirrel-restart'].includes(action)) writeReportFile(option(args, 'reportFile', 'BRIDGE_REPORT_FILE', ''), result);
   console.log(JSON.stringify(result, null, 2));
 }
 

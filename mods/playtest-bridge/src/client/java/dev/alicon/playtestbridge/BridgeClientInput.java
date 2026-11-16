@@ -16,6 +16,7 @@ final class BridgeClientInput {
 		Minecraft client = Minecraft.getInstance();
 		BridgeInputController controller = new BridgeInputController(new BridgeNativeInputTarget(client),
 				() -> TimeUnit.NANOSECONDS.toMillis(System.nanoTime()));
+		new BridgeClientRespawn().register(client, controller);
 		ClientTickEvents.START_CLIENT_TICK.register(ignored -> controller.startTick());
 		ClientTickEvents.END_CLIENT_TICK.register(ignored -> controller.endTick());
 		ClientLifecycleEvents.CLIENT_STOPPING.register(ignored -> controller.shutdown());

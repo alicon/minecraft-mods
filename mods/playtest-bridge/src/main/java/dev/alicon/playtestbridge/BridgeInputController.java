@@ -38,6 +38,10 @@ final class BridgeInputController {
 		return this.snapshot();
 	}
 
+	boolean isActive() {
+		return this.current != null && !this.current.complete;
+	}
+
 	void startTick() {
 		if (this.current == null || this.current.complete) return;
 		try {

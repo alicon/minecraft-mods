@@ -55,7 +55,9 @@ public final class PlaytestBridgeClient implements ClientModInitializer {
 				if (client.level == null) {
 					throw new IllegalStateException("screenshot requires a loaded client world");
 				}
-				if (resume && client.screen != null) {
+				// A failure capture must preserve a dead player's death screen.
+				boolean canResume = resume && (client.player == null || !client.player.isDeadOrDying());
+				if (canResume && client.screen != null) {
 					client.setScreen(null);
 				}
 				boolean previousHideGui = client.options.hideGui;
@@ -67,7 +69,7 @@ public final class PlaytestBridgeClient implements ClientModInitializer {
 				}
 				long delayMillis = resume ? 250L : 0L;
 				CompletableFuture.delayedExecutor(delayMillis, TimeUnit.MILLISECONDS)
-						.execute(() -> client.execute(() -> grabScreenshot(client, name, resume, hideGui, clearChat, previousHideGui, future)));
+						.execute(() -> client.execute(() -> grabScreenshot(client, name, canResume, hideGui, clearChat, previousHideGui, future)));
 			} catch (Exception exception) {
 				future.completeExceptionally(exception);
 			}

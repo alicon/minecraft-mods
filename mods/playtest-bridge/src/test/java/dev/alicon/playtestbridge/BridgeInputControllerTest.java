@@ -10,6 +10,14 @@ import org.junit.jupiter.api.Test;
 
 class BridgeInputControllerTest {
 	@Test
+	void recoveryWaitsUntilInputOwnershipIsTerminal() {
+		Fixture fixture = new Fixture();assertFalse(fixture.controller.isActive());
+		fixture.start(2);assertTrue(fixture.controller.isActive());
+		fixture.tick();fixture.tick();assertTrue(fixture.controller.isActive());
+		fixture.tick();assertFalse(fixture.controller.isActive());
+	}
+
+	@Test
 	void completesOnlyAfterTheExactBurstAndANeutralTick() {
 		Fixture fixture = new Fixture();
 		fixture.start(3);

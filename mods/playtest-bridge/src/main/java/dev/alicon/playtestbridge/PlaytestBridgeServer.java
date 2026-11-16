@@ -148,6 +148,10 @@ final class PlaytestBridgeServer {
 			} else if ("POST".equals(method) && "/screenshot".equals(path)) {
 				JsonObject body = readBody(exchange);
 				sendJson(exchange, 200, BridgeClientRequests.screenshot(body));
+			} else if ("POST".equals(method) && "/respawn".equals(path)) {
+				JsonObject body = readBody(exchange);
+				JsonObject snapshot = runOnServerThread(this::state);
+				sendJson(exchange, 200, BridgeClientRequests.respawn(snapshot, body));
 			} else if ("POST".equals(method) && "/quit".equals(path)) {
 				JsonObject body = readBody(exchange);
 				JsonObject snapshot = runOnServerThread(this::state);
@@ -180,6 +184,7 @@ final class PlaytestBridgeServer {
 	private JsonObject state() {
 		JsonObject state = this.health();
 		state.addProperty("motd", this.server.getMotd());
+		state.addProperty("hardcore", this.server.isHardcore());
 		state.addProperty("tickCount", this.server.getTickCount());
 		state.addProperty("worldFrozen", this.server.tickRateManager().isFrozen());
 		state.addProperty("overworldGameTime", Long.toString(this.server.overworld().getGameTime()));
