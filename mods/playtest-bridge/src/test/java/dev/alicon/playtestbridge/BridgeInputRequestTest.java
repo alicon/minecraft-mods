@@ -36,6 +36,55 @@ class BridgeInputRequestTest {
 		return body;
 	}
 
+	static JsonObject jumpState() {
+		JsonObject state = state(), player = state.getAsJsonArray("players").get(0).getAsJsonObject();
+		player.addProperty("health", 20);player.addProperty("onGround", true);player.addProperty("inWater", false);player.addProperty("shiftKeyDown", false);
+		JsonObject abilities = new JsonObject();
+		for (String key : new String[] {"creative", "spectator", "flying"}) abilities.addProperty(key, false);
+		player.add("abilities", abilities);
+		for (String key : new String[] {"inWaterOrBubble", "onClimbable", "hasEffects"}) player.addProperty(key, false);
+		player.addProperty("hurtTime", 0);
+		JsonObject position = new JsonObject();position.addProperty("y", 220);player.add("positionPrecise", position);
+		state.addProperty("inputObservationEndMillis", "0");
+		return state;
+	}
+
+	static JsonObject jumpBody() {
+		JsonObject body = body();body.addProperty("mode", "jump");body.addProperty("ticks", 2);body.remove("vehicleUuid");return body;
+	}
+
+	@Test
+	void jumpAllowsAShortOnFootForwardBurstButNoVehicleOrLongHold() {
+		assertEquals("jump", BridgeInputRequest.parse(jumpState(), jumpBody()).mode());
+		for (int ticks : new int[] {1, 6}) {
+			JsonObject body = jumpBody();body.addProperty("ticks", ticks);
+			assertThrows(IllegalArgumentException.class, () -> BridgeInputRequest.parse(jumpState(), body));
+		}
+		JsonObject vehicle = jumpBody();vehicle.addProperty("vehicleUuid", "00000000-0000-0000-0000-000000000001");
+		assertThrows(IllegalArgumentException.class, () -> BridgeInputRequest.parse(jumpState(), vehicle));
+	}
+
+	@Test
+	void jumpRefusesUnsupportedOrUnknownStartingPhysics() {
+		for (String fault : new String[] {"airborne", "water", "shift", "dead", "creative", "spectator", "flying", "vehicle", "unknown-ground", "unknown-mode", "hurt", "climb", "effects", "bubble", "unknown-position"}) {
+			JsonObject state = jumpState(), player = state.getAsJsonArray("players").get(0).getAsJsonObject();
+			if (fault.equals("airborne")) player.addProperty("onGround", false);
+			if (fault.equals("water")) player.addProperty("inWater", true);
+			if (fault.equals("shift")) player.addProperty("shiftKeyDown", true);
+			if (fault.equals("dead")) player.addProperty("health", 0);
+			if (java.util.Set.of("creative", "spectator", "flying").contains(fault)) player.getAsJsonObject("abilities").addProperty(fault, true);
+			if (fault.equals("vehicle")) player.add("vehicle", new JsonObject());
+			if (fault.equals("unknown-ground")) player.remove("onGround");
+			if (fault.equals("unknown-mode")) player.remove("abilities");
+			if (fault.equals("hurt")) player.addProperty("hurtTime", 10);
+			if (fault.equals("climb")) player.addProperty("onClimbable", true);
+			if (fault.equals("effects")) player.addProperty("hasEffects", true);
+			if (fault.equals("bubble")) player.addProperty("inWaterOrBubble", true);
+			if (fault.equals("unknown-position")) player.remove("positionPrecise");
+			assertThrows(IllegalArgumentException.class, () -> BridgeInputRequest.parse(state, jumpBody()).validateNewStart(), fault);
+		}
+	}
+
 	@Test
 	void boundedIdleAndDirectionalBurstsAreExplicit() {
 		assertEquals(20, BridgeInputRequest.parse(state(), body()).ticks());

@@ -21,10 +21,11 @@ final class BridgeInputController {
 	JsonObject request(BridgeInputRequest request) {
 		if (request.action().equals("start")) {
 			if (this.current != null && this.current.id.equals(request.operationId())) {
-				if (!this.current.request.equals(request)) throw new IllegalArgumentException("input operationId was reused with different controls");
+				if (!this.current.request.sameControls(request)) throw new IllegalArgumentException("input operationId was reused with different controls");
 				return this.snapshot();
 			}
 			if (this.current != null && !this.current.complete) throw new IllegalStateException("client input is already active");
+			request.validateNewStart();
 			this.target.bind(request);
 			this.current = new Operation(request, this.clock.getAsLong());
 		} else {
@@ -134,6 +135,8 @@ final class BridgeInputController {
 		result.addProperty("outcome", this.current.outcome);
 		result.addProperty("appliedClientTicks", this.current.appliedTicks);
 		result.addProperty("elapsedMillis", (this.current.complete ? this.current.finished : this.clock.getAsLong()) - this.current.started);
+		result.addProperty("startedMillis", Long.toString(this.current.started));
+		if (this.current.complete) result.addProperty("finishedMillis", Long.toString(this.current.finished));
 		result.addProperty("controlsReleased", this.current.complete ? this.current.releaseConfirmed : this.current.releaseProven);
 		result.add("request", this.current.request.describe());
 		result.add("clientFrames", this.current.frames.deepCopy());

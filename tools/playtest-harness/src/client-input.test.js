@@ -185,3 +185,109 @@ test('dismount refuses long bursts, directional movement and a missing source be
     assert.equal(f.calls.length, 0);
   }
 });
+
+function jumpFixture(options = {}) {
+  let body;
+  const calls = [];
+  const initial = { singleplayer: true, saveName: 'Codex Input Test', worldFrozen: false, overworldGameTime: '20',
+    players: [{ uuid: PLAYER, dimension: 'minecraft:overworld', health: 20, shiftKeyDown: false, onGround: true, inWater: false,
+      inWaterOrBubble: false, onClimbable: false, hasEffects: false, hurtTime: 0,
+      abilities: { creative: false, spectator: false, flying: false }, position: { x: 0, y: 220, z: 0 }, positionPrecise: { x: 0, y: 220, z: 0 }, nearbyEntities: [] }] };
+  const snapshot = rise => {
+    const s = structuredClone(initial);s.overworldGameTime = '23';
+    s.players[0].position.y += rise;s.players[0].positionPrecise.y += rise;s.players[0].onGround = rise === 0;
+    if (options.serverGrounded) s.players[0].onGround = true;
+    if (options.wrongPlayer) s.players[0].uuid = 'changed';
+    if (options.changedMode) s.players[0].abilities.creative = true;
+    if (options.frozen) s.worldFrozen = true;
+    if (options.serverEffects) s.players[0].hasEffects = true;
+    return s;
+  };
+  const receipt = (phase, outcome) => ({ operationId: body.operationId,
+    request: { ...body, jumpServerOriginY: options.badServerOrigin ? 221 : 220, jumpServerSampleMillis: '991' }, phase, outcome,
+    startedMillis: '1000', ...(phase === 'complete' ? { finishedMillis: '1150' } : {}),
+    controlsReleased: phase === 'complete', appliedClientTicks: phase === 'complete' ? 2 : 0,
+    serverSnapshot: { ...(phase === 'active' ? structuredClone(initial) : snapshot(options.noServerRise ? 0 : 0.42)),
+      ...(options.noPostStartWorldProgress ? { overworldGameTime: '23' } : {}),
+      inputObservationStartMillis: phase === 'active' ? '990' : options.lateServerJump ? '1200' : '1100',
+      inputObservationEndMillis: phase === 'active' ? '991' : options.lateServerJump ? '1201' : '1101' },
+    clientFrames: phase === 'active' ? [] : [true, true, false].map((pressed, i) => ({
+      clientPlayerTick: 100 + i, freshKeyboardSample: true, clientOnFoot: !options.remounted,
+      clientOnGround: Boolean(options.groundedRise),
+      clientSampleMillis: String(1050 + i * 50), ownedJumpPress: i < 2, clientGroundedBeforeTick: i === 0,
+      clientBeforeTickVelocityY: options.outsideImpulse ? 0.4 : -0.08, clientVelocity: { y: 0.3332 - i * 0.1 },
+      clientVerticalCollision: Boolean(options.ceiling), unsafeJumpMotion: Boolean(options.unsafeMotion),
+      clientJumpOriginY: options.missingOrigin ? undefined : 220 + (options.changedOrigin && i === 2 ? 0.1 : 0),
+      clientPlayerPosition: { x: 0, y: 220 + (options.noClientRise ? 0 : 0.42 + i * 0.2), z: 0 }, clientJumpObserved: !options.noClientRise,
+      nativeInput: { forward: true && i < 2, backward: false, left: false, right: false, jump: options.heldRelease && i === 2 || pressed && !options.noPress }
+    })) });
+  return { initial, calls, context: { expectedSave: initial.saveName, playerUuid: PLAYER,
+    state: async () => body ? snapshot(options.noServerRise || options.landed ? 0 : 0.8) : structuredClone(initial),
+    request: async (route, request) => { assert.equal(route, '/client-input');calls.push(request);
+      if (request.action === 'start') { body = request;return receipt('active', 'pending'); }
+      return receipt('complete', request.action === 'cancel' ? 'cancelled' : 'completed');
+    } } };
+}
+
+test('native jump proves press/release, owned launch and server-accepted rise, even after landing', async () => {
+  const f = jumpFixture({ landed: true });
+  const r = await driveClientInput(f.context, { mode: 'jump', ticks: 2, forward: true }, { pollMs: 0 });
+  assert(r.clientJumpHeight > 0.4 && r.serverJumpHeight > 0.4);
+  assert.equal(r.after.players[0].onGround, true);
+  assert.deepEqual(f.calls.map(c => c.action), ['start', 'status']);
+});
+
+test('jump acknowledgement cannot hide missing native press, release, rise or a changed origin', async () => {
+  for (const [option, expected] of [
+    ['noPress', /Requested controls/], ['heldRelease', /Native jump release/], ['noClientRise', /Native client upward/],
+    ['missingOrigin', /Client jump origin/], ['changedOrigin', /Client jump origin/], ['remounted', /Native jump release/],
+    ['noServerRise', /Server upward movement/], ['wrongPlayer', /Inspection player changed/], ['changedMode', /Jump changed owner mode/],
+    ['frozen', /World froze during jump observation/], ['groundedRise', /Native client upward/], ['serverGrounded', /Server upward movement/],
+    ['lateServerJump', /Server upward movement/], ['badServerOrigin', /bound request/], ['serverEffects', /Unsupported server jump physics/],
+    ['outsideImpulse', /owned grounded jump launch/], ['ceiling', /owned grounded jump launch/], ['unsafeMotion', /owned grounded jump launch/],
+    ['noPostStartWorldProgress', /Server upward movement/]
+  ]) {
+    const f = jumpFixture({ [option]: true });
+    await assert.rejects(driveClientInput(f.context, { mode: 'jump', ticks: 2, forward: true }, { pollMs: 0, timeoutMs: 500 }), error => {
+      assert.match(error.message, expected, option);
+      assert(error.observed.receipts.some(r => r.phase === 'complete' && r.outcome === 'completed'), option);
+      return true;
+    });
+    assert.equal(f.calls.at(-1).action, 'cancel');
+  }
+});
+
+test('jump refuses invalid bounds, a vehicle, unsupported owner modes and unknown ground before dispatch', async () => {
+  for (const change of [
+    (p, c) => { c.ticks = 1; }, (p, c) => { c.ticks = 6; }, (p, c) => { c.vehicleUuid = 'boat'; },
+    p => { p.vehicle = { id: 1 }; }, p => { p.onGround = false; }, p => { delete p.onGround; }, p => { p.inWater = true; },
+    p => { p.shiftKeyDown = true; }, p => { p.health = 0; }, p => { p.abilities.creative = true; },
+    p => { p.abilities.flying = true; }, p => { delete p.positionPrecise; }
+  ]) {
+    const f = jumpFixture(), controls = { mode: 'jump', ticks: 2, forward: true };change(f.initial.players[0], controls);
+    await assert.rejects(driveClientInput(f.context, controls));assert.equal(f.calls.length, 0);
+  }
+});
+
+test('the public jump CLI defaults to two ticks and records owned launch and accepted-motion evidence', async () => {
+  const http = require('node:http'), fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+  const { execFile } = require('node:child_process'), f = jumpFixture();
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'native-jump-cli-')), reportFile = path.join(directory, 'jump.json');
+  const server = http.createServer(async (request, response) => {
+    try {
+      let body = '';for await (const chunk of request) body += chunk;
+      const result = request.url === '/state' ? await f.context.state() : await f.context.request(request.url, JSON.parse(body));
+      response.setHeader('content-type', 'application/json');response.end(JSON.stringify({ ok: true, ...result }));
+    } catch (error) { response.statusCode = 500;response.end(JSON.stringify({ ok: false, error: error.message })); }
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const result = await new Promise(resolve => execFile(process.execPath, [path.join(__dirname, 'bridge-cli.js'), 'client-input', '--mode', 'jump',
+      '--forward', 'true', '--port', String(server.address().port), '--expected-save', f.context.expectedSave, '--report-file', reportFile],
+      { timeout: 10000 }, (error, stdout, stderr) => resolve({ error, stdout, stderr })));
+    assert.ifError(result.error);assert.equal(JSON.parse(result.stdout).ok, true);
+    assert.equal(f.calls[0].ticks, 2);
+    const evidence = JSON.parse(fs.readFileSync(reportFile, 'utf8')).cases[0].observed;
+    assert(evidence.clientJumpHeight > 0.4 && evidence.serverJumpHeight > 0.4);
+  } finally { await new Promise(resolve => server.close(resolve));fs.rmSync(directory, { recursive: true }); }
+});

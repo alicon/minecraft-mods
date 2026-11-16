@@ -3,6 +3,7 @@ package dev.alicon.playtestbridge;
 import com.google.gson.JsonObject;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 /** Client requests stay separate from world mutations and validate before dispatch. */
 final class BridgeClientRequests {
@@ -41,6 +42,15 @@ final class BridgeClientRequests {
 			future.cancel(false);
 			throw failure;
 		}
+	}
+
+	// The route invokes this supplier on the server thread; both threads share nanoTime.
+	static JsonObject captureInputState(Supplier<JsonObject> stateProvider) {
+		long started = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+		JsonObject snapshot = stateProvider.get();
+		snapshot.addProperty("inputObservationStartMillis", Long.toString(started));
+		snapshot.addProperty("inputObservationEndMillis", Long.toString(TimeUnit.NANOSECONDS.toMillis(System.nanoTime())));
+		return snapshot;
 	}
 
 	static String validateQuit(JsonObject state, JsonObject body) {

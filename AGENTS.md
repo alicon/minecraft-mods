@@ -46,6 +46,10 @@ save failure evidence, and distinguish setup failures from behavior assertions.
 Run the relevant automated tests and repository checks. Record any unrun checks.
 Java changes require rebuilding, installing the jars, and restarting Minecraft;
 a passing old client does not validate new code.
+Freeze the copied world's mob ticks after an investigative failure before lengthy
+code or review work, so the fixture does not keep aging. Players can still tick
+while the world is frozen: verify the owner's health and position, and explicitly
+resume world ticks before the next native-input test. Preserve the failed report.
 
 ## Gradle run isolation
 
