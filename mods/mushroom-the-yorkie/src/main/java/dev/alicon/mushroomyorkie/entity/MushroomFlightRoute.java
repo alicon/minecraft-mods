@@ -133,11 +133,8 @@ final class MushroomFlightRoute {
 	}
 
 	private boolean clearAscentApproach(Vec3 candidate, double rise) {
-		Vec3 delta = candidate.subtract(this.yorkie.position());
-		AABB box = this.yorkie.getBoundingBox();
 		// The swept boxes are conservative: both the approach and full vertical column must be empty.
-		return this.yorkie.level().noCollision(this.yorkie, box.expandTowards(delta))
-				&& this.yorkie.level().noCollision(this.yorkie, box.move(delta).expandTowards(0, rise, 0));
+		return MushroomClearAscent.canReach(this.yorkie, candidate, rise);
 	}
 
 	@Override

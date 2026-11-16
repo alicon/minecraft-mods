@@ -20,6 +20,38 @@ final class VehicleScenarios {
 		run(helper, vehicleType, true);
 	}
 
+	static void dismountStopsStaleSteering(GameTestHelper helper, EntityType<?>... vehicleTypes) {
+		var owner = SurvivalGameTestPlayers.createWithoutToyCleanup(helper);
+		try {
+			for (EntityType<?> type : vehicleTypes) {
+				MushroomYorkieEntity yorkie = helper.spawn(ModEntities.MUSHROOM_YORKIE, 3, 2, 3);
+				Entity vehicle = helper.spawn(type, 3, 2, 3);
+				try {
+					yorkie.claimFor(owner);
+					yorkie.setMushroomOrderedToSit(true);
+					helper.assertTrue(yorkie.startRiding(vehicle), "Stale-steering fixture could not mount");
+					// A native movement intent queued before leaving the seat must not
+					// carry the explicit sitter back off its new landing place.
+					yorkie.getMoveControl().setWantedPosition(yorkie.getX() - 2, yorkie.getY(), yorkie.getZ(), 1.25D);
+					yorkie.setDeltaMovement(-0.1D, 0.0D, 0.0D);
+					yorkie.dismountForOwner();
+					helper.assertTrue(!yorkie.isPassenger() && yorkie.isOrderedToSit(), "Help changed the sit order or retained its passenger");
+					helper.assertTrue(yorkie.getDeltaMovement().horizontalDistanceSqr() < 1.0E-8D,
+							"Owner dismount retained old vehicle movement for " + type);
+					helper.assertTrue(Math.abs(yorkie.getMoveControl().getWantedX() - yorkie.getX()) < 0.01D,
+							"Owner dismount retained old walking steering for " + type);
+				} finally {
+					yorkie.discard();
+					vehicle.discard();
+				}
+			}
+			helper.succeed();
+		} finally {
+			helper.getLevel().getServer().getPlayerList().remove(owner);
+			owner.discard();
+		}
+	}
+
 	private static void run(GameTestHelper helper, EntityType<?> vehicleType, boolean flight) {
 		for (int x = 0; x <= 6; x++) {
 			for (int z = 0; z <= 6; z++) {

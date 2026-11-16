@@ -1,0 +1,86 @@
+package dev.alicon.mushroomyorkie.entity;
+
+import net.minecraft.world.phys.Vec3;
+
+/** Swims around blocked headroom before resuming ordinary survival-owner following. */
+final class MushroomWaterEscape {
+	private static final double CLEAR_RISE_BLOCKS = 1.0D;
+	private static final double SEARCH_RADIUS_BLOCKS = 3.0D;
+	private static final double SEARCH_STEP_BLOCKS = 0.25D;
+	private static final double SWIM_SPEED_BLOCKS_PER_TICK = 0.12D;
+	private static final double ASCENT_SPEED_BLOCKS_PER_TICK = 0.08D;
+	private static final int REPLAN_TICKS = 10;
+	// Native contact can overlap by floating-point epsilon at a bank/boat edge.
+	// This is planning tolerance only; actual movement keeps full native collision.
+	private static final double CONTACT_TOLERANCE_BLOCKS = 0.0001D;
+	private final MushroomYorkieEntity yorkie;
+	private Vec3 approach;
+	private int nextPlanTick;
+	private boolean escaping;
+
+	MushroomWaterEscape(MushroomYorkieEntity yorkie) {
+		this.yorkie = yorkie;
+	}
+
+	void tick() {
+		if (!this.yorkie.isInWater() || this.yorkie.isPassenger() || MushroomYorkieStateQueries.ownerIsCreative(this.yorkie)) {
+			this.approach = null;
+			this.escaping = false;
+			return;
+		}
+		boolean clearAbove = this.canReach(this.yorkie.position());
+		if (clearAbove && !this.escaping) {
+			return;
+		}
+		if (this.approach != null) {
+			this.approach = new Vec3(this.approach.x, this.yorkie.getY(), this.approach.z);
+		}
+		if (!clearAbove && (this.approach == null || !this.canReach(this.approach))) {
+			this.approach = null;
+			if (this.yorkie.tickCount < this.nextPlanTick) {
+				return;
+			}
+			this.nextPlanTick = this.yorkie.tickCount + REPLAN_TICKS;
+			this.approach = this.findApproach();
+		}
+		if (!clearAbove && this.approach == null) {
+			return;
+		}
+		this.escaping = true;
+		this.yorkie.getNavigation().stop();
+		Vec3 velocity = this.yorkie.getDeltaMovement();
+		if (clearAbove) {
+			// Stay in the clear column until surfacing; immediately following the
+			// owner again would send the swimmer back beneath the same obstruction.
+			this.yorkie.setDeltaMovement(0, Math.max(velocity.y, ASCENT_SPEED_BLOCKS_PER_TICK), 0);
+		} else {
+			Vec3 direction = this.approach.subtract(this.yorkie.position()).multiply(1, 0, 1).normalize();
+			this.yorkie.setDeltaMovement(direction.x * SWIM_SPEED_BLOCKS_PER_TICK, velocity.y,
+					direction.z * SWIM_SPEED_BLOCKS_PER_TICK);
+		}
+	}
+
+	private Vec3 findApproach() {
+		for (double radius = SEARCH_STEP_BLOCKS; radius <= SEARCH_RADIUS_BLOCKS; radius += SEARCH_STEP_BLOCKS) {
+			for (int direction = 0; direction < 8; direction++) {
+				double angle = direction * Math.PI / 4;
+				Vec3 candidate = this.yorkie.position().add(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+				if (this.canReach(candidate)) {
+					return candidate;
+				}
+			}
+		}
+		return null;
+	}
+
+	private boolean canReach(Vec3 point) {
+		return MushroomClearAscent.canReach(this.yorkie, this.yorkie.getBoundingBox().deflate(CONTACT_TOLERANCE_BLOCKS), point, CLEAR_RISE_BLOCKS);
+	}
+
+	@Override
+	public String toString() {
+		return "escaping=" + this.escaping + ", approach=" + this.approach + ", velocity=" + this.yorkie.getDeltaMovement()
+				+ ", bodyClear=" + this.yorkie.level().noCollision(this.yorkie, this.yorkie.getBoundingBox())
+				+ ", ownerCreative=" + MushroomYorkieStateQueries.ownerIsCreative(this.yorkie);
+	}
+}

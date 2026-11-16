@@ -9,6 +9,7 @@ final class MushroomYorkieServerAi {
 	static void tick(MushroomYorkieEntity yorkie, ServerLevel level) {
 		MushroomSittingPose.preventWaterRest(yorkie);
 		MushroomFlightController.followFlyingOwner(yorkie);
+		yorkie.waterEscape.tick();
 		yorkie.creativeRecoveryFlight.tick();
 		MushroomOwnerContactHandler.tick(yorkie, level);
 		MushroomNightBehavior.tick(yorkie, level);

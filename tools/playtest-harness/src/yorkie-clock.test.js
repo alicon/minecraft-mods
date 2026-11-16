@@ -28,3 +28,11 @@ test('invalid or rejected clock evidence stops before issuing a tick mutation', 
     assert.deepEqual(commands, ['time query gametime']);
   }
 });
+
+test('rejected tick commands cannot be passed by an otherwise advancing world', async () => {
+  let queries = 0;
+  await assert.rejects(advanceWorldTicks(async text => text.startsWith('time')
+    ? { success: true, result: ++queries } : { success: false, result: 0 },
+  async () => { throw Error('Must not read completion state'); }, 1, 'step'), /tick request failed/);
+  assert.equal(queries, 1);
+});

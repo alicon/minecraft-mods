@@ -21,7 +21,8 @@ async function advanceWorldTicks(command, state, ticks, mode, { timeoutMs = 2000
   assert(['step', 'sprint'].includes(mode), 'Invalid native tick mode');
   assert(Number.isInteger(ticks) && ticks > 0 && ticks < GAME_TIME_MODULUS, 'Invalid native tick count');
   const before = await readWorldTime(command);
-  await command(`tick ${mode} ${ticks}t`);
+  const requested = await command(`tick ${mode} ${ticks}t`);
+  assert(requested.success === true, 'Native tick request failed');
   const started = Date.now(), deadline = started + timeoutMs;
   do {
     const after = await readWorldTime(command);

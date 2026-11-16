@@ -97,6 +97,11 @@ boats, genuinely submerged carts/boats, and bubble-column danger. Dry passengers
 retain their sit order; real water hazards still release it. Non-fetch vehicle
 owners use the shared player fixture without deleting neighboring fetch toys.
 This improves isolation without claiming the older intermittent throw setup is fixed.
+Boat-bank escape controls compare a swimmer trapped beneath a boat with the same
+clear bank without a boat, using full native ticks and real air/health. Native
+dismount controls also seed old movement/steering and require owner help to clear
+it for boats, chest boats and carts. Live dock sequences separately check the
+complete landing and settling behavior.
 
 Vehicle GameTests reproduce owner-assisted and creative-flight reboarding in boats
 and minecarts on both targets. They prove the grace period, retained sit order,
@@ -245,12 +250,11 @@ command-rejection, and save-safety regression tests. These tests also run in CI.
 Gameplay assertions still need the live Minecraft client and bridge. Matrix
 sprints and vehicle frozen steps wait on native gametime, not the server counter
 that keeps increasing during a frozen world. Clock-wrap and stalled-world controls
-run in the Node suite; snapshots include a tickAudit for completed waits. Successful
-journey interactions also verify actual supported owner placement and ordinary
+run in the Node suite; snapshots include a tickAudit for completed waits. Journey
+interactions also verify actual supported owner placement and ordinary
 interaction reach. The bridge's decimal-coordinate teleport avoids native integer
 coordinate auto-centering; invalid placement/reach is a setup failure.
-Successful
-matrix runs persist their original case observations before separately feeding
+Successful matrix runs persist their original case observations before separately feeding
 and healing the same tagged pet for inspection. The postRun record is maintenance,
 not gameplay evidence; its failure cannot turn a case failure into a pass. Failed
 or interrupted runs never receive this care.

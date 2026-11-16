@@ -6,6 +6,18 @@ import net.minecraft.world.entity.EntityType;
 
 /** Version-specific registration for water passenger rest controls. */
 public final class VehicleWaterRestGameTests {
+	/** A swimmer must get around a floating boat to reach its owner's bank. */
+	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 200)
+	public void boatBankSwimmerEscapes(GameTestHelper helper) {
+		BoatBankEscapeScenarios.escapeBank(helper, EntityType.BOAT);
+	}
+
+	/** The same bank remains reachable when no boat blocks the surface. */
+	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 200)
+	public void clearBankSwimmerEscapes(GameTestHelper helper) {
+		BoatBankEscapeScenarios.escapeBank(helper, null);
+	}
+
 	/** Dry floating boat passengers retain their explicit sit order. */
 	@GameTest(template = "fabric-gametest-api-v1:empty", timeoutTicks = 40)
 	public void floatingBoatKeepsSit(GameTestHelper helper) {

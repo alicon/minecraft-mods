@@ -82,8 +82,8 @@ function journeyCases(context) {
         check(pet.uuid === fixture.petUuid && pet.tameable.ownedByPlayer, 'Journey lost the original owned pet');
         check(pet.health === pet.maxHealth, 'Journey damaged Mushroom');
         check(pet.custom.harness, 'Journey lost the harness');
-        const clock = afterDismount && !pet.vehicle && (wet(frame) || orderState.firstWetClock !== undefined)
-          ? snapshot.tickAudit?.after ?? await readWorldTime(command) : undefined;
+        const clock = snapshot.tickAudit?.after ?? await readWorldTime(command);
+        frame.worldClock = clock;
         orderState = advanceJourneyOrder(orderState, { orderedToSit: pet.tameable.orderedToSit,
           mounted: Boolean(pet.vehicle), wet: wet(frame), afterDismount, clock });
         observed.wetOrderRelease = orderState.firstWetClock !== undefined;
@@ -154,14 +154,21 @@ function journeyCases(context) {
             // under its former sitting passenger creates real native immersion.
             await request('/teleport', { player, x: base.x + 6, y: base.y, z: base.z + 0.5 });
             const beforeDeparture = vehicleIn(await state()).position;
-            observed.departureMotion = await command(`data merge entity ${fixture.vehicleUuid} {Motion:[0.4d,0.0d,0.0d]}`);
+            // A downward bob separates the supporting hull from the pet's feet
+            // before horizontal travel. The east-bank obstruction stays in play.
+            observed.departureMotion = await command(`data merge entity ${fixture.vehicleUuid} {Motion:[0.4d,-0.08d,0.0d]}`);
             for (let tick = 1; tick <= 24; tick++) {
               await observe(await frozenStep(1), `offshore-immersion-${tick}`, { afterDismount: true });
             }
             const afterDeparture = vehicleIn(await state()).position;
             observed.emptyBoatDisplacement = Math.hypot(afterDeparture.x - beforeDeparture.x, afterDeparture.z - beforeDeparture.z);
-            check(observed.emptyBoatDisplacement >= 1, 'Empty boat did not actually move away from its former passenger');
-            check(observed.wetOrderRelease && observed.trace.some(frame => frame.pet.inWater), 'Offshore control did not observe genuine pet immersion and order release');
+            if (observed.emptyBoatDisplacement < 1) {
+              const error = new Error('Empty boat did not actually move away from its former passenger');
+              error.phase = 'setup';
+              throw error;
+            }
+            check(observed.wetOrderRelease && observed.trace.some(frame => frame.pet.inWater && !frame.pet.vehicle && !frame.pet.tameable.orderedToSit),
+              'Offshore control did not observe genuine pet immersion and order release');
           }
         } else {
           observed.flightSetup = [];
@@ -174,6 +181,7 @@ function journeyCases(context) {
           await command('tick unfreeze');
           for (let ticks = 5; ticks <= 60; ticks += 5) {
             const pet = await observe(await advance(5), `flying-${ticks}`, { flying: true, afterDismount: true });
+            check(!pet.custom.curledUpSleeping, 'Journey pet slept through owner takeoff');
             check(!pet.vehicle && pet.noGravity === !pet.tameable.orderedToSit, 'Journey takeoff did not respect flight or the wet safety transition');
             if (orderState.expectedSit && ticks >= 20) check(pet.onGround, 'Dry sitting pet did not settle after boat/cart dismount');
           }

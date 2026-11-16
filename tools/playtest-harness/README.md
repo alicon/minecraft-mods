@@ -235,14 +235,18 @@ Boat bank-exit cases have a real dock doorway, a controlled shore-facing passeng
 yaw, and an owner standing clear of the exit. They do not claim an offshore sit
 order should make a dog walk off its safe boat platform. Offshore controls
 explicitly move the empty boat away after dismount, witness actual water entry,
-then require safe return and released sitting.
+then require safe return and released sitting. Departure includes a small native
+downward bob before drifting toward the bank; a boat that never actually departs
+is a setup failure. The bank obstruction remains part of the recovery challenge.
 It combines day/night, hunger and sit/follow states, preserves native named cargo,
 and checks safe grounded recovery after dismount. Dry passengers retain their
 order; a witnessed wet dismount releases sitting for water safety. Fine-grained
 post-dismount samples distinguish that safety transition from an unwanted order
 change aboard a dry boat. The ejection frame may still retain sit because native
 water safety runs before flight dismount; the next witnessed world tick must
-release it. All matrix sprint waits and vehicle frozen-step waits now use native
+release it. Native world-clock evidence from an immediately preceding frame is required for that
+one-tick allowance; a first wet sample after a larger gap must already be released.
+All matrix sprint waits and vehicle frozen-step waits use native
 gametime, with modulo-wrap handling and tickAudit records. The server counter is
 not a physics clock while frozen. The shared vehicle fixture, flight setup and mounted
 care checks are reused by both groups. These controlled /ride mounts and injected
