@@ -95,7 +95,7 @@ async function driveClientInput(context, controls, { timeoutMs = 20000, pollMs =
           await sleep(pollMs);
           reply = await call('status');
         }
-        assert(reply.controlsReleased === true, 'Native input cleanup was not confirmed');
+        assert(reply.phase === 'complete' && reply.controlsReleased === true, 'Native input cleanup did not complete with confirmed release');
         observed.cleanup = reply;
       } catch (error) { observed.cleanupError = error.message; }
     }

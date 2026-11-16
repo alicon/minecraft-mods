@@ -4,8 +4,8 @@ const assert = require('node:assert/strict');
 const { driveClientInput } = require('./client-input');
 const PLAYER = '494f67d1-2009-4c26-bfcb-c41a89adaf80';
 
-function fixture({ lostStart = false, unchangedWorld = false, wrongNativeInput = false, neverFinishes = false, frozen = false, wrongReceipt = false, cachedInput = false } = {}) {
-  let reads = 0, body;
+function fixture({ lostStart = false, unchangedWorld = false, wrongNativeInput = false, neverFinishes = false, frozen = false, wrongReceipt = false, cachedInput = false, stalledCleanup = false } = {}) {
+  let reads = 0, body, cancelled = false;
   const calls = [];
   function state() {
     const after = reads++ > 0;
@@ -30,7 +30,11 @@ function fixture({ lostStart = false, unchangedWorld = false, wrongNativeInput =
         if (wrongReceipt) reply.operationId = 'another-operation';
         return reply;
       }
-      if (request.action === 'cancel') return receipt('complete', 'cancelled');
+      if (request.action === 'cancel') cancelled = true;
+      if (cancelled) {
+        const reply = receipt(stalledCleanup ? 'releasing' : 'complete', 'cancelled');
+        reply.controlsReleased = true;return reply;
+      }
       return neverFinishes ? receipt('active', 'pending') : receipt('complete', 'completed');
     } };
   return { context, calls };
@@ -66,6 +70,15 @@ test('timeout preserves the failed observations and verifies cancellation', asyn
   const f = fixture({ neverFinishes: true });
   await assert.rejects(driveClientInput(f.context, { mode: 'walk', ticks: 3, forward: true }, { timeoutMs: 0 }), error => {
     assert.match(error.message, /bounded wait/);assert.equal(error.observed.cleanup.controlsReleased, true);return true;
+  });
+});
+
+test('cleared keys without a completed cleanup phase cannot be claimed as confirmed cleanup', async () => {
+  const f = fixture({ stalledCleanup: true });
+  await assert.rejects(driveClientInput(f.context, { mode: 'walk', ticks: 3, forward: true }, { timeoutMs: 0, pollMs: 25 }), error => {
+    assert.match(error.message, /bounded wait/);
+    assert.match(error.observed.cleanupError, /did not complete/);
+    assert.equal(error.observed.cleanup, undefined);return true;
   });
 });
 

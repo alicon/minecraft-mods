@@ -21,6 +21,8 @@ class BridgeInputControllerTest {
 		assertEquals("completed", fixture.status().get("outcome").getAsString());
 		assertTrue(fixture.status().get("controlsReleased").getAsBoolean());
 		assertEquals(4, fixture.status().getAsJsonArray("clientFrames").size());
+		assertTrue(fixture.target.forces.stream().noneMatch(Boolean::booleanValue),
+				"Normal completion must wait for native neutral input rather than forcing its cached record");
 		fixture.tick();
 		assertEquals(3, fixture.target.applied);
 	}
@@ -132,12 +134,13 @@ class BridgeInputControllerTest {
 	private static final class FakeTarget implements BridgeInputController.Target {
 		private boolean held, failSample, ignoreRelease;
 		private int applied;
+		private final java.util.List<Boolean> forces = new java.util.ArrayList<>();
 		private String invalid;
 
 		@Override public void bind(BridgeInputRequest request) { this.invalid = null; }
 		@Override public String invalidContext() { return this.invalid; }
 		@Override public void apply(BridgeInputRequest request) { this.held = true;this.applied++; }
-		@Override public void release(boolean forceCachedInput) { if (!this.ignoreRelease) this.held = false; }
+		@Override public void release(boolean forceCachedInput) { this.forces.add(forceCachedInput);if (!this.ignoreRelease) this.held = false; }
 		@Override public boolean neutral() { return !this.held; }
 		@Override public JsonObject sample() {
 			if (this.failSample) throw new IllegalStateException("synthetic adapter failure");
