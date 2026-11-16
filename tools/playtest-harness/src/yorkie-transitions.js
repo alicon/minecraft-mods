@@ -3,7 +3,8 @@
 const { FETCH_TOYS } = require('./yorkie-inputs');
 
 // Additional sequences share the matrix's disposable-save guard and fresh fixtures.
-function transitionCases({ prepare, command, request, state, entity, advance, base, player, selector, check }) {
+function transitionCases(context) {
+  const { prepare, command, request, state, entity, advance, base, player, selector, check } = context;
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const rows = [];
   const toys = (snapshot, item) => snapshot.players[0].nearbyEntities.filter((candidate) => candidate.type === 'minecraft:item' && candidate.item?.id === item);
@@ -128,44 +129,7 @@ function transitionCases({ prepare, command, request, state, entity, advance, ba
       return { snapshot, bowl };
     }
   });
-  const treeFace = { time: 1000, shelter: 'outside', hunger: 10, sitting: false, flying: false };
-  rows.push({
-    name: 'squirrel-clear-tree-face', inspectionPet: false, inputs: treeFace,
-    setup: async () => {
-      await prepare(treeFace);
-      await request('/clear-entities', { type: 'mushroom_yorkie:mushroom_yorkie' });
-      await request('/clear-entities', { type: 'mushroom_yorkie:squirrel' });
-      await command(`fill ${base.x + 3} ${base.y} ${base.z + 3} ${base.x + 3} ${base.y + 4} ${base.z + 3} minecraft:oak_log`);
-      await command(`setblock ${base.x + 3} ${base.y + 2} ${base.z + 2} minecraft:oak_leaves[persistent=true]`);
-      await command(`summon mushroom_yorkie:squirrel ${base.x + 3.5} ${base.y} ${base.z + 0.5} {NoAI:1b,PersistenceRequired:1b}`);
-      const squirrel = (await state()).players[0].nearbyEntities.find(e => e.type === 'mushroom_yorkie:squirrel');
-      check(squirrel, 'Fresh squirrel fixture is not observable');
-      return { uuid: squirrel.uuid };
-    },
-    run: async (fixture, result, save) => {
-      await command('data merge entity @e[type=mushroom_yorkie:squirrel,limit=1] {NoAI:0b}');
-      const observed = result.observed = { fixture, trace: [] };
-      const find = snapshot => snapshot.players[0].nearbyEntities.find(e => e.uuid === fixture.uuid);
-      let completed;
-      for (let ticks = 20; ticks <= 400; ticks += 20) {
-        const snapshot = await advance(20), squirrel = find(snapshot);
-        observed.trace.push({ ticks, snapshot, squirrel });
-        save();
-        check(squirrel && squirrel.health === squirrel.maxHealth, 'Tree approach lost or damaged the original squirrel');
-        if (squirrel.custom.foundTree && squirrel.position.y >= base.y + 3.8) {
-          observed.completedAtTicks = ticks;
-          completed = snapshot;
-          break;
-        }
-      }
-      check(completed, 'Squirrel did not finish a safe clear-face climb within 400 ticks');
-      observed.settled = await advance(40);
-      const clinging = find(observed.settled);
-      check(clinging?.custom.foundTree && clinging.noGravity && clinging.health === clinging.maxHealth
-        && clinging.position.y >= base.y + 3.8, 'Squirrel did not remain safely clinging after the clear-face climb');
-      return observed;
-    }
-  });
+  rows.push(...require('./yorkie-squirrel-routes').squirrelRouteCases(context));
   return rows;
 }
 

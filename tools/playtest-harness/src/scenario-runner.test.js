@@ -97,8 +97,8 @@ test('actual bridge CLI exits unsuccessfully when Minecraft rejects command synt
 test('transition suite covers each fetch toy interrupted by both sit and sleep', () => {
   const { transitionCases } = require('./yorkie-transitions');
   const cases = transitionCases({});
-  assert.equal(cases.length, 13);
-  assert.equal(new Set(cases.map((scenario) => scenario.name)).size, 13);
+  assert.equal(cases.length, 20);
+  assert.equal(new Set(cases.map((scenario) => scenario.name)).size, 20);
   assert.equal(cases.filter((scenario) => /^fetch-(sit|sleep)-/.test(scenario.name)).length, 6);
   assert.equal(cases.filter((scenario) => scenario.name.startsWith('fetch-owner-mode-')).length, 3);
   assert.equal(cases.filter((scenario) => scenario.name.startsWith('sleep-flight-')).length, 2);
