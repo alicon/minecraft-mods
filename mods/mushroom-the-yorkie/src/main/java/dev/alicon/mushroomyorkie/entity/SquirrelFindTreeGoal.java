@@ -77,7 +77,7 @@ final class SquirrelFindTreeGoal extends Goal {
 
 	@Override
 	public boolean canContinueToUse() {
-		return this.treePos != null
+		boolean valid = this.treePos != null
 				&& !this.approachFailed
 				&& (this.climbing || this.approachTicks < MAX_APPROACH_TICKS)
 				&& this.approachPos != null
@@ -85,6 +85,16 @@ final class SquirrelFindTreeGoal extends Goal {
 				&& this.squirrel.level().getBlockState(this.treePos).is(BlockTags.LOGS)
 				&& this.squirrel.level().getBlockState(this.climbPos).is(BlockTags.LOGS)
 				&& isStandable(this.squirrel.level(), this.approachPos);
+		if (!valid) return false;
+		// A new branch/block can close the selected face after ground navigation
+		// hands off. Release the ascent instead of pressing into it indefinitely.
+		// An established perch need not fall because terrain below it changed.
+		if (this.climbing && !this.squirrel.hasFoundTree()
+				&& !this.climbPos.equals(findClimbTarget(this.squirrel.level(), this.treePos, this.approachPos))) {
+			this.nextSearchTick = 0;
+			return false;
+		}
+		return true;
 	}
 
 	@Override
