@@ -3440,6 +3440,7 @@ Actions:
   health, state, quit (--expected-save <copied save>), smoke, chat, command, look, give, summon, teleport
 	  player-abilities, use-entity, clear-entities
 	  set-block-near-entity, set-block, block, use-block, count-blocks, terrain-scan
+	  client-input (--expected-save <copied save>, --mode walk|boat, --ticks <1-100>, --forward true)
 	  yorkie-matrix (--expected-save <copied save>), yorkie-smoke, yorkie-water-smoke, yorkie-adventure-smoke, yorkie-home-squirrel, yorkie-visual-sweep, yorkie-biome-scout, yorkie-natural-gallery
 	  cops-smoke, cops-structures-smoke, cops-visual-sweep, screenshot
 
@@ -3601,6 +3602,16 @@ async function main() {
     putOptional(body, 'radius', optionNumber(args, 'radius', 'BRIDGE_RADIUS', 48));
     putOptional(body, 'step', optionNumber(args, 'step', 'BRIDGE_STEP', 8));
     result = await requestJson(baseUrl, '/terrain-scan', 'POST', body);
+  } else if (action === 'client-input') {
+    result = await require('./native-input-runner').runNativeInput(baseUrl, {
+      expectedSave: option(args, 'expectedSave', 'PLAYTEST_WORLD', ''),
+      mode: option(args, 'mode', 'BRIDGE_INPUT_MODE', 'walk'),
+      ticks: optionNumber(args, 'ticks', 'BRIDGE_INPUT_TICKS', 20),
+      vehicleUuid: option(args, 'vehicleUuid', 'BRIDGE_VEHICLE_UUID', ''),
+      ...Object.fromEntries(['forward', 'backward', 'left', 'right'].map(key => [key, optionBoolean(args, key, `BRIDGE_INPUT_${key.toUpperCase()}`, false)])),
+      reportFile: option(args, 'reportFile', 'BRIDGE_REPORT_FILE', '')
+    });
+    if (!result.ok) process.exitCode = 1;
   } else if (action === 'yorkie-crafting') {
     result = await require('./yorkie-crafting').runCraftingChecks(baseUrl, args);
     if (!result.ok) process.exitCode = 1;
@@ -3641,7 +3652,7 @@ async function main() {
   }
 
   // Scenario suites own atomic incremental reports, including any post-run phase.
-  if (!['yorkie-matrix', 'yorkie-crafting', 'yorkie-smoke'].includes(action)) writeReportFile(option(args, 'reportFile', 'BRIDGE_REPORT_FILE', ''), result);
+  if (!['yorkie-matrix', 'yorkie-crafting', 'yorkie-smoke', 'client-input'].includes(action)) writeReportFile(option(args, 'reportFile', 'BRIDGE_REPORT_FILE', ''), result);
   console.log(JSON.stringify(result, null, 2));
 }
 

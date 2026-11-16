@@ -6,6 +6,7 @@ import java.util.concurrent.CompletableFuture;
 final class BridgeClientHooks {
 	private static volatile ScreenshotProvider screenshotProvider;
 	private static volatile QuitProvider quitProvider;
+	private static volatile InputProvider inputProvider;
 
 	private BridgeClientHooks() {
 	}
@@ -34,6 +35,22 @@ final class BridgeClientHooks {
 			return CompletableFuture.failedFuture(new IllegalStateException("quit provider is available only in a Minecraft client"));
 		}
 		return provider.quit(expectedSave);
+	}
+
+	static void registerInputProvider(InputProvider provider) {
+		inputProvider = provider;
+	}
+
+	static CompletableFuture<JsonObject> input(BridgeInputRequest request) {
+		InputProvider provider = inputProvider;
+		return provider == null
+				? CompletableFuture.failedFuture(new IllegalStateException("input provider requires a Minecraft client"))
+				: provider.input(request);
+	}
+
+	@FunctionalInterface
+	interface InputProvider {
+		CompletableFuture<JsonObject> input(BridgeInputRequest request);
 	}
 
 	@FunctionalInterface
