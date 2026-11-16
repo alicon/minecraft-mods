@@ -6,6 +6,18 @@ import net.minecraft.world.entity.EntityType;
 
 /** Version-specific registration for water passenger rest controls. */
 public final class VehicleWaterRestGameTests {
+	/** A breathing idle input stays exempt even beyond the twenty-tick stall gate. */
+	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 200)
+	public void pinnedBreathingIdleDoesNotEscape(GameTestHelper helper) {
+		WaterEscapeControllerScenarios.breathingIdleDoesNotEscape(helper);
+	}
+
+	/** Explicit oscillating position input cannot keep controller ownership forever. */
+	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 200)
+	public void pinnedOscillationReleasesEscape(GameTestHelper helper) {
+		WaterEscapeControllerScenarios.episodeReleasesDespiteOscillatingPositions(helper, EntityType.BOAT);
+	}
+
 	/** Stalled automatic creative flight can hand control to a physical water escape. */
 	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 450)
 	public void farCreativeBoatBankSwimmerEscapes(GameTestHelper helper) {

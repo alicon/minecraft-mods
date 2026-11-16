@@ -52,9 +52,10 @@ final class MushroomWaterEscape {
 			return;
 		}
 		if (!this.escaping && this.stalledTicks < STALLED_TICKS) {
+			this.attempts.clearRoute();
 			return;
 		}
-		if (!this.attempts.continueEpisode(this.yorkie.tickCount)) {
+		if (this.escaping && !this.attempts.continueEpisode(this.yorkie.tickCount)) {
 			this.escaping = false;
 			this.approach = null;
 			this.stalledTicks = 0;
@@ -85,10 +86,16 @@ final class MushroomWaterEscape {
 		if (!clearAbove && this.approach == null) {
 			return;
 		}
-		this.escaping = true;
+		if (!this.escaping) {
+			if (!this.attempts.continueEpisode(this.yorkie.tickCount)) return;
+			this.progressAnchor = this.yorkie.position();
+			this.stalledTicks = 0;
+			this.escaping = true;
+		}
 		Vec3 velocity = this.yorkie.getDeltaMovement();
 		MushroomMovement.stop(this.yorkie);
 		if (clearAbove) {
+			this.approach = null;
 			// Stay in the clear column until surfacing; immediately following the
 			// owner again would send the swimmer back beneath the same obstruction.
 			this.yorkie.setDeltaMovement(0, Math.max(velocity.y, ASCENT_SPEED_BLOCKS_PER_TICK), 0);

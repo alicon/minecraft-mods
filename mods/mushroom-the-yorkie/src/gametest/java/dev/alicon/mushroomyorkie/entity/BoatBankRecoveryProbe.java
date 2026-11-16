@@ -82,7 +82,7 @@ final class BoatBankRecoveryProbe {
 
 	private boolean complete() {
 		BlockPos underfoot = BlockPos.containing(this.yorkie.getX(), this.yorkie.getY() - 0.05D, this.yorkie.getZ());
-		return !this.yorkie.isInWater() && this.yorkie.onGround() && !this.yorkie.isNoGravity()
+		return !this.yorkie.isPassenger() && !this.yorkie.isInWater() && this.yorkie.onGround() && !this.yorkie.isNoGravity()
 				&& !this.yorkie.level().getBlockState(underfoot).getCollisionShape(this.yorkie.level(), underfoot).isEmpty()
 				&& this.yorkie.getY() >= this.helper.absoluteVec(new Vec3(0, 4, 0)).y
 				&& this.yorkie.distanceToSqr(this.owner) < 4.0D && this.yorkie.getAirSupply() == this.yorkie.getMaxAirSupply();

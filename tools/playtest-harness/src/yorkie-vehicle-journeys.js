@@ -94,17 +94,33 @@ function journeyCases(context) {
       }
       const before = await state();
       await observe(before, 'mounted-before-travel', { mounted: true });
-      observed.motionRequest = await command(`data merge entity ${fixture.vehicleUuid} {Motion:[${inputs.layout === 'rail' ? '0.16' : inputs.offshore ? '0.3' : '0.4'}d,0.0d,0.0d]}`);
+      observed.motionRequests = [];
+      async function drive(ticks) {
+        const reply = await command(`data merge entity ${fixture.vehicleUuid} {Motion:[${inputs.layout === 'rail' ? '0.16' : inputs.offshore ? '0.3' : '0.4'}d,0.0d,0.0d]}`);
+        observed.motionRequests.push({ ticks, reply });
+        save();
+      }
+      await drive(0);
       await command('tick unfreeze');
       const start = vehicleIn(before).position;
       let last;
       for (let ticks = 5; ticks <= 30; ticks += 5) {
         last = await advance(5);
         await observe(last, `travel-${ticks}`, { mounted: true });
+        const current = vehicleIn(last).position;
+        const distance = Math.hypot(current.x - start.x, current.z - start.z);
+        // A single impulse can expire while a newly spawned boat settles into
+        // the water. Drive this controlled fixture for a bounded 30 ticks;
+        // never accept short travel or imply that these inputs are rowing.
+        if (distance < 2 && ticks < 30) await drive(ticks);
       }
       const traveled = vehicleIn(last);
       observed.displacement = Math.hypot(traveled.position.x - start.x, traveled.position.z - start.z);
-      check(observed.displacement >= 2, 'Vehicle did not actually travel at least two blocks');
+      if (observed.displacement < 2) {
+        const error = new Error('Vehicle did not actually travel at least two blocks');
+        error.phase = 'setup';
+        throw error;
+      }
       if (inputs.layout === 'water') {
         check(traveled.position.y > base.y - 0.8 && traveled.position.y < base.y + 0.2, 'Boat was not floating at the contained water surface');
       } else {

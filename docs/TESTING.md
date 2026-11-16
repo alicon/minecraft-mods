@@ -117,6 +117,14 @@ far creative fixture keeps its owner well ashore so normal boarding restoration
 after the ten-second grace does not confound the recovery observation. Boat
 support alone does not satisfy the bank check; the feet need block support.
 
+Two separate NoAI, no-gravity, position-pinned controls test the controller's
+boundaries. A wet pet with breathing eyes stays idle beneath a deck for 45 ticks,
+beyond the stall gate. A submerged pet alternates between two positions to keep
+resetting progress, yet must release escape after 80 ticks and remain inactive
+through the 40-tick cooldown. Native fluid flags are established before invoking
+the controller. These artificial inputs do not prove free-swimming recovery;
+the boat-bank and surface-following tests above provide that separate evidence.
+
 Vehicle GameTests reproduce owner-assisted and creative-flight reboarding in boats
 and minecarts on both targets. They prove the grace period, retained sit order,
 refusal while the owner is flying, and restoration of normal boarding after
@@ -268,6 +276,9 @@ run in the Node suite; snapshots include a tickAudit for completed waits. Journe
 interactions also verify actual supported owner placement and ordinary
 interaction reach. The bridge's decimal-coordinate teleport avoids native integer
 coordinate auto-centering; invalid placement/reach is a setup failure.
+Vehicle journeys record bounded motion requests during their 30-tick travel
+setup and require two blocks of actual movement before the owner action. Short
+travel is a setup failure, even when the movement command succeeded.
 The clear-tree-face squirrel sequence samples progress up to 400 ticks, checks
 the original healthy squirrel reaches the safe height, then requires 40 more
 ticks of stable clinging. A single sample at 120 ticks can miss a valid slower
