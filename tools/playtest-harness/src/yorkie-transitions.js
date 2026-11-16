@@ -133,6 +133,7 @@ function transitionCases(context) {
   rows.push(...require('./yorkie-squirrel-reachability').squirrelReachabilityCases(context));
   rows.push(...require('./yorkie-squirrel-reachability').squirrelStepCases(context));
   rows.push(...require('./yorkie-squirrel-interruptions').squirrelInterruptionCases(context));
+  rows.push(...require('./yorkie-squirrel-knockback').squirrelKnockbackCases(context));
   return rows;
 }
 

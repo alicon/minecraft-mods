@@ -182,7 +182,7 @@ The 144 base cases combine four times (day, dusk, night, dawn), three shelter ty
 and three owner states (survival walking, creative walking, creative flying). Each fresh-pet fixture checks sleep, orders,
 gravity, health, need bounds, and the transition back to daylight and landing.
 Each fixture verifies the owner mode and flight flags. The suite does not claim
-every state transition. 30 additional sequences interrupt carried fetches with sit/sleep (bone, ball,
+every state transition. 34 additional sequences interrupt carried fetches with sit/sleep (bone, ball,
 chew toy) exercise sleep-to-flight-to-sleep transitions at two hunger levels, and verify
 that a starving pet eats an available nighttime meal and settles back to sleep.
 Three fetch cases switch from survival pickup to grounded creative delivery and
@@ -223,7 +223,7 @@ observed airborne approach ticks and the intended tree, and stage the owner
 outside new solid blocks. The observer starts counting climbing travel near the
 expected trunk, so crossing the raised strip cannot masquerade as circling.
 
-Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, the water/rest group adds 22, and sleep-spot controls add eight, making 266 cases before vehicle coverage. The vehicle group adds 100 cases; the journeys group adds 112, for 478 total. Run one group with `--group base`,
+Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, the water/rest group adds 22, and sleep-spot controls add eight, making 270 cases before vehicle coverage. The vehicle group adds 100 cases; the journeys group adds 112, for 482 total. Run one group with `--group base`,
 `--group transitions`, `--group terrain`, `--group outdoors`, `--group water`, `--group rest`, `--group vehicles`, or `--group journeys`; combine it with an exact `--case`.
 Unknown groups/cases fail instead of running a different suite.
 
@@ -609,3 +609,17 @@ one of the two supporting log blocks instead and requires released no-gravity,
 observed height loss and native fall-distance accumulation within 20 ticks.
 The latter permits ordinary fall damage; it does not heal the squirrel. Native
 controls compare the same two support changes both before and after reload.
+
+The four `squirrel-hurt-*` transition cases cover climbing/perched squirrels
+and two attack-source directions. A creative flying owner supplies a controlled
+native `player_attack` damage command from within ordinary reach and a clear
+authored line of sight. This is not a client mouse attack. The original full-AI
+squirrel must receive native momentum, actually move within ten native ticks,
+release climbing and regain a stable perch within 400 ticks. Ordinary observed
+landing damage is retained for perched hits; unrelated damage, healing, missing
+identity, skipped ticks and unexpected position jumps fail. Every trace is saved
+before assertions and cleanup unfreezes the world. No squirrel care runs.
+
+Entity snapshots now include server-side `velocity` in blocks per native tick,
+rounded to two decimals like positions. This read-only field exposes supplied
+momentum separately from actual displacement; it does not itself prove movement.

@@ -47,6 +47,11 @@ final class SquirrelFindTreeGoal extends Goal {
 	@Override
 	public boolean canUse() {
 		this.recoveredCling = false;
+		if (this.squirrel.hurtTime > 0) {
+			// A saved perch cannot suppress an in-progress native damage reaction.
+			if (!this.squirrel.hasFoundTree()) this.squirrel.setNoGravity(false);
+			return false;
+		}
 		// Native NoGravity survives saving but the selected goal does not. A
 		// physically intact perch can be reclaimed without a fall/re-approach.
 		if (this.squirrel.isNoGravity() && !this.squirrel.hasFoundTree()) {
@@ -77,6 +82,10 @@ final class SquirrelFindTreeGoal extends Goal {
 
 	@Override
 	public boolean canContinueToUse() {
+		if (this.squirrel.hurtTime > 0) {
+			this.nextSearchTick = 0;
+			return false;
+		}
 		if (this.climbing && this.squirrel.hasFoundTree()) {
 			// Holding and recovering a perch use the same physical support rule;
 			// an obsolete run-up anchor cannot change the outcome after a reload.
@@ -138,14 +147,27 @@ final class SquirrelFindTreeGoal extends Goal {
 		this.approachPos = null;
 		this.climbPos = null;
 		this.climbing = false;
+		this.releaseClimbingPhysics();
+		this.squirrel.getNavigation().stop();
+	}
+
+	private void releaseClimbingPhysics() {
 		this.squirrel.setFoundTree(false);
 		this.squirrel.setTreeClimbing(false);
 		this.squirrel.setNoGravity(false);
-		this.squirrel.getNavigation().stop();
 	}
 
 	@Override
 	public void tick() {
+		if (this.squirrel.hurtTime > 0) {
+			// Goal cleanup is not scheduled on every entity tick. Release now,
+			// before cling steering can overwrite the hit's real momentum.
+			this.approachFailed = true;
+			this.nextSearchTick = 0;
+			this.releaseClimbingPhysics();
+			this.squirrel.getNavigation().stop();
+			return;
+		}
 		this.squirrel.getLookControl().setLookAt(
 				this.climbPos.getX() + 0.5D,
 				this.climbPos.getY() + 0.5D,

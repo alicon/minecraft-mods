@@ -266,7 +266,7 @@ Set `BRIDGE_REPORT_FILE=build/playtest-reports/<name>.json` to save the full bri
 ## State-combination testing
 
 The [Mushroom state matrix](../tools/playtest-harness/README.md#mushroom-state-matrix)
-checks 144 combinations, 36 interruption/owner-mode/flight/feeding/tree-approach sequences, 36 terrain cases, 20 outdoor-care sequences, 22 water/rest sequences, eight sleep-spot controls, 100 dry vehicle cases (96 full-entity sequences plus four controlled boarding-refusal challenges), and 112 controlled water/rail journeys (including 16 actual offshore immersion controls) in a disposable live world and preserves partial failure
+checks 144 combinations, 40 interruption/owner-mode/flight/feeding/tree-approach sequences, 36 terrain cases, 20 outdoor-care sequences, 22 water/rest sequences, eight sleep-spot controls, 100 dry vehicle cases (96 full-entity sequences plus four controlled boarding-refusal challenges), and 112 controlled water/rail journeys (including 16 actual offshore immersion controls) in a disposable live world and preserves partial failure
 reports. Run `npm --prefix tools/playtest-harness test` for the harness's runner,
 command-rejection, and save-safety regression tests. These tests also run in CI.
 Gameplay assertions still need the live Minecraft client and bridge. Matrix
@@ -332,9 +332,7 @@ attacks require empty-hand charge, actual reach/line of sight, damage and recove
 The synthetic player fixture drives native player doTick once per world tick;
 the squirrel uses full normal entity ticks. Separate controls keep an ascent
 when its canopy opens or already-passed face changes, and retain a perched
-squirrel when terrain below it changes. These assertions prove recovery,
-not normal knockback displacement while perched: retained traces show cling
-steering can cancel that impulse, still tracked in GitHub #67.
+squirrel when terrain below it changes. The attack assertions require a supplied native impulse and actual horizontal movement by ten ticks. A declared 16-block arena keeps the impulse away from the small template boundaries. Perched hits may take only observed native landing damage; unrelated damage or healing fails. Two controls save/load immediately after a real hit, preserving the hurt timer, momentum and original UUID. Four live command-driven hurt controls separately check both directions during ascent and while perched, including native velocity evidence, safe source reach, full normal AI, real falling and bounded re-clinging. These are controlled native damage commands, not client mouse attacks.
 Successful matrix runs persist their original case observations before separately feeding
 and healing the same tagged pet for inspection. The postRun record is maintenance,
 not gameplay evidence; its failure cannot turn a case failure into a pass. Failed

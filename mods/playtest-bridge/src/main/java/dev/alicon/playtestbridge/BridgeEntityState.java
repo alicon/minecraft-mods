@@ -80,6 +80,7 @@ final class BridgeEntityState {
 		state.addProperty("inWater", entity.isInWater());
 		state.addProperty("onGround", entity.onGround());
 		state.add("position", position(entity.position()));
+		state.add("velocity", position(entity.getDeltaMovement()));
 		if (entity.getVehicle() != null) {
 			state.add("vehicle", entityRef(entity.getVehicle()));
 		}
