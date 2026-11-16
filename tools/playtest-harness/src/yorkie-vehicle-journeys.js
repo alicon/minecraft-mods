@@ -109,8 +109,8 @@ function journeyCases(context) {
         await observe(last, `travel-${ticks}`, { mounted: true });
         const current = vehicleIn(last).position;
         const distance = Math.hypot(current.x - start.x, current.z - start.z);
-        // A single impulse can expire while a newly spawned boat settles into
-        // the water. Drive this controlled fixture for a bounded 30 ticks;
+        // A single initial impulse was observed to stop short. Drive this
+        // controlled fixture for a bounded 30 ticks;
         // never accept short travel or imply that these inputs are rowing.
         if (distance < 2 && ticks < 30) await drive(ticks);
       }

@@ -231,9 +231,9 @@ controls, and 32
 rail-minecart sequences. Each proves a real native passenger, injects motion
 for at most 30 ticks and requires at least two blocks of observed native movement before
 owner help, creative takeoff/landing, or mounted survival feeding/harness changes.
-Every motion request is recorded. A fresh boat's initial impulse can expire as
-it settles, so the fixture reapplies motion at five-tick samples until two blocks
-are observed. Short travel remains a setup failure; command success alone does
+Every motion request is recorded. A single initial impulse was observed to stop
+short, so the fixture reapplies motion at five-tick samples until two blocks
+are observed. The original short-travel cause is unconfirmed. Short travel remains a setup failure; command success alone does
 not establish movement. These inputs do not simulate player rowing.
 Boat bank-exit cases have a real dock doorway, a controlled shore-facing passenger
 yaw, and an owner standing clear of the exit. They do not claim an offshore sit
