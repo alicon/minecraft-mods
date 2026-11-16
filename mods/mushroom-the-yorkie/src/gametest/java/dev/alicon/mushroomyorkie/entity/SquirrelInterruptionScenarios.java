@@ -5,6 +5,7 @@ import static dev.alicon.mushroomyorkie.entity.SquirrelTraceReports.point;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.nio.file.Path;
+import java.util.function.UnaryOperator;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.Blocks;
@@ -35,9 +36,14 @@ final class SquirrelInterruptionScenarios {
 		new Probe(helper, false, false, true, 2).start();
 	}
 
+	static void savedAttack(GameTestHelper helper, UnaryOperator<SquirrelEntity> roundTrip, boolean south) {
+		new Probe(helper, true, south, false, 0, roundTrip).start();
+	}
+
 	private static final class Probe {
 		private final GameTestHelper helper;
-		private final SquirrelEntity squirrel;
+		private SquirrelEntity squirrel;
+		private final UnaryOperator<SquirrelEntity> roundTrip;
 		private final ServerPlayer attacker;
 		private final boolean perched, south, closeFace;
 		private final int terrainVariant;
@@ -47,35 +53,55 @@ final class SquirrelInterruptionScenarios {
 		private final Vec3 origin;
 		private int ticks, stableTicks, interruptedAt = -1, recoveredAt = -1;
 		private float postAttackHealth;
+		private Vec3 attackPosition;
+		private Vec3 attackDirection;
+		private double largestAttackDisplacement;
+		private double earlyAwayDisplacement;
+		private double largestFallDistance;
+		private boolean normalFallObserved;
+		private float previousHealth, fallHealthLoss, minimumHealth = Float.MAX_VALUE;
 
 		Probe(GameTestHelper helper, boolean perched, boolean south, boolean closeFace) {
 			this(helper, perched, south, closeFace, 0);
 		}
 
 		Probe(GameTestHelper helper, boolean perched, boolean south, boolean closeFace, int terrainVariant) {
+			this(helper, perched, south, closeFace, terrainVariant, null);
+		}
+
+		Probe(GameTestHelper helper, boolean perched, boolean south, boolean closeFace, int terrainVariant, UnaryOperator<SquirrelEntity> roundTrip) {
 			this.helper = helper;
+			this.roundTrip = roundTrip;
 			this.perched = perched;
 			this.south = south;
 			this.closeFace = closeFace;
 			this.terrainVariant = terrainVariant;
-			this.origin = helper.absoluteVec(Vec3.ZERO);
-			for (int x = 0; x <= 7; x++) {
-				for (int z = 0; z <= 7; z++) helper.setBlock(x, 0, z, Blocks.STONE);
+			int offset = closeFace ? 0 : 4;
+			this.origin = helper.absoluteVec(new Vec3(offset, 0, offset));
+			int floorMax = closeFace ? 7 : 15;
+			if (!closeFace) {
+				var corner = helper.absoluteVec(new Vec3(15.9D, 1, 15.9D));
+				var bounds = helper.getBounds();
+				helper.assertTrue(corner.x < bounds.maxX && corner.z < bounds.maxZ, "Attack fixture requires the declared 16-block arena");
 			}
-			for (int y = 1; y <= 5; y++) helper.setBlock(4, y, 4, Blocks.OAK_LOG);
+			for (int x = 0; x <= floorMax; x++) {
+				for (int z = 0; z <= floorMax; z++) helper.setBlock(x, 0, z, Blocks.STONE);
+			}
+			for (int y = 1; y <= 5; y++) helper.setBlock(4 + offset, y, 4 + offset, Blocks.OAK_LOG);
 			if (terrainVariant == 1) helper.setBlock(3, 4, 4, Blocks.STONE);
-			this.squirrel = helper.spawn(ModEntities.SQUIRREL, 1, 1, 4);
+			this.squirrel = helper.spawn(ModEntities.SQUIRREL, 1 + offset, 1, 4 + offset);
 			GameTestSeeds.apply(this.squirrel, "interruption-" + perched + "-" + south + "-" + closeFace);
 			this.attacker = closeFace ? null : SurvivalGameTestPlayers.createWithoutToyCleanup(helper);
 			if (this.attacker != null) {
 				// This stationary player is only the attack source. The squirrel is never pinned.
-				this.attacker.setPos(helper.absoluteVec(new Vec3(3.0D, perched ? 3.0D : 1.0D, south ? 6.0D : 3.0D)));
+				this.attacker.setPos(this.origin.add(3.0D, perched ? 3.0D : 1.0D, south ? 6.0D : 3.0D));
 			}
 			String directory = System.getenv("MUSHROOM_SQUIRREL_TRACE_DIR");
 			this.output = directory == null ? null : Path.of(directory, "native-interruption-" + perched + "-" + south
 					+ "-" + closeFace + "-variant" + terrainVariant + "-" + this.squirrel.getUUID() + ".json");
 			this.report.addProperty("entityUuid", this.squirrel.getUUID().toString());
 			this.report.addProperty("perched", perched);
+			this.report.addProperty("nativeLoadImmediatelyAfterHit", roundTrip != null);
 			this.report.addProperty("southAttack", south);
 			this.report.addProperty("closeFace", closeFace);
 			this.report.addProperty("terrainVariant", terrainVariant);
@@ -92,6 +118,7 @@ final class SquirrelInterruptionScenarios {
 				// The embedded test connection has no client movement packets to drive doTick.
 				// Advance the synthetic attack source through native player logic once per world tick.
 				if (this.attacker != null) this.attacker.doTick();
+				this.minimumHealth = Math.min(this.minimumHealth, this.squirrel.getHealth());
 				this.frames.add(this.frame());
 				this.helper.assertTrue(this.squirrel.isAlive(), "Interrupted squirrel died");
 				if (this.interruptedAt < 0) {
@@ -102,7 +129,31 @@ final class SquirrelInterruptionScenarios {
 					this.stableTicks = ready ? this.stableTicks + 1 : 0;
 					if (this.stableTicks >= (this.perched ? 40 : 1)) this.interrupt();
 				} else {
-					this.helper.assertTrue(this.squirrel.getHealth() == (this.closeFace ? this.squirrel.getMaxHealth() : this.postAttackHealth),
+					if (this.attacker != null) {
+						int sinceHit = this.ticks - this.interruptedAt;
+						if (sinceHit == 1) this.helper.assertTrue(!this.squirrel.onClimbable()
+								&& !this.squirrel.isNoGravity() && !this.squirrel.hasFoundTree(), "Hit did not release climbing on the first native tick");
+						if (sinceHit <= 2) this.earlyAwayDisplacement = Math.max(this.earlyAwayDisplacement,
+								this.squirrel.position().subtract(this.attackPosition).dot(this.attackDirection));
+						if (sinceHit == 2) this.helper.assertTrue(this.earlyAwayDisplacement > 0.05D,
+								"Native hit did not immediately move away from its attacker");
+						this.largestAttackDisplacement = Math.max(this.largestAttackDisplacement, Math.hypot(
+								this.squirrel.getX() - this.attackPosition.x, this.squirrel.getZ() - this.attackPosition.z));
+						if (this.ticks - this.interruptedAt >= 10) this.helper.assertTrue(this.largestAttackDisplacement > 0.1D,
+								"Native attack impulse was cancelled before physical displacement");
+					}
+					this.normalFallObserved |= !this.squirrel.isNoGravity() && this.squirrel.getDeltaMovement().y < -0.2D;
+					this.largestFallDistance = Math.max(this.largestFallDistance, this.squirrel.fallDistance);
+					if (this.perched && !this.closeFace) {
+						this.helper.assertTrue(this.squirrel.getHealth() <= this.previousHealth, "Attack recovery gained health");
+						if (this.squirrel.getHealth() < this.previousHealth) {
+							var damage = this.squirrel.getLastDamageSource();
+							this.helper.assertTrue(this.normalFallObserved && this.squirrel.onGround() && damage != null && damage.getMsgId().equals("fall"),
+									"Attack recovery took damage other than an observed native landing");
+							this.fallHealthLoss += this.previousHealth - this.squirrel.getHealth();
+						}
+						this.previousHealth = this.squirrel.getHealth();
+					} else this.helper.assertTrue(this.squirrel.getHealth() == (this.closeFace ? this.squirrel.getMaxHealth() : this.postAttackHealth),
 							"Interruption recovery took additional damage");
 					boolean recovered = this.squirrel.hasFoundTree() && this.squirrel.isNoGravity()
 							&& this.squirrel.getY() >= this.origin.y + (this.terrainVariant == 1 ? 2.8D : 4.8D);
@@ -111,6 +162,9 @@ final class SquirrelInterruptionScenarios {
 					this.stableTicks = recovered ? this.stableTicks + 1 : 0;
 					if (recovered && this.recoveredAt < 0) this.recoveredAt = this.ticks;
 					if (this.stableTicks >= 40) {
+						if (this.perched && !this.closeFace) this.helper.assertTrue(this.normalFallObserved && this.largestFallDistance >= 3.0F,
+								"Perched hit never accumulated ordinary native fall distance");
+						if (this.roundTrip != null) this.helper.assertTrue(this.fallHealthLoss > 0, "Saved hit suppressed its expected native landing damage");
 						this.helper.assertTrue(Math.hypot(this.squirrel.getX() - this.origin.x - 4.5D,
 								this.squirrel.getZ() - this.origin.z - 4.5D) < 1.5D, "Squirrel recovered on an unrelated tree");
 						this.save(true);
@@ -157,15 +211,32 @@ final class SquirrelInterruptionScenarios {
 				this.attacker.setYRot((float) Math.toDegrees(Math.atan2(-direction.x, direction.z)));
 				this.attacker.setSprinting(true);
 				float before = this.squirrel.getHealth();
+				this.helper.assertTrue(this.squirrel.onClimbable(), "Attack target is not actually climbing or perched");
+				Vec3 beforeVelocity = this.squirrel.getDeltaMovement();
+				this.attackPosition = this.squirrel.position();
+				this.attackDirection = new Vec3(direction.x, 0, direction.z).normalize();
 				this.report.addProperty("attackStrength", this.attacker.getAttackStrengthScale(0));
 				this.report.addProperty("attackerNativeTick", this.attacker.tickCount);
 				this.attacker.attack(this.squirrel);
 				this.postAttackHealth = this.squirrel.getHealth();
+				this.previousHealth = this.postAttackHealth;
+				this.helper.assertTrue(this.squirrel.getDeltaMovement().subtract(beforeVelocity).dot(this.attackDirection) > 0.1D
+						&& this.squirrel.hurtTime > 0 && this.squirrel.getLastDamageSource().getMsgId().equals("player"), "Native hit did not supply new attacker-directed momentum");
+				this.helper.assertTrue(Math.hypot(this.squirrel.getDeltaMovement().x, this.squirrel.getDeltaMovement().z) > 0.1D,
+						"Native sprint attack did not supply a horizontal impulse");
 				this.helper.assertTrue(this.postAttackHealth < before, "Native attack caused no damage");
 				this.report.addProperty("attackHealthLoss", before - this.postAttackHealth);
 				this.report.add("attackerPosition", point(this.attacker.position().subtract(this.origin)));
 			}
 			this.report.add("afterInterruption", this.frame());
+			if (this.roundTrip != null) {
+				var uuid = this.squirrel.getUUID();
+				this.squirrel = this.roundTrip.apply(this.squirrel);
+				this.helper.assertTrue(uuid.equals(this.squirrel.getUUID()) && this.squirrel.getHealth() == this.postAttackHealth
+						&& this.squirrel.isNoGravity() && this.squirrel.hurtTime > 0, "Native saved hit lost its damage/perch state");
+				this.helper.assertTrue(Math.hypot(this.squirrel.getDeltaMovement().x, this.squirrel.getDeltaMovement().z) > 0.1D, "Native saved hit lost its impulse");
+				this.report.add("afterNativeLoad", this.frame());
+			}
 		}
 
 		private JsonObject frame() {
@@ -173,6 +244,10 @@ final class SquirrelInterruptionScenarios {
 			frame.addProperty("tick", this.ticks);
 			frame.addProperty("nativeTick", this.squirrel.tickCount);
 			frame.addProperty("health", this.squirrel.getHealth());
+			frame.addProperty("fallDistance", this.squirrel.fallDistance);
+			frame.addProperty("hurtTime", this.squirrel.hurtTime);
+			var damage = this.squirrel.getLastDamageSource();
+			frame.addProperty("lastDamageType", damage == null ? "unavailable" : damage.getMsgId());
 			frame.addProperty("foundTree", this.squirrel.hasFoundTree());
 			frame.addProperty("noGravity", this.squirrel.isNoGravity());
 			frame.addProperty("onClimbable", this.squirrel.onClimbable());
@@ -186,6 +261,12 @@ final class SquirrelInterruptionScenarios {
 			this.report.addProperty("complete", complete);
 			this.report.addProperty("passed", complete && !this.report.has("error"));
 			this.report.addProperty("interruptedAt", this.interruptedAt);
+			this.report.addProperty("largestAttackDisplacement", this.largestAttackDisplacement);
+			this.report.addProperty("earlyAwayDisplacement", this.earlyAwayDisplacement);
+			this.report.addProperty("largestFallDistance", this.largestFallDistance);
+			this.report.addProperty("normalFallObserved", this.normalFallObserved);
+			this.report.addProperty("fallHealthLoss", this.fallHealthLoss);
+			this.report.addProperty("minimumHealth", this.minimumHealth);
 			this.report.addProperty("recoveredAt", this.recoveredAt);
 			SquirrelTraceReports.save(this.output, this.report);
 		}

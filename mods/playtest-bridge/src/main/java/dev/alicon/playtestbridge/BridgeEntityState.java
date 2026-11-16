@@ -80,6 +80,7 @@ final class BridgeEntityState {
 		state.addProperty("inWater", entity.isInWater());
 		state.addProperty("onGround", entity.onGround());
 		state.add("position", position(entity.position()));
+		state.add("velocity", position(entity.getDeltaMovement()));
 		if (entity.getVehicle() != null) {
 			state.add("vehicle", entityRef(entity.getVehicle()));
 		}
@@ -96,6 +97,7 @@ final class BridgeEntityState {
 			state.addProperty("air", living.getAirSupply());
 			state.addProperty("maxAir", living.getMaxAirSupply());
 			state.addProperty("fallDistance", living.fallDistance);
+			state.addProperty("onClimbable", living.onClimbable());
 			state.addProperty("hurtTime", living.hurtTime);
 			var source = living.getLastDamageSource();
 			state.addProperty("lastDamageType", source == null ? "unavailable" : source.getMsgId());

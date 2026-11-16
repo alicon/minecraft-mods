@@ -166,25 +166,25 @@ public final class SquirrelApproachGameTests {
 	}
 
 	/** Observe recovery after a reachable native sprint attack. */
-	@GameTest(maxTicks = 340)
+	@GameTest(structure = "mushroom_yorkie_gametest:fetch_arena", maxTicks = 340)
 	public void squirrelAttackMidClimbNorth(GameTestHelper helper) {
 		SquirrelInterruptionScenarios.attack(helper, false, false);
 	}
 
 	/** Observe recovery after a reachable native sprint attack. */
-	@GameTest(maxTicks = 340)
+	@GameTest(structure = "mushroom_yorkie_gametest:fetch_arena", maxTicks = 340)
 	public void squirrelAttackMidClimbSouth(GameTestHelper helper) {
 		SquirrelInterruptionScenarios.attack(helper, false, true);
 	}
 
 	/** Observe recovery after a reachable native sprint attack. */
-	@GameTest(maxTicks = 340)
+	@GameTest(structure = "mushroom_yorkie_gametest:fetch_arena", maxTicks = 340)
 	public void squirrelAttackPerchedNorth(GameTestHelper helper) {
 		SquirrelInterruptionScenarios.attack(helper, true, false);
 	}
 
 	/** Observe recovery after a reachable native sprint attack. */
-	@GameTest(maxTicks = 340)
+	@GameTest(structure = "mushroom_yorkie_gametest:fetch_arena", maxTicks = 340)
 	public void squirrelAttackPerchedSouth(GameTestHelper helper) {
 		SquirrelInterruptionScenarios.attack(helper, true, true);
 	}
@@ -265,6 +265,18 @@ public final class SquirrelApproachGameTests {
 	@GameTest(maxTicks = 340)
 	public void squirrelSupportChangeReloadedMiddle(GameTestHelper helper) {
 		SquirrelSupportChangeScenarios.observe(helper, squirrel -> roundTrip(helper, squirrel), true, true);
+	}
+
+	/** Saving immediately after a hit must not reclaim a perch and erase its native impulse. */
+	@GameTest(structure = "mushroom_yorkie_gametest:fetch_arena", maxTicks = 340)
+	public void squirrelSavedNativeHitNorth(GameTestHelper helper) {
+		SquirrelInterruptionScenarios.savedAttack(helper, squirrel -> roundTrip(helper, squirrel), false);
+	}
+
+	/** Saving immediately after a hit must not reclaim a perch and erase its native impulse. */
+	@GameTest(structure = "mushroom_yorkie_gametest:fetch_arena", maxTicks = 340)
+	public void squirrelSavedNativeHitSouth(GameTestHelper helper) {
+		SquirrelInterruptionScenarios.savedAttack(helper, squirrel -> roundTrip(helper, squirrel), true);
 	}
 
 	private static SquirrelEntity roundTrip(GameTestHelper helper, SquirrelEntity squirrel) {
