@@ -50,6 +50,9 @@ Freeze the copied world's mob ticks after an investigative failure before length
 code or review work, so the fixture does not keep aging. Players can still tick
 while the world is frozen: verify the owner's health and position, and explicitly
 resume world ticks before the next native-input test. Preserve the failed report.
+Failure screenshots must preserve the current owner/view: no camera teleports or
+rotation, screen closing, HUD hiding or chat clearing. Even a same-position `/tp`
+can dismount the owner and reset native movement/ground state.
 
 ## Gradle run isolation
 

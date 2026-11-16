@@ -259,6 +259,9 @@ and time retained; player ticks can still advance, so check owner safety before
 resuming. Input release failures are visible in the case error and observations.
 The report distinguishes terminal completion from
 whether every requested case ran.
+Matrix failure screenshots preserve the current screen, HUD, chat and camera
+orientation. They do not teleport or rotate the owner for framing, which could
+otherwise dismount a rider and change the failed physics state.
 The matrix's 490 defined cases are not a claim that a full sweep has passed.
 
 ```shell
