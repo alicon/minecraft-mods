@@ -35,10 +35,19 @@ final class SurfaceSwimmingScenarios {
 				// The independent one-tick callback was observed at native tick4.
 				// The recurring probe adds tasks while Minecraft walks its runnable
 				// map; keep the precondition inside the same first native sample.
-				new BoatBankRecoveryProbe(helper, yorkie, owner, false, false, seed, cleanup, () -> {
-					String observation = observe(helper, yorkie, seed, "first-recovery-sample");
-					helper.assertTrue(yorkie.isInWater() && !yorkie.isUnderWater(), "Deck control must have a wet body and breathing eyes: " + observation);
-					helper.assertTrue(!yorkie.waterEscape.active(), "Breathing surface swimmer was diverted into obstruction escape: " + observation);
+				new BoatBankRecoveryProbe(helper, yorkie, owner, false, false, seed, cleanup, sample -> {
+					if (System.getenv("MUSHROOM_SURFACE_TRACE") != null) {
+						MushroomTheYorkie.LOGGER.info("Native surface sample: {}", SurfaceSwimmingTrace.frame(helper, yorkie, seed, sample));
+					}
+					if (sample == 1) {
+						String observation = observe(helper, yorkie, seed, "first-recovery-sample");
+						helper.assertTrue(yorkie.isInWater() && !yorkie.isUnderWater(), "Deck control must have a wet body and breathing eyes: " + observation);
+					}
+					// This clear route keeps making progress, including its brief
+					// submergence. Low headroom alone must never take over following.
+					if (yorkie.waterEscape.active()) {
+						helper.assertTrue(false, "Unobstructed deck following entered escape: " + observe(helper, yorkie, seed, "unexpected-escape-" + sample));
+					}
 				}).start();
 			} catch (RuntimeException | Error failure) {
 				yorkie.discard();
