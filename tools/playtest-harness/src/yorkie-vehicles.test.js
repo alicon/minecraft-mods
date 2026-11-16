@@ -48,3 +48,22 @@ test('mount evidence joins native id/type references to full UUID states in both
   assert.throws(() => assertVehicleMount(snapshot, 'different-pet', 'boat'));
   assert.throws(() => assertVehicleMount(snapshot, 'pet', 'different-boat'));
 });
+
+
+test('journey scenarios cover real water/rail travel and each owner action across hunger, time and orders', () => {
+  const { journeyInputs, journeyCases } = require('./yorkie-vehicle-journeys');
+  const rows = journeyInputs();
+  assert.equal(rows.length, 96);
+  assert.equal(new Set(journeyCases({}).map(c => c.name)).size, rows.length);
+  assert.equal(rows.filter(r => r.layout === 'water').length, 64);
+  assert.equal(rows.filter(r => r.layout === 'rail').length, 32);
+  for (const vehicle of VEHICLES)
+    for (const time of [1000, 18000])
+      for (const hunger of [0, 90])
+        for (const sitting of [false, true]) {
+          const cases = rows.filter(r => r.vehicle === vehicle && r.time === time && r.hunger === hunger && r.sitting === sitting);
+          assert.deepEqual(cases.map(r => [r.action, r.ownerMode]), [
+            ['assist', 'survival'], ['assist', 'creative'], ['takeoff', 'creative'], ['care', 'survival']
+          ]);
+        }
+});

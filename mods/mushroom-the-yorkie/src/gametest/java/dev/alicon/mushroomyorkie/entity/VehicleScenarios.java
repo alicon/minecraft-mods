@@ -26,7 +26,7 @@ final class VehicleScenarios {
 				helper.setBlock(x, 1, z, Blocks.STONE);
 			}
 		}
-		var owner = SurvivalGameTestPlayers.create(helper);
+		var owner = SurvivalGameTestPlayers.createWithoutToyCleanup(helper);
 		owner.setGameMode(GameType.CREATIVE);
 		owner.setPos(helper.absoluteVec(new net.minecraft.world.phys.Vec3(1.5D, 2.0D, 3.5D)));
 		try {

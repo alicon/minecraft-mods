@@ -15,6 +15,7 @@
 			"dev.alicon.mushroomyorkie.entity.OutdoorReliefGameTests",
 			"dev.alicon.mushroomyorkie.entity.WaterRestGameTests",
 			"dev.alicon.mushroomyorkie.entity.VehicleGameTests",
+			"dev.alicon.mushroomyorkie.entity.VehicleWaterRestGameTests",
 			"dev.alicon.mushroomyorkie.entity.NightRecoveryGameTests",
 			"dev.alicon.mushroomyorkie.entity.DomesticCareGameTests",
 			"dev.alicon.mushroomyorkie.entity.SquirrelApproachGameTests"

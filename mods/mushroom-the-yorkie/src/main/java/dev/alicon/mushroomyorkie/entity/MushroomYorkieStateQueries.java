@@ -4,6 +4,7 @@ import dev.alicon.mushroomyorkie.block.ModBlocks;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 
 final class MushroomYorkieStateQueries {
@@ -38,6 +39,9 @@ final class MushroomYorkieStateQueries {
 	}
 
 	static boolean isWetForSitting(MushroomYorkieEntity yorkie) {
-		return yorkie.isInWater() || yorkie.level().getFluidState(yorkie.blockPosition()).is(FluidTags.WATER);
+		// A dry passenger's seat can put its feet in a water block. Keep the feet
+		// check for unmounted bank contact, but do not erase an order on a floating boat.
+		return yorkie.isInWater() || yorkie.level().getBlockState(yorkie.blockPosition()).is(Blocks.BUBBLE_COLUMN)
+				|| (!yorkie.isPassenger() && yorkie.level().getFluidState(yorkie.blockPosition()).is(FluidTags.WATER));
 	}
 }

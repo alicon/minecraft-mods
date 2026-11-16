@@ -12,8 +12,11 @@ Domestic care adds a few home objects without turning Mushroom into a chore mach
 
 Mushroom wakes and refuses sitting, nighttime sleep, and creative building naps while in water or a bubble column. Nighttime sleep and creative naps wait for a dry landing with support under his feet, so a surface jump or partial bank contact cannot stop his return halfway out. When recovering from water for a grounded creative owner, he uses the same collision-checked ascent routing as fetch and aims for the owner's standing position, so a solid bank does not leave him hovering below the floor. The doghouse retains its quarter-block visual bed position over a solid floor; that anchor does not permit sleeping over unsupported water. A sheltered nighttime routine keeps outside requests quiet during water recovery and brief jumps; safe sleep still waits for dry support. Once established from dry ground, resting on its visual bed does not accumulate fall damage at dawn; awake airborne pets retain normal fall behavior. Normal airborne following keeps its usual offset.
 
-An empty-hand owner interaction helps a mounted Mushroom out without changing
-his sit/follow order. Owner help or creative takeoff gives him ten seconds before
+A dry Mushroom keeps his sit order while riding a floating boat, even when his
+seat position falls inside a water block. Actual immersion and bubble columns
+still cancel rest. An empty-hand owner interaction helps him out without changing
+his sit/follow order; if the dismount then puts him in water, wet safety releases
+the order so he can swim to dry ground. Owner help or creative takeoff gives him ten seconds before
 he can automatically board again, so the player has time to move away. Automatic
 boarding also stays blocked while his creative owner is flying. Ordinary boarding
 returns after landing and the grace period; this does not permanently disable

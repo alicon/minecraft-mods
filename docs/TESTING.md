@@ -92,12 +92,19 @@ Crafting GameTests load every Mushroom recipe and check exact output/count throu
 
 Water GameTests check clearing existing sleep/pose on entering water, refusing new wet sleep/sit requests, refusing airborne or overhanging-edge sleep/nap until supported landing, retaining sleep on thin dog beds/slabs and the supported doghouse visual bed, resuming dry nighttime sleep, preventing synthetic fall accumulation during supported doghouse sleep without protecting an awake falling pet, requiring the low-bed approach path to end on the bed rather than adjacent floor, and reaching a dry bank with the grounded creative recovery controller and native collision movement. Night recovery controls keep the sheltered routine quiet while wet or airborne, preserve daytime/outdoor trips and daily limits, and exercise doghouse priority and dusk cancellation. The live water group adds full entity ticks, day/night, hunger, real wet interactions, and creative naps triggered by actual block placement.
 
+Vehicle water controls run full native ticks for dry floating boats and chest
+boats, genuinely submerged carts/boats, and bubble-column danger. Dry passengers
+retain their sit order; real water hazards still release it. Non-fetch vehicle
+owners use the shared player fixture without deleting neighboring fetch toys.
+This improves isolation without claiming the older intermittent throw setup is fixed.
+
 Vehicle GameTests reproduce owner-assisted and creative-flight reboarding in boats
 and minecarts on both targets. They prove the grace period, retained sit order,
 refusal while the owner is flying, and restoration of normal boarding after
 landing and timeout. Their isolated NoAI ticks test native boarding decisions;
 the live vehicle group separately covers full entity/goal ticks. Water journeys,
-moving carts and natural boarding are still work in progress.
+moving-cart journeys now run in the live journeys group; natural approach/boarding
+routes and reload journeys remain work in progress.
 
 GameTests boot a scripted Minecraft server from the CLI. They are slower than unit tests, so keep them focused on behavior that needs a real world, entity registry, or server tick loop.
 
@@ -232,7 +239,7 @@ Set `BRIDGE_REPORT_FILE=build/playtest-reports/<name>.json` to save the full bri
 ## State-combination testing
 
 The [Mushroom state matrix](../tools/playtest-harness/README.md#mushroom-state-matrix)
-checks 144 combinations, nineteen interruption/owner-mode/flight/feeding/tree-approach sequences, 36 terrain cases, 20 outdoor-care sequences, 22 water/rest sequences, eight sleep-spot controls, and 100 dry vehicle cases (96 full-entity sequences plus four controlled boarding-refusal challenges) in a disposable live world and preserves partial failure
+checks 144 combinations, nineteen interruption/owner-mode/flight/feeding/tree-approach sequences, 36 terrain cases, 20 outdoor-care sequences, 22 water/rest sequences, eight sleep-spot controls, 100 dry vehicle cases (96 full-entity sequences plus four controlled boarding-refusal challenges), and 96 controlled water/rail journeys in a disposable live world and preserves partial failure
 reports. Run `npm --prefix tools/playtest-harness test` for the harness's runner,
 command-rejection, and save-safety regression tests. These tests also run in CI.
 Gameplay assertions still need the live Minecraft client and bridge. Successful

@@ -199,8 +199,8 @@ six-block drop for each toy and owner locomotion state. It requires ordinary
 returns in accessible terrain and safe refusal under covered water or a survival
 cliff. A grounded creative cliff attempt may return or safely give up; it must
 conserve the toy, avoid damage, and end near the owner. Flying fetches must return.
-Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, the water/rest group adds 22, and sleep-spot controls add eight, making 249 cases before vehicle coverage. The vehicle group adds 100 cases, for 349 total. Run one group with `--group base`,
-`--group transitions`, `--group terrain`, `--group outdoors`, `--group water`, `--group rest`, or `--group vehicles`; combine it with an exact `--case`.
+Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, the water/rest group adds 22, and sleep-spot controls add eight, making 249 cases before vehicle coverage. The vehicle group adds 100 cases; the journeys group adds 96, for 445 total. Run one group with `--group base`,
+`--group transitions`, `--group terrain`, `--group outdoors`, `--group water`, `--group rest`, `--group vehicles`, or `--group journeys`; combine it with an exact `--case`.
 Unknown groups/cases fail instead of running a different suite.
 
 ```shell
@@ -224,6 +224,20 @@ and harness controls freeze ticks for exact item/need changes, then resume full
 entity ticks. Successful final passenger fixtures retain their vehicle through
 inspection care. These are dry stationary vehicles and controlled contact tests, not water travel,
 moving-cart or natural approach/boarding journeys; those journeys remain tracked in issue #45.
+
+The `journeys` group adds 64 contained-water boat/chest-boat sequences and 32
+rail-minecart sequences. Each proves a real native passenger, injects initial
+motion and then requires at least two blocks of observed native movement before
+owner help, creative takeoff/landing, or mounted survival feeding/harness changes.
+It combines day/night, hunger and sit/follow states, preserves native named cargo,
+and checks safe grounded recovery after dismount. Dry passengers retain their
+order; a witnessed wet dismount releases sitting for water safety. Fine-grained
+post-dismount samples distinguish that safety transition from an unwanted order
+change aboard a dry boat. The shared vehicle fixture, flight setup and mounted
+care checks are reused by both groups. These controlled /ride mounts and injected
+motion do not prove natural walking approaches, player rowing or reload behavior.
+Those remain tracked in issue #45. A case that fails before its travel/end-state
+checks is not counted as completing that journey.
 
 The `outdoors` group checks closed-to-open doors across day/night, fed/hungry,
 sit/follow, and survival/grounded creative owners. Four additional cases start
