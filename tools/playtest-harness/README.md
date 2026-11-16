@@ -89,6 +89,11 @@ Screenshots close the active client screen before capture by default. Set `BRIDG
 Set `BRIDGE_REPORT_FILE=build/playtest-reports/<name>.json` on any bridge scenario target to persist the full JSON result, including every step payload and screenshot path, outside the terminal output.
 The `set-block` and `set-block-near-entity` bridge actions accept namespaced block IDs or full block-state strings such as `minecraft:cherry_leaves[persistent=true]`.
 
+`/block` also reports native `blockLight`, `skyLight` and `waterFreezeEligible`.
+The last field is Minecraft's current biome/light/water/edge eligibility check,
+not a prediction that a weather tick will select that cell. Use block light,
+which differs from daylight, when auditing controlled pools against ice formation.
+
 You can launch Modrinth directly into a save without using the launcher UI:
 
 ```shell
