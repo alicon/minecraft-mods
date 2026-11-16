@@ -213,13 +213,70 @@ public final class SquirrelApproachGameTests {
 		SquirrelInterruptionScenarios.closeBelowAscent(helper);
 	}
 
+	/** A harmless new block below an intact perch must not cause a fall on native reload. */
+	@GameTest(maxTicks = 340)
+	public void squirrelResumesSavedPerchWithChangedLowerFace(GameTestHelper helper) {
+		SquirrelReloadApproachScenarios.changedLowerFace(helper, squirrel -> roundTrip(helper, squirrel));
+	}
+
+	/** Reject an artificial saved no-gravity input outside a valid physical perch. */
+	@GameTest(maxTicks = 120)
+	public void squirrelRejectsSavedPerchHorizontalGap(GameTestHelper helper) {
+		SquirrelPerchBoundaryScenarios.observe(helper, squirrel -> roundTrip(helper, squirrel), "horizontal-gap");
+	}
+
+	/** Reject an artificial saved no-gravity input outside a valid physical perch. */
+	@GameTest(maxTicks = 120)
+	public void squirrelRejectsSavedPerchAboveLog(GameTestHelper helper) {
+		SquirrelPerchBoundaryScenarios.observe(helper, squirrel -> roundTrip(helper, squirrel), "above-log");
+	}
+
+	/** Reject an artificial saved no-gravity input outside a valid physical perch. */
+	@GameTest(maxTicks = 120)
+	public void squirrelRejectsSavedPerchShortColumn(GameTestHelper helper) {
+		SquirrelPerchBoundaryScenarios.observe(helper, squirrel -> roundTrip(helper, squirrel), "short-column");
+	}
+
+	/** Reload must retain which original top log owns a stable perch. */
+	@GameTest(maxTicks = 340)
+	public void squirrelReleasesOriginalTopAfterReload(GameTestHelper helper) {
+		SquirrelReloadApproachScenarios.trackedTopAfterReload(helper, squirrel -> roundTrip(helper, squirrel));
+	}
+
+	/** Apply the same physical support rule before and after native reload. */
+	@GameTest(maxTicks = 340)
+	public void squirrelSupportChangeLiveGround(GameTestHelper helper) {
+		SquirrelSupportChangeScenarios.observe(helper, squirrel -> roundTrip(helper, squirrel), false, false);
+	}
+
+	/** Apply the same physical support rule before and after native reload. */
+	@GameTest(maxTicks = 340)
+	public void squirrelSupportChangeLiveMiddle(GameTestHelper helper) {
+		SquirrelSupportChangeScenarios.observe(helper, squirrel -> roundTrip(helper, squirrel), false, true);
+	}
+
+	/** Apply the same physical support rule before and after native reload. */
+	@GameTest(maxTicks = 340)
+	public void squirrelSupportChangeReloadedGround(GameTestHelper helper) {
+		SquirrelSupportChangeScenarios.observe(helper, squirrel -> roundTrip(helper, squirrel), true, false);
+	}
+
+	/** Apply the same physical support rule before and after native reload. */
+	@GameTest(maxTicks = 340)
+	public void squirrelSupportChangeReloadedMiddle(GameTestHelper helper) {
+		SquirrelSupportChangeScenarios.observe(helper, squirrel -> roundTrip(helper, squirrel), true, true);
+	}
+
 	private static SquirrelEntity roundTrip(GameTestHelper helper, SquirrelEntity squirrel) {
-		var output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, helper.getLevel().registryAccess());
+		var problems = new ProblemReporter.Collector();
+		var output = TagValueOutput.createWithContext(problems, helper.getLevel().registryAccess());
 		squirrel.saveWithoutId(output);
 		var data = output.buildResult();
+		helper.assertTrue(problems.isEmpty(), "Squirrel save problems: " + problems.getReport());
 		squirrel.discard();
 		SquirrelEntity restored = new SquirrelEntity(ModEntities.SQUIRREL, helper.getLevel());
-		restored.load(TagValueInput.create(ProblemReporter.DISCARDING, helper.getLevel().registryAccess(), data));
+		restored.load(TagValueInput.create(problems, helper.getLevel().registryAccess(), data));
+		helper.assertTrue(problems.isEmpty(), "Squirrel load problems: " + problems.getReport());
 		helper.getLevel().addFreshEntity(restored);
 		return restored;
 	}

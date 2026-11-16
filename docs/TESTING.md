@@ -321,7 +321,7 @@ version's NBT API. With the trunk intact, the original UUID must resume healthy
 clinging without fall damage. With the trunk removed before reload, no-gravity
 must release and the same squirrel must demonstrate normal free fall and land.
 The removed-tree control allows ordinary fall damage; no actor receives immunity
-or healing. This proves entity serialization/recovery, not a client-world restart.
+or healing. This proves entity serialization/recovery, not a client-world restart. A changed-lower-face control places a solid block below the original perched body before native serialization and requires full health, unchanged height and no move to another face. A top-log removal control after reload checks that the original support log still owns the perch. Four additional full-AI controls remove a remote ground log or the supporting middle log before/after native reload: both modes keep a still-supported perch and both release a missing supporting column. Modern native serialization asserts that the save/load problem collector stays empty. Artificial saved-flag boundary inputs place the initial squirrel just outside horizontal contact, above a log, or on a short column; normal native ticks must clear no-gravity, fall and land. These are rejection controls, not observed natural climbs. The live `yorkie-squirrel-restart` command separately checks a fresh real climb across a normal client-world saved restart, with optional lower-face placement.
 Two live ascent-interruption controls place a solid block above the original
 squirrel only after verified west-face climbing and body clearance, or retain the
 same open route. They sample every native tick and require 40 healthy recovered

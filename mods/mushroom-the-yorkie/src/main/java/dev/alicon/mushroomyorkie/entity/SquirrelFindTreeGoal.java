@@ -12,7 +12,7 @@ import net.minecraft.world.phys.Vec3;
 final class SquirrelFindTreeGoal extends Goal {
 	private static final int SEARCH_RADIUS = 20;
 	private static final int SEARCH_Y_RADIUS = 5;
-	private static final int MIN_CLIMB_BLOCKS = 2;
+	static final int MIN_CLIMB_BLOCKS = 2;
 	static final int MAX_CLIMB_BLOCKS = 4;
 	// Reach the selected face before climbing; a loose corner radius can hit a blocked neighbor face.
 	private static final double REACHED_APPROACH_DISTANCE_SQR = 0.09D;
@@ -77,6 +77,11 @@ final class SquirrelFindTreeGoal extends Goal {
 
 	@Override
 	public boolean canContinueToUse() {
+		if (this.climbing && this.squirrel.hasFoundTree()) {
+			// Holding and recovering a perch use the same physical support rule;
+			// an obsolete run-up anchor cannot change the outcome after a reload.
+			return this.climbPos != null && SquirrelPerchRecovery.supports(this.squirrel, this.climbPos);
+		}
 		boolean valid = this.treePos != null
 				&& !this.approachFailed
 				&& (this.climbing || this.approachTicks < MAX_APPROACH_TICKS)

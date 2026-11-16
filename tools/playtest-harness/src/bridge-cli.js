@@ -3618,6 +3618,15 @@ async function main() {
   } else if (action === 'yorkie-matrix') {
     result = await require('./yorkie-matrix').runMatrix(baseUrl, args);
     if (!result.ok) process.exitCode = 1;
+  } else if (action === 'yorkie-squirrel-restart') {
+    result = await require('./yorkie-squirrel-restart').runSquirrelRestart(baseUrl, {
+      ...args, expectedSave: option(args, 'expectedSave', 'PLAYTEST_WORLD', ''),
+      lowerFaceBlock: optionBoolean(args, 'lowerFaceBlock', 'BRIDGE_LOWER_FACE_BLOCK', false),
+      instanceId: option(args, 'instanceId', 'MODRINTH_INSTANCE_ID', ''),
+      supportLog: option(args, 'supportLog', 'BRIDGE_SUPPORT_LOG', ''),
+      reportFile: option(args, 'reportFile', 'BRIDGE_REPORT_FILE', '')
+    });
+    if (!result.ok) process.exitCode = 1;
   } else if (action === 'yorkie-smoke') {
     result = await require('./yorkie-smoke-runner').runRuntimeSmoke(baseUrl, args, hooks => runYorkieSmoke(baseUrl, args, hooks));
     if (!result.ok) process.exitCode = 1;
@@ -3652,7 +3661,7 @@ async function main() {
   }
 
   // Scenario suites own atomic incremental reports, including any post-run phase.
-  if (!['yorkie-matrix', 'yorkie-crafting', 'yorkie-smoke', 'client-input'].includes(action)) writeReportFile(option(args, 'reportFile', 'BRIDGE_REPORT_FILE', ''), result);
+  if (!['yorkie-matrix', 'yorkie-crafting', 'yorkie-smoke', 'client-input', 'yorkie-squirrel-restart'].includes(action)) writeReportFile(option(args, 'reportFile', 'BRIDGE_REPORT_FILE', ''), result);
   console.log(JSON.stringify(result, null, 2));
 }
 
