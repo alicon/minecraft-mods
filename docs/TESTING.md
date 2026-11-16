@@ -239,10 +239,13 @@ Set `BRIDGE_REPORT_FILE=build/playtest-reports/<name>.json` to save the full bri
 ## State-combination testing
 
 The [Mushroom state matrix](../tools/playtest-harness/README.md#mushroom-state-matrix)
-checks 144 combinations, nineteen interruption/owner-mode/flight/feeding/tree-approach sequences, 36 terrain cases, 20 outdoor-care sequences, 22 water/rest sequences, eight sleep-spot controls, 100 dry vehicle cases (96 full-entity sequences plus four controlled boarding-refusal challenges), and 96 controlled water/rail journeys in a disposable live world and preserves partial failure
+checks 144 combinations, nineteen interruption/owner-mode/flight/feeding/tree-approach sequences, 36 terrain cases, 20 outdoor-care sequences, 22 water/rest sequences, eight sleep-spot controls, 100 dry vehicle cases (96 full-entity sequences plus four controlled boarding-refusal challenges), and 112 controlled water/rail journeys (including 16 actual offshore immersion controls) in a disposable live world and preserves partial failure
 reports. Run `npm --prefix tools/playtest-harness test` for the harness's runner,
 command-rejection, and save-safety regression tests. These tests also run in CI.
-Gameplay assertions still need the live Minecraft client and bridge. Successful
+Gameplay assertions still need the live Minecraft client and bridge. Matrix
+sprints and vehicle frozen steps wait on native gametime, not the server counter
+that keeps increasing during a frozen world. Clock-wrap and stalled-world controls
+run in the Node suite; snapshots include a tickAudit for completed waits. Successful
 matrix runs persist their original case observations before separately feeding
 and healing the same tagged pet for inspection. The postRun record is maintenance,
 not gameplay evidence; its failure cannot turn a case failure into a pass. Failed

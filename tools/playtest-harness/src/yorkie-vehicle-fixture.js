@@ -29,17 +29,7 @@ function vehicleTools({ prepare, command, request, state, entity, advance, base,
     check(reply.success && reply.feedback?.length && !reply.feedbackTruncated, 'Native vehicle possessions are unreadable');
     return reply.feedback;
   }
-  async function frozenStep(ticks) {
-    const before = (await state()).tickCount;
-    await command(`tick step ${ticks}t`);
-    const deadline = Date.now() + 5000;
-    while (Date.now() < deadline) {
-      const snapshot = await state();
-      if (snapshot.tickCount >= before + ticks) return snapshot;
-      await new Promise(resolve => setTimeout(resolve, 25));
-    }
-    throw new Error('Vehicle fixture did not complete its frozen tick step');
-  }
+  const frozenStep = ticks => require('./yorkie-clock').advanceWorldTicks(command, state, ticks, 'step', { timeoutMs: 5000 });
   async function prepareVehicle(inputs, options = {}) {
     await prepare(inputs);
     await command('tick freeze');
