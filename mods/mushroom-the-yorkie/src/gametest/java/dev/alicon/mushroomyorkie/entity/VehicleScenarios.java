@@ -51,6 +51,11 @@ final class VehicleScenarios {
 					int wait = flight ? 220 : 80;
 					for (int tick = 0; tick < wait; tick++) {
 						yorkie.tick();
+						if (flight && tick == 79) {
+							owner.getAbilities().flying = false;
+							helper.assertTrue(!yorkie.startRiding(vehicle), "Landing early lost the remaining dismount grace period");
+							owner.getAbilities().flying = true;
+						}
 					}
 					helper.assertTrue(!yorkie.startRiding(vehicle), flight
 							? "Mushroom boarded again while the creative owner was flying"

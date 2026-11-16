@@ -34,7 +34,11 @@ function vehicleInputs() {
           rows.push({ ...common, ownerMode: 'creative', action: 'takeoff' });
           rows.push({ ...common, ownerMode: 'survival', action: 'care' });
         }
-  return rows;
+  const controls = [];
+  for (const vehicle of VEHICLES.filter(type => type !== 'minecraft:minecart'))
+    for (const ownerMode of ['survival', 'creative'])
+      controls.push({ vehicle, ownerMode, time: 1000, hunger: 0, sitting: false, shelter: 'outside', flying: false, action: 'reboard' });
+  return [...controls, ...rows];
 }
 
 // Controlled /ride mounts prove passenger behavior, not natural automatic boarding.
@@ -60,9 +64,6 @@ function vehicleCases({ prepare, command, request, state, entity, advance, base,
     inputs,
     setup: async () => {
       await prepare(inputs);
-      // Cleanup stays inside prepare's exact disposable-world/owner guard. Clear all
-      // loaded test vehicle types before the next fixture can board an old one.
-      for (const type of VEHICLES) await request('/clear-entities', { type });
       await command('tick freeze');
       await request('/command', { command: `clear ${player} mushroom_yorkie:yorkie_harness` }, true);
       const initial = await state();
@@ -101,12 +102,17 @@ function vehicleCases({ prepare, command, request, state, entity, advance, base,
         check(pet.custom.harness, 'Vehicle action lost the harness');
         return pet;
       }
+      function inspectMounted(snapshot, stage) {
+        const pet = inspect(snapshot, stage);
+        assertVehicleMount(snapshot, fixture.petUuid, fixture.vehicleUuid);
+        return pet;
+      }
       const ready = await state();
       const before = inspect(ready, 'before-action');
       assertVehicleMount(ready, fixture.petUuid, fixture.vehicleUuid);
       if (inputs.action === 'care') {
         observed.feed = await request('/use-entity', { type: before.type, radius: 8, item: 'minecraft:apple', count: 2 });
-        const fed = inspect(await state(), 'fed-mounted');
+        const fed = inspectMounted(await state(), 'fed-mounted');
         check(fed.vehicle?.id === fixture.vehicleId, 'Mounted feeding unexpectedly dismounted Mushroom');
         check(fed.custom.needs.hunger === Math.max(0, before.custom.needs.hunger - 32), 'Mounted apple applied an unexpected food change');
         const held = await command(`data get entity ${player} SelectedItem.count`);
@@ -118,18 +124,33 @@ function vehicleCases({ prepare, command, request, state, entity, advance, base,
         check(!removed.custom.harness && removed.vehicle?.id === fixture.vehicleId, 'Mounted harness removal failed or dismounted the pet');
         const removedCount = await command(`clear ${player} mushroom_yorkie:yorkie_harness 0`);
         check(removedCount.result === 2, 'Harness removal did not retain the spare and return exactly one worn harness');
-        await request('/use-entity', { type: before.type, radius: 8, item: 'mushroom_yorkie:yorkie_harness', count: 1 });
-        const restored = inspect(await state(), 'harness-restored-mounted');
+        await request('/use-entity', { type: before.type, radius: 8 });
+        const restored = inspectMounted(await state(), 'harness-restored-mounted');
         check(restored.vehicle?.id === fixture.vehicleId, 'Mounted harness equip dismounted Mushroom');
         const restoredCount = await command(`clear ${player} mushroom_yorkie:yorkie_harness 0`);
         check(restoredCount.result === 1, 'Mounted harness equip did not consume exactly one survival harness');
         // A completed care case deliberately leaves a passenger for post-run inspection.
         await command('tick unfreeze');
-        const settled = inspect(await advance(40), 'mounted-full-ticks');
+        const settled = inspectMounted(await advance(40), 'mounted-full-ticks');
         check(settled.vehicle?.id === fixture.vehicleId && !settled.noGravity, 'Grounded owner did not retain a normal passenger');
-      } else if (inputs.action === 'assist') {
+      } else if (inputs.action === 'assist' || inputs.action === 'reboard') {
         observed.interaction = await request('/use-entity', { type: before.type, radius: 8, emptyHand: true });
         check(!inspect(await state(), 'assisted-dismount').vehicle, 'Owner empty-hand interaction did not dismount Mushroom');
+        if (inputs.action === 'reboard') {
+          // Separate controlled contact from ordinary companionship: NoAI holds
+          // the pet still; the real boat ticks and attempts automatic boarding.
+          await command(`data merge entity ${fixture.petUuid} {NoAI:1b}`);
+          await command('tick unfreeze');
+          inspect(await advance(80), 'past-vanilla-cooldown');
+          await command('tick freeze');
+          const carrier = (await state()).players[0].nearbyEntities.find(e => e.uuid === fixture.vehicleUuid);
+          check(carrier, 'Reboarding challenge lost its original boat');
+          await command(`tp ${fixture.petUuid} ${carrier.position.x} ${carrier.position.y + 0.1} ${carrier.position.z}`);
+          observed.reboardContact = await state();
+          const contacted = inspect(await frozenStep(2), 'native-automatic-boarding-contact');
+          check(!contacted.vehicle, 'Boat automatically boarded Mushroom during the owner-dismount grace period');
+          await command(`data merge entity ${fixture.petUuid} {NoAI:0b}`);
+        }
         await command('tick unfreeze');
         await command(`tp ${player} ${base.x - 3} ${base.y} ${base.z + 0.5}`);
         const settled = inspect(await advance(60), 'after-dismount-full-ticks');

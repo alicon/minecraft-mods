@@ -15,17 +15,18 @@ test('lost owner flight is a fixture failure rather than a trapped-pet verdict',
 
 test('vehicle scenarios independently cover passenger actions, owner modes, hunger, night and sit orders', () => {
   const rows = vehicleInputs();
-  assert.equal(rows.length, 96);
+  assert.equal(rows.length, 100);
   assert.equal(new Set(vehicleCases({}).map(c => c.name)).size, rows.length);
   for (const vehicle of VEHICLES)
     for (const time of [1000, 18000])
       for (const hunger of [0, 90])
         for (const sitting of [false, true]) {
-          const actions = rows.filter(r => r.vehicle === vehicle && r.time === time && r.hunger === hunger && r.sitting === sitting);
+          const actions = rows.filter(r => r.action !== 'reboard' && r.vehicle === vehicle && r.time === time && r.hunger === hunger && r.sitting === sitting);
           assert.deepEqual(actions.map(r => [r.action, r.ownerMode]), [
             ['assist', 'survival'], ['assist', 'creative'], ['takeoff', 'creative'], ['care', 'survival']
           ]);
         }
+  assert.equal(rows.filter(r => r.action === 'reboard').length, 4);
 });
 
 test('mount evidence joins native id/type references to full UUID states in both directions', () => {

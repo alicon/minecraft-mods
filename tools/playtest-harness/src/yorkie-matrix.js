@@ -80,6 +80,9 @@ async function executeMatrix(baseUrl, args) {
     await command(`tp ${player} ${base.x} ${base.y + 1} ${base.z} 0 0`);
     // Clear the baseline pet in this disposable save so ownership guards do not block taming.
     await request('/clear-entities', { type: TYPE });
+    // A boat left by an interrupted vehicle run must not board the next fresh pet,
+    // including when that next run selects a different group.
+    for (const type of require('./yorkie-vehicles').VEHICLES) await request('/clear-entities', { type });
     await request('/clear-entities', { type: 'mushroom_yorkie:squirrel' });
     await request('/clear-entities', { type: 'minecraft:item' });
     // CreativeBuildActivity belongs to the owner, not the replaced pet. Let its 1800-tick
