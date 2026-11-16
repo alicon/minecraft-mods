@@ -138,7 +138,8 @@ test('real matrix CLI forwards investigate, retains failures and rejects ambiguo
       assert.equal(report.requestedCaseCount, requested);assert.equal(report.cases.length, 1);
       assert.equal(report.complete, true);assert.equal(report.gameplayComplete, false);assert.equal(report.ok, false);
       assert.equal(report.cases[0].status, 'setup_failed');assert.equal(report.stoppedAfterFailure, true);
-      assert.equal(report.cases[0].investigativeCleanup.status, 'skipped');
+      if (allGroups) assert.equal(report.cases[0].investigativeCleanup, undefined, 'Base cases have no scenario cleanup to skip');
+      else assert.equal(report.cases[0].investigativeCleanup.status, 'skipped');
       assert.equal(Boolean(report.cases[0].captureError), failScreenshot);
       assert.deepEqual(report.worldReset, { status: 'skipped', reason: 'investigative_failure_fixture_retained', worldFrozen: true });
       const commands = requests.filter(r => r.route === '/command').map(r => r.body.command);
