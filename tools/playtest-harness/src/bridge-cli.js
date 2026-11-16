@@ -3423,6 +3423,7 @@ Common options:
   --item <id>          Namespaced item id for give/use-block/use-entity
   --block <id>         Namespaced block id or block state for set-block actions
   --report-file <path> Write the full JSON result to a file
+  --investigate       Matrix only: stop at first failure and retain its frozen fixture
 `);
 }
 
