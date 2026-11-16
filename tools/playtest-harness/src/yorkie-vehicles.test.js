@@ -4,6 +4,15 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { VEHICLES, vehicleInputs, vehicleCases, assertVehicleMount, assertVehicleOwnerState } = require('./yorkie-vehicles');
 
+test('unreachable or missing interaction distance is a setup failure before a journey action', () => {
+  const { assertVehicleReach } = require('./yorkie-vehicle-fixture');
+  assertVehicleReach({ distance: 3 }, 'survival');
+  assertVehicleReach({ distance: 4.5 }, 'creative');
+  for (const [distance, mode] of [[3.21, 'survival'], [4.51, 'creative'], [undefined, 'survival'], [NaN, 'creative']]) {
+    assert.throws(() => assertVehicleReach({ distance }, mode), error => error.phase === 'setup');
+  }
+});
+
 test('lost owner flight is a fixture failure rather than a trapped-pet verdict', () => {
   const state = { players: [{ abilities: { creative: true, flying: false } }] };
   assertVehicleOwnerState(state, 'creative', false);
@@ -47,4 +56,24 @@ test('mount evidence joins native id/type references to full UUID states in both
   }
   assert.throws(() => assertVehicleMount(snapshot, 'different-pet', 'boat'));
   assert.throws(() => assertVehicleMount(snapshot, 'pet', 'different-boat'));
+});
+
+
+test('journey scenarios cover real water/rail travel and each owner action across hunger, time and orders', () => {
+  const { journeyInputs, journeyCases } = require('./yorkie-vehicle-journeys');
+  const rows = journeyInputs();
+  assert.equal(rows.length, 112);
+  assert.equal(new Set(journeyCases({}).map(c => c.name)).size, rows.length);
+  assert.equal(rows.filter(r => r.layout === 'water').length, 80);
+  assert.equal(rows.filter(r => r.layout === 'rail').length, 32);
+  assert.equal(rows.filter(r => r.offshore && r.sitting && r.action === 'assist-immersion').length, 16);
+  for (const vehicle of VEHICLES)
+    for (const time of [1000, 18000])
+      for (const hunger of [0, 90])
+        for (const sitting of [false, true]) {
+          const cases = rows.filter(r => !r.offshore && r.vehicle === vehicle && r.time === time && r.hunger === hunger && r.sitting === sitting);
+          assert.deepEqual(cases.map(r => [r.action, r.ownerMode]), [
+            ['assist', 'survival'], ['assist', 'creative'], ['takeoff', 'creative'], ['care', 'survival']
+          ]);
+        }
 });

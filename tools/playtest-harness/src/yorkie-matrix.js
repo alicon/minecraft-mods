@@ -55,17 +55,7 @@ async function executeMatrix(baseUrl, args) {
   const entity = (snapshot) => snapshot.players[0].nearbyEntities.find((candidate) => candidate.type === TYPE);
   const merge = (nbt) => command(`data merge entity ${SELECTOR} ${nbt}`);
   const use = (body) => request('/use-entity', { type: TYPE, radius: 24, ...body });
-  async function advance(ticks = 100) {
-    const before = (await state()).tickCount;
-    await command(`tick sprint ${ticks}t`);
-    const deadline = Date.now() + 20000;
-    while (Date.now() < deadline) {
-      const snapshot = await state();
-      if (snapshot.tickCount >= before + ticks) return snapshot;
-      await delay(100);
-    }
-    throw new Error(`Server failed to advance ${ticks} ticks`);
-  }
+  const advance = (ticks = 100) => require('./yorkie-clock').advanceWorldTicks(command, state, ticks, 'sprint');
   let lastFixtureUuid;
   async function prepare(inputs) {
     const ownerMode = inputs.ownerMode || (inputs.flying ? 'creative' : 'survival');
@@ -75,6 +65,7 @@ async function executeMatrix(baseUrl, args) {
     assertTestWorld(current, args.expectedSave);
     check(current.players[0].dimension.includes('minecraft:overworld'), 'Matrix arena requires the Overworld');
     await command('tick sprint stop');
+    await command('tick unfreeze');
     await command(`gamemode creative ${player}`);
     await request('/player-abilities', { player, flying: false, mayfly: true });
     await command(`tp ${player} ${base.x} ${base.y + 1} ${base.z} 0 0`);
@@ -160,7 +151,7 @@ async function executeMatrix(baseUrl, args) {
     };
   });
   const context = { prepare, command, request, state, entity, advance, base, player, selector: SELECTOR, check };
-  const groups = { base: cases, transitions: [...require('./yorkie-transitions').transitionCases(context), ...require('./yorkie-flight-transitions').flightTransitionCases(context)], terrain: require('./yorkie-terrain').terrainCases(context), outdoors: require('./yorkie-outdoor').outdoorCases(context), water: require('./yorkie-water-rest').waterRestCases(context), rest: require('./yorkie-sleep-spots').sleepSpotCases(context), vehicles: require('./yorkie-vehicles').vehicleCases(context) };
+  const groups = { base: cases, transitions: [...require('./yorkie-transitions').transitionCases(context), ...require('./yorkie-flight-transitions').flightTransitionCases(context)], terrain: require('./yorkie-terrain').terrainCases(context), outdoors: require('./yorkie-outdoor').outdoorCases(context), water: require('./yorkie-water-rest').waterRestCases(context), rest: require('./yorkie-sleep-spots').sleepSpotCases(context), vehicles: require('./yorkie-vehicles').vehicleCases(context), journeys: require('./yorkie-vehicle-journeys').journeyCases(context) };
   const selected = selectCases(groups, args);
   await command('gamerule minecraft:spawn_mobs false');
   await command('gamerule minecraft:advance_time false');

@@ -6,6 +6,12 @@ import net.minecraft.world.entity.EntityType;
 
 /** Version-specific registration for native vehicle boarding regressions. */
 public final class VehicleGameTests {
+	/** Helping a passenger out cancels movement intended for its old seat. */
+	@GameTest
+	public void dismountStopsStaleSteering(GameTestHelper helper) {
+		VehicleScenarios.dismountStopsStaleSteering(helper, EntityType.OAK_BOAT, EntityType.OAK_CHEST_BOAT, EntityType.MINECART);
+	}
+
 	/** Owner dismount grants time to leave before ordinary boarding resumes. */
 	@GameTest
 	public void ownerDismountBoat(GameTestHelper helper) {

@@ -25,6 +25,12 @@ final class SurvivalGameTestPlayers {
 		// fixtures must not redirect the next goal's 32-block search or pollute its counts.
 		level.getEntitiesOfClass(ItemEntity.class, new AABB(helper.absolutePos(BlockPos.ZERO)).inflate(40),
 				item -> MushroomFetchToyPolicy.isFetchToy(item.getItem())).forEach(ItemEntity::discard);
+		return createWithoutToyCleanup(helper);
+	}
+
+	// Vehicle fixtures must not remove toys belonging to neighboring fetch tests.
+	static ServerPlayer createWithoutToyCleanup(GameTestHelper helper) {
+		var level = helper.getLevel();
 		UUID id = UUID.randomUUID();
 		GameProfile profile = new GameProfile(id, "fetch-" + id.toString().replace("-", "").substring(0, 10));
 		ServerPlayer player = new ServerPlayer(level.getServer(), level, profile, ClientInformation.createDefault());

@@ -55,6 +55,7 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	final MushroomOwnerPresenceState ownerPresence = new MushroomOwnerPresenceState();
 	final MushroomCreativeFlightRecovery creativeRecoveryFlight = new MushroomCreativeFlightRecovery();
 	final MushroomFlightRoute fetchFlight = new MushroomFlightRoute(this);
+	final MushroomWaterEscape waterEscape = new MushroomWaterEscape(this);
 	private final MushroomSleepInteractionTracker sleepInteractions = new MushroomSleepInteractionTracker();
 	int nightWakeTicks;
 	int scaredRunTicks;
@@ -204,6 +205,7 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	/** Leave enough time to move away; vanilla's three-second cooldown allowed immediate reboarding. */
 	void dismountForOwner() {
 		this.stopRiding();
+		MushroomMovement.stop(this);
 		this.boardingCooldown = Math.max(this.boardingCooldown, MushroomOwnerCommandInteractions.DISMOUNT_GRACE_TICKS);
 	}
 

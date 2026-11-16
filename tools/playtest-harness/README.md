@@ -199,8 +199,8 @@ six-block drop for each toy and owner locomotion state. It requires ordinary
 returns in accessible terrain and safe refusal under covered water or a survival
 cliff. A grounded creative cliff attempt may return or safely give up; it must
 conserve the toy, avoid damage, and end near the owner. Flying fetches must return.
-Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, the water/rest group adds 22, and sleep-spot controls add eight, making 249 cases before vehicle coverage. The vehicle group adds 100 cases, for 349 total. Run one group with `--group base`,
-`--group transitions`, `--group terrain`, `--group outdoors`, `--group water`, `--group rest`, or `--group vehicles`; combine it with an exact `--case`.
+Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, the water/rest group adds 22, and sleep-spot controls add eight, making 249 cases before vehicle coverage. The vehicle group adds 100 cases; the journeys group adds 112, for 461 total. Run one group with `--group base`,
+`--group transitions`, `--group terrain`, `--group outdoors`, `--group water`, `--group rest`, `--group vehicles`, or `--group journeys`; combine it with an exact `--case`.
 Unknown groups/cases fail instead of running a different suite.
 
 ```shell
@@ -223,7 +223,51 @@ Named native pet equipment and chest-boat cargo must survive. Food
 and harness controls freeze ticks for exact item/need changes, then resume full
 entity ticks. Successful final passenger fixtures retain their vehicle through
 inspection care. These are dry stationary vehicles and controlled contact tests, not water travel,
-moving-cart or natural approach/boarding journeys; those journeys remain tracked in issue #45.
+moving-cart journeys. Those are in the journeys group below; natural approach and
+reload behavior remain tracked in issue #45.
+
+The `journeys` group adds 64 contained-water dock sequences, 16 offshore immersion
+controls, and 32
+rail-minecart sequences. Each proves a real native passenger, injects motion
+for at most 30 frozen native ticks and requires at least two blocks of observed native movement before
+owner help, creative takeoff/landing, or mounted survival feeding/harness changes.
+Every motion request is recorded. A single initial impulse was observed to stop
+short, so the fixture reapplies motion at five-tick samples until its travel
+target is observed. Offshore controls sample every tick and stop the hull after three
+blocks, leaving room for its later departure; dock and rail controls sample every
+five ticks. The original short-travel cause is unconfirmed. Short travel remains a setup failure; command success alone does
+not establish movement. These inputs do not simulate player rowing.
+Boat bank-exit cases have a real dock doorway, a controlled shore-facing passenger
+yaw, and an owner standing clear of the exit. They do not claim an offshore sit
+order should make a dog walk off its safe boat platform. Offshore controls
+explicitly move the empty boat away after dismount, then witness actual water entry.
+Survival controls observe a native fall; creative controls explicitly place the
+same dismounted pet underwater because early creative recovery can otherwise
+preempt immersion. Both require witnessed immersion, released sitting and safe
+return; their entry methods are recorded separately in the inputs and trace.
+Departure includes a small native
+downward bob before drifting toward the bank; a boat that never actually departs
+is a setup failure. The bank obstruction remains part of the recovery challenge.
+It combines day/night, hunger and sit/follow states, preserves native named cargo,
+and checks safe grounded recovery after dismount. Dry passengers retain their
+order; a witnessed wet dismount releases sitting for water safety. Fine-grained
+post-dismount samples distinguish that safety transition from an unwanted order
+change aboard a dry boat. The ejection frame may still retain sit because native
+water safety runs before flight dismount; the next witnessed world tick must
+release it. Native world-clock evidence from an immediately preceding frame is required for that
+one-tick allowance; a first wet sample after a larger gap must already be released.
+All matrix sprint waits and vehicle frozen-step waits use native
+gametime, with modulo-wrap handling and tickAudit records. The server counter is
+not a physics clock while frozen. The shared vehicle fixture, flight setup and mounted
+care checks are reused by both groups. These controlled /ride mounts and injected
+motion do not prove natural walking approaches, player rowing or reload behavior.
+Those remain tracked in issue #45. A case that fails before its travel/end-state
+checks is not counted as completing that journey.
+
+The clear-tree-face squirrel transition records movement every 20 ticks for up
+to 400 ticks, then requires 40 ticks of stable clinging by the same healthy
+squirrel. Its completion time is retained. This tests a completed safe climb
+rather than assuming all valid approaches finish at a single fixed tick.
 
 The `outdoors` group checks closed-to-open doors across day/night, fed/hungry,
 sit/follow, and survival/grounded creative owners. Four additional cases start

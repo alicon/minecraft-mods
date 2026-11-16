@@ -92,12 +92,46 @@ Crafting GameTests load every Mushroom recipe and check exact output/count throu
 
 Water GameTests check clearing existing sleep/pose on entering water, refusing new wet sleep/sit requests, refusing airborne or overhanging-edge sleep/nap until supported landing, retaining sleep on thin dog beds/slabs and the supported doghouse visual bed, resuming dry nighttime sleep, preventing synthetic fall accumulation during supported doghouse sleep without protecting an awake falling pet, requiring the low-bed approach path to end on the bed rather than adjacent floor, and reaching a dry bank with the grounded creative recovery controller and native collision movement. Night recovery controls keep the sheltered routine quiet while wet or airborne, preserve daytime/outdoor trips and daily limits, and exercise doghouse priority and dusk cancellation. The live water group adds full entity ticks, day/night, hunger, real wet interactions, and creative naps triggered by actual block placement.
 
+Vehicle water controls run full native ticks for dry floating boats and chest
+boats, genuinely submerged carts/boats, and bubble-column danger. Dry passengers
+retain their sit order; real water hazards still release it. Non-fetch vehicle
+owners use the shared player fixture without deleting neighboring fetch toys.
+This improves isolation without claiming the older intermittent throw setup is fixed.
+Boat-bank escape controls compare a swimmer trapped beneath a boat with the same
+clear bank without a boat, including a close grounded creative owner. They require
+dry support, restored air and normal close following. A breathing surface swimmer
+beneath a low deck keeps ordinary following; only submerged stalled movement
+triggers escape. A farther creative control requires an observed flight-to-escape
+handoff. These tests sample every world tick, retain minimum air and largest
+movement, and observe at least 200 ticks with 40 consecutive settled ticks within a 400-tick
+bound. First recovery and later water re-entry are recorded separately. Native
+dismount controls also seed old movement/steering and require owner help to clear
+it for boats, chest boats and carts. Live dock sequences separately check the
+complete landing and settling behavior.
+
+Water movement fixtures record each entity's RNG seed. Use
+`MUSHROOM_GAME_TEST_SEED=42 ./gradlew :mushroom-the-yorkie:runGameTestServer`
+to replay that RNG stream. This does not pin the complete world or structure
+origin; retained positions and source versions remain part of the evidence. The
+far creative fixture keeps its owner well ashore so normal boarding restoration
+after the ten-second grace does not confound the recovery observation. Boat
+support alone does not satisfy the bank check; the feet need block support.
+
+Two separate NoAI, no-gravity, position-pinned controls test the controller's
+boundaries. A wet pet with breathing eyes stays idle beneath a deck for 45 ticks,
+beyond the stall gate. A submerged pet alternates between two positions to keep
+resetting progress, yet must release escape after 80 ticks and remain inactive
+through the 40-tick cooldown. Native fluid flags are established before invoking
+the controller. These artificial inputs do not prove free-swimming recovery;
+the boat-bank and surface-following tests above provide that separate evidence.
+
 Vehicle GameTests reproduce owner-assisted and creative-flight reboarding in boats
 and minecarts on both targets. They prove the grace period, retained sit order,
 refusal while the owner is flying, and restoration of normal boarding after
 landing and timeout. Their isolated NoAI ticks test native boarding decisions;
 the live vehicle group separately covers full entity/goal ticks. Water journeys,
-moving carts and natural boarding are still work in progress.
+moving-cart journeys now run in the live journeys group; natural approach/boarding
+routes and reload journeys remain work in progress.
 
 GameTests boot a scripted Minecraft server from the CLI. They are slower than unit tests, so keep them focused on behavior that needs a real world, entity registry, or server tick loop.
 
@@ -232,11 +266,26 @@ Set `BRIDGE_REPORT_FILE=build/playtest-reports/<name>.json` to save the full bri
 ## State-combination testing
 
 The [Mushroom state matrix](../tools/playtest-harness/README.md#mushroom-state-matrix)
-checks 144 combinations, nineteen interruption/owner-mode/flight/feeding/tree-approach sequences, 36 terrain cases, 20 outdoor-care sequences, 22 water/rest sequences, eight sleep-spot controls, and 100 dry vehicle cases (96 full-entity sequences plus four controlled boarding-refusal challenges) in a disposable live world and preserves partial failure
+checks 144 combinations, nineteen interruption/owner-mode/flight/feeding/tree-approach sequences, 36 terrain cases, 20 outdoor-care sequences, 22 water/rest sequences, eight sleep-spot controls, 100 dry vehicle cases (96 full-entity sequences plus four controlled boarding-refusal challenges), and 112 controlled water/rail journeys (including 16 actual offshore immersion controls) in a disposable live world and preserves partial failure
 reports. Run `npm --prefix tools/playtest-harness test` for the harness's runner,
 command-rejection, and save-safety regression tests. These tests also run in CI.
-Gameplay assertions still need the live Minecraft client and bridge. Successful
-matrix runs persist their original case observations before separately feeding
+Gameplay assertions still need the live Minecraft client and bridge. Matrix
+sprints and vehicle frozen steps wait on native gametime, not the server counter
+that keeps increasing during a frozen world. Clock-wrap and stalled-world controls
+run in the Node suite; snapshots include a tickAudit for completed waits. Journey
+interactions also verify actual supported owner placement and ordinary
+interaction reach. The bridge's decimal-coordinate teleport avoids native integer
+coordinate auto-centering; invalid placement/reach is a setup failure.
+Vehicle journeys record bounded motion requests during 30 frozen native travel
+ticks and require two blocks of actual movement before the owner action. Offshore
+controls sample every tick and stop after three blocks to retain departure room;
+dock and rail controls sample every five ticks. Short travel is a setup failure,
+even when the movement command succeeded.
+The clear-tree-face squirrel sequence samples progress up to 400 ticks, checks
+the original healthy squirrel reaches the safe height, then requires 40 more
+ticks of stable clinging. A single sample at 120 ticks can miss a valid slower
+route around the blocked side; the observed completion time remains in the report.
+Successful matrix runs persist their original case observations before separately feeding
 and healing the same tagged pet for inspection. The postRun record is maintenance,
 not gameplay evidence; its failure cannot turn a case failure into a pass. Failed
 or interrupted runs never receive this care.
