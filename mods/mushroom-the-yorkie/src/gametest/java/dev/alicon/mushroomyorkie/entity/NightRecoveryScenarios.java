@@ -79,6 +79,8 @@ final class NightRecoveryScenarios {
 						"Wet recovery near an outdoor doghouse requested outside");
 				helper.succeed();
 			} finally {
+				// Adjacent native fixtures are within the 18-block domestic search radius.
+				helper.setBlock(7, 2, 2, Blocks.AIR);
 				yorkie.discard();
 				helper.getLevel().setDayTime(priorTime);
 			}
