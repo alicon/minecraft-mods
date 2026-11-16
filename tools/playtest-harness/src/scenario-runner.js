@@ -14,7 +14,7 @@ function saveReport(reportFile, report) {
 
 // Persist after every case, including setup errors and partial runs. A long case can use its third run argument to checkpoint observations.
 async function runCases(cases, { reportFile, metadata = {}, capture = async () => null, onResult = () => {}, afterSuccess }) {
-  const report = { ...metadata, ok: false, complete: false, startedAt: new Date().toISOString(), cases: [] };
+  const report = { ...metadata, requestedCaseCount: cases.length, ok: false, complete: false, startedAt: new Date().toISOString(), cases: [] };
   const save = () => saveReport(reportFile, report);
   save();
   for (const scenario of cases) {
@@ -34,17 +34,22 @@ async function runCases(cases, { reportFile, metadata = {}, capture = async () =
       catch (captureError) { result.captureError = captureError.message; }
     } finally {
       if (scenario.cleanup) {
-        try { await scenario.cleanup(); }
+        try { await scenario.cleanup(result); }
         catch (error) { result.cleanupError = error.message; result.status = 'cleanup_failed'; }
       }
       save();
     }
     onResult(result);
+    // Keep failed investigative actors available instead of replacing their fixture.
+    if (scenario.stopOnFailure && result.status !== 'passed' && report.cases.length < cases.length) {
+      report.stoppedAfterFailure = true;
+      break;
+    }
   }
-  report.gameplayComplete = true;
+  report.gameplayComplete = report.cases.length === cases.length;
   report.summary = {};
   for (const result of report.cases) report.summary[result.status] = (report.summary[result.status] || 0) + 1;
-  report.gameplayOk = report.cases.length > 0 && report.cases.every((result) => result.status === 'passed');
+  report.gameplayOk = report.gameplayComplete && report.cases.length > 0 && report.cases.every((result) => result.status === 'passed');
   if (afterSuccess) {
     report.postRun = { status: report.gameplayOk ? 'running' : 'skipped', startedAt: new Date().toISOString() };
     // Persist the original verdicts before any success-only maintenance. Completion still waits for maintenance.

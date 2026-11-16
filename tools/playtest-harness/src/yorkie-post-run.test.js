@@ -195,3 +195,11 @@ test('a changed world during leash hydration fails instead of retrying there', a
   await assert.rejects(careForSuccessfulPet(f.context), /expected-save/);
   assert.equal(mergeCommands(f).length, 1);
 });
+
+test('final world disposition receives the original failed report without changing its verdict', async () => {
+  const { withWorldReset } = require('./yorkie-post-run');
+  const original = { ok: false, cases: [{ name: 'native-shore', status: 'failed', error: 'original anomaly' }] };
+  let received;
+  const result = await withWorldReset({ run: async () => original, reset: async report => { received = report; } });
+  assert.equal(received, original);assert.equal(result, original);assert.equal(result.cases[0].error, 'original anomaly');
+});

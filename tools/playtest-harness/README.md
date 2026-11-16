@@ -231,9 +231,39 @@ observed airborne approach ticks and the intended tree, and stage the owner
 outside new solid blocks. The observer starts counting climbing travel near the
 expected trunk, so crossing the raised strip cannot masquerade as circling.
 
-Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, the water/rest group adds 22, and sleep-spot controls add eight, making 270 cases before vehicle coverage. The vehicle group adds 100 cases; the journeys group adds 112, for 482 total. Run one group with `--group base`,
-`--group transitions`, `--group terrain`, `--group outdoors`, `--group water`, `--group rest`, `--group vehicles`, or `--group journeys`; combine it with an exact `--case`.
+Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, the water/rest group adds 22, and sleep-spot controls add eight, making 270 cases before vehicle coverage. The vehicle group adds 100 cases; the journeys group adds 112; native shore adds eight, for 490 defined cases. Run one group with `--group base`,
+`--group transitions`, `--group terrain`, `--group outdoors`, `--group water`, `--group rest`, `--group vehicles`, `--group journeys`, or `--group native-shore`; combine it with an exact `--case`.
 Unknown groups/cases fail instead of running a different suite.
+
+`native-shore` needs the current Minecraft client and bridge. It covers day/night,
+hungry/fed and sit/follow using a native owner exit, an empty-hand pet interaction
+within survival reach, 80 native forward walking ticks and 120 subsequent world
+ticks. Before movement it checks the entire walking bank's floor, headroom,
+30 pool-water blocks, walls, bottom, pool headroom and half-block step. Runtime bounds cancel native input
+before the owner reaches an edge. Following recovery requires 40 final consecutive
+world samples with full air, normal gravity, dry grounded posture and the original
+owner nearby, followed by a native block-support check. Dry sitting keeps its
+order, full air and actual support on audited blocks or the original boat hull.
+Ordinary reboarding of that same boat after 200 native world ticks is allowed;
+earlier reboarding fails. Drift
+over one block from the help position fails. Observed water contact requires
+release and recovery, but these eight cases do not guarantee wet-sit coverage.
+The empty-hand help is frozen, with its first subsequent native world tick
+inspected separately. Walking is sampled by request snapshots, not every world
+tick; a short contact between those polls can remain unseen. The world freezes
+before post-walk block queries. All cases retain original
+actors, health, air/fall/damage facts and possessions, and disable inspection care.
+These investigative cases stop at the first failure so a later setup cannot
+replace its original actors. A failed fixture stays frozen with its owner mode
+and time retained; player ticks can still advance, so check owner safety before
+resuming. Input release failures are visible in the case error and observations.
+The report distinguishes terminal completion from
+whether every requested case ran.
+The matrix's 490 defined cases are not a claim that a full sweep has passed.
+
+```shell
+node tools/playtest-harness/src/bridge-cli.js yorkie-matrix --expected-save "<copied save>" --group native-shore --report-file build/playtest-reports/native-shore.json
+```
 
 ```shell
 node tools/playtest-harness/src/bridge-cli.js yorkie-matrix --expected-save "<copied save>" --group terrain --report-file build/playtest-reports/terrain.json
