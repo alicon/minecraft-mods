@@ -394,6 +394,7 @@ node tools/playtest-harness/src/bridge-cli.js yorkie-crafting \
 This guarded, read-only suite checks all nine mod recipes, vanilla copper nuggets and dyed wool,
 empty input, and rejected malformed/unknown-item grids. It records the native selected output,
 quantity and every matching recipe, so a mod craft cannot silently overlap another recipe.
+Vanilla controls also reject any matching Mushroom recipe, even when the selected output is vanilla.
 Reports are saved incrementally, including failed checks. This command does not replace items,
 change the player's inventory, reset pets, or apply post-run care.
 

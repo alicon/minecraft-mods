@@ -46,6 +46,7 @@ class LegacyCraftingIngredients extends FilterReader {
 
 if (project.ext.active_minecraft_version == '1.21.1') {
 	tasks.named('processResources') {
+		inputs.file(rootProject.file('gradle/legacy-crafting-recipes.gradle')).withPropertyName('legacyCraftingAdapter')
 		inputs.property('legacyCraftingIngredientSchema', 1)
 		filesMatching("data/${project.ext.mod_id}/recipe/*.json") {
 			filter(LegacyCraftingIngredients)

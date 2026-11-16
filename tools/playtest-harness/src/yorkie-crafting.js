@@ -46,7 +46,13 @@ function craftingCases({ query, guard = async () => {} }) {
         else {
           check(response.matched && response.result?.id === row.expected && response.result?.count === row.count,
             `Expected ${row.count} ${row.expected}, observed ${JSON.stringify(response.result)}`);
-          if (row.unique) check(response.matchingRecipes?.length === 1, `Ambiguous Mushroom craft: ${JSON.stringify(response.matchingRecipes)}`);
+          check(Array.isArray(response.matchingRecipes), 'Missing matching recipe IDs');
+          if (row.unique) {
+            check(response.matchingRecipes.length === 1, `Ambiguous Mushroom craft: ${JSON.stringify(response.matchingRecipes)}`);
+            check(response.selectedRecipe === row.expected, 'The selected Mushroom recipe ID does not match the expected recipe');
+          } else check(response.matchingRecipes.every(id => typeof id === 'string' && !id.startsWith('mushroom_yorkie:')),
+            'Vanilla craft still overlaps a Mushroom recipe');
+          check(response.matchingRecipes.includes(response.selectedRecipe), 'The selected recipe is absent from the matching recipe IDs');
         }
       }
       return response;
