@@ -16,6 +16,7 @@ public final class PlaytestBridgeClient implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
+		BridgeClientInput.register();
 		BridgeClientHooks.registerScreenshotProvider(this::captureScreenshot);
 		BridgeClientHooks.registerQuitProvider(this::requestQuit);
 		PlaytestBridge.LOGGER.info("Playtest bridge client screenshot hook initialized");

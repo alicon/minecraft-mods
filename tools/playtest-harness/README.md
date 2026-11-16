@@ -361,6 +361,62 @@ not a confirmed cause or proof that the world failed to load. Other worker
 writes and non-console file writes do not implicate launcher backpressure. The diagnostic
 never kills or relaunches a process; inspect it before attempting another launch.
 
+## Bounded native client input
+
+The development bridge can hold forward/backward/left/right through Minecraft's
+key mappings, before native `KeyboardInput` runs. It supports a walking player
+or the driver of an identified boat. It does not set velocity, teleport the
+player, or use OS keyboard automation. Start with a clear copied-world route
+and no movement keys held. An open screen, frozen world, flying/spectator player,
+wrong vehicle or changed save/player prevents input or releases an active burst.
+
+```shell
+node tools/playtest-harness/src/bridge-cli.js client-input \
+  --expected-save "Mushroom Abel Noelle 20261115-075437" \
+  --mode walk --ticks 20 --forward true \
+  --report-file build/playtest-reports/native-walk.json
+```
+
+For rowing, use `--mode boat --vehicle-uuid <original boat UUID>` while the
+original player is already its driver. Omitting direction flags requests an idle
+control. Durations are 1–100 client ticks, with a 15-second wall-time cleanup
+callback. Normal completion includes a later neutral input tick. Cancellation,
+context loss and shutdown release injected controls; an unconfirmed release is
+reported as failure, not movement success. Physical jumping, sprinting or
+sneaking interrupts the burst. Native momentum can continue after keys release.
+
+The CLI holds the shared bridge lock and saves incremental reports. It checks
+fresh native keyboard records and player ticks, neutral release, actual server-world progress and measured
+owner/vehicle displacement. A valid burst can have zero movement against an
+obstacle or in an idle control; scenario callers must assert the travel they need.
+It does not reset the arena or apply pet care.
+
+Direct `POST /client-input` requests use `action: start|status|cancel`, the exact
+`expectedSave`, `playerUuid` and a caller-generated UUID `operationId`. Starts add
+`mode`, integer `ticks`, Boolean direction flags and, for boats, `vehicleUuid`.
+Status/cancel use only the common fields. The current operation's identical start
+can be retried without applying input twice. Other overlapping starts fail.
+Only the most recent receipt is retained. Poll until `phase=complete`, then
+require `outcome=completed` and `controlsReleased=true`. Receipts include bounded
+client frames and a server snapshot taken before dispatch of that request.
+The CLI takes a separate final server snapshot for movement verification.
+`/state` also exposes `worldFrozen` and exact string `overworldGameTime`; client
+frame time is a distinct observation. The shared `driveClientInput` helper
+requires its caller to hold the bridge lock and attempts cancellation on failure,
+including a lost acceptance reply using the ID chosen before dispatch.
+Normal completion uses a fresh native neutral sample. Emergency context, adapter
+failure or shutdown cleanup can clear cached input without waiting for another
+player tick; those outcomes are not successful movement evidence. The CLI also
+attempts cancellation and preserves a failed report on SIGINT/SIGTERM.
+
+Nearby living-entity snapshots include native `air`, `maxAir`, `fallDistance`,
+`hurtTime` and `lastDamageType` alongside health. These read-only facts help
+separate drowning, fall accumulation and other damage during travel. A retained
+damage type is recent native history; `unavailable` means no cause is currently
+retained, not that the entity has never taken damage. Gameplay observers run only
+during the requested operation; cancellation receipt collection stays independent
+of an observer that has already failed.
+
 ## Fetch across a saved restart
 
 ```shell

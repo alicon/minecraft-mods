@@ -152,6 +152,10 @@ final class PlaytestBridgeServer {
 				JsonObject body = readBody(exchange);
 				JsonObject snapshot = runOnServerThread(this::state);
 				sendJson(exchange, 200, BridgeClientRequests.quit(snapshot, body));
+			} else if ("POST".equals(method) && "/client-input".equals(path)) {
+				JsonObject body = readBody(exchange);
+				JsonObject snapshot = runOnServerThread(this::state);
+				sendJson(exchange, 200, BridgeClientRequests.input(snapshot, body));
 			} else {
 				sendError(exchange, 404, "Unknown bridge endpoint");
 			}
@@ -177,6 +181,8 @@ final class PlaytestBridgeServer {
 		JsonObject state = this.health();
 		state.addProperty("motd", this.server.getMotd());
 		state.addProperty("tickCount", this.server.getTickCount());
+		state.addProperty("worldFrozen", this.server.tickRateManager().isFrozen());
+		state.addProperty("overworldGameTime", Long.toString(this.server.overworld().getGameTime()));
 		BridgeWorldMetadata.addTo(state, this.server.overworld().getSeed(), this.server.getWorldPath(LevelResource.ROOT));
 
 		JsonArray players = new JsonArray();

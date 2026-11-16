@@ -93,6 +93,12 @@ final class BridgeEntityState {
 		if (entity instanceof LivingEntity living) {
 			state.addProperty("health", round(living.getHealth()));
 			state.addProperty("maxHealth", round(living.getMaxHealth()));
+			state.addProperty("air", living.getAirSupply());
+			state.addProperty("maxAir", living.getMaxAirSupply());
+			state.addProperty("fallDistance", living.fallDistance);
+			state.addProperty("hurtTime", living.hurtTime);
+			var source = living.getLastDamageSource();
+			state.addProperty("lastDamageType", source == null ? "unavailable" : source.getMsgId());
 			state.add("mainHand", itemStack(living.getMainHandItem()));
 		}
 		if (entity instanceof TamableAnimal tameable) {

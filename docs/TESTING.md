@@ -298,6 +298,20 @@ Missing/dead/unverified fixtures and failed/interrupted runs are never repaired 
 
 ## Current Automated Coverage
 
+Native client input has separate lifecycle and request tests. They cover exact
+duration followed by a neutral tick, overlap, safe retry, stale cancellation,
+context loss, wall timeout, shutdown, adapter failure and bounded unconfirmed
+release. Harness controls reject wrong identity, unapplied native buttons and a
+stalled server clock, and cancel by a known operation ID if acceptance is lost.
+The [native input CLI](../tools/playtest-harness/README.md#bounded-native-client-input)
+records actual input and displacement; accepting a key request alone does not
+prove a walking or rowing scenario. These controls do not add cases to the 461
+Mushroom matrix until explicit gameplay sequences use them.
+Nearby living-entity snapshots also retain native air, accumulated fall distance,
+hurt timer and recent damage type for diagnosing a health change. These fields
+do not change damage rules, and unavailable retained history cannot identify the
+cause of an older hit.
+
 NARwhal Together:
 
 - target cycling selects the first target when no previous target exists

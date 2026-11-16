@@ -20,17 +20,34 @@ final class BridgeClientRequests {
 		return BridgeClientHooks.requestQuit(expectedSave).get(10, TimeUnit.SECONDS);
 	}
 
+	static JsonObject input(JsonObject state, JsonObject body) throws Exception {
+		BridgeInputRequest request = BridgeInputRequest.parse(state, body);
+		var future = BridgeClientHooks.input(request);
+		try {
+			JsonObject response = future.get(5, TimeUnit.SECONDS);
+			response.add("serverSnapshot", state);
+			return response;
+		} catch (Exception failure) {
+			future.cancel(false);
+			throw failure;
+		}
+	}
+
 	static String validateQuit(JsonObject state, JsonObject body) {
+		return validateTestWorld(state, body, "quit");
+	}
+
+	static String validateTestWorld(JsonObject state, JsonObject body, String action) {
 		String expectedSave = string(body, "expectedSave");
 		if (expectedSave.isEmpty() || !expectedSave.equals(string(state, "saveName"))) {
-			throw new IllegalArgumentException("quit requires the exact expectedSave name");
+			throw new IllegalArgumentException(action + " requires the exact expectedSave name");
 		}
 		if (!(expectedSave.startsWith("Codex ") || expectedSave.startsWith("Mushroom Matrix ")
 				|| expectedSave.startsWith("Mushroom Abel Noelle "))) {
-			throw new IllegalArgumentException("quit requires a disposable test save");
+			throw new IllegalArgumentException(action + " requires a disposable test save");
 		}
 		if (!bool(state, "singleplayer", false) || !state.has("playerCount") || state.get("playerCount").getAsInt() != 1) {
-			throw new IllegalArgumentException("quit requires exactly one player in a single-player world");
+			throw new IllegalArgumentException(action + " requires exactly one player in a single-player world");
 		}
 		return expectedSave;
 	}
