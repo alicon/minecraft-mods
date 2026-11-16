@@ -114,8 +114,9 @@ The `yorkie-smoke` command now requires the exact disposable save via `--expecte
 (or `PLAYTEST_WORLD`), plus a single local player in the Overworld. The copied-world
 launcher passes its actual save name automatically. It shares the matrix's bridge lock,
 checks the same world/player before every step and mutating request, and checkpoints partial observations.
-Its report retains the original flat `steps`/`screenshot` fields alongside the runner's
-case record and separate `gameplayOk`/`postRun` verdicts. On success only, it feeds/heals
+Completed reports retain the original flat `steps`/`screenshot` fields alongside the runner's
+case record and separate `gameplayOk`/`postRun` verdicts. While running, partial steps live
+under `cases[0].observed.steps`; failed assertions are recorded in `cases[0].error`. On success only, it feeds/heals
 the same living owned `runtime_smoke_yorkie` fixture after the original observations
 are saved. Harness, leash holder, UUID and native item components must be preserved.
 Saved leash data may need a native entity tick to restore its holder; care observes this
@@ -123,6 +124,8 @@ with a bounded read-only wait and never attaches a replacement leash. Failed/int
 runs and dead/missing/unverified pets receive no care or replacement. A care error fails
 overall `ok` while preserving gameplay results. The default report is
 `build/playtest-reports/yorkie-smoke.json`; `--report-file` or `BRIDGE_REPORT_FILE` can override it.
+Paths are relative to the CLI working directory. `make` uses npm's harness directory;
+pass an absolute report path when you want the report under the repository root.
 Care is a one-time inspection step, not immunity from later hunger decay.
 
 The focused home-and-squirrel scenario proves visible doghouse sleep, squirrel tree seeking, Mushroom's chase and 30-second return, and the early return when a tree-less squirrel crosses the 24-block player limit. It also saves clean doghouse and squirrel-chase screenshots.
