@@ -305,8 +305,20 @@ Every motion request is recorded. A single initial impulse was observed to stop
 short, so the fixture reapplies motion at five-tick samples until its travel
 target is observed. Offshore controls sample every tick and stop the hull after three
 blocks, leaving room for its later departure; dock and rail controls sample every
-five ticks. The original short-travel cause is unconfirmed. Short travel remains a setup failure; command success alone does
+five ticks. Earlier short-travel causes remain unconfirmed. Short travel remains a setup failure; command success alone does
 not establish movement. These inputs do not simulate player rowing.
+
+A later stopped journey was blocked by ice in its authored pool. A same-actor
+continuation moved again after only that ice cell was cleared. Controlled water
+journeys now use a submerged sea-lantern floor without changing biome, depth or
+sky exposure. All 36 source-water cells must have native block light at least 10
+and native freezing eligibility false. Full bottom and wall volumes are audited
+too. Setup allows a bounded light-propagation wait while frozen; it never refills
+or melts changed water during observation. Audits run before travel, at each
+travel sample, before the owner action and at the end. A changed cell/light/support
+is a setup failure with retained observations. Health failures retain their gameplay
+classification even when the environment also changed. These are controlled
+liquid-water journeys, not natural freezing or dark-pool coverage.
 Boat bank-exit cases have a real dock doorway, a controlled shore-facing passenger
 yaw, and an owner on the inner quarter of the first dry bank column. This keeps
 short valid trips within survival reach; actual support and reach are still
