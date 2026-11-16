@@ -73,6 +73,7 @@ async function careForSuccessfulPet(context) {
     assert.deepEqual(cared.mainHand, original.mainHand, 'Care changed held possessions');
     assert.equal(cared.custom.harness, original.custom.harness, 'Care changed the harness');
     assert.deepEqual(cared.leash, original.leash, 'Care changed the leash');
+    assert.deepEqual(cared.vehicle, original.vehicle, 'Care changed the mounted vehicle');
     observed.equipment.after = await equipment();
     assert.deepEqual(observed.equipment.after, before, 'Care changed native item components');
     return observed;

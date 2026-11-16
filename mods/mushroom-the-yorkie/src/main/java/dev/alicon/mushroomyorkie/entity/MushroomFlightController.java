@@ -16,7 +16,7 @@ final class MushroomFlightController {
 	static void followFlyingOwner(MushroomYorkieEntity yorkie) {
 		if (yorkie.isPassenger()) {
 			if (MushroomYorkieStateQueries.ownerIsCreativeFlying(yorkie)) {
-				yorkie.stopRiding();
+				yorkie.dismountForOwner();
 				MushroomBehaviorDebugger.debug(yorkie, "vehicle_dismount", "vehicle: hopped out before creative flight", true);
 			}
 			yorkie.setNoGravity(false);

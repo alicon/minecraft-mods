@@ -33,6 +33,7 @@ function fixture(options = {}) {
       assert.equal(route, '/command'); commands.push(command);
       if (command.includes('run data merge')) {
         changed = true; pet.health = 12; pet.custom.needs = { hunger: 0, potty: 0 };
+        if (options.changeVehicle) delete pet.vehicle;
         return { success: true };
       }
       if (command.includes('if entity @s[type=')) return { success: !options.untagged };
@@ -45,6 +46,18 @@ function fixture(options = {}) {
 }
 
 const mergeCommands = (f) => f.commands.filter((s) => s.includes('data merge'));
+
+test('inspection care preserves the existing vehicle and rejects an unintended dismount', async () => {
+  for (const changeVehicle of [false, true]) {
+    const f = fixture({ changeVehicle });
+    f.pet.vehicle = { id: 21, type: 'minecraft:oak_chest_boat', name: 'Oak Boat with Chest' };
+    if (changeVehicle) await assert.rejects(careForSuccessfulPet(f.context), /mounted vehicle/);
+    else {
+      const report = await careForSuccessfulPet(f.context);
+      assert.deepEqual(report.after.players[0].nearbyEntities[0].vehicle, f.pet.vehicle);
+    }
+  }
+});
 
 test('success-only care follows persisted original verdicts and preserves pet/items', async () => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'matrix-care-'));

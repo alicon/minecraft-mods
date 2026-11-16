@@ -165,7 +165,7 @@ the client. Never point it at a family save. Keep only one live scenario run
 active per bridge. It leaves the test arena and report available for inspection;
 it restores daylight and a grounded creative player, not the original save state.
 After a successful run it feeds/heals only the original tagged matrix pet, retaining
-its UUID, harness, leash and native equipment (including item components). This care
+its UUID, harness, leash, mounted vehicle and native equipment (including item components). This care
 happens after case observations are persisted, and is recorded separately in
 `postRun`; it cannot change gameplay verdicts. Failed/interrupted runs get no pet
 care, and missing/dead/unowned/untagged pets are never replaced. Every maintenance
@@ -199,13 +199,24 @@ six-block drop for each toy and owner locomotion state. It requires ordinary
 returns in accessible terrain and safe refusal under covered water or a survival
 cliff. A grounded creative cliff attempt may return or safely give up; it must
 conserve the toy, avoid damage, and end near the owner. Flying fetches must return.
-Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, the water/rest group adds 22, and sleep-spot controls add eight, making the full suite 249 cases. Run one group with `--group base`,
-`--group transitions`, `--group terrain`, `--group outdoors`, `--group water`, or `--group rest`; combine it with an exact `--case`.
+Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, the water/rest group adds 22, and sleep-spot controls add eight, making 249 cases before vehicle coverage. The vehicle group adds 96 cases, for 345 total. Run one group with `--group base`,
+`--group transitions`, `--group terrain`, `--group outdoors`, `--group water`, `--group rest`, or `--group vehicles`; combine it with an exact `--case`.
 Unknown groups/cases fail instead of running a different suite.
 
 ```shell
 node tools/playtest-harness/src/bridge-cli.js yorkie-matrix --expected-save "<copied save>" --group terrain --report-file build/playtest-reports/terrain.json
 ```
+
+The `vehicles` group proves controlled native mounts in oak boats, chest boats and
+minecarts before testing owner-assisted dismount, creative takeoff/landing, and
+mounted survival feeding/harness changes. It covers day/night, fed/hungry and
+sit/follow orders; assisted dismount also covers survival/creative grounded owners.
+Both directions of the bridge's id/type passenger references must match the full
+UUID states. Named native pet equipment and chest-boat cargo must survive. Food
+and harness controls freeze ticks for exact item/need changes, then resume full
+entity ticks. Successful final passenger fixtures retain their vehicle through
+inspection care. These are dry stationary vehicles, not water travel, moving-cart
+or natural boarding coverage; those journeys remain tracked in issue #45.
 
 The `outdoors` group checks closed-to-open doors across day/night, fed/hungry,
 sit/follow, and survival/grounded creative owners. Four additional cases start
