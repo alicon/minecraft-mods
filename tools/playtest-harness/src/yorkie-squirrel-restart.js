@@ -50,9 +50,18 @@ function perchVerdict(original, frames) {
     ok: healthUnchanged && heightLoss <= 0.2 && largestHorizontalMove <= 0.2 && settled };
 }
 
+function supportVerdict(original, frames, removed) {
+  if (removed === 'ground') return perchVerdict(original, frames);
+  assert.equal(removed, 'middle');
+  const releasedAndFell = frames.some(({ squirrel: e }) => e?.uuid === original.uuid && e.health > 0
+    && !e.noGravity && !e.custom?.foundTree && e.fallDistance > 0.2 && e.position.y < original.position.y - 0.2);
+  return { ok: releasedAndFell, releasedAndFell };
+}
+
 async function runSquirrelRestart(baseUrl, args) {
   assert(/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(baseUrl), 'Restart requires a loopback bridge');
   assert(args.lowerFaceBlock === undefined || typeof args.lowerFaceBlock === 'boolean', 'Lower-face option must be a boolean');
+  assert(!args.supportLog || ['ground', 'middle'].includes(args.supportLog), 'Support log must be ground or middle');
   const reportFile = path.resolve(args.reportFile || `build/playtest-reports/squirrel-restart-${Date.now()}-${randomUUID().slice(0, 8)}.json`);
   const report = { scenario: 'squirrel-saved-restart', expectedSave: args.expectedSave, lowerFaceBlock: args.lowerFaceBlock === true,
     stage: 'preflight', complete: false, ok: false, preRestart: [], postRestart: [] };
@@ -128,6 +137,26 @@ async function runSquirrelRestart(baseUrl, args) {
           assert(actor(snapshot)?.health > 0, 'Original squirrel died or vanished after reload');
         }
         Object.assign(report, perchVerdict(original, report.postRestart));
+        report.perchOk = report.ok;
+        if (report.ok && args.supportLog) {
+          report.stage = 'support-change';
+          const block = { x: tree.x, y: tree.y + (args.supportLog === 'middle' ? 2 : 0), z: tree.z };
+          const perched = actor(await state());
+          assert(perched?.custom?.foundTree && perched.noGravity && perched.position.y > block.y + 1.05, 'Support change overlaps or missed the perched body');
+          assert.equal((await request('/block', block)).block, 'minecraft:oak_log', 'Support log is not present');
+          assert.equal((await command(`setblock ${block.x} ${block.y} ${block.z} minecraft:air`)).success, true);
+          assert.equal((await request('/block', block)).block, 'minecraft:air');
+          report.supportChange = { removed: args.supportLog, block, original: perched, trace: [] }; save();
+          for (let tick = 1; tick <= (args.supportLog === 'ground' ? 40 : 20); tick++) {
+            const snapshot = await advanceWorldTicks(command, state, 1, 'step');
+            assert(snapshot.worldFrozen && snapshot.tickAudit.elapsedTicks === 1, 'Support reaction lost exact native ticks');
+            report.supportChange.trace.push({ tick, squirrel: actor(snapshot), tickAudit: snapshot.tickAudit }); save();
+            assert(actor(snapshot)?.health > 0, 'Support change lost the original squirrel');
+            if (args.supportLog === 'middle' && supportVerdict(perched, report.supportChange.trace, 'middle').ok) break;
+          }
+          report.supportChange.verdict = supportVerdict(perched, report.supportChange.trace, args.supportLog);
+          report.ok = report.ok && report.supportChange.verdict.ok;
+        }
         report.gameplayOk = report.ok;
         report.complete = true; report.stage = 'complete'; save();
         return report;
@@ -142,4 +171,4 @@ async function runSquirrelRestart(baseUrl, args) {
   }
 }
 
-module.exports = { runSquirrelRestart, perchVerdict, assertRestartWorld, cleanupRestart };
+module.exports = { runSquirrelRestart, perchVerdict, supportVerdict, assertRestartWorld, cleanupRestart };

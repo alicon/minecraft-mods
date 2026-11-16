@@ -77,6 +77,11 @@ final class SquirrelFindTreeGoal extends Goal {
 
 	@Override
 	public boolean canContinueToUse() {
+		if (this.climbing && this.squirrel.hasFoundTree()) {
+			// Holding and recovering a perch use the same physical support rule;
+			// an obsolete run-up anchor cannot change the outcome after a reload.
+			return this.climbPos != null && SquirrelPerchRecovery.supports(this.squirrel, this.climbPos);
+		}
 		boolean valid = this.treePos != null
 				&& !this.approachFailed
 				&& (this.climbing || this.approachTicks < MAX_APPROACH_TICKS)

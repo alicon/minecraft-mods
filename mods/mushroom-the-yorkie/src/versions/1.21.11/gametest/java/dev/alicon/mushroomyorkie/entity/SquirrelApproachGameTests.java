@@ -243,6 +243,30 @@ public final class SquirrelApproachGameTests {
 		SquirrelReloadApproachScenarios.trackedTopAfterReload(helper, squirrel -> roundTrip(helper, squirrel));
 	}
 
+	/** Apply the same physical support rule before and after native reload. */
+	@GameTest(maxTicks = 340)
+	public void squirrelSupportChangeLiveGround(GameTestHelper helper) {
+		SquirrelSupportChangeScenarios.observe(helper, squirrel -> roundTrip(helper, squirrel), false, false);
+	}
+
+	/** Apply the same physical support rule before and after native reload. */
+	@GameTest(maxTicks = 340)
+	public void squirrelSupportChangeLiveMiddle(GameTestHelper helper) {
+		SquirrelSupportChangeScenarios.observe(helper, squirrel -> roundTrip(helper, squirrel), false, true);
+	}
+
+	/** Apply the same physical support rule before and after native reload. */
+	@GameTest(maxTicks = 340)
+	public void squirrelSupportChangeReloadedGround(GameTestHelper helper) {
+		SquirrelSupportChangeScenarios.observe(helper, squirrel -> roundTrip(helper, squirrel), true, false);
+	}
+
+	/** Apply the same physical support rule before and after native reload. */
+	@GameTest(maxTicks = 340)
+	public void squirrelSupportChangeReloadedMiddle(GameTestHelper helper) {
+		SquirrelSupportChangeScenarios.observe(helper, squirrel -> roundTrip(helper, squirrel), true, true);
+	}
+
 	private static SquirrelEntity roundTrip(GameTestHelper helper, SquirrelEntity squirrel) {
 		var problems = new ProblemReporter.Collector();
 		var output = TagValueOutput.createWithContext(problems, helper.getLevel().registryAccess());

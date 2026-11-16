@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
-const { perchVerdict, runSquirrelRestart, assertRestartWorld, cleanupRestart } = require('./yorkie-squirrel-restart');
+const { perchVerdict, supportVerdict, runSquirrelRestart, assertRestartWorld, cleanupRestart } = require('./yorkie-squirrel-restart');
 
 const original = { uuid: 'original', health: 8, position: { x: 3.81, y: 4.9, z: 4.5 } };
 const good = () => ({ squirrel: { ...original, noGravity: true, custom: { foundTree: true } } });
@@ -103,4 +103,19 @@ test('cleanup cannot replace the original bootstrap failure', async () => {
   await cleanupRestart({ report, save: () => {}, command: async () => assert.fail('No mutation after state failure'), state: async () => { throw new Error('bridge unavailable'); } });
   assert.equal(report.error, 'original bootstrap failure'); assert.equal(report.failedStage, 'relaunching');
   assert.equal(report.cleanupError, 'bridge unavailable');
+});
+
+test('a remote ground log can disappear while the same physical perch remains', () => {
+  const frames = Array.from({ length: 40 }, good);
+  assert.equal(supportVerdict(original, frames, 'ground').ok, true);
+  frames[1] = { squirrel: { ...good().squirrel, position: { ...original.position, y: 4 } } };
+  assert.equal(supportVerdict(original, frames, 'ground').ok, false);
+});
+
+test('removing the supporting middle requires real released falling, not a toggled flag alone', () => {
+  const released = { ...good().squirrel, noGravity: false, custom: { foundTree: false }, fallDistance: 0 };
+  assert.equal(supportVerdict(original, [{ squirrel: released }], 'middle').ok, false);
+  const fell = { ...released, position: { ...original.position, y: 4.5 }, fallDistance: 0.4 };
+  assert.equal(supportVerdict(original, [{ squirrel: fell }], 'middle').ok, true);
+  assert.equal(supportVerdict(original, [{ squirrel: { ...fell, uuid: 'replacement' } }], 'middle').ok, false);
 });

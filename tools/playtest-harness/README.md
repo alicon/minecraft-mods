@@ -602,3 +602,10 @@ errors remain distinct. Cleanup rechecks identity and verifies the world is
 unfrozen. A cleanup failure keeps the gameplay verdict separately and fails the
 overall run. No failed or successful squirrel run receives pet care, damage
 immunity, a replacement squirrel or a post-start success teleport.
+
+Add `--support-log ground` to remove a remote ground log after a verified saved
+restart and require 40 more safe perching ticks. `--support-log middle` removes
+one of the two supporting log blocks instead and requires released no-gravity,
+observed height loss and native fall-distance accumulation within 20 ticks.
+The latter permits ordinary fall damage; it does not heal the squirrel. Native
+controls compare the same two support changes both before and after reload.

@@ -70,7 +70,7 @@ final class SquirrelReloadApproachScenarios {
 			this.blockBelow = blockBelow;
 			this.removeTop = removeTop;
 			String directory = System.getenv("MUSHROOM_SQUIRREL_TRACE_DIR");
-			this.output = directory == null ? null : Path.of(directory, "native-perch-reload-" + removeTree + "-lower-" + blockBelow + "-" + squirrel.getUUID() + ".json");
+			this.output = directory == null ? null : Path.of(directory, "native-perch-reload-" + removeTree + "-lower-" + blockBelow + "-top-" + removeTop + "-" + squirrel.getUUID() + ".json");
 			this.report.addProperty("entityUuid", squirrel.getUUID().toString());
 			this.report.addProperty("changedLowerFace", blockBelow);
 			this.report.addProperty("removeTrackedTop", removeTop);
@@ -99,11 +99,6 @@ final class SquirrelReloadApproachScenarios {
 				if (this.reloadedAt >= 0) {
 					this.minimumReloadY = Math.min(this.minimumReloadY, this.squirrel.getY());
 					if (!this.removeTree && this.topRemovedAt < 0) {
-						this.largestReloadHorizontalMove = Math.max(this.largestReloadHorizontalMove, Math.hypot(
-								this.squirrel.getX() - this.savedPosition.x, this.squirrel.getZ() - this.savedPosition.z));
-						this.helper.assertTrue(this.largestReloadHorizontalMove <= 0.2D, "Intact saved perch moved to another face");
-					}
-					if (!this.removeTree && this.topRemovedAt < 0) {
 						this.largestReloadHorizontalMove = Math.max(this.largestReloadHorizontalMove,
 								Math.hypot(this.squirrel.getX() - this.savedPosition.x, this.squirrel.getZ() - this.savedPosition.z));
 						this.helper.assertTrue(this.largestReloadHorizontalMove <= 0.2D, "Intact saved perch moved to another face");
@@ -125,7 +120,6 @@ final class SquirrelReloadApproachScenarios {
 				if (this.stableTicks >= (removedAndLanded ? 10 : 40)) {
 					if (this.reloadedAt < 0) {
 						this.savedPerchY = this.squirrel.getY();
-						this.savedPosition = this.squirrel.position();
 						this.savedPosition = this.squirrel.position();
 						if (this.removeTree) {
 							for (int y = 1; y <= 5; y++) this.helper.setBlock(4, y, 4, Blocks.AIR);

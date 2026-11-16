@@ -3623,6 +3623,7 @@ async function main() {
       ...args, expectedSave: option(args, 'expectedSave', 'PLAYTEST_WORLD', ''),
       lowerFaceBlock: optionBoolean(args, 'lowerFaceBlock', 'BRIDGE_LOWER_FACE_BLOCK', false),
       instanceId: option(args, 'instanceId', 'MODRINTH_INSTANCE_ID', ''),
+      supportLog: option(args, 'supportLog', 'BRIDGE_SUPPORT_LOG', ''),
       reportFile: option(args, 'reportFile', 'BRIDGE_REPORT_FILE', '')
     });
     if (!result.ok) process.exitCode = 1;

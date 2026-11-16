@@ -6,7 +6,7 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
-/** Reclaims a native-saved perch only when the current body and tree still support that state. */
+/** Uses the same physical support for holding and reclaiming native-saved perches. */
 final class SquirrelPerchRecovery {
 	record Perch(BlockPos tree, BlockPos approach, BlockPos climb) {
 	}
@@ -15,8 +15,7 @@ final class SquirrelPerchRecovery {
 	}
 
 	static Perch find(SquirrelEntity squirrel) {
-		var level = squirrel.level();
-		if (squirrel.onGround() || !level.noCollision(squirrel, squirrel.getBoundingBox())) return null;
+		if (!clearBody(squirrel)) return null;
 		BlockPos origin = squirrel.blockPosition();
 		// Native wall contact can sit exactly on a block boundary. This small
 		// horizontal tolerance admits contact, not a nearby floating squirrel.
@@ -24,11 +23,7 @@ final class SquirrelPerchRecovery {
 		Perch highest = null;
 		for (BlockPos trunk : BlockPos.betweenClosed(origin.offset(-1, -1, -1), origin.offset(1, 1, 1))) {
 			if (highest != null && trunk.getY() <= highest.climb().getY()) continue;
-			var state = level.getBlockState(trunk);
-			if (!state.is(BlockTags.LOGS) || !SquirrelTreeClimbPolicy.reachedHeight(squirrel.getY(), trunk.getY())) continue;
-			boolean touching = state.getCollisionShape(level, trunk).toAabbs().stream()
-					.anyMatch(box -> contact.intersects(box.move(trunk)));
-			if (!touching || !hasClimbedColumn(squirrel, trunk)) continue;
+			if (!supportedContact(squirrel, trunk, contact)) continue;
 			// The saved body already reached this perch. Its old ground approach
 			// may have changed without disturbing the remaining physical support.
 			BlockPos tree = trunk.below(SquirrelFindTreeGoal.MIN_CLIMB_BLOCKS);
@@ -41,6 +36,23 @@ final class SquirrelPerchRecovery {
 			}
 		}
 		return highest;
+	}
+
+	static boolean supports(SquirrelEntity squirrel, BlockPos trunk) {
+		return clearBody(squirrel) && supportedContact(squirrel, trunk,
+				squirrel.getBoundingBox().inflate(0.02D, 0.0D, 0.02D));
+	}
+
+	private static boolean clearBody(SquirrelEntity squirrel) {
+		return !squirrel.onGround() && squirrel.level().noCollision(squirrel, squirrel.getBoundingBox());
+	}
+
+	private static boolean supportedContact(SquirrelEntity squirrel, BlockPos trunk, AABB contact) {
+		var state = squirrel.level().getBlockState(trunk);
+		if (!state.is(BlockTags.LOGS) || !SquirrelTreeClimbPolicy.reachedHeight(squirrel.getY(), trunk.getY())
+				|| !hasClimbedColumn(squirrel, trunk)) return false;
+		return state.getCollisionShape(squirrel.level(), trunk).toAabbs().stream()
+				.anyMatch(box -> contact.intersects(box.move(trunk)));
 	}
 
 	private static boolean hasClimbedColumn(SquirrelEntity squirrel, BlockPos trunk) {
