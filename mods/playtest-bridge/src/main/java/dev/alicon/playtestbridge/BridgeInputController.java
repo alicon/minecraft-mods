@@ -59,6 +59,7 @@ final class BridgeInputController {
 			if (this.current.releasing) {
 				this.target.release(!this.current.outcome.equals("completed"));
 			} else {
+				if (this.current.firstApplyAttempt == null) this.current.firstApplyAttempt = this.clock.getAsLong();
 				this.target.apply(this.current.request);
 				this.current.appliedTicks++;
 			}
@@ -109,12 +110,14 @@ final class BridgeInputController {
 	}
 
 	private void release(String reason) {
+		if (this.current.releaseRequested == null) this.current.releaseRequested = this.clock.getAsLong();
 		if (!this.current.releasing || this.current.outcome.equals("completed")) this.current.outcome = reason;
 		this.current.releasing = true;
 		if (!this.current.releaseProven) this.target.release(!reason.equals("completed"));
 	}
 
 	private void failAndRelease() {
+		if (this.current.releaseRequested == null) this.current.releaseRequested = this.clock.getAsLong();
 		this.current.outcome = "input_adapter_failed";
 		this.current.releasing = true;
 		if (!this.current.releaseProven) this.target.release(true);
@@ -137,6 +140,8 @@ final class BridgeInputController {
 		result.addProperty("elapsedMillis", (this.current.complete ? this.current.finished : this.clock.getAsLong()) - this.current.started);
 		result.addProperty("startedMillis", Long.toString(this.current.started));
 		if (this.current.complete) result.addProperty("finishedMillis", Long.toString(this.current.finished));
+		if (this.current.firstApplyAttempt != null) result.addProperty("firstApplyAttemptMillis", Long.toString(this.current.firstApplyAttempt));
+		if (this.current.releaseRequested != null) result.addProperty("releaseRequestedMillis", Long.toString(this.current.releaseRequested));
 		result.addProperty("controlsReleased", this.current.complete ? this.current.releaseConfirmed : this.current.releaseProven);
 		result.add("request", this.current.request.describe());
 		result.add("clientFrames", this.current.frames.deepCopy());
@@ -168,6 +173,8 @@ final class BridgeInputController {
 		private boolean releaseConfirmed;
 		private boolean releaseProven;
 		private long finished;
+		private Long firstApplyAttempt;
+		private Long releaseRequested;
 		private String outcome = "pending";
 
 		private Operation(BridgeInputRequest request, long started) {

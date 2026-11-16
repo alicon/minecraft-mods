@@ -2,11 +2,32 @@ package dev.alicon.playtestbridge;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonObject;
 import org.junit.jupiter.api.Test;
 
 class BridgeClientRequestsTest {
+	@Test
+	void failedDiagnosticSnapshotDoesNotReplaceTheInputReceiptWithAnException() {
+		var future = new java.util.concurrent.CompletableFuture<JsonObject>();
+		future.completeExceptionally(new IllegalStateException("private diagnostic detail"));
+		var result = BridgeClientRequests.awaitInputTrace(future, 0);
+		assertEquals("unavailable", result.get("status").getAsString());
+		assertFalse(result.get("coverageComplete").getAsBoolean());
+		assertFalse(result.toString().contains("private diagnostic detail"));
+	}
+
+	@Test
+	void timedOutReadOnlySnapshotIsCancelledAndSuccessfulSnapshotsArePreserved() {
+		var future = new java.util.concurrent.CompletableFuture<JsonObject>();
+		assertEquals("unavailable", BridgeClientRequests.awaitInputTrace(future, 0).get("status").getAsString());
+		assertTrue(future.isCancelled());
+		JsonObject original = new JsonObject();original.addProperty("status", "available");
+		assertEquals(original, BridgeClientRequests.awaitInputTrace(java.util.concurrent.CompletableFuture.completedFuture(original), 0));
+	}
+
 	@Test
 	void quitRequiresAnExactDisposableSinglePlayerSave() {
 		JsonObject state = new JsonObject();

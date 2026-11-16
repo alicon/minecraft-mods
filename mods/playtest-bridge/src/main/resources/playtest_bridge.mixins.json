@@ -1,0 +1,12 @@
+{
+	"required": true,
+	"package": "dev.alicon.playtestbridge.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"mixins": [
+		"ServerInputTraceMixin",
+		"ServerRideTraceMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

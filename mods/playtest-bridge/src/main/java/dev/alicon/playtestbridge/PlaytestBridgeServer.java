@@ -159,7 +159,7 @@ final class PlaytestBridgeServer {
 			} else if ("POST".equals(method) && "/client-input".equals(path)) {
 				JsonObject body = readBody(exchange);
 				JsonObject snapshot = runOnServerThread(() -> BridgeClientRequests.captureInputState(this::state));
-				sendJson(exchange, 200, BridgeClientRequests.input(snapshot, body));
+				sendJson(exchange, 200, BridgeClientRequests.input(this.server, snapshot, body));
 			} else {
 				sendError(exchange, 404, "Unknown bridge endpoint");
 			}

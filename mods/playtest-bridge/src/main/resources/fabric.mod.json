@@ -15,6 +15,9 @@
 	"license": "MIT",
 	"icon": "assets/playtest_bridge/icon.png",
 	"environment": "*",
+	"mixins": [
+		"playtest_bridge.mixins.json"
+	],
 	"entrypoints": {
 		"main": [
 			"dev.alicon.playtestbridge.PlaytestBridge"
