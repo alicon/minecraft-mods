@@ -317,6 +317,15 @@ Set `BRIDGE_REPORT_FILE=build/playtest-reports/<name>.json` to save the full bri
 
 ## State-combination testing
 
+For first-anomaly diagnosis, add `--investigate` to the matrix CLI. It stops before
+another fixture replaces a setup/assertion/cleanup failure. Setup/assertion failure
+skips scenario-level fixture cleanup; action-owned key/resource release still runs
+in its own `finally`. Failure capture and guarded reset retain the frozen original
+scene, owner mode and time. Reports record the policy and all requested names/inputs,
+so terminal reports with unexecuted cases cannot be mistaken for full coverage.
+Successful cleanup/care and ordinary run policy remain unchanged. See the harness
+README for the command and capture/reset failure behavior.
+
 The [Mushroom state matrix](../tools/playtest-harness/README.md#mushroom-state-matrix)
 defines 490 cases: 144 combinations, 40 interruption/owner-mode/flight/feeding/tree-approach sequences, 36 terrain cases, 20 outdoor-care sequences, 22 water/rest sequences, eight sleep-spot controls, 100 dry vehicle cases (96 full-entity sequences plus four controlled boarding-refusal challenges), 112 controlled water/rail journeys (including 16 actual offshore immersion controls), and eight native exit-to-shore sequences in a disposable live world. It preserves partial failure
 reports. Run `npm --prefix tools/playtest-harness test` for the harness's runner,

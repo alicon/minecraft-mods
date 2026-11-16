@@ -185,6 +185,25 @@ unexpectedly missing from another fixture remains a failure. World-reset errors
 preserve the original failed report or interruption. Direct CLI calls also honor
 `BRIDGE_REPORT_FILE`; an explicit `--report-file` takes precedence.
 
+Use `--investigate` to preserve the first anomaly before another case can replace
+its fixture:
+
+```shell
+npm --prefix tools/playtest-harness run bridge -- yorkie-matrix --expected-save "Codex Test Copy" --investigate --report-file build/playtest-reports/investigation.json
+```
+
+It works with `--group` and `--case`. Reports include `investigativeAudit`, the
+execution policy and `requestedCases` (names/inputs), including unexecuted cases.
+Original bodies, inputs, assertions and successful cleanup/care stay unchanged.
+After a setup or assertion failure, capture freezes the original scene and the
+mode skips scenario-level fixture cleanup. The guarded world reset retains that
+freeze instead of changing owner mode/time. Capture errors remain visible; reset
+still attempts the guarded freeze. A cleanup error after a passing body also stops
+the run and fails it. Key/resource release belongs in the action's own `finally`,
+never in skippable fixture cleanup. Ordinary runs keep their existing policy.
+`complete` means the report finished; check `gameplayComplete`, `requestedCaseCount`
+and executed cases before claiming the selected coverage passed.
+
 The 144 base cases combine four times (day, dusk, night, dawn), three shelter types
 (open sky, roof only, enclosed room), fed/hungry needs, sit/follow orders,
 and three owner states (survival walking, creative walking, creative flying). Each fresh-pet fixture checks sleep, orders,
