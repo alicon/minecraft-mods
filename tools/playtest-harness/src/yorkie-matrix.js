@@ -188,29 +188,7 @@ async function executeMatrix(baseUrl, args) {
         return careForSuccessfulPet({ ...careContext, petUuid: lastFixtureUuid });
       },
       reportFile, metadata: { scenario: 'yorkie-matrix', runId, group: args.group || 'all', provenance, startScreenshot: startScreenshot.file, saveName: initial.saveName, base, expectedSave: args.expectedSave },
-      capture: async (scenario) => {
-        const snapshot = await state();
-        assertTestWorld(snapshot, args.expectedSave);
-        check(snapshot.players[0].dimension.includes('minecraft:overworld'), 'Failure capture requires the original Overworld fixture');
-        if (scenario.stopOnFailure) await command('tick freeze');
-        // Let client interpolation catch up before choosing a visual target.
-        await delay(300);
-        const cameraState = await state();
-        assertTestWorld(cameraState, args.expectedSave);
-        const target = entity(cameraState) || cameraState.players[0].nearbyEntities.find((candidate) => candidate.type === 'mushroom_yorkie:squirrel');
-        let camera;
-        if (target) {
-          const point = { ...target.position, y: target.position.y + 0.25 };
-          try {
-            // Resolve rotation from server coordinates; entity-look packets can use a stale client entity position.
-            await command(`execute as ${player} at @s anchored eyes facing ${point.x} ${point.y} ${point.z} run tp @s ~ ~ ~ ~ ~`);
-            camera = { targetUuid: target.uuid, point };
-          } catch (error) { camera = { targetUuid: target.uuid, point, error: error.message }; }
-        }
-        await delay(150);
-        const screenshot = await request('/screenshot', { name: `yorkie-${runId}-${scenario.name}-failure.png`, resume: true, hideGui: true, clearChat: true });
-        return { state: snapshot, cameraState, screenshot: screenshot.file, camera, captureDelayMs: 450 };
-      },
+      capture: scenario => require('./yorkie-failure-capture').captureMatrixFailure({ ...careContext, command, runId }, scenario),
       onResult: (result) => console.error(`${result.name}: ${result.status}${result.error ? `: ${result.error}` : ''}`)
     })
   });

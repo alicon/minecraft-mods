@@ -349,6 +349,10 @@ count is not a completed full sweep. Investigative failures retain a frozen
 fixture, owner mode and time; they do not receive the usual creative/day reset.
 Player ticks can still advance while frozen. Confirm owner safety and resume
 world ticks explicitly before new native input.
+Failure screenshots keep the current view, screen, HUD and chat. They never aim
+the camera with an owner teleport: even a same-position teleport can dismount a
+rider and reset native physics. The frozen actor snapshot and current-view image
+remain available together for diagnosis.
 Eight squirrel starts around a partly blocked tree sample every native world tick,
 retain the original healthy squirrel, require first clinging within 100 ticks,
 and require 40 consecutive safe clinging ticks within a 400-tick bound. The live observer starts measuring horizontal
