@@ -409,6 +409,14 @@ failure or shutdown cleanup can clear cached input without waiting for another
 player tick; those outcomes are not successful movement evidence. The CLI also
 attempts cancellation and preserves a failed report on SIGINT/SIGTERM.
 
+Nearby living-entity snapshots include native `air`, `maxAir`, `fallDistance`,
+`hurtTime` and `lastDamageType` alongside health. These read-only facts help
+separate drowning, fall accumulation and other damage during travel. A retained
+damage type is recent native history; `unavailable` means no cause is currently
+retained, not that the entity has never taken damage. Gameplay observers run only
+during the requested operation; cancellation receipt collection stays independent
+of an observer that has already failed.
+
 ## Fetch across a saved restart
 
 ```shell

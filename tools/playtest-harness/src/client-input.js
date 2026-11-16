@@ -36,7 +36,7 @@ async function driveClientInput(context, controls, { timeoutMs = 20000, pollMs =
   function checkInterrupted() {
     if (signal?.aborted) throw new Error('Native client input interrupted');
   }
-  async function call(action) {
+  async function call(action, observe = true) {
     const reply = await request('/client-input', action === 'start' ? body : { action, expectedSave, playerUuid, operationId: body.operationId });
     assert(observed.receipts.length < 1000, 'Native input receipt limit exceeded');
     observed.receipts.push(reply);
@@ -44,7 +44,7 @@ async function driveClientInput(context, controls, { timeoutMs = 20000, pollMs =
     assert(reply.request?.playerUuid === playerUuid && reply.request?.expectedSave === expectedSave, 'Input receipt has the wrong identity');
     assert(['mode', 'ticks', ...DIRECTIONS].every(k => reply.request[k] === body[k])
       && reply.request.vehicleUuid === body.vehicleUuid, 'Input receipt describes different controls');
-    await onReceipt(observed);
+    if (observe) await onReceipt(observed);
     return reply;
   }
   try {
@@ -89,11 +89,13 @@ async function driveClientInput(context, controls, { timeoutMs = 20000, pollMs =
   } finally {
     if (attemptedStart && !finished) {
       try {
-        let reply = await call('cancel');
+        // Gameplay observers may be the original source of failure. Keep
+        // cleanup independent so that same assertion cannot interrupt release.
+        let reply = await call('cancel', false);
         const deadline = performance.now() + 2000;
         while (reply.phase !== 'complete' && performance.now() < deadline) {
           await sleep(pollMs);
-          reply = await call('status');
+          reply = await call('status', false);
         }
         assert(reply.phase === 'complete' && reply.controlsReleased === true, 'Native input cleanup did not complete with confirmed release');
         observed.cleanup = reply;

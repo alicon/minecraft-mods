@@ -92,6 +92,19 @@ test('an interrupted caller cancels and retains its original failure', async () 
   });
 });
 
+test('a failing gameplay observer cannot interrupt native cancellation receipt collection', async () => {
+  const f = fixture();let observations = 0;
+  await assert.rejects(driveClientInput(f.context, { mode: 'walk', ticks: 3, forward: true }, {
+    onReceipt: () => { observations++;throw new Error('synthetic pet health loss'); }
+  }), error => {
+    assert.match(error.message, /pet health loss/);
+    assert.equal(error.observed.cleanup.phase, 'complete');
+    assert.equal(error.observed.cleanup.controlsReleased, true);
+    assert.equal(error.observed.cleanupError, undefined);return true;
+  });
+  assert.equal(observations, 1);
+});
+
 test('a mismatched receipt is preserved while cleanup still targets the original operation', async () => {
   const f = fixture({ wrongReceipt: true });
   await assert.rejects(driveClientInput(f.context, { mode: 'walk', ticks: 3, forward: true }), error => {

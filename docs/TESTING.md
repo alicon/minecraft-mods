@@ -307,6 +307,10 @@ The [native input CLI](../tools/playtest-harness/README.md#bounded-native-client
 records actual input and displacement; accepting a key request alone does not
 prove a walking or rowing scenario. These controls do not add cases to the 461
 Mushroom matrix until explicit gameplay sequences use them.
+Nearby living-entity snapshots also retain native air, accumulated fall distance,
+hurt timer and recent damage type for diagnosing a health change. These fields
+do not change damage rules, and unavailable retained history cannot identify the
+cause of an older hit.
 
 NARwhal Together:
 
