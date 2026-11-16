@@ -246,6 +246,10 @@ Gameplay assertions still need the live Minecraft client and bridge. Matrix
 sprints and vehicle frozen steps wait on native gametime, not the server counter
 that keeps increasing during a frozen world. Clock-wrap and stalled-world controls
 run in the Node suite; snapshots include a tickAudit for completed waits. Successful
+journey interactions also verify actual supported owner placement and ordinary
+interaction reach. The bridge's decimal-coordinate teleport avoids native integer
+coordinate auto-centering; invalid placement/reach is a setup failure.
+Successful
 matrix runs persist their original case observations before separately feeding
 and healing the same tagged pet for inspection. The postRun record is maintenance,
 not gameplay evidence; its failure cannot turn a case failure into a pass. Failed

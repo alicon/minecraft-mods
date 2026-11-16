@@ -1,7 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const { VEHICLES, assertVehicleMount, assertVehicleOwnerState, vehicleTools } = require('./yorkie-vehicle-fixture');
+const { VEHICLES, assertVehicleMount, assertVehicleOwnerState, assertVehicleReach, vehicleTools } = require('./yorkie-vehicle-fixture');
 const { readWorldTime } = require('./yorkie-clock');
 const { advanceJourneyOrder } = require('./yorkie-journey-order');
 const { exerciseMountedCare } = require('./yorkie-vehicle-care');
@@ -116,7 +116,7 @@ function journeyCases(context) {
       const owner = inputs.layout === 'water'
         ? { x: base.x + (inputs.offshore ? 4.25 : 6), y: base.y, z: base.z + 0.5 }
         : { x: traveled.position.x, y: base.y, z: base.z - 1.5 };
-      await command(`tp ${player} ${owner.x} ${owner.y} ${owner.z}`);
+      await request('/teleport', { player, ...owner });
       if (inputs.layout === 'water' && !inputs.offshore) {
         // Vanilla boat exits use the passenger's yaw. This is a controlled dock
         // exit facing the bank, not a claim about natural approach/orientation.
@@ -124,11 +124,20 @@ function journeyCases(context) {
         const yaw = await command(`data get entity ${fixture.petUuid} Rotation[0]`);
         check(yaw.result === -90, 'Dock fixture did not face its passenger toward the bank');
         const floor = await request('/block', { x: base.x + 4, y: base.y - 1, z: base.z });
-        check(floor.block === 'minecraft:stone', 'Dock owner does not have a solid bank');
+        check(floor.block === 'minecraft:stone', 'Dock exit does not have a solid bank');
       }
       const ready = await state();
       const passenger = await observe(ready, 'before-owner-action', { mounted: true });
-      check(passenger.distance <= (inputs.ownerMode === 'survival' ? 3 : 4.5), 'Owner action is beyond ordinary entity interaction reach');
+      const actualOwner = ready.players[0].position;
+      const ownerFloor = await request('/block', { x: Math.floor(actualOwner.x), y: Math.floor(actualOwner.y - 0.05), z: Math.floor(actualOwner.z) });
+      observed.ownerPlacement = { intended: owner, actual: actualOwner, floor: ownerFloor };
+      if (Math.hypot(actualOwner.x - owner.x, actualOwner.y - owner.y, actualOwner.z - owner.z) > 0.05
+        || !['minecraft:grass_block', 'minecraft:stone', 'minecraft:oak_planks'].includes(ownerFloor.block)) {
+        const error = new Error('Journey owner placement lacks the intended supported bank/trackside position');
+        error.phase = 'setup';
+        throw error;
+      }
+      assertVehicleReach(passenger, inputs.ownerMode);
       if (inputs.action === 'care') {
         await exerciseMountedCare(context, fixture, passenger, observed,
           (snapshot, stage) => observe(snapshot, stage, { mounted: true }));
@@ -143,7 +152,7 @@ function journeyCases(context) {
           if (inputs.offshore) {
             // The owner steps back on the bank. Moving the empty boat out from
             // under its former sitting passenger creates real native immersion.
-            await command(`tp ${player} ${base.x + 6} ${base.y} ${base.z + 0.5}`);
+            await request('/teleport', { player, x: base.x + 6, y: base.y, z: base.z + 0.5 });
             const beforeDeparture = vehicleIn(await state()).position;
             observed.departureMotion = await command(`data merge entity ${fixture.vehicleUuid} {Motion:[0.4d,0.0d,0.0d]}`);
             for (let tick = 1; tick <= 24; tick++) {
@@ -169,7 +178,7 @@ function journeyCases(context) {
             if (orderState.expectedSit && ticks >= 20) check(pet.onGround, 'Dry sitting pet did not settle after boat/cart dismount');
           }
           await request('/player-abilities', { player, flying: false, mayfly: true });
-          await command(`tp ${player} ${owner.x} ${owner.y} ${owner.z}`);
+          await request('/teleport', { player, ...owner });
         }
         await command('tick unfreeze');
         let recovered;

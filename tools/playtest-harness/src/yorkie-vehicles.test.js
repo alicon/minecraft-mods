@@ -4,6 +4,15 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { VEHICLES, vehicleInputs, vehicleCases, assertVehicleMount, assertVehicleOwnerState } = require('./yorkie-vehicles');
 
+test('unreachable or missing interaction distance is a setup failure before a journey action', () => {
+  const { assertVehicleReach } = require('./yorkie-vehicle-fixture');
+  assertVehicleReach({ distance: 3 }, 'survival');
+  assertVehicleReach({ distance: 4.5 }, 'creative');
+  for (const [distance, mode] of [[3.21, 'survival'], [4.51, 'creative'], [undefined, 'survival'], [NaN, 'creative']]) {
+    assert.throws(() => assertVehicleReach({ distance }, mode), error => error.phase === 'setup');
+  }
+});
+
 test('lost owner flight is a fixture failure rather than a trapped-pet verdict', () => {
   const state = { players: [{ abilities: { creative: true, flying: false } }] };
   assertVehicleOwnerState(state, 'creative', false);

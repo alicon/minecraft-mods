@@ -23,6 +23,15 @@ function assertVehicleMount(snapshot, petUuid, vehicleUuid) {
   return pet;
 }
 
+function assertVehicleReach(pet, mode) {
+  const reach = mode === 'survival' ? 3 : 4.5;
+  if (!Number.isFinite(pet.distance) || pet.distance > reach) {
+    const error = new Error(`Owner action is beyond ordinary entity interaction reach: ${pet.distance}/${reach}`);
+    error.phase = 'setup';
+    throw error;
+  }
+}
+
 function vehicleTools({ prepare, command, request, state, entity, advance, base, player, check }) {
   async function nativeItems(uuid, field) {
     const reply = await command(`data get entity ${uuid} ${field}`);
@@ -62,7 +71,7 @@ function vehicleTools({ prepare, command, request, state, entity, advance, base,
   async function enableFlight(trace, save, point = { x: base.x - 1.5, y: base.y + 2, z: base.z + 0.5 }) {
     // A grounded client can send flying=false after the bridge's acknowledgement.
     // Move first, then require stable replicated flight before ticking the pet.
-    await command(`tp ${player} ${point.x} ${point.y} ${point.z}`);
+    await request('/teleport', { player, ...point });
     let stable = false;
     await new Promise(resolve => setTimeout(resolve, 150));
     for (let attempt = 0; attempt < 5 && !stable; attempt++) {
@@ -83,4 +92,4 @@ function vehicleTools({ prepare, command, request, state, entity, advance, base,
   return { nativeItems, frozenStep, prepareVehicle, enableFlight };
 }
 
-module.exports = { VEHICLES, assertVehicleMount, assertVehicleOwnerState, vehicleTools };
+module.exports = { VEHICLES, assertVehicleMount, assertVehicleOwnerState, assertVehicleReach, vehicleTools };
