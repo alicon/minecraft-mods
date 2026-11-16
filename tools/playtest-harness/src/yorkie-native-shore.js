@@ -5,7 +5,7 @@ const { driveClientInput } = require('./client-input');
 const { assertInspectionWorld } = require('./yorkie-post-run');
 const { assertVehicleMount, assertVehicleReach, vehicleTools } = require('./yorkie-vehicle-fixture');
 const { advanceWorldTicks } = require('./yorkie-clock');
-const { WALK_TICKS, SETTLE_TICKS, buildShoreBank, assertOwnerInShore, assertShoreEndpoint, assertStableShore } = require('./yorkie-native-shore-fixture');
+const { WALK_TICKS, SETTLE_TICKS, buildShoreBank, assertOwnerInShore, assertShoreBoardingGrace, assertShoreEndpoint, assertStableShore } = require('./yorkie-native-shore-fixture');
 
 function nativeShoreInputs() {
   const rows = [];
@@ -62,6 +62,7 @@ function nativeShoreCases(context) {
         assert(owner.health === fixture.before.players[0].health, 'Shore owner lost health');
         assert(owner.nearbyEntities.some(e => e.uuid === fixture.boatUuid), 'Original shore boat is missing');
         observed.sawWet ||= pet.inWater;
+        if (observed.restAnchor) assertShoreBoardingGrace(snapshot, pet, { boatUuid: fixture.boatUuid, helpGameTime: observed.helpGameTime });
         if (inputs.sitting && !observed.sawWet && observed.restAnchor) {
           assert(Math.hypot(...['x', 'y', 'z'].map(k => pet.position[k] - observed.restAnchor[k])) <= 1,
             'Dry sitting pet drifted more than one block after owner help');
@@ -84,7 +85,7 @@ function nativeShoreCases(context) {
           observed[name] = error.observed;
           const last = error.observed?.cleanup || error.observed?.receipts?.at(-1);
           observed.inputRelease = { stage: name, attempted: !!error.observed,
-            confirmed: !error.observed || last?.phase === 'complete' && last?.controlsReleased === true,
+            confirmed: !error.observed || !error.observed.cleanupError && last?.phase === 'complete' && last?.controlsReleased === true,
             outcome: last?.outcome, cleanupError: error.observed?.cleanupError };
           if (!observed.inputRelease.confirmed) error.message += `; native control release unconfirmed: ${observed.inputRelease.cleanupError || 'no terminal release proof'}`;
           save();throw error;
@@ -92,15 +93,18 @@ function nativeShoreCases(context) {
         return inspect(observed[name].after, `${name}-after`);
       };
       inspect(fixture.before, 'before');
-      const passenger = await drive('exit', { mode: 'dismount', ticks: 2, vehicleUuid: fixture.boatUuid });
+      await drive('exit', { mode: 'dismount', ticks: 2, vehicleUuid: fixture.boatUuid });
       await command('tick freeze');
-      inspect(await state(), 'exit-frozen');
+      const frozenExit = await state();assert(frozenExit.worldFrozen, 'Owner help requires a frozen world');
+      const passenger = inspect(frozenExit, 'exit-frozen');
       assertVehicleReach(passenger, 'survival');
       observed.help = await request('/use-entity', { type: passenger.type, radius: 3, emptyHand: true });save();
       assert(observed.help.target.uuid === fixture.petUuid, 'Shore help targeted another pet');
-      const helped = inspect(await state(), 'help-after-frozen');
+      const helpState = await state();
+      assert(helpState.worldFrozen, 'Owner help observation lost its frozen boundary');
+      const helped = inspect(helpState, 'help-after-frozen');
       assert(!helped.vehicle, 'Ordinary owner help did not dismount Mushroom');
-      observed.restAnchor = { ...helped.position };save();
+      observed.restAnchor = { ...helped.position };observed.helpGameTime = helpState.overworldGameTime;save();
       const firstHelpTick = await advanceWorldTicks(command, state, 1, 'step');
       assert(firstHelpTick.worldFrozen && firstHelpTick.tickAudit.elapsedTicks === 1, 'Help observation skipped a native tick');
       inspect(firstHelpTick, 'help-first-native-tick');

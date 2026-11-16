@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { AUDIT_BLOCKS, shoreGeometry, assertShoreAudit, assertOwnerInShore, assertShoreEndpoint, assertStableShore, dryRestSupport } = require('./yorkie-native-shore-fixture');
+const { AUDIT_BLOCKS, shoreGeometry, assertShoreAudit, assertOwnerInShore, assertShoreEndpoint, assertStableShore, dryRestSupport, assertShoreBoardingGrace } = require('./yorkie-native-shore-fixture');
 const { nativeShoreCases } = require('./yorkie-native-shore');
 const base = { x: 0, y: 220, z: 0 };
 const volume = r => (r.x2 - r.x1 + 1) * (r.y2 - r.y1 + 1) * (r.z2 - r.z1 + 1);
@@ -145,7 +145,8 @@ test('dry sitting rejects unsupported hulls, late drift and lost air while allow
   assert.throws(() => assertStableShore(frames, { ...rest, petUuid: 'pet', initialSit: true, sawWet: false }), /drifted/);
 });
 
-for (const released of [true, false]) test(`missing receipt snapshot cannot hide release confirmed=${released}`, async () => {
+for (const fault of ['released', 'unreleased', 'mismatched']) test(`missing receipt snapshot cannot hide ${fault} cleanup`, async () => {
+  const released = fault !== 'unreleased', confirmed = fault === 'released';
   const pet = { id: 1, uuid: 'pet', type: 'mushroom_yorkie:mushroom_yorkie', health: 12, maxHealth: 12,
     air: 300, fallDistance: 0, lastDamageType: 'unavailable', inWater: false, noGravity: false,
     custom: { harness: true }, tameable: { ownedByPlayer: true }, position: { x: 0.5, y: 220, z: 0.5 } };
@@ -159,16 +160,26 @@ for (const released of [true, false]) test(`missing receipt snapshot cannot hide
       assert.equal(route, '/client-input');
       if (body.action === 'start') start = body;
       else { assert.equal(body.action, 'cancel');cancelled = true; }
-      return { operationId: body.operationId, request: start, phase: cancelled ? 'complete' : 'active',
+      return { operationId: cancelled && fault === 'mismatched' ? 'wrong-operation' : body.operationId, request: start, phase: cancelled ? 'complete' : 'active',
         controlsReleased: cancelled && released, outcome: cancelled ? 'cancelled' : 'running' };
     } };
   const result = {};
   await assert.rejects(nativeShoreCases(context)[0].run({ before, petUuid: 'pet', boatUuid: 'boat',
     bank: { geometry: shoreGeometry(base) } }, result, () => {}), error => {
     assert.match(error.message, /missing its server snapshot/);
-    if (!released) assert.match(error.message, /release unconfirmed/);
+    if (!confirmed) assert.match(error.message, /release unconfirmed/);
     return true;
   });
-  assert(cancelled);assert.equal(result.observed.inputRelease.confirmed, released);
-  if (!released) assert.match(result.observed.inputRelease.cleanupError, /confirmed release/);
+  assert(cancelled);assert.equal(result.observed.inputRelease.confirmed, confirmed);
+  if (!confirmed) assert.match(result.observed.inputRelease.cleanupError, /confirmed release|wrong operation/);
+});
+
+test('native help forbids early reboarding but permits the original boat at tick 200', () => {
+  const boat = { id: 2, uuid: 'boat' }, pet = { vehicle: { id: 2 } };
+  const snapshot = ticks => ({ overworldGameTime: String(1000 + ticks), players: [{ nearbyEntities: [boat] }] });
+  const context = { boatUuid: 'boat', helpGameTime: '1000' };
+  for (const tick of [0, 1, 199]) assert.throws(() => assertShoreBoardingGrace(snapshot(tick), pet, context), /grace/);
+  for (const tick of [200, 240]) assertShoreBoardingGrace(snapshot(tick), pet, context);
+  pet.vehicle.id = 3;assert.throws(() => assertShoreBoardingGrace(snapshot(240), pet, context), /different vehicle/);
+  delete pet.vehicle;assertShoreBoardingGrace(snapshot(1), pet, context);
 });

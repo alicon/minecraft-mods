@@ -327,7 +327,7 @@ water/walls/bottom and a half-block bank step before movement, and watches fixtu
 are held. A following pet must have 40 final consecutive native world samples
 dry, grounded, fully breathing and near the owner, with actual block support at
 the end. Dry sitting also requires full air, bounded movement and support on
-audited blocks or the original hull; normal reboarding after its grace period
+audited blocks or the original hull; normal reboarding after 200 native world ticks
 is permitted. The group records observed wet contact without guaranteeing wet-sit
 coverage. Help's first native tick is inspected while frozen. Walking still uses
 polling, so a transient contact between samples is an explicit limit. Native AI,

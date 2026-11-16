@@ -64,6 +64,18 @@ async function buildShoreBank(context) {
 
 function distance(a, b) { return Math.hypot(...['x', 'y', 'z'].map(k => a?.[k] - b?.[k])); }
 
+function assertShoreBoardingGrace(snapshot, pet, { boatUuid, helpGameTime }) {
+  if (!pet.vehicle) return;
+  const boat = snapshot.players[0].nearbyEntities.find(e => e.uuid === boatUuid);
+  assert(boat && pet.vehicle.id === boat.id, 'Helped pet boarded a different vehicle');
+  for (const value of [helpGameTime, snapshot.overworldGameTime]) {
+    assert(typeof value === 'string' && /^-?\d+$/.test(value), 'Native reboarding clock is unavailable');
+  }
+  // This is the mod's 200-entity-tick owner-help cooldown. The original nearby
+  // fixture stays loaded; frozen steps and live movement use the same world clock.
+  assert(BigInt(snapshot.overworldGameTime) - BigInt(helpGameTime) >= 200n, 'Helped pet reboarded before its 200-tick grace ended');
+}
+
 // The audited blocks are never changed during observation. Rounded entity positions
 // need a 0.04-block tolerance around their known native support heights.
 function dryRestSupport(pet, snapshot, { geometry, boatUuid, restAnchor }) {
@@ -127,4 +139,4 @@ function assertStableShore(frames, { petUuid, initialSit, sawWet, ...rest }) {
 }
 
 module.exports = { WALK_TICKS, SETTLE_TICKS, AUDIT_BLOCKS, shoreGeometry, assertShoreAudit, assertOwnerInShore,
-  buildShoreBank, dryRestSupport, assertShoreEndpoint, assertStableShore };
+  buildShoreBank, assertShoreBoardingGrace, dryRestSupport, assertShoreEndpoint, assertStableShore };

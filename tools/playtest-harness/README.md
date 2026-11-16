@@ -244,7 +244,8 @@ before the owner reaches an edge. Following recovery requires 40 final consecuti
 world samples with full air, normal gravity, dry grounded posture and the original
 owner nearby, followed by a native block-support check. Dry sitting keeps its
 order, full air and actual support on audited blocks or the original boat hull.
-Ordinary reboarding of that same boat after the grace period is allowed; drift
+Ordinary reboarding of that same boat after 200 native world ticks is allowed;
+earlier reboarding fails. Drift
 over one block from the help position fails. Observed water contact requires
 release and recovery, but these eight cases do not guarantee wet-sit coverage.
 The empty-hand help is frozen, with its first subsequent native world tick
