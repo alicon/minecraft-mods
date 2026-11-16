@@ -5,6 +5,7 @@ const { VEHICLES, assertVehicleMount, assertVehicleOwnerState, assertVehicleReac
 const { readWorldTime } = require('./yorkie-clock');
 const { advanceJourneyOrder } = require('./yorkie-journey-order');
 const { exerciseMountedCare } = require('./yorkie-vehicle-care');
+const { journeyWaterGeometry, readWaterFixture, assertWaterFixture, settleWaterFixture } = require('./yorkie-water-fixture');
 
 function journeyOwnerPosition(inputs, base, traveled, { flying = false } = {}) {
   // The first dry bank column has a nighttime doorway. Stay on its inner
@@ -43,15 +44,18 @@ function journeyCases(context) {
   const { prepareVehicle, frozenStep, nativeItems, enableFlight } = vehicleTools(context);
   async function build(inputs) {
     const audit = [];
+    let waterFixture;
     if (inputs.layout === 'water') {
       await command(`fill ${base.x - 3} ${base.y - 3} ${base.z - 2} ${base.x + 4} ${base.y - 1} ${base.z + 2} minecraft:stone`);
+      const geometry = journeyWaterGeometry(base), floor = geometry.floor;
+      await command(`fill ${floor.x1} ${floor.y1} ${floor.z1} ${floor.x2} ${floor.y2} ${floor.z2} minecraft:sea_lantern`);
       await command(`fill ${base.x - 2} ${base.y - 2} ${base.z - 1} ${base.x + 3} ${base.y - 1} ${base.z + 1} minecraft:water`);
       // The boat reaches the east bank; the nighttime room needs an actual dock
       // doorway, otherwise native dismount correctly rejects the solid wall.
       await command(`fill ${base.x + 4} ${base.y} ${base.z - 1} ${base.x + 4} ${base.y + 2} ${base.z + 1} minecraft:air`);
       for (const [x, y, z, expected] of [
         [base.x, base.y - 1, base.z, 'minecraft:water'],
-        [base.x, base.y - 3, base.z, 'minecraft:stone'],
+        [base.x, base.y - 3, base.z, 'minecraft:sea_lantern'],
         [base.x, base.y - 1, base.z - 2, 'minecraft:stone'],
         [base.x, base.y, base.z, 'minecraft:air']
       ]) {
@@ -59,6 +63,7 @@ function journeyCases(context) {
         audit.push({ x, y, z, expected, block });
         check(block.block === expected, 'Contained-water vehicle fixture has the wrong block');
       }
+      waterFixture = { geometry, initial: await settleWaterFixture(request, geometry) };
     } else {
       await command(`fill ${base.x - 3} ${base.y} ${base.z} ${base.x + 3} ${base.y} ${base.z} minecraft:rail[shape=east_west]`);
       for (const x of [base.x - 4, base.x + 4]) await command(`setblock ${x} ${base.y} ${base.z} minecraft:stone`);
@@ -69,7 +74,7 @@ function journeyCases(context) {
       }
     }
     await command(`tp ${player} ${base.x - 2.5} ${base.y} ${base.z + 0.5}`);
-    return { audit, spawn: { x: base.x - (inputs.layout === 'water' && !inputs.offshore ? 0.5 : 1.5), y: base.y + 0.1, z: base.z + 0.5 } };
+    return { audit, waterFixture, spawn: { x: base.x - (inputs.layout === 'water' && !inputs.offshore ? 0.5 : 1.5), y: base.y + 0.1, z: base.z + 0.5 } };
   }
   return journeyInputs().map(inputs => ({
     name: `journey-${inputs.layout}-${inputs.action}-${inputs.vehicle.split(':')[1]}-${inputs.ownerMode}-${inputs.time}-${inputs.hunger}-${inputs.sitting ? 'sit' : 'follow'}`,
@@ -88,11 +93,17 @@ function journeyCases(context) {
         const footBlock = await request('/block', { x: Math.floor(pet.position.x), y: Math.floor(pet.position.y), z: Math.floor(pet.position.z) });
         const frame = { stage, snapshot, pet, carrier, footBlock };
         observed.trace.push(frame);
+        if (inputs.layout === 'water' && (stage === 'mounted-before-travel' || stage.startsWith('travel-') || stage === 'before-owner-action')) {
+          frame.waterFixtureAudit = await readWaterFixture(request, fixture.geometry.waterFixture.geometry);
+        }
         save();
         assertVehicleOwnerState(snapshot, inputs.ownerMode, flying);
         check(pet.uuid === fixture.petUuid && pet.tameable.ownedByPlayer, 'Journey lost the original owned pet');
         check(pet.health === pet.maxHealth, 'Journey damaged Mushroom');
         check(pet.custom.harness, 'Journey lost the harness');
+        // Retain environment observations before health checks above: an injured
+        // pet stays a gameplay failure, even if its fixture also changed.
+        if (frame.waterFixtureAudit) assertWaterFixture(frame.waterFixtureAudit, fixture.geometry.waterFixture.geometry);
         const clock = snapshot.tickAudit?.after ?? await readWorldTime(command);
         frame.worldClock = clock;
         orderState = advanceJourneyOrder(orderState, { orderedToSit: pet.tameable.orderedToSit,
@@ -253,6 +264,10 @@ function journeyCases(context) {
       if (fixture.cargo) {
         observed.cargoAfter = await nativeItems(fixture.vehicleUuid, 'Items');
         assert.deepEqual(observed.cargoAfter, fixture.cargo, 'Journey changed chest-boat cargo');
+      }
+      if (inputs.layout === 'water') {
+        observed.finalWaterFixtureAudit = await readWaterFixture(request, fixture.geometry.waterFixture.geometry);
+        save();assertWaterFixture(observed.finalWaterFixtureAudit, fixture.geometry.waterFixture.geometry);
       }
       return observed;
     },

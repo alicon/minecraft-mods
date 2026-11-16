@@ -333,6 +333,14 @@ ticks and require two blocks of actual movement before the owner action. Offshor
 controls sample every tick and stop after three blocks to retain departure room;
 dock and rail controls sample every five ticks. Short travel is a setup failure,
 even when the movement command succeeded.
+Controlled water journeys have a submerged sea-lantern floor to prevent native
+freezing in cold high-altitude arenas while retaining the biome, depth and sky.
+The harness audits all 36 source cells, native block light >=10, false native
+freezing eligibility, and complete bottom/wall support before travel, at travel
+samples, before owner action and at the end. Light setup settling is bounded and
+does not advance world ticks; changed water is never silently refilled mid-case.
+Invalid environment stays a setup failure; existing pet-health assertions keep
+priority. Earlier unexplained short trips are not retroactively attributed to ice.
 Dock owners stand on the inner quarter of the first dry bank column, within
 survival reach of a short valid trip. Actual support and reach remain setup guards;
 the fixture does not move the pet or hull to satisfy them. Elevated takeoff keeps
