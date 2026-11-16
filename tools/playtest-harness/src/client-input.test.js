@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { driveClientInput } = require('./client-input');
 const PLAYER = '494f67d1-2009-4c26-bfcb-c41a89adaf80';
 
-function fixture({ lostStart = false, unchangedWorld = false, wrongNativeInput = false, neverFinishes = false, frozen = false, wrongReceipt = false } = {}) {
+function fixture({ lostStart = false, unchangedWorld = false, wrongNativeInput = false, neverFinishes = false, frozen = false, wrongReceipt = false, cachedInput = false } = {}) {
   let reads = 0, body;
   const calls = [];
   function state() {
@@ -17,7 +17,8 @@ function fixture({ lostStart = false, unchangedWorld = false, wrongNativeInput =
     const active = { forward: !wrongNativeInput, backward: false, left: false, right: false };
     const neutral = { forward: false, backward: false, left: false, right: false };
     return { operationId: body.operationId, request: body, phase, outcome, controlsReleased: phase === 'complete',
-      appliedClientTicks: 3, clientFrames: [...Array.from({ length: 3 }, () => ({ nativeInput: active })), { nativeInput: neutral }] };
+      appliedClientTicks: 3, clientFrames: [...Array.from({ length: 3 }, () => ({ nativeInput: active })), { nativeInput: neutral }]
+        .map((frame, index) => ({ ...frame, freshKeyboardSample: !cachedInput, clientPlayerTick: 100 + index })) };
   }
   const context = { state: async () => state(), expectedSave: 'Codex Input Test', playerUuid: PLAYER,
     request: async (route, request) => {
@@ -54,7 +55,7 @@ test('lost acceptance still cancels the operation ID chosen before dispatch', as
 });
 
 test('client tick receipts cannot hide a frozen server world or unapplied native buttons', async () => {
-  for (const options of [{ unchangedWorld: true }, { wrongNativeInput: true }]) {
+  for (const options of [{ unchangedWorld: true }, { wrongNativeInput: true }, { cachedInput: true }]) {
     const f = fixture(options);
     await assert.rejects(driveClientInput(f.context, { mode: 'walk', ticks: 3, forward: true }, { pollMs: 0 }));
     assert.equal(f.calls.at(-1).action, 'cancel');

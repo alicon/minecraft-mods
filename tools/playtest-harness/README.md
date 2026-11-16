@@ -386,7 +386,7 @@ reported as failure, not movement success. Physical jumping, sprinting or
 sneaking interrupts the burst. Native momentum can continue after keys release.
 
 The CLI holds the shared bridge lock and saves incremental reports. It checks
-native input samples, neutral release, actual server-world progress and measured
+fresh native keyboard records and player ticks, neutral release, actual server-world progress and measured
 owner/vehicle displacement. A valid burst can have zero movement against an
 obstacle or in an idle control; scenario callers must assert the travel they need.
 It does not reset the arena or apply pet care.
@@ -404,6 +404,10 @@ The CLI takes a separate final server snapshot for movement verification.
 frame time is a distinct observation. The shared `driveClientInput` helper
 requires its caller to hold the bridge lock and attempts cancellation on failure,
 including a lost acceptance reply using the ID chosen before dispatch.
+Normal completion uses a fresh native neutral sample. Emergency context, adapter
+failure or shutdown cleanup can clear cached input without waiting for another
+player tick; those outcomes are not successful movement evidence. The CLI also
+attempts cancellation and preserves a failed report on SIGINT/SIGTERM.
 
 ## Fetch across a saved restart
 

@@ -19,6 +19,8 @@ final class BridgeNativeInputTarget implements BridgeInputController.Target {
 	private Entity vehicle;
 	private String dimension;
 	private BridgeInputRequest request;
+	private Input beforeTickInput;
+	private boolean forcedRelease;
 
 	BridgeNativeInputTarget(Minecraft client) {
 		this.client = client;
@@ -27,6 +29,7 @@ final class BridgeNativeInputTarget implements BridgeInputController.Target {
 	@Override
 	public void bind(BridgeInputRequest request) {
 		this.request = request;
+		this.forcedRelease = false;
 		this.player = this.client.player;
 		this.server = this.client.getSingleplayerServer();
 		this.vehicle = this.player == null ? null : this.player.getVehicle();
@@ -66,6 +69,11 @@ final class BridgeNativeInputTarget implements BridgeInputController.Target {
 	}
 
 	@Override
+	public void beforeTick() {
+		this.beforeTickInput = this.player == null || this.player.input == null ? null : this.player.input.keyPresses;
+	}
+
+	@Override
 	public void apply(BridgeInputRequest request) {
 		var keys = this.client.options;
 		keys.keyUp.setDown(request.forward());
@@ -75,7 +83,7 @@ final class BridgeNativeInputTarget implements BridgeInputController.Target {
 	}
 
 	@Override
-	public void release() {
+	public void release(boolean forceCachedInput) {
 		var keys = this.client.options;
 		keys.keyUp.setDown(false);
 		keys.keyDown.setDown(false);
@@ -83,7 +91,8 @@ final class BridgeNativeInputTarget implements BridgeInputController.Target {
 		keys.keyRight.setDown(false);
 		// Clear the captured player's cached input as well; that object may no
 		// longer tick after a disconnect, death or dimension transition.
-		if (this.player != null && this.player.input != null) this.player.input.keyPresses = Input.EMPTY;
+		this.forcedRelease = forceCachedInput;
+		if (forceCachedInput && this.player != null && this.player.input != null) this.player.input.keyPresses = Input.EMPTY;
 	}
 
 	@Override
@@ -92,13 +101,25 @@ final class BridgeNativeInputTarget implements BridgeInputController.Target {
 		if (keys.keyUp.isDown() || keys.keyDown.isDown() || keys.keyLeft.isDown() || keys.keyRight.isDown()) return false;
 		if (this.player == null || this.player.input == null) return true;
 		Input input = this.player.input.keyPresses;
-		return !input.forward() && !input.backward() && !input.left() && !input.right();
+		return !input.forward() && !input.backward() && !input.left() && !input.right()
+				&& (this.forcedRelease || this.freshKeyboardSample());
+	}
+
+	private boolean freshKeyboardSample() {
+		// Pinned 1.21.11 KeyboardInput.tick creates a new Input record each tick.
+		// Neither a cached record nor the bridge's emergency EMPTY clear proves
+		// that native keyboard processing happened during this client tick.
+		Input input = this.player.input.keyPresses;
+		return input != this.beforeTickInput && input != Input.EMPTY;
 	}
 
 	@Override
 	public JsonObject sample() {
 		JsonObject frame = new JsonObject();
 		frame.addProperty("clientWorldGameTime", Long.toString(this.player.level().getGameTime()));
+		frame.addProperty("clientPlayerTick", this.player.tickCount);
+		frame.addProperty("freshKeyboardSample", this.freshKeyboardSample());
+		frame.addProperty("clientPlayerSprinting", this.player.isSprinting());
 		frame.add("clientPlayerPosition", position(this.player.position()));
 		frame.addProperty("clientPlayerYaw", this.player.getYRot());
 		Input input = this.player.input.keyPresses;

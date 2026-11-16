@@ -127,7 +127,7 @@ class BridgeInputControllerTest {
 		@Override public void bind(BridgeInputRequest request) { this.invalid = null; }
 		@Override public String invalidContext() { return this.invalid; }
 		@Override public void apply(BridgeInputRequest request) { this.held = true;this.applied++; }
-		@Override public void release() { if (!this.ignoreRelease) this.held = false; }
+		@Override public void release(boolean forceCachedInput) { if (!this.ignoreRelease) this.held = false; }
 		@Override public boolean neutral() { return !this.held; }
 		@Override public JsonObject sample() {
 			if (this.failSample) throw new IllegalStateException("synthetic adapter failure");

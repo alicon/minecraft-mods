@@ -40,11 +40,13 @@ final class BridgeInputController {
 	void startTick() {
 		if (this.current == null || this.current.complete) return;
 		try {
+			this.current.observing = true;
+			this.target.beforeTick();
 			String invalid = this.target.invalidContext();
 			if (invalid != null) this.release(invalid);
 			if (this.clock.getAsLong() - this.current.started >= MAX_WALL_MILLIS) this.release("wall_timeout");
 			if (this.current.releasing) {
-				this.target.release();
+				this.target.release(!this.current.outcome.equals("completed"));
 			} else {
 				this.target.apply(this.current.request);
 				this.current.appliedTicks++;
@@ -55,7 +57,8 @@ final class BridgeInputController {
 	}
 
 	void endTick() {
-		if (this.current == null || this.current.complete) return;
+		if (this.current == null || this.current.complete || !this.current.observing) return;
+		this.current.observing = false;
 		try {
 			this.current.frames.add(this.target.sample());
 			if (this.current.releasing) {
@@ -86,13 +89,13 @@ final class BridgeInputController {
 	private void release(String reason) {
 		if (!this.current.releasing || this.current.outcome.equals("completed")) this.current.outcome = reason;
 		this.current.releasing = true;
-		this.target.release();
+		this.target.release(!reason.equals("completed"));
 	}
 
 	private void failAndRelease() {
 		this.current.outcome = "input_adapter_failed";
 		this.current.releasing = true;
-		this.target.release();
+		this.target.release(true);
 		this.finish(this.target.neutral());
 	}
 
@@ -118,9 +121,10 @@ final class BridgeInputController {
 
 	interface Target {
 		void bind(BridgeInputRequest request);
+		default void beforeTick() { }
 		String invalidContext();
 		void apply(BridgeInputRequest request);
-		void release();
+		void release(boolean forceCachedInput);
 		boolean neutral();
 		JsonObject sample();
 	}
@@ -134,6 +138,7 @@ final class BridgeInputController {
 		private int releaseTicks;
 		private boolean releasing;
 		private boolean complete;
+		private boolean observing;
 		private boolean releaseConfirmed;
 		private long finished;
 		private String outcome = "pending";

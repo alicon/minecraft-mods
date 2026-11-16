@@ -63,6 +63,10 @@ async function driveClientInput(context, controls, { timeoutMs = 20000, pollMs =
     assert(reply.appliedClientTicks === controls.ticks, 'Native input tick count differs from the request');
     const frames = reply.clientFrames;
     assert(Array.isArray(frames) && frames.length >= controls.ticks && frames.length <= controls.ticks + 6, 'Native input trace has an invalid bound');
+    for (const [index, frame] of frames.entries()) {
+      assert(frame.freshKeyboardSample === true && Number.isInteger(frame.clientPlayerTick), 'Input trace reused cached keyboard state');
+      if (index) assert(frame.clientPlayerTick > frames[index - 1].clientPlayerTick, 'Input trace did not advance native player ticks');
+    }
     const matching = frames.filter(frame => DIRECTIONS.every(k => frame.nativeInput?.[k] === body[k]));
     assert(matching.length >= controls.ticks, 'Requested controls were not observed in native client input');
     assert(DIRECTIONS.every(k => frames.at(-1).nativeInput?.[k] === false), 'The final native input sample is not neutral');
