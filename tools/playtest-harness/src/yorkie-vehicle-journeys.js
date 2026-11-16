@@ -95,24 +95,30 @@ function journeyCases(context) {
       const before = await state();
       await observe(before, 'mounted-before-travel', { mounted: true });
       observed.motionRequests = [];
-      async function drive(ticks) {
-        const reply = await command(`data merge entity ${fixture.vehicleUuid} {Motion:[${inputs.layout === 'rail' ? '0.16' : inputs.offshore ? '0.3' : '0.4'}d,0.0d,0.0d]}`);
-        observed.motionRequests.push({ ticks, reply });
+      async function drive(ticks, stop = false) {
+        const speed = stop ? '0.0' : inputs.layout === 'rail' ? '0.16' : inputs.offshore ? '0.3' : '0.4';
+        const reply = await command(`data merge entity ${fixture.vehicleUuid} {Motion:[${speed}d,0.0d,0.0d]}`);
+        observed.motionRequests.push({ ticks, stop, reply });
         save();
       }
       await drive(0);
-      await command('tick unfreeze');
       const start = vehicleIn(before).position;
+      const targetDistance = inputs.offshore ? 3 : 2;
+      const step = inputs.offshore ? 1 : 5;
+      let stopped = false;
       let last;
-      for (let ticks = 5; ticks <= 30; ticks += 5) {
-        last = await advance(5);
+      for (let ticks = step; ticks <= 30; ticks += step) {
+        last = await frozenStep(step);
         await observe(last, `travel-${ticks}`, { mounted: true });
         const current = vehicleIn(last).position;
         const distance = Math.hypot(current.x - start.x, current.z - start.z);
         // A single initial impulse was observed to stop short. Drive this
-        // controlled fixture for a bounded 30 ticks;
-        // never accept short travel or imply that these inputs are rowing.
-        if (distance < 2 && ticks < 30) await drive(ticks);
+        // fixture in frozen native steps, without uncontrolled wall-clock drift.
+        // Offshore travel stops before the bank so the empty hull can depart.
+        if (inputs.offshore && !stopped && distance >= targetDistance) {
+          await drive(ticks, true);
+          stopped = true;
+        } else if (distance < targetDistance && ticks % 5 === 0 && ticks < 30) await drive(ticks);
       }
       const traveled = vehicleIn(last);
       observed.displacement = Math.hypot(traveled.position.x - start.x, traveled.position.z - start.z);

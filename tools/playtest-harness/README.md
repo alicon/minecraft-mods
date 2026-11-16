@@ -229,11 +229,13 @@ reload behavior remain tracked in issue #45.
 The `journeys` group adds 64 contained-water dock sequences, 16 offshore immersion
 controls, and 32
 rail-minecart sequences. Each proves a real native passenger, injects motion
-for at most 30 ticks and requires at least two blocks of observed native movement before
+for at most 30 frozen native ticks and requires at least two blocks of observed native movement before
 owner help, creative takeoff/landing, or mounted survival feeding/harness changes.
 Every motion request is recorded. A single initial impulse was observed to stop
-short, so the fixture reapplies motion at five-tick samples until two blocks
-are observed. The original short-travel cause is unconfirmed. Short travel remains a setup failure; command success alone does
+short, so the fixture reapplies motion at five-tick samples until its travel
+target is observed. Offshore controls sample every tick and stop the hull after three
+blocks, leaving room for its later departure; dock and rail controls sample every
+five ticks. The original short-travel cause is unconfirmed. Short travel remains a setup failure; command success alone does
 not establish movement. These inputs do not simulate player rowing.
 Boat bank-exit cases have a real dock doorway, a controlled shore-facing passenger
 yaw, and an owner standing clear of the exit. They do not claim an offshore sit
