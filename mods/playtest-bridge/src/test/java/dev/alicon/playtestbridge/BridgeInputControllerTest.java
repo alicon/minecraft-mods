@@ -26,6 +26,16 @@ class BridgeInputControllerTest {
 	}
 
 	@Test
+	void contextLossDuringTheNeutralTickCannotKeepASuccessOutcome() {
+		Fixture fixture = new Fixture();
+		fixture.start(1);fixture.tick();
+		fixture.target.invalid = "vehicle_changed";fixture.tick();
+		assertEquals("vehicle_changed", fixture.status().get("outcome").getAsString());
+		assertTrue(fixture.status().get("controlsReleased").getAsBoolean());
+		assertEquals(1, fixture.target.applied);
+	}
+
+	@Test
 	void retainedReceiptDoesNotChangeWhenPhysicalInputOrTimeChangesLater() {
 		Fixture fixture = new Fixture();
 		fixture.start(1);fixture.tick();fixture.tick();
