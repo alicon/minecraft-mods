@@ -3,6 +3,15 @@
 const assert = require('node:assert/strict');
 const VEHICLES = ['minecraft:oak_boat', 'minecraft:oak_chest_boat', 'minecraft:minecart'];
 
+function assertVehicleOwnerState(snapshot, mode, flying) {
+  const abilities = snapshot.players[0].abilities;
+  if (abilities?.creative !== (mode === 'creative') || abilities?.flying !== flying) {
+    const error = new Error(`Vehicle owner fixture lost ${mode}/flying=${flying}: ${JSON.stringify(abilities)}`);
+    error.phase = 'setup';
+    throw error;
+  }
+}
+
 function assertVehicleMount(snapshot, petUuid, vehicleUuid) {
   const nearby = snapshot.players[0].nearbyEntities;
   const pet = nearby.find(e => e.uuid === petUuid);
@@ -81,10 +90,11 @@ function vehicleCases({ prepare, command, request, state, entity, advance, base,
     },
     run: async (fixture, result, save) => {
       const observed = result.observed = { fixture, trace: [] };
-      function inspect(snapshot, stage) {
+      function inspect(snapshot, stage, ownerFlying = false) {
         const pet = entity(snapshot);
         observed.trace.push({ stage, snapshot });
         save();
+        assertVehicleOwnerState(snapshot, inputs.ownerMode, ownerFlying);
         check(pet?.uuid === fixture.petUuid && pet.tameable?.ownedByPlayer, 'Vehicle action lost the original owned Mushroom');
         check(pet.health === pet.maxHealth, 'Vehicle action damaged Mushroom');
         check(pet.tameable.orderedToSit === inputs.sitting, 'Vehicle action toggled the original sit/follow order');
@@ -125,14 +135,34 @@ function vehicleCases({ prepare, command, request, state, entity, advance, base,
         const settled = inspect(await advance(60), 'after-dismount-full-ticks');
         check(!settled.vehicle && !settled.noGravity, 'Assisted dismount did not settle with normal gravity');
       } else {
-        await request('/player-abilities', { player, flying: true, mayfly: true });
+        // A grounded client can send flying=false after the bridge's acknowledgement.
+        // Move first, then require stable replicated flight before ticking the pet.
         await command(`tp ${player} ${base.x - 1.5} ${base.y + 2} ${base.z + 0.5}`);
+        observed.flightSetup = [];
+        let stable = false;
+        await new Promise(resolve => setTimeout(resolve, 150));
+        for (let attempt = 0; attempt < 5 && !stable; attempt++) {
+          const reply = await request('/player-abilities', { player, flying: true, mayfly: true });
+          const immediate = await state();
+          await new Promise(resolve => setTimeout(resolve, 150));
+          const replicated = await state();
+          observed.flightSetup.push({ reply, immediate, replicated });
+          save();
+          stable = immediate.players[0].abilities.flying && replicated.players[0].abilities.flying;
+        }
+        if (!stable) {
+          const error = new Error('Could not establish stable client/server creative flight');
+          error.phase = 'setup';
+          throw error;
+        }
         await command('tick unfreeze');
-        const airborne = inspect(await advance(60), 'creative-takeoff');
-        check(!airborne.vehicle, 'Mushroom was mounted at the creative-takeoff observation');
-        check(airborne.noGravity === !inputs.sitting, 'Takeoff ignored the original sit/follow flight choice');
-        check(!airborne.custom.curledUpSleeping, 'Mushroom slept through owner takeoff');
-        if (inputs.sitting) check(airborne.onGround, 'Ordered sitting pet did not remain grounded after dismount');
+        for (let ticks = 10; ticks <= 60; ticks += 10) {
+          const airborne = inspect(await advance(10), `creative-takeoff-${ticks}`, true);
+          check(!airborne.vehicle, 'Mushroom was mounted at the creative-takeoff observation');
+          check(airborne.noGravity === !inputs.sitting, 'Takeoff ignored the original sit/follow flight choice');
+          check(!airborne.custom.curledUpSleeping, 'Mushroom slept through owner takeoff');
+          if (inputs.sitting) check(airborne.onGround, 'Ordered sitting pet did not remain grounded after dismount');
+        }
         await request('/player-abilities', { player, flying: false, mayfly: true });
         await command(`tp ${player} ${base.x - 2} ${base.y} ${base.z + 0.5}`);
         const landed = inspect(await advance(100), 'owner-landed');
@@ -150,4 +180,4 @@ function vehicleCases({ prepare, command, request, state, entity, advance, base,
   }));
 }
 
-module.exports = { VEHICLES, vehicleInputs, vehicleCases, assertVehicleMount };
+module.exports = { VEHICLES, vehicleInputs, vehicleCases, assertVehicleMount, assertVehicleOwnerState };

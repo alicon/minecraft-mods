@@ -212,7 +212,10 @@ minecarts before testing owner-assisted dismount, creative takeoff/landing, and
 mounted survival feeding/harness changes. It covers day/night, fed/hungry and
 sit/follow orders; assisted dismount also covers survival/creative grounded owners.
 Both directions of the bridge's id/type passenger references must match the full
-UUID states. Named native pet equipment and chest-boat cargo must survive. Food
+UUID states. Takeoff moves the owner above ground before enabling flight, waits
+for stable client/server flight flags, and samples those flags during gameplay.
+A lost flight/mode flag is a setup failure, not a pet-behavior failure.
+Named native pet equipment and chest-boat cargo must survive. Food
 and harness controls freeze ticks for exact item/need changes, then resume full
 entity ticks. Successful final passenger fixtures retain their vehicle through
 inspection care. These are dry stationary vehicles, not water travel, moving-cart

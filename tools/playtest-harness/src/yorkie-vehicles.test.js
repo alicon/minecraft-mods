@@ -2,7 +2,16 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { VEHICLES, vehicleInputs, vehicleCases, assertVehicleMount } = require('./yorkie-vehicles');
+const { VEHICLES, vehicleInputs, vehicleCases, assertVehicleMount, assertVehicleOwnerState } = require('./yorkie-vehicles');
+
+test('lost owner flight is a fixture failure rather than a trapped-pet verdict', () => {
+  const state = { players: [{ abilities: { creative: true, flying: false } }] };
+  assertVehicleOwnerState(state, 'creative', false);
+  assert.throws(() => assertVehicleOwnerState(state, 'creative', true), e => e.phase === 'setup' && /fixture lost/.test(e.message));
+  state.players[0].abilities.flying = true;
+  assertVehicleOwnerState(state, 'creative', true);
+  assert.throws(() => assertVehicleOwnerState(state, 'survival', false), e => e.phase === 'setup');
+});
 
 test('vehicle scenarios independently cover passenger actions, owner modes, hunger, night and sit orders', () => {
   const rows = vehicleInputs();
