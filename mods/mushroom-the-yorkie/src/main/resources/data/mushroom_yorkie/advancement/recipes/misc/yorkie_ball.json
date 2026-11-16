@@ -10,6 +10,9 @@
 					},
 					{
 						"items": "minecraft:lime_dye"
+					},
+					{
+						"items": "minecraft:string"
 					}
 				]
 			}

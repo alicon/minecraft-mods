@@ -3587,6 +3587,9 @@ async function main() {
     putOptional(body, 'radius', optionNumber(args, 'radius', 'BRIDGE_RADIUS', 48));
     putOptional(body, 'step', optionNumber(args, 'step', 'BRIDGE_STEP', 8));
     result = await requestJson(baseUrl, '/terrain-scan', 'POST', body);
+  } else if (action === 'yorkie-crafting') {
+    result = await require('./yorkie-crafting').runCraftingChecks(baseUrl, args);
+    if (!result.ok) process.exitCode = 1;
   } else if (action === 'yorkie-matrix') {
     result = await require('./yorkie-matrix').runMatrix(baseUrl, args);
     if (!result.ok) process.exitCode = 1;
@@ -3622,8 +3625,8 @@ async function main() {
     throw new Error(`Unknown bridge action: ${action}`);
   }
 
-  // Matrix owns atomic incremental reports, including its post-run phase.
-  if (action !== 'yorkie-matrix') writeReportFile(option(args, 'reportFile', 'BRIDGE_REPORT_FILE', ''), result);
+  // Scenario suites own atomic incremental reports, including any post-run phase.
+  if (!['yorkie-matrix', 'yorkie-crafting'].includes(action)) writeReportFile(option(args, 'reportFile', 'BRIDGE_REPORT_FILE', ''), result);
   console.log(JSON.stringify(result, null, 2));
 }
 

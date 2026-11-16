@@ -42,3 +42,5 @@ ext {
 }
 
 apply from: rootProject.file('gradle/fabric-mod.gradle')
+
+apply from: rootProject.file('gradle/legacy-crafting-recipes.gradle')

@@ -7,6 +7,7 @@
 	"entrypoints": {
 		"fabric-gametest": [
 			"dev.alicon.mushroomyorkie.gametest.MushroomYorkieGameTests",
+			"dev.alicon.mushroomyorkie.gametest.RecipeCraftingGameTests",
 			"dev.alicon.mushroomyorkie.entity.FetchInterruptionGameTests",
 			"dev.alicon.mushroomyorkie.entity.FetchPersistenceGameTests",
 			"dev.alicon.mushroomyorkie.entity.FetchFlightGameTests",

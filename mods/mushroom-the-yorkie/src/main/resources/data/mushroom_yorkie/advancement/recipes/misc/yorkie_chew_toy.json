@@ -10,6 +10,9 @@
 					},
 					{
 						"items": "minecraft:yellow_dye"
+					},
+					{
+						"items": "minecraft:string"
 					}
 				]
 			}

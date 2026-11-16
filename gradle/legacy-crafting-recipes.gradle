@@ -1,0 +1,54 @@
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+
+// Keep one modern recipe definition; only the 1.21.1 ingredient wire format differs.
+class LegacyCraftingIngredients extends FilterReader {
+	private final Reader source
+	private Reader converted
+
+	LegacyCraftingIngredients(Reader source) {
+		super(source)
+		this.source = source
+	}
+
+	private Reader content() {
+		if (converted == null) {
+			def recipe = new JsonSlurper().parse(source)
+			if (recipe.type == 'minecraft:crafting_shaped') {
+				recipe.key = recipe.key.collectEntries { key, value -> [(key): ingredient(value)] }
+			} else if (recipe.type == 'minecraft:crafting_shapeless') {
+				recipe.ingredients = recipe.ingredients.collect { ingredient(it) }
+			} else {
+				throw new IllegalArgumentException("Legacy crafting adapter does not support ${recipe.type}")
+			}
+			converted = new StringReader(JsonOutput.prettyPrint(JsonOutput.toJson(recipe)) + '\n')
+		}
+		return converted
+	}
+
+	private static Map ingredient(Object value) {
+		if (!(value instanceof String) || !(value ==~ /#?[a-z0-9_.-]+:[a-z0-9_\/.-]+/)) {
+			throw new IllegalArgumentException("Expected a modern item or tag ingredient, got ${value}")
+		}
+		return value.startsWith('#') ? [tag: value.substring(1)] : [item: value]
+	}
+
+	@Override
+	int read() {
+		return content().read()
+	}
+
+	@Override
+	int read(char[] buffer, int offset, int length) {
+		return content().read(buffer, offset, length)
+	}
+}
+
+if (project.ext.active_minecraft_version == '1.21.1') {
+	tasks.named('processResources') {
+		inputs.property('legacyCraftingIngredientSchema', 1)
+		filesMatching("data/${project.ext.mod_id}/recipe/*.json") {
+			filter(LegacyCraftingIngredients)
+		}
+	}
+}

@@ -118,6 +118,9 @@ final class PlaytestBridgeServer {
 			} else if ("POST".equals(method) && "/player-abilities".equals(path)) {
 				JsonObject body = readBody(exchange);
 				sendJson(exchange, 200, runOnServerThread(() -> BridgePlayerActions.updateAbilities(this.playerFromBody(body), body)));
+			} else if ("POST".equals(method) && "/crafting-check".equals(path)) {
+				JsonObject body = readBody(exchange);
+				sendJson(exchange, 200, runOnServerThread(() -> BridgeCraftingActions.check(this.playerFromBody(body), body)));
 			} else if ("POST".equals(method) && "/use-entity".equals(path)) {
 				JsonObject body = readBody(exchange);
 				sendJson(exchange, 200, runOnServerThread(() -> this.useEntity(body)));
