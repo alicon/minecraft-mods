@@ -213,6 +213,30 @@ public final class SquirrelApproachGameTests {
 		SquirrelInterruptionScenarios.closeBelowAscent(helper);
 	}
 
+	/** A harmless new block below an intact perch must not cause a fall on native reload. */
+	@GameTest(maxTicks = 340)
+	public void squirrelResumesSavedPerchWithChangedLowerFace(GameTestHelper helper) {
+		SquirrelReloadApproachScenarios.changedLowerFace(helper, squirrel -> roundTrip(helper, squirrel));
+	}
+
+	/** Reject an artificial saved no-gravity input outside a valid physical perch. */
+	@GameTest(maxTicks = 120)
+	public void squirrelRejectsSavedPerchHorizontalGap(GameTestHelper helper) {
+		SquirrelPerchBoundaryScenarios.observe(helper, squirrel -> roundTrip(helper, squirrel), "horizontal-gap");
+	}
+
+	/** Reject an artificial saved no-gravity input outside a valid physical perch. */
+	@GameTest(maxTicks = 120)
+	public void squirrelRejectsSavedPerchAboveLog(GameTestHelper helper) {
+		SquirrelPerchBoundaryScenarios.observe(helper, squirrel -> roundTrip(helper, squirrel), "above-log");
+	}
+
+	/** Reject an artificial saved no-gravity input outside a valid physical perch. */
+	@GameTest(maxTicks = 120)
+	public void squirrelRejectsSavedPerchShortColumn(GameTestHelper helper) {
+		SquirrelPerchBoundaryScenarios.observe(helper, squirrel -> roundTrip(helper, squirrel), "short-column");
+	}
+
 	private static SquirrelEntity roundTrip(GameTestHelper helper, SquirrelEntity squirrel) {
 		var output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, helper.getLevel().registryAccess());
 		squirrel.saveWithoutId(output);

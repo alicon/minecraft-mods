@@ -572,3 +572,32 @@ by a solid block with the same open route. They verify exact native ticks,
 body-safe placement, the original healthy UUID and 40 recovered perch ticks
 within a 300-tick bound. A failed climb preserves its trace and unfreezes during
 cleanup; neither case receives success-only pet care.
+
+## Squirrel perch across a saved restart
+
+```shell
+node tools/playtest-harness/src/bridge-cli.js yorkie-squirrel-restart \
+  --expected-save "Mushroom Abel Noelle 20261115-075437" --lower-face-block
+```
+
+Omit `--lower-face-block` for the unchanged-perch control. This destructive check
+uses the existing matrix case to create a fresh squirrel and observe a real
+climb. It then verifies the original healthy UUID and trunk, optionally places
+and reads back stone below the body, and observes 40 safe native ticks before
+saving. Normal shutdown must produce fresh save-completion logs and the old
+client process must exit before the same profile is relaunched. No jars change
+during this test. The original owner, exact save path and jar hashes must match.
+A non-default profile requires `--instance-id`.
+
+The report includes the first reconnected snapshot and 120 further exact frozen
+native ticks. A later recovered perch cannot hide observed health/height loss or
+movement to another face. Startup ticks before the bridge reconnects are not
+individually sampled; this limit is recorded explicitly. Native serialization
+controls provide separate per-tick evidence across entity loading.
+
+Reports are atomic and incremental, with a linked fixture report and bootstrap
+log; `--report-file` overrides the unique default name. Failures and startup
+errors remain distinct. Cleanup rechecks identity and verifies the world is
+unfrozen. A cleanup failure keeps the gameplay verdict separately and fails the
+overall run. No failed or successful squirrel run receives pet care, damage
+immunity, a replacement squirrel or a post-start success teleport.
