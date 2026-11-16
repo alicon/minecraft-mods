@@ -306,7 +306,7 @@ Set `BRIDGE_REPORT_FILE=build/playtest-reports/<name>.json` to save the full bri
 ## State-combination testing
 
 The [Mushroom state matrix](../tools/playtest-harness/README.md#mushroom-state-matrix)
-checks 144 combinations, 40 interruption/owner-mode/flight/feeding/tree-approach sequences, 36 terrain cases, 20 outdoor-care sequences, 22 water/rest sequences, eight sleep-spot controls, 100 dry vehicle cases (96 full-entity sequences plus four controlled boarding-refusal challenges), and 112 controlled water/rail journeys (including 16 actual offshore immersion controls) in a disposable live world and preserves partial failure
+defines 490 cases: 144 combinations, 40 interruption/owner-mode/flight/feeding/tree-approach sequences, 36 terrain cases, 20 outdoor-care sequences, 22 water/rest sequences, eight sleep-spot controls, 100 dry vehicle cases (96 full-entity sequences plus four controlled boarding-refusal challenges), 112 controlled water/rail journeys (including 16 actual offshore immersion controls), and eight native exit-to-shore sequences in a disposable live world. It preserves partial failure
 reports. Run `npm --prefix tools/playtest-harness test` for the harness's runner,
 command-rejection, and save-safety regression tests. These tests also run in CI.
 Gameplay assertions still need the live Minecraft client and bridge. Matrix
@@ -321,6 +321,14 @@ ticks and require two blocks of actual movement before the owner action. Offshor
 controls sample every tick and stop after three blocks to retain departure room;
 dock and rail controls sample every five ticks. Short travel is a setup failure,
 even when the movement command succeeded.
+The `native-shore` group separately uses ordinary native keyboard exit and walking,
+with empty-hand pet help at survival reach. It verifies floor/headroom and a
+half-block bank step before movement, and watches fixture boundaries while keys
+are held. A following pet must have 40 final consecutive native world samples
+dry, grounded, fully breathing and near the owner, with actual block support at
+the end. Native AI, collision, gravity and damage remain active. These cases
+preserve possessions and disable success-only inspection care. A defined case
+count is not a completed full sweep.
 Eight squirrel starts around a partly blocked tree sample every native world tick,
 retain the original healthy squirrel, require first clinging within 100 ticks,
 and require 40 consecutive safe clinging ticks within a 400-tick bound. The live observer starts measuring horizontal

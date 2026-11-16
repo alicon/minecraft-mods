@@ -37,6 +37,23 @@ test('records evidence and cleanup errors without hiding original failure', asyn
   assert.equal(result.ok, false);
 });
 
+test('an investigative failure retains its fixture and reports unexecuted cases', async () => {
+  for (const fault of ['behavior', 'cleanup']) {
+    let replaced = false, cared = false;
+    const report = await runCases([
+      { name: 'investigation', stopOnFailure: true, setup: async () => {},
+        run: async () => { if (fault === 'behavior') throw Error('original anomaly'); return { original: true }; },
+        cleanup: async () => { if (fault === 'cleanup') throw Error('cleanup issue'); } },
+      { name: 'replacement', setup: async () => { replaced = true; }, run: async () => {} }
+    ], { capture: async () => ({ originalFixture: 'retained' }), afterSuccess: async () => { cared = true; } });
+    assert.equal(replaced, false);assert.equal(cared, false);
+    assert.equal(report.complete, true);assert.equal(report.gameplayComplete, false);assert.equal(report.ok, false);
+    assert.equal(report.requestedCaseCount, 2);assert.equal(report.cases.length, 1);assert.equal(report.stoppedAfterFailure, true);
+    assert.match(report.cases[0].error || report.cases[0].cleanupError, /original anomaly|cleanup issue/);
+    if (fault === 'behavior') assert.equal(report.cases[0].evidence.originalFixture, 'retained');
+  }
+});
+
 test('rejects family saves, wrong identities, and multiplayer', () => {
   const save = 'Mushroom Matrix Test';
   const state = { saveName: save, singleplayer: true, players: [{}] };

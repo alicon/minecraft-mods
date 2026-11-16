@@ -152,8 +152,9 @@ async function executeMatrix(baseUrl, args) {
       }
     };
   });
-  const context = { prepare, command, request, state, entity, advance, base, player, selector: SELECTOR, check };
+  const context = { prepare, command, request, state, entity, advance, base, player, expectedSave: args.expectedSave, playerUuid: initial.players[0].uuid, selector: SELECTOR, check };
   const groups = { base: cases, transitions: [...require('./yorkie-transitions').transitionCases(context), ...require('./yorkie-flight-transitions').flightTransitionCases(context)], terrain: require('./yorkie-terrain').terrainCases(context), outdoors: require('./yorkie-outdoor').outdoorCases(context), water: require('./yorkie-water-rest').waterRestCases(context), rest: require('./yorkie-sleep-spots').sleepSpotCases(context), vehicles: require('./yorkie-vehicles').vehicleCases(context), journeys: require('./yorkie-vehicle-journeys').journeyCases(context) };
+  groups['native-shore'] = require('./yorkie-native-shore').nativeShoreCases(context);
   const selected = selectCases(groups, args);
   await command('gamerule minecraft:spawn_mobs false');
   await command('gamerule minecraft:advance_time false');
@@ -175,7 +176,7 @@ async function executeMatrix(baseUrl, args) {
     run: (resetOnce) => runCases(selected, {
       afterSuccess: async () => {
         await resetOnce();
-        if (selected.at(-1).inspectionPet === false) return { skipped: true, reason: 'final_fixture_intentionally_has_no_pet' };
+        if (selected.at(-1).inspectionPet === false) return { skipped: true, reason: 'final_fixture_disables_inspection_care' };
         return careForSuccessfulPet({ ...careContext, petUuid: lastFixtureUuid });
       },
       reportFile, metadata: { scenario: 'yorkie-matrix', runId, group: args.group || 'all', provenance, startScreenshot: startScreenshot.file, saveName: initial.saveName, base, expectedSave: args.expectedSave },
