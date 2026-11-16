@@ -27,11 +27,20 @@ final class SquirrelInterruptionScenarios {
 		new Probe(helper, true, false, true).start();
 	}
 
+	static void openCanopy(GameTestHelper helper) {
+		new Probe(helper, false, false, true, 1).start();
+	}
+
+	static void closeBelowAscent(GameTestHelper helper) {
+		new Probe(helper, false, false, true, 2).start();
+	}
+
 	private static final class Probe {
 		private final GameTestHelper helper;
 		private final SquirrelEntity squirrel;
 		private final ServerPlayer attacker;
 		private final boolean perched, south, closeFace;
+		private final int terrainVariant;
 		private final JsonObject report = new JsonObject();
 		private final JsonArray frames = new JsonArray();
 		private final Path output;
@@ -40,15 +49,21 @@ final class SquirrelInterruptionScenarios {
 		private float postAttackHealth;
 
 		Probe(GameTestHelper helper, boolean perched, boolean south, boolean closeFace) {
+			this(helper, perched, south, closeFace, 0);
+		}
+
+		Probe(GameTestHelper helper, boolean perched, boolean south, boolean closeFace, int terrainVariant) {
 			this.helper = helper;
 			this.perched = perched;
 			this.south = south;
 			this.closeFace = closeFace;
+			this.terrainVariant = terrainVariant;
 			this.origin = helper.absoluteVec(Vec3.ZERO);
 			for (int x = 0; x <= 7; x++) {
 				for (int z = 0; z <= 7; z++) helper.setBlock(x, 0, z, Blocks.STONE);
 			}
 			for (int y = 1; y <= 5; y++) helper.setBlock(4, y, 4, Blocks.OAK_LOG);
+			if (terrainVariant == 1) helper.setBlock(3, 4, 4, Blocks.STONE);
 			this.squirrel = helper.spawn(ModEntities.SQUIRREL, 1, 1, 4);
 			GameTestSeeds.apply(this.squirrel, "interruption-" + perched + "-" + south + "-" + closeFace);
 			this.attacker = closeFace ? null : SurvivalGameTestPlayers.createWithoutToyCleanup(helper);
@@ -58,11 +73,12 @@ final class SquirrelInterruptionScenarios {
 			}
 			String directory = System.getenv("MUSHROOM_SQUIRREL_TRACE_DIR");
 			this.output = directory == null ? null : Path.of(directory, "native-interruption-" + perched + "-" + south
-					+ "-" + closeFace + "-" + this.squirrel.getUUID() + ".json");
+					+ "-" + closeFace + "-variant" + terrainVariant + "-" + this.squirrel.getUUID() + ".json");
 			this.report.addProperty("entityUuid", this.squirrel.getUUID().toString());
 			this.report.addProperty("perched", perched);
 			this.report.addProperty("southAttack", south);
 			this.report.addProperty("closeFace", closeFace);
+			this.report.addProperty("terrainVariant", terrainVariant);
 			this.report.add("frames", this.frames);
 		}
 
@@ -81,6 +97,7 @@ final class SquirrelInterruptionScenarios {
 				if (this.interruptedAt < 0) {
 					this.helper.assertTrue(this.squirrel.getHealth() == this.squirrel.getMaxHealth(), "Interruption setup lost health");
 					boolean ready = this.perched ? this.squirrel.hasFoundTree() && this.squirrel.isNoGravity()
+							: this.terrainVariant == 2 ? this.squirrel.getY() >= this.origin.y + 3.5D && this.squirrel.getY() < this.origin.y + 4.0D
 							: this.squirrel.getY() >= this.origin.y + 1.8D && this.squirrel.getY() < this.origin.y + 2.3D;
 					this.stableTicks = ready ? this.stableTicks + 1 : 0;
 					if (this.stableTicks >= (this.perched ? 40 : 1)) this.interrupt();
@@ -88,7 +105,8 @@ final class SquirrelInterruptionScenarios {
 					this.helper.assertTrue(this.squirrel.getHealth() == (this.closeFace ? this.squirrel.getMaxHealth() : this.postAttackHealth),
 							"Interruption recovery took additional damage");
 					boolean recovered = this.squirrel.hasFoundTree() && this.squirrel.isNoGravity()
-							&& this.squirrel.getY() >= this.origin.y + 4.8D;
+							&& this.squirrel.getY() >= this.origin.y + (this.terrainVariant == 1 ? 2.8D : 4.8D);
+					if (this.terrainVariant > 0) this.helper.assertTrue(this.squirrel.onClimbable(), "An unchanged remaining route released its ascent");
 					if (this.perched && this.closeFace) this.helper.assertTrue(recovered, "Changing terrain below an intact perch caused a fall");
 					this.stableTicks = recovered ? this.stableTicks + 1 : 0;
 					if (recovered && this.recoveredAt < 0) this.recoveredAt = this.ticks;
@@ -123,11 +141,13 @@ final class SquirrelInterruptionScenarios {
 			this.stableTicks = 0;
 			this.report.add("beforeInterruption", this.frame());
 			if (this.closeFace) {
-				var block = this.helper.absolutePos(new net.minecraft.core.BlockPos(3, 3, 4));
+				var block = this.helper.absolutePos(new net.minecraft.core.BlockPos(3, this.terrainVariant == 1 ? 4 : this.terrainVariant == 2 ? 1 : 3, 4));
 				this.helper.assertTrue(!new net.minecraft.world.phys.AABB(block).intersects(this.squirrel.getBoundingBox()),
 						"Changed face overlaps the squirrel: invalid setup");
-				this.helper.assertTrue(this.squirrel.getX() < this.origin.x + 4.0D, "Squirrel did not use the west face");
-				this.helper.setBlock(3, 3, 4, Blocks.STONE);
+				this.helper.assertTrue(this.squirrel.getX() < this.origin.x + 4.0D
+						&& Math.abs(this.squirrel.getZ() - this.origin.z - 4.5D) < 0.2D, "Squirrel did not use the west face");
+				if (!this.perched) this.helper.assertTrue(!this.squirrel.hasFoundTree() && !this.squirrel.isNoGravity(), "Ascent intervention missed its phase");
+				this.helper.getLevel().setBlockAndUpdate(block, (this.terrainVariant == 1 ? Blocks.AIR : Blocks.STONE).defaultBlockState());
 			} else {
 				this.helper.assertTrue(this.attacker.hasLineOfSight(this.squirrel)
 						&& this.attacker.getEyePosition().distanceToSqr(this.squirrel.getBoundingBox().getCenter()) <= 9.0D, "Native attack lacks reach/line of sight");

@@ -5,17 +5,20 @@ const assert = require('node:assert/strict');
 const { squirrelInterruptionCases } = require('./yorkie-squirrel-interruptions');
 const { runCases } = require('./scenario-runner');
 
-function fixture({ stalled = false, wrongFace = false, hurt = false, neverClimbs = false } = {}) {
+function fixture({ stalled = false, wrongFace = false, hurt = false, neverClimbs = false, rejectPlace = false, wrongBlock = false } = {}) {
   let clock = 0, frozen = false;
   const walls = [];
   const context = {
-    base: { x: 0, y: 20, z: 0 }, prepare: async () => {}, request: async () => ({}),
+    base: { x: 0, y: 20, z: 0 }, prepare: async () => {}, request: async route => route === '/block' ? ({ block: wrongBlock ? 'minecraft:air' : 'minecraft:stone' }) : ({}),
     check: (value, message) => assert(value, message),
     command: async text => {
       if (text === 'tick freeze') frozen = true;
       if (text === 'tick unfreeze') frozen = false;
       if (text === 'tick step 1t') clock++;
-      if (text.startsWith('setblock ')) walls.push({ text, clock });
+      if (text.startsWith('setblock ')) {
+        walls.push({ text, clock });
+        if (rejectPlace) return { success: false, callbackSeen: true, result: 0 };
+      }
       return { success: true, callbackSeen: true, result: clock };
     },
     state: async () => {
@@ -74,3 +77,13 @@ test('interruption damage cannot be hidden by a later perch', async () => {
   assert.equal(report.cases[0].observed.trace.length, 2);
   assert.equal(f.frozen(), false);
 });
+
+for (const options of [{ rejectPlace: true }, { wrongBlock: true }]) {
+  test(`missing obstruction is invalid setup: ${JSON.stringify(options)}`, async () => {
+    const f = fixture(options);
+    const report = await runCases([squirrelInterruptionCases(f.context)[1]], {});
+    assert.equal(report.cases[0].status, 'setup_failed');
+    assert.equal(report.cases[0].observed.trace.length, 1);
+    assert.equal(f.frozen(), false);
+  });
+}

@@ -165,7 +165,6 @@ public final class SquirrelApproachGameTests {
 				"Squirrel never reached the clear tree face: " + squirrel.position()));
 	}
 
-
 	/** Observe recovery after a reachable native sprint attack. */
 	@GameTest(maxTicks = 340)
 	public void squirrelAttackMidClimbNorth(GameTestHelper helper) {
@@ -200,6 +199,18 @@ public final class SquirrelApproachGameTests {
 	@GameTest(maxTicks = 340)
 	public void squirrelKeepsPerchAboveChangedFace(GameTestHelper helper) {
 		SquirrelInterruptionScenarios.closeBelowPerch(helper);
+	}
+
+	/** Removing a canopy above the original target must not release the existing climb. */
+	@GameTest(maxTicks = 340)
+	public void squirrelKeepsClimbWhenCanopyOpens(GameTestHelper helper) {
+		SquirrelInterruptionScenarios.openCanopy(helper);
+	}
+
+	/** Changing a face below the body must not release an otherwise clear remaining ascent. */
+	@GameTest(maxTicks = 340)
+	public void squirrelKeepsClimbWhenLowerFaceCloses(GameTestHelper helper) {
+		SquirrelInterruptionScenarios.closeBelowAscent(helper);
 	}
 
 	private static SquirrelEntity roundTrip(GameTestHelper helper, SquirrelEntity squirrel) {

@@ -39,7 +39,19 @@ function squirrelInterruptionCases(context) {
               error.phase = 'setup'; throw error;
             }
             observed.interruptedAt = ticks; save();
-            if (closeFace) await command(`setblock ${base.x + 2} ${base.y + 2} ${base.z + 3} minecraft:stone`);
+            if (closeFace) {
+              const placed = await command(`setblock ${base.x + 2} ${base.y + 2} ${base.z + 3} minecraft:stone`);
+              if (placed.success !== true) {
+                const error = new Error('Climbing-face obstruction was not placed');
+                error.phase = 'setup'; throw error;
+              }
+              const block = await request('/block', { x: base.x + 2, y: base.y + 2, z: base.z + 3 });
+              if (block.block !== 'minecraft:stone') {
+                const error = new Error('Climbing-face obstruction did not match the requested block');
+                error.phase = 'setup'; throw error;
+              }
+              observed.placedBlock = block.block; save();
+            }
           }
           const recovered = observed.interruptedAt !== undefined && squirrel.custom.foundTree && squirrel.noGravity
             && squirrel.position.y >= base.y + 3.8;

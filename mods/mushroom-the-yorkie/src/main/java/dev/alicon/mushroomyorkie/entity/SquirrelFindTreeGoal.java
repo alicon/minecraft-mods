@@ -84,15 +84,28 @@ final class SquirrelFindTreeGoal extends Goal {
 				&& this.climbPos != null
 				&& this.squirrel.level().getBlockState(this.treePos).is(BlockTags.LOGS)
 				&& this.squirrel.level().getBlockState(this.climbPos).is(BlockTags.LOGS)
-				&& isStandable(this.squirrel.level(), this.approachPos);
+				&& (this.climbing || isStandable(this.squirrel.level(), this.approachPos));
 		if (!valid) return false;
 		// A new branch/block can close the selected face after ground navigation
 		// hands off. Release the ascent instead of pressing into it indefinitely.
 		// An established perch need not fall because terrain below it changed.
 		if (this.climbing && !this.squirrel.hasFoundTree()
-				&& !this.climbPos.equals(findClimbTarget(this.squirrel.level(), this.treePos, this.approachPos))) {
+				&& !this.remainingClimbIsClear()) {
 			this.nextSearchTick = 0;
 			return false;
+		}
+		return true;
+	}
+
+	private boolean remainingClimbIsClear() {
+		// Opening a taller route or changing terrain already passed must not
+		// release a sound ascent. Validate only the remainder of this target.
+		int fromY = Math.max(this.treePos.getY(), (int) Math.floor(this.squirrel.getY()));
+		for (int y = fromY; y <= this.climbPos.getY(); y++) {
+			BlockPos trunk = new BlockPos(this.treePos.getX(), y, this.treePos.getZ());
+			BlockPos space = new BlockPos(this.approachPos.getX(), y, this.approachPos.getZ());
+			if (!this.squirrel.level().getBlockState(trunk).is(BlockTags.LOGS)
+					|| !this.squirrel.level().getBlockState(space).isAir()) return false;
 		}
 		return true;
 	}

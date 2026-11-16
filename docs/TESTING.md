@@ -330,7 +330,9 @@ Native controls repeat this change during ascent and below an established perch;
 the latter must retain full health and height. Four controlled native sprint
 attacks require empty-hand charge, actual reach/line of sight, damage and recovery.
 The synthetic player fixture drives native player doTick once per world tick;
-the squirrel uses full normal entity ticks. These assertions prove recovery,
+the squirrel uses full normal entity ticks. Separate controls keep an ascent
+when its canopy opens or already-passed face changes, and retain a perched
+squirrel when terrain below it changes. These assertions prove recovery,
 not normal knockback displacement while perched: retained traces show cling
 steering can cancel that impulse, still tracked in GitHub #67.
 Successful matrix runs persist their original case observations before separately feeding
