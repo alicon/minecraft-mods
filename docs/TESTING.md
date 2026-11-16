@@ -282,8 +282,8 @@ controls sample every tick and stop after three blocks to retain departure room;
 dock and rail controls sample every five ticks. Short travel is a setup failure,
 even when the movement command succeeded.
 Eight squirrel starts around a partly blocked tree sample every native world tick,
-retain the original healthy squirrel, and require 40 consecutive safe clinging
-ticks within a 400-tick bound. The live observer starts measuring horizontal
+retain the original healthy squirrel, require first clinging within 100 ticks,
+and require 40 consecutive safe clinging ticks within a 400-tick bound. The live observer starts measuring horizontal
 travel after the first half-block ascent; more than three blocks of travel or
 more than one block of lost height fails even when the squirrel eventually
 reaches safety. Ordinary contact hops remain allowed. Every case preserves its

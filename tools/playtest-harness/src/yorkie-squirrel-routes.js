@@ -27,8 +27,10 @@ class ClimbRouteObservation {
     this.previous = position;
   }
 
-  assertSmooth() {
+  assertSmooth(firstClingTicks) {
     assert(this.started, 'Squirrel never began its climb');
+    assert(Number.isInteger(firstClingTicks) && firstClingTicks > 0 && firstClingTicks <= 100,
+      `Squirrel took too long to reach the nearby tree: ${firstClingTicks} ticks`);
     assert(this.distance <= 3, `Squirrel circled during its climb: ${this.distance} horizontal blocks`);
     assert(this.largestDrop <= 1, `Squirrel lost its climb and dropped ${this.largestDrop} blocks`);
   }
@@ -52,7 +54,9 @@ function squirrelRouteCases({ prepare, command, request, state, base, check }) {
         await command(`fill ${base.x + 3} ${base.y} ${base.z + 3} ${base.x + 3} ${base.y + 4} ${base.z + 3} minecraft:oak_log`);
         await command(`setblock ${base.x + 3} ${base.y + 2} ${base.z + 2} minecraft:oak_leaves[persistent=true]`);
         await command(`summon mushroom_yorkie:squirrel ${base.x + x} ${base.y} ${base.z + z} {NoAI:1b,PersistenceRequired:1b}`);
-        const squirrel = (await state()).players[0].nearbyEntities.find(e => e.type === 'mushroom_yorkie:squirrel');
+        const snapshot = await state();
+        check(snapshot.worldFrozen === true, 'Squirrel fixture world did not freeze');
+        const squirrel = snapshot.players[0].nearbyEntities.find(e => e.type === 'mushroom_yorkie:squirrel');
         check(squirrel && squirrel.health === squirrel.maxHealth, 'Fresh healthy squirrel fixture is not observable');
         return { uuid: squirrel.uuid, position: squirrel.position };
       },
@@ -66,6 +70,7 @@ function squirrelRouteCases({ prepare, command, request, state, base, check }) {
           const squirrel = snapshot.players[0].nearbyEntities.find(e => e.uuid === fixture.uuid);
           observed.trace.push({ ticks, squirrel, tickAudit: snapshot.tickAudit });
           save();
+          check(snapshot.worldFrozen === true, 'Squirrel observation world became unfrozen');
           check(snapshot.tickAudit.elapsedTicks === 1, 'Squirrel observation skipped native world ticks');
           check(squirrel && squirrel.health === squirrel.maxHealth, 'Tree approach lost or damaged the original squirrel');
           route.sample(squirrel.position);
@@ -73,7 +78,7 @@ function squirrelRouteCases({ prepare, command, request, state, base, check }) {
           if (clinging && observed.completedAtTicks === undefined) observed.completedAtTicks = ticks;
           stableTicks = clinging ? stableTicks + 1 : 0;
           if (stableTicks >= 40) {
-            route.assertSmooth();
+            route.assertSmooth(observed.completedAtTicks);
             return observed;
           }
         }

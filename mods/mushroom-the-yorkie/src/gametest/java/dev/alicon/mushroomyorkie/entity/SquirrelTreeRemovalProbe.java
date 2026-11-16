@@ -10,6 +10,7 @@ final class SquirrelTreeRemovalProbe {
 	private final SquirrelEntity squirrel;
 	private int ticks, stableTicks, removedAt = -1, landedTicks;
 	private double clingingY;
+	private boolean normalFallObserved;
 
 	SquirrelTreeRemovalProbe(GameTestHelper helper, SquirrelEntity squirrel) {
 		this.helper = helper;
@@ -39,9 +40,13 @@ final class SquirrelTreeRemovalProbe {
 			} else if (this.ticks - this.removedAt >= 5) {
 				this.helper.assertTrue(!this.squirrel.isNoGravity() && !this.squirrel.hasFoundTree(),
 						"Squirrel kept clinging after its trunk disappeared");
+				this.helper.assertTrue(!this.squirrel.onClimbable(),
+						"Squirrel retained climbing physics after its trunk disappeared");
+				this.normalFallObserved |= this.squirrel.getDeltaMovement().y < -0.2D;
 				boolean landed = this.squirrel.onGround() && this.squirrel.getY() < this.clingingY - 2.0D;
 				this.landedTicks = landed ? this.landedTicks + 1 : 0;
 				if (this.landedTicks >= 10) {
+					this.helper.assertTrue(this.normalFallObserved, "Tree removal never produced normal free fall");
 					this.squirrel.discard();
 					this.helper.succeed();
 					return;

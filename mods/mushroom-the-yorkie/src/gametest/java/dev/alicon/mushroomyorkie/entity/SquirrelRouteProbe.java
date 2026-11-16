@@ -107,6 +107,8 @@ final class SquirrelRouteProbe {
 			if (clinging && this.firstCling < 0) this.firstCling = this.ticks;
 			this.stableTicks = clinging ? this.stableTicks + 1 : 0;
 			if (this.stableTicks >= 40) {
+				this.helper.assertTrue(this.firstCling <= 100,
+						"Squirrel took too long to reach the nearby tree: " + this.firstCling + " ticks");
 				this.helper.assertTrue(this.climbingDistance <= 3.0D,
 						"Squirrel circled after committing to the clear face: " + this.climbingDistance + " horizontal blocks");
 				// A native jump while making wall contact can settle back down.
@@ -138,6 +140,7 @@ final class SquirrelRouteProbe {
 
 	private void save(boolean complete) {
 		this.report.addProperty("complete", complete);
+		this.report.addProperty("passed", complete && !this.report.has("error"));
 		this.report.addProperty("firstCling", this.firstCling);
 		this.report.addProperty("climbingDistance", this.climbingDistance);
 		this.report.addProperty("largestDrop", this.largestDrop);
