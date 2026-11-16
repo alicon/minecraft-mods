@@ -198,11 +198,15 @@ Original bodies, inputs, assertions and successful cleanup/care stay unchanged.
 After a setup or assertion failure, capture freezes the original scene and the
 mode skips scenario-level fixture cleanup. The guarded world reset retains that
 freeze instead of changing owner mode/time. Capture errors remain visible; reset
-still attempts the guarded freeze. A cleanup error after a passing body also stops
-the run and fails it. Key/resource release belongs in the action's own `finally`,
+still attempts the guarded freeze. Unexpected runner errors (such as report-write
+failure) also attempt guarded retention, even after success care reset the world;
+the original error stays primary and stderr states whether retention succeeded or
+failed. A cleanup error after a passing body also stops the run and fails it.
+Key/resource release belongs in the action's own `finally`,
 never in skippable fixture cleanup. Ordinary runs keep their existing policy.
 `complete` means the report finished; check `gameplayComplete`, `requestedCaseCount`
-and executed cases before claiming the selected coverage passed.
+and executed cases before claiming the selected coverage passed. Other commands
+reject this matrix-only flag instead of silently ignoring it.
 
 The 144 base cases combine four times (day, dusk, night, dawn), three shelter types
 (open sky, roof only, enclosed room), fed/hungry needs, sit/follow orders,

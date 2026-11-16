@@ -3464,6 +3464,9 @@ async function main() {
     printBridgeUsage();
     return;
   }
+  if (args.investigate !== undefined && action !== 'yorkie-matrix') {
+    throw new Error('--investigate is only supported by yorkie-matrix');
+  }
   const host = option(args, 'host', 'BRIDGE_HOST', '127.0.0.1');
   const port = option(args, 'port', 'BRIDGE_PORT', '57321');
   const baseUrl = `http://${host}:${port}`;
@@ -3677,10 +3680,13 @@ async function main() {
 
 function describeError(error) {
   const code = error && error.cause && error.cause.code;
-  if (code === 'ECONNREFUSED' || (error && error.message === 'fetch failed')) {
-    return 'Could not reach the playtest bridge. Start or restart Minecraft with playtest-bridge installed, then load a world.';
-  }
-  return error.stack || error.message;
+  const message = code === 'ECONNREFUSED' || (error && error.message === 'fetch failed')
+    ? 'Could not reach the playtest bridge. Start or restart Minecraft with playtest-bridge installed, then load a world.'
+    : error.stack || error.message;
+  return [message,
+    ...(error.investigativeWorldReset?.worldFrozen ? ['Investigative fixture retained frozen after runner interruption.'] : []),
+    ...(error.worldResetError ? [`World reset also failed: ${error.worldResetError}`] : [])
+  ].join('\n');
 }
 
 main().catch((error) => {

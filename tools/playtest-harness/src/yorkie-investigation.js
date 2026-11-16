@@ -31,4 +31,17 @@ function investigateCases(cases, enabled) {
   };
 }
 
-module.exports = { investigationEnabled, investigateCases };
+// Report I/O can throw outside normal case verdicts, even after success care
+// already reset the world. Preserve that primary error and explicitly retain
+// the fixture again rather than letting ordinary reset erase its context.
+async function retainInterruptedInvestigation(run, retain, enabled) {
+  if (!enabled) return run();
+  try { return await run(); }
+  catch (error) {
+    try { error.investigativeWorldReset = await retain(); }
+    catch (resetError) { error.worldResetError = resetError.message; }
+    throw error;
+  }
+}
+
+module.exports = { investigationEnabled, investigateCases, retainInterruptedInvestigation };
