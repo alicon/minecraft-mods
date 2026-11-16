@@ -205,7 +205,12 @@ async function executeMatrix(baseUrl, args) {
 }
 
 async function runMatrix(baseUrl, args) {
-  return require('./bridge-lock').withBridgeLock(baseUrl, () => executeMatrix(baseUrl, args));
+  return runMatrixWithContinuation(baseUrl, args, result => result);
 }
 
-module.exports = { runMatrix, matrixInputs, assertTestWorld, selectCases };
+// Saved-restart callers consume the verified fixture without releasing its mutation lease.
+async function runMatrixWithContinuation(baseUrl, args, consume) {
+  return require('./bridge-lock').withBridgeLock(baseUrl, async () => consume(await executeMatrix(baseUrl, args)));
+}
+
+module.exports = { runMatrix, runMatrixWithContinuation, matrixInputs, assertTestWorld, selectCases };

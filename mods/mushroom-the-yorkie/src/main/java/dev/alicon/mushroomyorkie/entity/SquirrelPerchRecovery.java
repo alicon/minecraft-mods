@@ -21,7 +21,9 @@ final class SquirrelPerchRecovery {
 		// Native wall contact can sit exactly on a block boundary. This small
 		// horizontal tolerance admits contact, not a nearby floating squirrel.
 		AABB contact = squirrel.getBoundingBox().inflate(0.02D, 0.0D, 0.02D);
+		Perch highest = null;
 		for (BlockPos trunk : BlockPos.betweenClosed(origin.offset(-1, -1, -1), origin.offset(1, 1, 1))) {
+			if (highest != null && trunk.getY() <= highest.climb().getY()) continue;
 			var state = level.getBlockState(trunk);
 			if (!state.is(BlockTags.LOGS) || !SquirrelTreeClimbPolicy.reachedHeight(squirrel.getY(), trunk.getY())) continue;
 			boolean touching = state.getCollisionShape(level, trunk).toAabbs().stream()
@@ -33,11 +35,12 @@ final class SquirrelPerchRecovery {
 			for (Direction direction : Direction.Plane.HORIZONTAL) {
 				Vec3 face = Vec3.atBottomCenterOf(trunk.relative(direction));
 				if (Math.hypot(squirrel.getX() - face.x, squirrel.getZ() - face.z) <= 0.8D) {
-					return new Perch(tree, tree.relative(direction), trunk.immutable());
+					highest = new Perch(tree, tree.relative(direction), trunk.immutable());
+					break;
 				}
 			}
 		}
-		return null;
+		return highest;
 	}
 
 	private static boolean hasClimbedColumn(SquirrelEntity squirrel, BlockPos trunk) {

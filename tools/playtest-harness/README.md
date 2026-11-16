@@ -580,8 +580,8 @@ node tools/playtest-harness/src/bridge-cli.js yorkie-squirrel-restart \
   --expected-save "Mushroom Abel Noelle 20261115-075437" --lower-face-block
 ```
 
-Omit `--lower-face-block` for the unchanged-perch control. This destructive check
-uses the existing matrix case to create a fresh squirrel and observe a real
+Omit `--lower-face-block` for the unchanged-perch control. This destructive check keeps one mutation lock across its matrix fixture and
+restart. It uses the existing matrix case to create a fresh squirrel and observe a real
 climb. It then verifies the original healthy UUID and trunk, optionally places
 and reads back stone below the body, and observes 40 safe native ticks before
 saving. Normal shutdown must produce fresh save-completion logs and the old
@@ -591,8 +591,9 @@ A non-default profile requires `--instance-id`.
 
 The report includes the first reconnected snapshot and 120 further exact frozen
 native ticks. A later recovered perch cannot hide observed health/height loss or
-movement to another face. Startup ticks before the bridge reconnects are not
-individually sampled; this limit is recorded explicitly. Native serialization
+movement to another face. The unfrozen intervals before quit, during startup and between reconnection
+and freeze are not individually sampled; their native clock endpoints and this
+limit are recorded explicitly. Native serialization
 controls provide separate per-tick evidence across entity loading.
 
 Reports are atomic and incremental, with a linked fixture report and bootstrap

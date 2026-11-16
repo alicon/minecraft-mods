@@ -3,12 +3,39 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
-const { runMatrix } = require('./yorkie-matrix');
+const { runMatrixWithContinuation } = require('./yorkie-matrix');
 const { saveReport } = require('./scenario-runner');
-const { withBridgeLock } = require('./bridge-lock');
 const { assertInspectionWorld } = require('./yorkie-post-run');
 const { advanceWorldTicks } = require('./yorkie-clock');
 const { restartSavedClient } = require('./saved-client-restart');
+
+function assertRestartWorld(snapshot, identity) {
+  try {
+    assert(typeof snapshot.savePath === 'string' && snapshot.savePath, 'Missing actual save path');
+    const savePath = path.resolve(snapshot.savePath);
+    if (identity.expectedSavePath) assert.equal(savePath, identity.expectedSavePath, 'Restart changed the profile/save path');
+    if (identity.playerUuid && snapshot.players?.length === 0 && snapshot.singleplayer && snapshot.saveName === identity.expectedSave) {
+      const pending = new Error('Saved world is waiting for the original local player');
+      pending.retryableStartup = true; throw pending;
+    }
+    const playerUuid = identity.playerUuid || snapshot.players?.[0]?.uuid;
+    assert.match(playerUuid || '', /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i, 'Missing original player UUID');
+    assertInspectionWorld(snapshot, { ...identity, playerUuid });
+    identity.playerUuid = playerUuid; identity.expectedSavePath = savePath;
+  } catch (error) {
+    if (!error.retryableStartup) error.restartIdentityFailure = true;
+    throw error;
+  }
+}
+
+async function cleanupRestart({ state, command, report, save }) {
+  try {
+    await state(); await command('tick unfreeze');
+    assert.equal((await state()).worldFrozen, false, 'Restart cleanup did not unfreeze the world');
+    report.cleanup = 'unfrozen';
+  } catch (error) { report.cleanupError = error.message; report.ok = false; }
+  save();
+}
 
 function perchVerdict(original, frames) {
   assert(frames.length >= 40, 'Restart observation is incomplete');
@@ -33,7 +60,9 @@ async function runSquirrelRestart(baseUrl, args) {
   async function request(route, body) {
     const response = await fetch(baseUrl + route, { method: body ? 'POST' : 'GET', headers: body ? { 'content-type': 'application/json' } : {},
       body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(15000) });
-    const result = await response.json();
+    let result;
+    try { result = await response.json(); }
+    catch { throw new Error(`Invalid bridge JSON from ${route} (HTTP ${response.status})`); }
     require('./command-result').checkCommandParsed(result);
     assert(response.ok && result.ok !== false, `Restart bridge request failed: ${route}`);
     return result;
@@ -42,20 +71,15 @@ async function runSquirrelRestart(baseUrl, args) {
   const identity = { expectedSave: args.expectedSave, playerUuid: undefined };
   async function state() {
     const snapshot = await request('/state');
-    if (!identity.playerUuid) {
-      assert.match(snapshot.players?.[0]?.uuid || '', /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i, 'Missing original player UUID');
-      identity.playerUuid = snapshot.players[0].uuid;
-    }
-    assertInspectionWorld(snapshot, identity);
+    assertRestartWorld(snapshot, identity);
     return snapshot;
   }
   try {
     report.preflight = await state(); report.stage = 'fixture'; save();
-    const fixture = await runMatrix(baseUrl, { expectedSave: args.expectedSave, group: 'transitions',
-      case: 'squirrel-climbing-face-open-control', reportFile: reportFile + '.fixture.json' });
     report.fixtureReport = reportFile + '.fixture.json'; save();
-    assert(fixture.ok && fixture.complete, 'Native climb fixture failed before restart');
-    return await withBridgeLock(baseUrl, async () => {
+    return await runMatrixWithContinuation(baseUrl, { expectedSave: args.expectedSave, group: 'transitions',
+      case: 'squirrel-climbing-face-open-control', reportFile: report.fixtureReport }, async fixture => {
+      assert(fixture.ok && fixture.complete, 'Native climb fixture failed before restart');
       try {
         report.stage = 'verify-perch';
         const initial = await state();
@@ -93,6 +117,12 @@ async function runSquirrelRestart(baseUrl, args) {
         await command('tick freeze'); report.stage = 'observe-reloaded-perch'; save();
         for (let tick = 0; tick <= 120; tick++) {
           const snapshot = tick ? await advanceWorldTicks(command, state, 1, 'step') : await state();
+          if (!tick) {
+            report.unobservedWorldClockIntervals = {
+              beforeQuitToReconnect: [report.beforeQuit.overworldGameTime, report.firstAfterRestart.overworldGameTime],
+              reconnectToFreeze: [report.firstAfterRestart.overworldGameTime, snapshot.overworldGameTime]
+            };
+          }
           assert(snapshot.worldFrozen && (!tick || snapshot.tickAudit.elapsedTicks === 1), 'Reload observation lost exact native ticks');
           report.postRestart.push({ tick, squirrel: actor(snapshot), tickAudit: snapshot.tickAudit }); save();
           assert(actor(snapshot)?.health > 0, 'Original squirrel died or vanished after reload');
@@ -103,11 +133,7 @@ async function runSquirrelRestart(baseUrl, args) {
         return report;
       } finally {
         // Identity is rechecked before cleanup, including failed bootstrap/wrong-world paths.
-        try {
-          await state(); await command('tick unfreeze');
-          assert.equal((await state()).worldFrozen, false, 'Restart cleanup did not unfreeze the world');
-          report.cleanup = 'unfrozen'; save();
-        } catch (error) { report.cleanupError = error.message; report.ok = false; save(); }
+        await cleanupRestart({ state, command, report, save });
       }
     });
   } catch (error) {
@@ -116,4 +142,4 @@ async function runSquirrelRestart(baseUrl, args) {
   }
 }
 
-module.exports = { runSquirrelRestart, perchVerdict };
+module.exports = { runSquirrelRestart, perchVerdict, assertRestartWorld, cleanupRestart };

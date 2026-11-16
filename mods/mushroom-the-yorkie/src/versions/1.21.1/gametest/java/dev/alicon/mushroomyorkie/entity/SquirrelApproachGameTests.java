@@ -235,6 +235,12 @@ public final class SquirrelApproachGameTests {
 		SquirrelPerchBoundaryScenarios.observe(helper, squirrel -> roundTrip(helper, squirrel), "short-column");
 	}
 
+	/** Reload must retain which original top log owns a stable perch. */
+	@GameTest(template = "fabric-gametest-api-v1:empty", timeoutTicks = 340)
+	public void squirrelReleasesOriginalTopAfterReload(GameTestHelper helper) {
+		SquirrelReloadApproachScenarios.trackedTopAfterReload(helper, squirrel -> roundTrip(helper, squirrel));
+	}
+
 	private static SquirrelEntity roundTrip(GameTestHelper helper, SquirrelEntity squirrel) {
 		CompoundTag data = squirrel.saveWithoutId(new CompoundTag());
 		squirrel.discard();

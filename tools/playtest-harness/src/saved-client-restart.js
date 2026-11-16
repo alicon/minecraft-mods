@@ -72,7 +72,10 @@ async function restartSavedClient({ request, state, expectedSave, instanceId, re
       report.startupTicksNotIndividuallyObserved = true;
       report.stage = 'reloaded'; save();
       return loaded;
-    } catch (error) { lastError = error; await delay(500); }
+    } catch (error) {
+      if (error.restartIdentityFailure || error.code === 'ERR_ASSERTION') throw error;
+      lastError = error; await delay(500);
+    }
   } while (Date.now() < deadline);
   throw new Error(`Saved world did not reconnect within the launch bound: ${lastError?.message}`);
 }
