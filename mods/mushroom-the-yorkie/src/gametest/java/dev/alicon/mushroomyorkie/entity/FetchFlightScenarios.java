@@ -163,8 +163,20 @@ final class FetchFlightScenarios {
 		owner.setPos(yorkie.getX() - 2, yorkie.getY() + ownerHeight, yorkie.getZ());
 		yorkie.claimFor(owner);
 		ItemEntity toy = helper.spawnItem(ModItems.YORKIE_BALL, cliff ? 7 : 8, cliff ? -4 : 2, 3);
+		// Vertical out-of-bounds is intentional for below-platform returns. Horizontal
+		// targets must belong to the declared structure so native entity sections are visible.
+		var bounds = helper.getBounds();
+		helper.assertTrue(toy.getX() >= bounds.minX && toy.getX() < bounds.maxX
+				&& toy.getZ() >= bounds.minZ && toy.getZ() < bounds.maxZ,
+				"Fetch toy extends outside declared horizontal fixture: toy=" + toy.position() + ", bounds=" + bounds);
 		FetchBallGoal fetch = new FetchBallGoal(yorkie);
-		helper.assertTrue(fetch.canUse(), "Flight fixture did not find the toy");
+		boolean canFetch = fetch.canUse();
+		helper.assertTrue(canFetch, "Flight fixture did not find the toy: pet=" + yorkie.position()
+				+ ", toy=" + toy.position() + ", removed=" + toy.isRemoved()
+				+ ", toyChunkLoaded=" + helper.getLevel().hasChunkAt(toy.blockPosition())
+				+ ", ownerResolved=" + (yorkie.getOwner() == owner) + ", sitting=" + yorkie.isOrderedToSit()
+				+ ", sleeping=" + yorkie.isMushroomSleeping() + ", scared=" + yorkie.scaredRunTicks
+				+ ", queryCount=" + helper.getLevel().getEntitiesOfClass(ItemEntity.class, yorkie.getBoundingBox().inflate(32.0D, 8.0D, 32.0D), item -> item.getUUID().equals(toy.getUUID())).size());
 		fetch.start();
 		return new Fixture(yorkie, owner, fetch, toy);
 	}
