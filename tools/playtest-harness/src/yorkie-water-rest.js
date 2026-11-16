@@ -61,6 +61,7 @@ function waterRestCases({ prepare, command, request, entity, advance, base, play
     run: async (fixture, result) => {
       result.observed = { fixture, trace: [] };
       const original = entity(fixture.wet);
+      let sawOutsideTrip = original.custom.relief.tripActive;
       check(!original.custom.curledUpSleeping && !original.tameable.sittingPose, 'Submerged pet retained sleep/rest pose');
       if (inputs.time === 18000) check(original.custom.relief?.tripActive === false, 'Nighttime water entry started an unrelated outside trip');
       if (inputs.requestSit) result.observed.interaction = await request('/use-entity', {
@@ -74,6 +75,7 @@ function waterRestCases({ prepare, command, request, entity, advance, base, play
       for (let ticks = 20; ticks <= 400; ticks += 20) {
         const snapshot = await advance(20);
         const pet = entity(snapshot);
+        sawOutsideTrip ||= pet?.custom.relief?.tripActive === true;
         result.observed.trace.push({ ticks, pet });
         check(pet?.uuid === original.uuid, 'Water recovery lost or replaced the pet');
         check(pet.health >= original.health && pet.health === pet.maxHealth, 'Water recovery damaged Mushroom');
@@ -84,6 +86,7 @@ function waterRestCases({ prepare, command, request, entity, advance, base, play
         if (!pet.inWater && pet.distance < 4 && pet.onGround && pet.position.x < base.x + 1 && Math.abs(pet.position.y - base.y) < 0.3) { recovered = snapshot; break; }
       }
       check(recovered, 'Mushroom did not leave the reachable pool for his owner');
+      if (inputs.potty && inputs.time === 1000) check(sawOutsideTrip, 'Urgent daytime control never started its expected outside trip');
       result.observed.recovered = recovered;
       const landed = entity(recovered);
       const underfoot = await request('/block', { x: Math.floor(landed.position.x), y: Math.floor(landed.position.y - 0.05), z: Math.floor(landed.position.z) });

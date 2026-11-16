@@ -1,6 +1,7 @@
 package dev.alicon.mushroomyorkie.entity;
 
 import dev.alicon.mushroomyorkie.pet.PetNeeds;
+import dev.alicon.mushroomyorkie.block.ModBlocks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -41,6 +42,15 @@ final class NightRecoveryScenarios {
 				helper.assertTrue(warning.canUse(), "Daytime wet need no longer permits an outside trip");
 				level.setBlockAndUpdate(yorkie.blockPosition(), Blocks.AIR.defaultBlockState());
 				helper.assertTrue(warning.canUse(), "Dry daytime need no longer permits an outside trip");
+				warning.start();
+				helper.assertTrue(yorkie.relief.shouldAskToday(MushroomNightBehavior.currentDay(level), false), "Daytime trip did not start");
+				level.setDayTime(18000);
+				yorkie.setOnGround(false);
+				helper.assertTrue(!warning.canContinueToUse(), "Active daytime trip survived sheltered dusk recovery");
+				warning.stop();
+				helper.assertTrue(!yorkie.relief.shouldAskToday(MushroomNightBehavior.currentDay(level), false), "Cancelled trip retained its active state");
+				level.setDayTime(1000);
+				yorkie.setOnGround(true);
 				yorkie.setMushroomOrderedToSit(true);
 				helper.assertTrue(!warning.canUse(), "Explicit sit order no longer blocks the outside trip");
 				yorkie.setMushroomOrderedToSit(false);
@@ -60,6 +70,13 @@ final class NightRecoveryScenarios {
 				yorkie.setOnGround(true);
 				helper.assertTrue(!MushroomNightBehavior.shouldSleepAtNight(yorkie, level), "Open-sky control still counted as a sheltered sleep spot");
 				helper.assertTrue(MushroomNightBehavior.shouldSeekOutdoorRelief(yorkie, level), "Nighttime open-sky relief was blocked");
+				helper.setBlock(7, 2, 2, ModBlocks.DOGHOUSE);
+				yorkie.setPos(Vec3.atBottomCenterOf(helper.absolutePos(new BlockPos(6, 2, 2))));
+				yorkie.setOnGround(false);
+				helper.assertTrue(!MushroomNightBehavior.shouldSeekOutdoorRelief(yorkie, level), "Airborne recovery near an outdoor doghouse requested outside");
+				level.setBlockAndUpdate(yorkie.blockPosition(), Blocks.WATER.defaultBlockState());
+				helper.assertTrue(MushroomYorkieStateQueries.isWetForSitting(yorkie) && !MushroomNightBehavior.shouldSeekOutdoorRelief(yorkie, level),
+						"Wet recovery near an outdoor doghouse requested outside");
 				helper.succeed();
 			} finally {
 				yorkie.discard();
