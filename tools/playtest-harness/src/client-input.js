@@ -19,15 +19,18 @@ async function driveClientInput(context, controls, { timeoutMs = 20000, pollMs =
   assertInspectionWorld(before, context);
   assert(before.worldFrozen === false, 'Native client input requires an unfrozen world');
   assert(typeof before.overworldGameTime === 'string' && /^-?\d+$/.test(before.overworldGameTime), 'Native server world clock is unavailable');
-  assert(['walk', 'boat'].includes(controls.mode), 'Input mode must be walk or boat');
+  assert(['walk', 'boat', 'dismount'].includes(controls.mode), 'Input mode must be walk, boat or dismount');
   assert(Number.isInteger(controls.ticks) && controls.ticks >= 1 && controls.ticks <= 100, 'Invalid native input duration');
   assert(Object.keys(controls).every(k => ['mode', 'ticks', 'vehicleUuid', ...DIRECTIONS].includes(k)), 'Unknown native input control');
   for (const key of DIRECTIONS) assert(controls[key] === undefined || typeof controls[key] === 'boolean', 'Input flags must be Boolean');
   const body = { action: 'start', expectedSave, playerUuid, operationId: randomUUID(), ...controls };
   for (const key of DIRECTIONS) body[key] ??= false;
   assert(!(body.forward && body.backward || body.left && body.right), 'Opposing native input directions are unsupported');
+  const dismount = controls.mode === 'dismount';
+  assert(!dismount || controls.ticks >= 2 && controls.ticks <= 5 && DIRECTIONS.every(k => body[k] === false), 'Dismount requires 2 to 5 ticks without directional controls');
+  assert(!dismount || before.players[0].shiftKeyDown === false, 'Dismount requires an observed released server shift key');
   const vehicle = snapshot => snapshot.players[0].nearbyEntities.find(e => e.uuid === controls.vehicleUuid);
-  if (controls.mode === 'boat') {
+  if (controls.mode !== 'walk') {
     const original = vehicle(before);
     assert(original && before.players[0].vehicle?.id === original.id, 'Input fixture is not driving its expected vehicle');
   } else assert(!before.players[0].vehicle && controls.vehicleUuid === undefined, 'Walking input requires a player on foot');
@@ -62,16 +65,41 @@ async function driveClientInput(context, controls, { timeoutMs = 20000, pollMs =
     assert(reply.outcome === 'completed' && reply.controlsReleased === true, `Native input ended as ${reply.outcome}`);
     assert(reply.appliedClientTicks === controls.ticks, 'Native input tick count differs from the request');
     const frames = reply.clientFrames;
-    assert(Array.isArray(frames) && frames.length >= controls.ticks && frames.length <= controls.ticks + 6, 'Native input trace has an invalid bound');
+    assert(Array.isArray(frames) && frames.length >= controls.ticks && frames.length <= controls.ticks + (dismount ? 40 : 6), 'Native input trace has an invalid bound');
     for (const [index, frame] of frames.entries()) {
       assert(frame.freshKeyboardSample === true && Number.isInteger(frame.clientPlayerTick), 'Input trace reused cached keyboard state');
       if (index) assert(frame.clientPlayerTick > frames[index - 1].clientPlayerTick, 'Input trace did not advance native player ticks');
     }
-    const matching = frames.filter(frame => DIRECTIONS.every(k => frame.nativeInput?.[k] === body[k]));
+    const matching = frames.filter(frame => DIRECTIONS.every(k => frame.nativeInput?.[k] === body[k])
+      && (!dismount || frame.nativeInput?.shift === true));
     assert(matching.length >= controls.ticks, 'Requested controls were not observed in native client input');
     assert(DIRECTIONS.every(k => frames.at(-1).nativeInput?.[k] === false), 'The final native input sample is not neutral');
-    const after = await state();
+    if (dismount) {
+      assert(frames.at(-1).nativeInput?.shift === false, 'Dismount key release was not observed');
+      assert(frames.at(-1).clientOnFoot === true, 'Native client did not leave the source vehicle');
+      assert(frames.every(frame => frame.vehicleUuid === controls.vehicleUuid), 'Dismount trace lost the source vehicle');
+    }
+    let after = await state();
+    observed.after = after;
+    if (dismount) observed.serverDismount = [after];
     assertInspectionWorld(after, context);
+    if (dismount) {
+      const acknowledgementDeadline = Math.min(deadline, performance.now() + 2000);
+      while (after.players[0].vehicle || after.players[0].shiftKeyDown !== false
+        || BigInt(after.overworldGameTime) <= BigInt(before.overworldGameTime)) {
+        assert(after.worldFrozen === false, 'World froze during dismount acknowledgement');
+        assert(!after.players[0].vehicle || after.players[0].vehicle.id === vehicle(before).id, 'Server player entered another vehicle during dismount');
+        assert(performance.now() < acknowledgementDeadline, 'Server did not confirm dismount and released shift within the bounded wait');
+        await sleep(pollMs);
+        await call('status');
+        checkInterrupted();
+        after = await state();
+        observed.after = after;
+        observed.serverDismount.push(after);
+        assertInspectionWorld(after, context);
+      }
+      assert(vehicle(after)?.uuid === controls.vehicleUuid, 'Dismount source vehicle disappeared from server observation');
+    }
     observed.after = after;
     assert(after.worldFrozen === false, 'World froze during native input');
     observed.serverTicksElapsed = (BigInt(after.overworldGameTime) - BigInt(before.overworldGameTime)).toString();

@@ -8,6 +8,7 @@ import java.util.UUID;
 record BridgeInputRequest(String action, String expectedSave, String playerUuid, String operationId,
 		String mode, int ticks, boolean forward, boolean backward, boolean left, boolean right, String vehicleUuid) {
 	static final int MAX_TICKS = 100;
+	static final int MAX_DISMOUNT_TICKS = 5;
 	private static final Set<String> COMMON = Set.of("action", "expectedSave", "playerUuid", "operationId");
 	private static final Set<String> START = Set.of("mode", "ticks", "forward", "backward", "left", "right", "vehicleUuid");
 
@@ -35,9 +36,9 @@ record BridgeInputRequest(String action, String expectedSave, String playerUuid,
 			return new BridgeInputRequest(action, save, playerUuid, id, "", 0, false, false, false, false, null);
 		}
 		String mode = text(body, "mode");
-		if (!Set.of("walk", "boat").contains(mode)) throw new IllegalArgumentException("input mode must be walk or boat");
+		if (!Set.of("walk", "boat", "dismount").contains(mode)) throw new IllegalArgumentException("input mode must be walk, boat or dismount");
 		String vehicleUuid = null;
-		if (mode.equals("boat")) {
+		if (!mode.equals("walk")) {
 			vehicleUuid = text(body, "vehicleUuid");
 			UUID.fromString(vehicleUuid);
 		} else if (body.has("vehicleUuid")) throw new IllegalArgumentException("walk input cannot target a vehicle");
@@ -58,6 +59,9 @@ record BridgeInputRequest(String action, String expectedSave, String playerUuid,
 		boolean forward = flag(body, "forward"), backward = flag(body, "backward");
 		boolean left = flag(body, "left"), right = flag(body, "right");
 		if (forward && backward || left && right) throw new IllegalArgumentException("opposing input directions are unsupported");
+		if (mode.equals("dismount") && (ticks < 2 || ticks > MAX_DISMOUNT_TICKS || forward || backward || left || right)) {
+			throw new IllegalArgumentException("dismount input requires 2 to " + MAX_DISMOUNT_TICKS + " ticks without directional controls");
+		}
 		return new BridgeInputRequest(action, save, playerUuid, id, mode, ticks, forward, backward, left, right, vehicleUuid);
 	}
 

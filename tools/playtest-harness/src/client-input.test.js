@@ -122,3 +122,66 @@ test('wrong save, frozen setup, invalid duration and string flags never dispatch
   const frozen = fixture({ frozen: true });
   await assert.rejects(driveClientInput(frozen.context, { mode: 'walk', ticks: 3 }));assert.equal(frozen.calls.length, 0);
 });
+
+function dismountFixture({ delayedServer = false, staysMounted = false, serverShiftHeld = false,
+  wrongVehicle = false, missingNativeShift = false, heldRelease = false, clientStillMounted = false } = {}) {
+  const source = { id: 7, uuid: '00000000-0000-0000-0000-000000000007', type: 'minecraft:oak_boat', position: { x: 0, y: 220, z: 0 } };
+  let reads = 0, body;
+  const calls = [];
+  const snapshot = () => {
+    const index = reads++;
+    const riding = index === 0 || staysMounted || delayedServer && index === 1 || wrongVehicle;
+    return { singleplayer: true, saveName: 'Codex Input Test', worldFrozen: false, overworldGameTime: index ? '23' : '20',
+      players: [{ uuid: PLAYER, dimension: 'minecraft:overworld', position: { x: index ? 1 : 0, y: 220, z: 0 },
+        shiftKeyDown: index > 0 && serverShiftHeld, nearbyEntities: [source],
+        ...(riding ? { vehicle: { id: wrongVehicle && index ? 8 : source.id } } : {}) }] };
+  };
+  const receipt = outcome => ({ operationId: body.operationId, request: body, phase: 'complete', outcome,
+    controlsReleased: true, appliedClientTicks: 2,
+    clientFrames: [true, true, false].map((pressed, index) => ({ clientPlayerTick: 100 + index, freshKeyboardSample: true,
+      clientOnFoot: !clientStillMounted, vehicleUuid: source.uuid,
+      nativeInput: { forward: false, backward: false, left: false, right: false,
+        shift: heldRelease && index === 2 || pressed && !missingNativeShift } })) });
+  return { source, calls, context: { expectedSave: 'Codex Input Test', playerUuid: PLAYER, state: async () => snapshot(),
+    request: async (route, request) => { assert.equal(route, '/client-input');calls.push(request);
+      if (request.action === 'start') body = request;
+      return receipt(request.action === 'cancel' ? 'cancelled' : 'completed'); } } };
+}
+
+test('native dismount requires key press/release and separately waits for server exit', async () => {
+  const f = dismountFixture({ delayedServer: true });
+  const r = await driveClientInput(f.context, { mode: 'dismount', ticks: 2, vehicleUuid: f.source.uuid }, { pollMs: 0 });
+  assert.equal(r.after.players[0].vehicle, undefined);
+  assert.equal(r.after.players[0].shiftKeyDown, false);
+  assert.equal(r.serverDismount.length, 2);
+  assert.deepEqual(f.calls.map(c => c.action), ['start', 'status']);
+});
+
+test('acknowledged dismount cannot pass without native key evidence and neutral release', async () => {
+  for (const options of [{ missingNativeShift: true }, { heldRelease: true }, { clientStillMounted: true }]) {
+    const f = dismountFixture(options);
+    await assert.rejects(driveClientInput(f.context, { mode: 'dismount', ticks: 2, vehicleUuid: f.source.uuid }, { pollMs: 0 }));
+    assert.equal(f.calls.at(-1).action, 'cancel');
+  }
+});
+
+test('client exit cannot hide a still-mounted server, held server key or another vehicle', async () => {
+  for (const options of [{ staysMounted: true }, { serverShiftHeld: true }, { wrongVehicle: true }]) {
+    const f = dismountFixture(options);
+    await assert.rejects(driveClientInput(f.context, { mode: 'dismount', ticks: 2, vehicleUuid: f.source.uuid }, { pollMs: 0, timeoutMs: 0 }), error => {
+      assert.match(error.message, options.wrongVehicle ? /another vehicle/ : /Server did not confirm dismount and released shift/);
+      assert.equal(error.observed.serverDismount.length, 1);
+      assert.equal(error.observed.receipts[0].phase, 'complete');
+      return true;
+    });
+    assert.equal(f.calls.at(-1).action, 'cancel');
+  }
+});
+
+test('dismount refuses long bursts, directional movement and a missing source before dispatch', async () => {
+  for (const controls of [{ ticks: 1 }, { ticks: 6 }, { ticks: 2, forward: true }, { ticks: 2, vehicleUuid: undefined }]) {
+    const f = dismountFixture();
+    await assert.rejects(driveClientInput(f.context, { mode: 'dismount', vehicleUuid: f.source.uuid, ...controls }));
+    assert.equal(f.calls.length, 0);
+  }
+});

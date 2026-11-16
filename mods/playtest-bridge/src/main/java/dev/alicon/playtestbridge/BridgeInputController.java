@@ -8,6 +8,7 @@ import java.util.function.LongSupplier;
 final class BridgeInputController {
 	static final long MAX_WALL_MILLIS = 15000;
 	private static final int MAX_RELEASE_TICKS = 5;
+	static final int MAX_ACTION_CONFIRM_TICKS = 40;
 	private final Target target;
 	private final LongSupplier clock;
 	private Operation current;
@@ -45,6 +46,11 @@ final class BridgeInputController {
 			String invalid = this.target.invalidContext();
 			if (invalid != null) this.release(invalid);
 			if (this.clock.getAsLong() - this.current.started >= MAX_WALL_MILLIS) this.release("wall_timeout");
+			if (this.current.releaseProven) {
+				if (this.target.controlsDown()) this.current.outcome = "external_movement_input";
+				if (!this.current.outcome.equals("completed")) this.finish(true);
+				return;
+			}
 			if (this.current.releasing) {
 				this.target.release(!this.current.outcome.equals("completed"));
 			} else {
@@ -63,10 +69,21 @@ final class BridgeInputController {
 			this.current.frames.add(this.target.sample());
 			if (this.current.releasing) {
 				this.current.releaseTicks++;
-				if (this.target.neutral()) this.finish(true);
-				else if (this.current.releaseTicks >= MAX_RELEASE_TICKS) {
+				if (this.current.releaseProven && this.target.controlsDown()) {
+					this.current.outcome = "external_movement_input";
+					this.finish(true);
+					return;
+				}
+				boolean neutral = this.current.releaseProven || this.target.neutral();
+				this.current.releaseProven |= neutral;
+				boolean ready = !this.current.outcome.equals("completed") || this.target.completionReady();
+				if (neutral && ready) this.finish(true);
+				else if (!neutral && this.current.releaseTicks >= MAX_RELEASE_TICKS) {
 					this.current.outcome = "release_unconfirmed";
 					this.finish(false);
+				} else if (neutral && this.current.releaseTicks >= MAX_ACTION_CONFIRM_TICKS) {
+					this.current.outcome = "action_unconfirmed";
+					this.finish(true);
 				}
 			} else if (this.current.appliedTicks >= this.current.request.ticks()) {
 				this.release("completed");
@@ -83,20 +100,20 @@ final class BridgeInputController {
 	void shutdown() {
 		if (this.current == null || this.current.complete) return;
 		this.release("client_stopping");
-		this.finish(this.target.neutral());
+		this.finish(this.current.releaseProven || this.target.neutral());
 	}
 
 	private void release(String reason) {
 		if (!this.current.releasing || this.current.outcome.equals("completed")) this.current.outcome = reason;
 		this.current.releasing = true;
-		this.target.release(!reason.equals("completed"));
+		if (!this.current.releaseProven) this.target.release(!reason.equals("completed"));
 	}
 
 	private void failAndRelease() {
 		this.current.outcome = "input_adapter_failed";
 		this.current.releasing = true;
-		this.target.release(true);
-		this.finish(this.target.neutral());
+		if (!this.current.releaseProven) this.target.release(true);
+		this.finish(this.current.releaseProven || this.target.neutral());
 	}
 
 	private void finish(boolean released) {
@@ -113,7 +130,7 @@ final class BridgeInputController {
 		result.addProperty("outcome", this.current.outcome);
 		result.addProperty("appliedClientTicks", this.current.appliedTicks);
 		result.addProperty("elapsedMillis", (this.current.complete ? this.current.finished : this.clock.getAsLong()) - this.current.started);
-		result.addProperty("controlsReleased", this.current.complete ? this.current.releaseConfirmed : this.current.releasing && this.target.neutral());
+		result.addProperty("controlsReleased", this.current.complete ? this.current.releaseConfirmed : this.current.releaseProven);
 		result.add("request", this.current.request.describe());
 		result.add("clientFrames", this.current.frames.deepCopy());
 		return result;
@@ -126,6 +143,8 @@ final class BridgeInputController {
 		void apply(BridgeInputRequest request);
 		void release(boolean forceCachedInput);
 		boolean neutral();
+		default boolean completionReady() { return true; }
+		default boolean controlsDown() { return !this.neutral(); }
 		JsonObject sample();
 	}
 
@@ -140,6 +159,7 @@ final class BridgeInputController {
 		private boolean complete;
 		private boolean observing;
 		private boolean releaseConfirmed;
+		private boolean releaseProven;
 		private long finished;
 		private String outcome = "pending";
 

@@ -2,12 +2,14 @@ package dev.alicon.playtestbridge;
 
 import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.ToggleKeyMapping;
 import net.minecraft.client.player.KeyboardInput;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.entity.vehicle.boat.AbstractBoat;
+import net.minecraft.world.entity.vehicle.minecart.AbstractMinecart;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.phys.Vec3;
 
@@ -21,6 +23,7 @@ final class BridgeNativeInputTarget implements BridgeInputController.Target {
 	private BridgeInputRequest request;
 	private Input beforeTickInput;
 	private boolean forcedRelease;
+	private boolean dismounted;
 
 	BridgeNativeInputTarget(Minecraft client) {
 		this.client = client;
@@ -30,6 +33,7 @@ final class BridgeNativeInputTarget implements BridgeInputController.Target {
 	public void bind(BridgeInputRequest request) {
 		this.request = request;
 		this.forcedRelease = false;
+		this.dismounted = false;
 		this.player = this.client.player;
 		this.server = this.client.getSingleplayerServer();
 		this.vehicle = this.player == null ? null : this.player.getVehicle();
@@ -56,11 +60,21 @@ final class BridgeNativeInputTarget implements BridgeInputController.Target {
 		if (this.client.screen != null) return "screen_open";
 		if (this.client.level == null || this.client.level.tickRateManager().isFrozen()) return "world_frozen";
 		if (!(this.player.input instanceof KeyboardInput)) return "input_source_changed";
+		if (this.request.mode().equals("dismount") && this.client.options.toggleCrouch().get()) return "toggle_sneak_enabled";
 		if (this.player.isSpectator() || this.player.getAbilities().flying) return "unsupported_player_mode";
 		var keys = this.client.options;
-		if (keys.keyJump.isDown() || keys.keyShift.isDown() || keys.keySprint.isDown()) return "external_movement_input";
-		if (this.player.getVehicle() != this.vehicle) return "vehicle_changed";
-		if (this.request.mode().equals("boat")) {
+		if (keys.keyJump.isDown() || keys.keySprint.isDown()
+				|| keys.keyShift.isDown() && !this.request.mode().equals("dismount")) return "external_movement_input";
+		if (this.request.mode().equals("dismount")) {
+			// This mode owns Shift and allows exactly source-to-foot. Returning
+			// to the original vehicle or transferring elsewhere is context loss.
+			if (!(this.vehicle instanceof AbstractBoat || this.vehicle instanceof AbstractMinecart)
+					|| !this.vehicle.isAlive() || !this.request.vehicleUuid().equals(this.vehicle.getUUID().toString())) return "invalid_dismount_source";
+			Entity currentVehicle = this.player.getVehicle();
+			if (currentVehicle != null && (currentVehicle != this.vehicle || this.dismounted)) return "vehicle_changed";
+			this.dismounted |= currentVehicle == null;
+		} else if (this.player.getVehicle() != this.vehicle) return "vehicle_changed";
+		else if (this.request.mode().equals("boat")) {
 			if (!(this.vehicle instanceof AbstractBoat boat) || !boat.isAlive()
 					|| !this.request.vehicleUuid().equals(boat.getUUID().toString())
 					|| boat.getControllingPassenger() != this.player) return "not_boat_driver";
@@ -80,6 +94,7 @@ final class BridgeNativeInputTarget implements BridgeInputController.Target {
 		keys.keyDown.setDown(request.backward());
 		keys.keyLeft.setDown(request.left());
 		keys.keyRight.setDown(request.right());
+		if (request.mode().equals("dismount")) keys.keyShift.setDown(true);
 	}
 
 	@Override
@@ -89,6 +104,11 @@ final class BridgeNativeInputTarget implements BridgeInputController.Target {
 		keys.keyDown.setDown(false);
 		keys.keyLeft.setDown(false);
 		keys.keyRight.setDown(false);
+		if (this.request != null && this.request.mode().equals("dismount")) {
+			// A menu or changed toggle setting must not restore our held key later.
+			if (keys.keyShift instanceof ToggleKeyMapping toggle) toggle.shouldRestoreStateOnScreenClosed();
+			BridgeOwnedShift.release(keys.keyShift.isDown(), keys.toggleCrouch().get(), keys.keyShift::setDown);
+		}
 		// Clear the captured player's cached input as well; that object may no
 		// longer tick after a disconnect, death or dimension transition.
 		this.forcedRelease = forceCachedInput;
@@ -99,9 +119,11 @@ final class BridgeNativeInputTarget implements BridgeInputController.Target {
 	public boolean neutral() {
 		var keys = this.client.options;
 		if (keys.keyUp.isDown() || keys.keyDown.isDown() || keys.keyLeft.isDown() || keys.keyRight.isDown()) return false;
+		if (this.request != null && this.request.mode().equals("dismount") && keys.keyShift.isDown()) return false;
 		if (this.player == null || this.player.input == null) return true;
 		Input input = this.player.input.keyPresses;
 		return !input.forward() && !input.backward() && !input.left() && !input.right()
+				&& (!this.request.mode().equals("dismount") || !input.shift())
 				&& (this.forcedRelease || this.freshKeyboardSample());
 	}
 
@@ -114,7 +136,20 @@ final class BridgeNativeInputTarget implements BridgeInputController.Target {
 	}
 
 	@Override
+	public boolean completionReady() {
+		return !this.request.mode().equals("dismount") || this.player.getVehicle() == null;
+	}
+
+	@Override
+	public boolean controlsDown() {
+		var keys = this.client.options;
+		return keys.keyUp.isDown() || keys.keyDown.isDown() || keys.keyLeft.isDown() || keys.keyRight.isDown()
+				|| this.request.mode().equals("dismount") && keys.keyShift.isDown();
+	}
+
+	@Override
 	public JsonObject sample() {
+		if (this.request.mode().equals("dismount") && this.player.getVehicle() == null) this.dismounted = true;
 		JsonObject frame = new JsonObject();
 		frame.addProperty("clientWorldGameTime", Long.toString(this.player.level().getGameTime()));
 		frame.addProperty("clientPlayerTick", this.player.tickCount);
@@ -122,12 +157,14 @@ final class BridgeNativeInputTarget implements BridgeInputController.Target {
 		frame.addProperty("clientPlayerSprinting", this.player.isSprinting());
 		frame.add("clientPlayerPosition", position(this.player.position()));
 		frame.addProperty("clientPlayerYaw", this.player.getYRot());
+		frame.addProperty("clientOnFoot", this.player.getVehicle() == null);
 		Input input = this.player.input.keyPresses;
 		JsonObject buttons = new JsonObject();
 		buttons.addProperty("forward", input.forward());
 		buttons.addProperty("backward", input.backward());
 		buttons.addProperty("left", input.left());
 		buttons.addProperty("right", input.right());
+		buttons.addProperty("shift", input.shift());
 		frame.add("nativeInput", buttons);
 		if (this.vehicle != null) {
 			frame.addProperty("vehicleUuid", this.vehicle.getUUID().toString());

@@ -88,4 +88,25 @@ class BridgeInputRequestTest {
 		cancel.addProperty("operationId", java.util.UUID.randomUUID().toString());
 		assertEquals("cancel", BridgeInputRequest.parse(state(), cancel).action());
 	}
+
+	@Test
+	void dismountTargetsOneVehicleForAShortNeutralDirectionalBurst() {
+		JsonObject body = body();
+		body.addProperty("mode", "dismount");
+		body.addProperty("forward", false);
+		body.addProperty("ticks", 2);
+		assertEquals("dismount", BridgeInputRequest.parse(state(), body).mode());
+		body.addProperty("ticks", 1);
+		assertThrows(IllegalArgumentException.class, () -> BridgeInputRequest.parse(state(), body));
+		body.addProperty("ticks", 6);
+		assertThrows(IllegalArgumentException.class, () -> BridgeInputRequest.parse(state(), body));
+		body.addProperty("ticks", 2);
+		for (String direction : new String[] {"forward", "backward", "left", "right"}) {
+			body.addProperty(direction, true);
+			assertThrows(IllegalArgumentException.class, () -> BridgeInputRequest.parse(state(), body));
+			body.addProperty(direction, false);
+		}
+		body.remove("vehicleUuid");
+		assertThrows(IllegalArgumentException.class, () -> BridgeInputRequest.parse(state(), body));
+	}
 }
