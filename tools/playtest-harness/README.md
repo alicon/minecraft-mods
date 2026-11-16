@@ -174,12 +174,14 @@ branch blocks the nearest face (`--case squirrel-clear-tree-face`).
 Replay them by name with `--case fetch-sit-yorkie_ball` or
 `--case sleep-flight-sleep-90`, or `--case starving-night-food-bowl`, or `--case fetch-owner-mode-yorkie_ball`.
 
+Before each fresh pet, the fixture advances an empty arena past the owner’s 1800-tick builder-focus window. Replacing the pet alone does not clear that owner activity. The audit records this reset so case ordering cannot silently trigger a leftover creative nap.
+
 The terrain group adds 36 cases: dry ground, open water, covered water, and a
 six-block drop for each toy and owner locomotion state. It requires ordinary
 returns in accessible terrain and safe refusal under covered water or a survival
 cliff. A grounded creative cliff attempt may return or safely give up; it must
 conserve the toy, avoid damage, and end near the owner. Flying fetches must return.
-Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, the water/rest group adds 18, and sleep-spot controls add eight, making the full suite 245 cases. Run one group with `--group base`,
+Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, the water/rest group adds 22, and sleep-spot controls add eight, making the full suite 249 cases. Run one group with `--group base`,
 `--group transitions`, `--group terrain`, `--group outdoors`, `--group water`, or `--group rest`; combine it with an exact `--case`.
 Unknown groups/cases fail instead of running a different suite.
 
@@ -200,10 +202,10 @@ so these care cases do not become starvation tests.
 The `water` group moves an already-resting or awake pet into a contained deep
 pool. Sixteen cases cross day/night, fed/hungry, survival/grounded creative,
 and real empty-hand wet sit requests. Two more trigger creative naps through
-three actual block placements, at energy 0 and 80. Every case checks wet rest
+three actual block placements, at energy 0 and 80. Four urgent-potty cases compare day and night for both grounded owner modes. Night recovery must keep the outside trip inactive while retaining water escape and dry sleep. Every case checks wet rest
 refusal, the same healthy pet, a real bank landing rather than a surface hop,
 normal gravity afterward, and appropriate dry sleep/nap resumption. Bridge
-entity state includes `onGround`; sleeping during an airborne hop fails. Native sleep guards also require center
+entity state includes `custom.relief.tripActive` and `lastReliefDay` to observe active outside trips during water recovery (not every brief transition between samples), plus `onGround`; sleeping during an airborne hop fails. Native sleep guards also require center
 support, so partial bank contact cannot count as a safe place to rest. The owner
 steps farther onto shore after the reachable interaction. Each fixture resets
 and verifies owner yaw/pitch so an earlier failure camera cannot change flight

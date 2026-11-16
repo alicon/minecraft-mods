@@ -82,6 +82,9 @@ async function executeMatrix(baseUrl, args) {
     await request('/clear-entities', { type: TYPE });
     await request('/clear-entities', { type: 'mushroom_yorkie:squirrel' });
     await request('/clear-entities', { type: 'minecraft:item' });
+    // CreativeBuildActivity belongs to the owner, not the replaced pet. Let its 1800-tick
+    // focus expire before creating a fixture, so earlier real building cannot induce a nap.
+    await advance(1801);
     await command(`fill ${base.x - 7} ${base.y - 1} ${base.z - 7} ${base.x + 7} 319 ${base.z + 7} minecraft:air`);
     await command(`fill ${base.x - 7} ${base.y - 1} ${base.z - 7} ${base.x + 7} ${base.y - 1} ${base.z + 7} minecraft:grass_block`);
     if (inputs.shelter === 'inside') {
@@ -116,7 +119,7 @@ async function executeMatrix(baseUrl, args) {
     const yaw = (await command(`data get entity ${player} Rotation[0]`)).result;
     const pitch = (await command(`data get entity ${player} Rotation[1]`)).result;
     check(yaw === 0 && pitch === 0, 'Fixture owner view was not reset after earlier camera movement');
-    snapshot.fixtureAudit = { upperAirVolume: sky, ownerMode, flying: Boolean(inputs.flying), ownerView: { yaw, pitch } };
+    snapshot.fixtureAudit = { upperAirVolume: sky, ownerMode, flying: Boolean(inputs.flying), ownerView: { yaw, pitch }, buildFocusResetTicks: 1801 };
     check(entity(snapshot), 'Fresh fixture is not observable');
     lastFixtureUuid = entity(snapshot).uuid;
     check(snapshot.players[0].abilities.creative === (ownerMode === 'creative')

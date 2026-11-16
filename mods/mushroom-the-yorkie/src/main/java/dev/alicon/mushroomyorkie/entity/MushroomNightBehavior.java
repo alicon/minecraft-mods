@@ -26,8 +26,12 @@ final class MushroomNightBehavior {
 	}
 
 	static boolean shouldSleepAtNight(MushroomYorkieEntity yorkie, ServerLevel level) {
+		return MushroomYorkieStateQueries.canSleep(yorkie) && hasNightRestPriority(yorkie, level);
+	}
+
+	// Water or a jump delays safe sleep, but must not replace the night routine with an outside request.
+	private static boolean hasNightRestPriority(MushroomYorkieEntity yorkie, ServerLevel level) {
 		return yorkie.isTame()
-				&& MushroomYorkieStateQueries.canSleep(yorkie)
 				&& !MushroomYorkieStateQueries.ownerIsCreativeFlying(yorkie)
 				&& isNight(level)
 				&& (isInside(level, yorkie) || MushroomDomesticLocator.findNearestDoghouse(level, yorkie.blockPosition()) != null);
@@ -42,8 +46,8 @@ final class MushroomNightBehavior {
 		return yorkie.isTame()
 				&& !yorkie.isOrderedToSit()
 				&& !MushroomYorkieStateQueries.ownerIsCreativeFlying(yorkie)
-				&& !shouldSleepAtNight(yorkie, level)
-				&& yorkie.relief.shouldAskToday(currentDay(level), yorkie.needs.shouldWarnPotty());
+				&& yorkie.relief.shouldAskToday(currentDay(level), yorkie.needs.shouldWarnPotty())
+				&& !hasNightRestPriority(yorkie, level);
 	}
 
 	static long currentDay(ServerLevel level) {

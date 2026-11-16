@@ -79,7 +79,7 @@ Run Mushroom's headless Minecraft GameTests:
 
 Fetch GameTests cover active flight steering, interruption returning to normal following, toy returns from below a platform, fractional owner heights, landing during chase/return, airborne return across native save/load, and shoreline path endpoints within pickup reach. Flight fixtures run the real fetch goal, flight controller, and native collision movement in server order. Live terrain cases additionally exercise full entity ticks, all three toys, and independent survival/creative walking/creative flying owner states.
 
-Water GameTests check clearing existing sleep/pose on entering water, refusing new wet sleep/sit requests, refusing airborne or overhanging-edge sleep/nap until supported landing, retaining sleep on thin dog beds/slabs and the supported doghouse visual bed, resuming dry nighttime sleep, preventing synthetic fall accumulation during supported doghouse sleep without protecting an awake falling pet, requiring the low-bed approach path to end on the bed rather than adjacent floor, and reaching a dry bank with the grounded creative recovery controller and native collision movement. The live water group adds full entity ticks, day/night, hunger, real wet interactions, and creative naps triggered by actual block placement.
+Water GameTests check clearing existing sleep/pose on entering water, refusing new wet sleep/sit requests, refusing airborne or overhanging-edge sleep/nap until supported landing, retaining sleep on thin dog beds/slabs and the supported doghouse visual bed, resuming dry nighttime sleep, preventing synthetic fall accumulation during supported doghouse sleep without protecting an awake falling pet, requiring the low-bed approach path to end on the bed rather than adjacent floor, and reaching a dry bank with the grounded creative recovery controller and native collision movement. Night recovery controls keep the sheltered routine quiet while wet or airborne, preserve daytime/outdoor trips and daily limits, and exercise doghouse priority and dusk cancellation. The live water group adds full entity ticks, day/night, hunger, real wet interactions, and creative naps triggered by actual block placement.
 
 GameTests boot a scripted Minecraft server from the CLI. They are slower than unit tests, so keep them focused on behavior that needs a real world, entity registry, or server tick loop.
 
@@ -214,7 +214,7 @@ Set `BRIDGE_REPORT_FILE=build/playtest-reports/<name>.json` to save the full bri
 ## State-combination testing
 
 The [Mushroom state matrix](../tools/playtest-harness/README.md#mushroom-state-matrix)
-checks 144 combinations, nineteen interruption/owner-mode/flight/feeding/tree-approach sequences, 36 terrain cases, 20 outdoor-care sequences, 18 water/rest sequences, and eight sleep-spot controls in a disposable live world and preserves partial failure
+checks 144 combinations, nineteen interruption/owner-mode/flight/feeding/tree-approach sequences, 36 terrain cases, 20 outdoor-care sequences, 22 water/rest sequences, and eight sleep-spot controls in a disposable live world and preserves partial failure
 reports. Run `npm --prefix tools/playtest-harness test` for the harness's runner,
 command-rejection, and save-safety regression tests. These tests also run in CI.
 Gameplay assertions still need the live Minecraft client and bridge. Successful

@@ -173,7 +173,25 @@ final class BridgeEntityState {
 		putIntegerMethod(custom, entity, "capturedRobbers");
 		putNeeds(custom, entity);
 		putDomestic(custom, entity);
+		putRelief(custom, entity);
 		return custom;
+	}
+
+	private static void putRelief(JsonObject custom, Entity entity) {
+		Object relief = fieldValue(entity, "relief");
+		if (relief == null) {
+			return;
+		}
+		JsonObject state = new JsonObject();
+		// Read the existing transient field so the diagnostic also works with older gameplay jars.
+		Object tripActive = fieldValue(relief, "tripActive");
+		if (tripActive instanceof Boolean active) {
+			state.addProperty("tripActive", active);
+		}
+		putLongMethod(state, relief, "lastReliefDay");
+		if (state.size() > 0) {
+			custom.add("relief", state);
+		}
 	}
 
 	private static JsonObject entityRef(Entity entity) {
