@@ -85,7 +85,7 @@ async function withWorldReset({ run, reset, reportFile, onResetError = (error) =
   let attempted = false;
   let report;
   let primaryError;
-  const resetOnce = async () => { attempted = true; return reset(); };
+  const resetOnce = async () => { attempted = true; return reset(report); };
   try { report = await run(resetOnce); return report; }
   catch (error) { primaryError = error; throw error; }
   finally {

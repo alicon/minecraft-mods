@@ -1,6 +1,6 @@
 'use strict';
 
-const { runCases } = require('./scenario-runner');
+const { runCases, saveReport } = require('./scenario-runner');
 const { OWNER_STATES } = require('./yorkie-inputs');
 const { assertTestWorld, assertLivingTestOwner } = require('./yorkie-world');
 const { assertInspectionWorld, careForSuccessfulPet, withWorldReset } = require('./yorkie-post-run');
@@ -153,15 +153,23 @@ async function executeMatrix(baseUrl, args) {
     };
   });
   const context = { prepare, command, request, state, entity, advance, base, player, expectedSave: args.expectedSave, playerUuid: initial.players[0].uuid, selector: SELECTOR, check };
-  const groups = { base: cases, transitions: [...require('./yorkie-transitions').transitionCases(context), ...require('./yorkie-flight-transitions').flightTransitionCases(context)], terrain: require('./yorkie-terrain').terrainCases(context), outdoors: require('./yorkie-outdoor').outdoorCases(context), water: require('./yorkie-water-rest').waterRestCases(context), rest: require('./yorkie-sleep-spots').sleepSpotCases(context), vehicles: require('./yorkie-vehicles').vehicleCases(context), journeys: require('./yorkie-vehicle-journeys').journeyCases(context) };
-  groups['native-shore'] = require('./yorkie-native-shore').nativeShoreCases(context);
+  const groups = { base: cases, transitions: [...require('./yorkie-transitions').transitionCases(context), ...require('./yorkie-flight-transitions').flightTransitionCases(context)], terrain: require('./yorkie-terrain').terrainCases(context), outdoors: require('./yorkie-outdoor').outdoorCases(context), water: require('./yorkie-water-rest').waterRestCases(context), rest: require('./yorkie-sleep-spots').sleepSpotCases(context), vehicles: require('./yorkie-vehicles').vehicleCases(context), 'native-shore': require('./yorkie-native-shore').nativeShoreCases(context), journeys: require('./yorkie-vehicle-journeys').journeyCases(context) };
   const selected = selectCases(groups, args);
   await command('gamerule minecraft:spawn_mobs false');
   await command('gamerule minecraft:advance_time false');
   await command('weather clear');
   const reportFile = args.reportFile || process.env.BRIDGE_REPORT_FILE || 'build/playtest-reports/yorkie-matrix.json';
   const careContext = { state, request, expectedSave: args.expectedSave, playerUuid: initial.players[0].uuid };
-  async function resetWorld() {
+  async function resetWorld(report) {
+    if (report?.cases.some(result => result.status !== 'passed' && selected.find(c => c.name === result.name)?.stopOnFailure)) {
+      assertInspectionWorld(await state(), careContext);
+      await command('tick freeze');
+      const frozen = await state();assertInspectionWorld(frozen, careContext);
+      check(frozen.worldFrozen, 'Investigative failure did not retain a frozen world');
+      report.worldReset = { status: 'skipped', reason: 'investigative_failure_fixture_retained', worldFrozen: true };
+      saveReport(reportFile, report);
+      return;
+    }
     for (const body of [
       { command: 'tick sprint stop' }, { command: 'time set day' }, { command: `gamemode creative ${player}` }
     ]) {
@@ -184,6 +192,7 @@ async function executeMatrix(baseUrl, args) {
         const snapshot = await state();
         assertTestWorld(snapshot, args.expectedSave);
         check(snapshot.players[0].dimension.includes('minecraft:overworld'), 'Failure capture requires the original Overworld fixture');
+        if (scenario.stopOnFailure) await command('tick freeze');
         // Let client interpolation catch up before choosing a visual target.
         await delay(300);
         const cameraState = await state();

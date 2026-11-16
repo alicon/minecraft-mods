@@ -164,3 +164,12 @@ test('a long case can persist partial observations before completion', async () 
     } }], { reportFile });
   } finally { fs.rmSync(folder, { recursive: true }); }
 });
+
+test('cleanup receives the observed verdict before it can preserve a failed fixture', async () => {
+  for (const fail of [false, true]) {
+    let status;
+    const report = await runCases([{ name: 'fixture', setup: async () => {}, run: async () => { if (fail) throw Error('anomaly'); },
+      cleanup: async result => { status = result.status; } }], {});
+    assert.equal(status, fail ? 'failed' : 'passed');assert.equal(report.cases[0].status, status);
+  }
+});

@@ -44,7 +44,9 @@ function nativeShoreCases(context) {
       assert(before.players[0].vehicle?.id === boat.id, 'Original owner is not driving the source boat');
       assert(mounted.health === mounted.maxHealth && mounted.tameable.orderedToSit === inputs.sitting
         && !mounted.inWater && !mounted.noGravity, 'Invalid starting shore passenger state');
-      return { before, bank, petUuid: pet.uuid, boatUuid: boat.uuid, equipment: await nativeItems(pet.uuid, 'equipment'),
+      const equipment = await nativeItems(pet.uuid, 'equipment');
+      assert(JSON.stringify(equipment).includes('Shore keepsake'), 'Named shore possession was not established');
+      return { before, bank, petUuid: pet.uuid, boatUuid: boat.uuid, equipment,
         staging: 'native ride commands only before observation; normal AI, collision, gravity and damage' };
     },
     run: async (fixture, result, save) => {
@@ -60,6 +62,10 @@ function nativeShoreCases(context) {
         assert(owner.health === fixture.before.players[0].health, 'Shore owner lost health');
         assert(owner.nearbyEntities.some(e => e.uuid === fixture.boatUuid), 'Original shore boat is missing');
         observed.sawWet ||= pet.inWater;
+        if (inputs.sitting && !observed.sawWet && observed.restAnchor) {
+          assert(Math.hypot(...['x', 'y', 'z'].map(k => pet.position[k] - observed.restAnchor[k])) <= 1,
+            'Dry sitting pet drifted more than one block after owner help');
+        }
         assertOwnerInShore(snapshot, fixture.bank.geometry);
         return pet;
       }
@@ -69,24 +75,43 @@ function nativeShoreCases(context) {
             onReceipt: partial => {
               observed[name] = partial;
               const snapshot = partial.receipts.at(-1).serverSnapshot;
-              if (snapshot) inspect(snapshot, name);
+              assert(snapshot, 'Native shore input receipt is missing its server snapshot');
+              inspect(snapshot, name);
               save();
             }
           });
-        } catch (error) { observed[name] = error.observed;save();throw error; }
+        } catch (error) {
+          observed[name] = error.observed;
+          const last = error.observed?.cleanup || error.observed?.receipts?.at(-1);
+          observed.inputRelease = { stage: name, attempted: !!error.observed,
+            confirmed: !error.observed || last?.phase === 'complete' && last?.controlsReleased === true,
+            outcome: last?.outcome, cleanupError: error.observed?.cleanupError };
+          if (!observed.inputRelease.confirmed) error.message += `; native control release unconfirmed: ${observed.inputRelease.cleanupError || 'no terminal release proof'}`;
+          save();throw error;
+        }
         return inspect(observed[name].after, `${name}-after`);
       };
       inspect(fixture.before, 'before');
       const passenger = await drive('exit', { mode: 'dismount', ticks: 2, vehicleUuid: fixture.boatUuid });
+      await command('tick freeze');
+      inspect(await state(), 'exit-frozen');
       assertVehicleReach(passenger, 'survival');
       observed.help = await request('/use-entity', { type: passenger.type, radius: 3, emptyHand: true });save();
       assert(observed.help.target.uuid === fixture.petUuid, 'Shore help targeted another pet');
-      assert(!inspect(await state(), 'help-after').vehicle, 'Ordinary owner help did not dismount Mushroom');
+      const helped = inspect(await state(), 'help-after-frozen');
+      assert(!helped.vehicle, 'Ordinary owner help did not dismount Mushroom');
+      observed.restAnchor = { ...helped.position };save();
+      const firstHelpTick = await advanceWorldTicks(command, state, 1, 'step');
+      assert(firstHelpTick.worldFrozen && firstHelpTick.tickAudit.elapsedTicks === 1, 'Help observation skipped a native tick');
+      inspect(firstHelpTick, 'help-first-native-tick');
+      await command('tick unfreeze');
+      inspect(await state(), 'walk-resumed');
       await drive('walk', { mode: 'walk', ticks: WALK_TICKS, forward: true });
-      const blockBelow = actor => request('/block', { x: Math.floor(actor.position.x), y: Math.floor(actor.position.y - 0.01), z: Math.floor(actor.position.z) });
-      observed.ownerFootBlock = await blockBelow(observed.walk.after.players[0]);save();
-      assert(observed.ownerFootBlock.block === 'minecraft:grass_block', 'Owner did not walk onto dry bank support');
       await command('tick freeze');
+      observed.afterWalkFrozen = await state();inspect(observed.afterWalkFrozen, 'walk-frozen');
+      const blockBelow = actor => request('/block', { x: Math.floor(actor.position.x), y: Math.floor(actor.position.y - 0.01), z: Math.floor(actor.position.z) });
+      observed.ownerFootBlock = await blockBelow(observed.afterWalkFrozen.players[0]);save();
+      assert(observed.ownerFootBlock.block === 'minecraft:grass_block', 'Owner did not walk onto dry bank support');
       let final;
       for (let tick = 1; tick <= SETTLE_TICKS; tick++) {
         final = await advanceWorldTicks(command, state, 1, 'step');
@@ -99,12 +124,19 @@ function nativeShoreCases(context) {
       observed.equipmentAfter = await nativeItems(fixture.petUuid, 'equipment');save();
       assert.deepEqual(observed.equipmentAfter, fixture.equipment);
       observed.endpoint = assertShoreEndpoint({ pet, owner: final.players[0], footBlock: observed.petFootBlock,
-        ownerFootBlock: observed.ownerFootBlockAtEnd, initialSit: inputs.sitting, sawWet: observed.sawWet });
+        ownerFootBlock: observed.ownerFootBlockAtEnd, initialSit: inputs.sitting, sawWet: observed.sawWet,
+        snapshot: final, geometry: fixture.bank.geometry, boatUuid: fixture.boatUuid, restAnchor: observed.restAnchor });
       observed.stability = assertStableShore(observed.trace.filter(f => f.stage.startsWith('settle-')).slice(-40).map(f => f.snapshot),
-        { petUuid: fixture.petUuid, initialSit: inputs.sitting, sawWet: observed.sawWet });
+        { petUuid: fixture.petUuid, initialSit: inputs.sitting, sawWet: observed.sawWet,
+          geometry: fixture.bank.geometry, boatUuid: fixture.boatUuid, restAnchor: observed.restAnchor });
       return observed;
     },
-    cleanup: async () => { assertInspectionWorld(await state(), identity);return command('tick unfreeze'); }
+    cleanup: async result => {
+      assertInspectionWorld(await state(), identity);
+      await command(result.status === 'passed' ? 'tick unfreeze' : 'tick freeze');
+      const snapshot = await state();assertInspectionWorld(snapshot, identity);
+      assert(snapshot.worldFrozen === (result.status !== 'passed'), 'Shore cleanup did not establish the requested world tick state');
+    }
   }));
 }
 

@@ -322,13 +322,21 @@ controls sample every tick and stop after three blocks to retain departure room;
 dock and rail controls sample every five ticks. Short travel is a setup failure,
 even when the movement command succeeded.
 The `native-shore` group separately uses ordinary native keyboard exit and walking,
-with empty-hand pet help at survival reach. It verifies floor/headroom and a
-half-block bank step before movement, and watches fixture boundaries while keys
+with empty-hand pet help at survival reach. It verifies floor/headroom, pool
+water/walls/bottom and a half-block bank step before movement, and watches fixture boundaries while keys
 are held. A following pet must have 40 final consecutive native world samples
 dry, grounded, fully breathing and near the owner, with actual block support at
-the end. Native AI, collision, gravity and damage remain active. These cases
+the end. Dry sitting also requires full air, bounded movement and support on
+audited blocks or the original hull; normal reboarding after its grace period
+is permitted. The group records observed wet contact without guaranteeing wet-sit
+coverage. Help's first native tick is inspected while frozen. Walking still uses
+polling, so a transient contact between samples is an explicit limit. Native AI,
+collision, gravity and damage remain active. These cases
 preserve possessions and disable success-only inspection care. A defined case
-count is not a completed full sweep.
+count is not a completed full sweep. Investigative failures retain a frozen
+fixture, owner mode and time; they do not receive the usual creative/day reset.
+Player ticks can still advance while frozen. Confirm owner safety and resume
+world ticks explicitly before new native input.
 Eight squirrel starts around a partly blocked tree sample every native world tick,
 retain the original healthy squirrel, require first clinging within 100 ticks,
 and require 40 consecutive safe clinging ticks within a 400-tick bound. The live observer starts measuring horizontal

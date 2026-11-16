@@ -2,13 +2,13 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { shoreGeometry, assertShoreAudit, assertOwnerInShore, assertShoreEndpoint, assertStableShore } = require('./yorkie-native-shore-fixture');
+const { AUDIT_BLOCKS, shoreGeometry, assertShoreAudit, assertOwnerInShore, assertShoreEndpoint, assertStableShore, dryRestSupport } = require('./yorkie-native-shore-fixture');
 const { nativeShoreCases } = require('./yorkie-native-shore');
 const base = { x: 0, y: 220, z: 0 };
 const volume = r => (r.x2 - r.x1 + 1) * (r.y2 - r.y1 + 1) * (r.z2 - r.z1 + 1);
 function validAudit(g) {
   const audit = {};
-  for (const [name, block] of [['floor', 'minecraft:grass_block'], ['headroom', 'minecraft:air'], ['bottom', 'minecraft:stone'], ['ramp', 'minecraft:stone_slab']]) {
+  for (const [name, block] of Object.entries(AUDIT_BLOCKS)) {
     audit[name] = { volume: volume(g[name]), counts: { [block]: volume(g[name]) } };
   }
   audit.rampState = { state: 'minecraft:stone_slab[type=bottom,waterlogged=false]' };
@@ -26,10 +26,10 @@ test('the walking bank exceeds the observed command and every clear fits native 
   assert.throws(() => shoreGeometry({ ...base, x: NaN }));
 });
 
-for (const fault of ['floor', 'headroom', 'bottom', 'ramp', 'empty-volume', 'top-slab']) {
+for (const fault of [...Object.keys(AUDIT_BLOCKS), 'empty-volume', 'top-slab']) {
   test(`refuse unsafe ${fault} before any owner or pet mounts`, async () => {
     const g = shoreGeometry(base), audit = validAudit(g), commands = [];
-    if (['floor', 'headroom', 'bottom', 'ramp'].includes(fault)) audit[fault].counts = {};
+    if (Object.hasOwn(AUDIT_BLOCKS, fault)) audit[fault].counts = {};
     if (fault === 'empty-volume') audit.floor.volume = 0;
     if (fault === 'top-slab') audit.rampState.state = 'minecraft:stone_slab[type=top,waterlogged=false]';
     assert.throws(() => assertShoreAudit(g, audit));
@@ -41,7 +41,7 @@ for (const fault of ['floor', 'headroom', 'bottom', 'ramp', 'empty-volume', 'top
         if (route === '/use-entity') return { target: { custom: { harness: true } } };
         if (route === '/block') return audit.rampState;
         assert.equal(route, '/count-blocks');
-        const name = ['floor', 'headroom', 'bottom', 'ramp'].find(key => JSON.stringify(g[key]) === JSON.stringify(body));
+        const name = Object.keys(AUDIT_BLOCKS).find(key => JSON.stringify(g[key]) === JSON.stringify(body));
         assert(name);return audit[name];
       }
     };
@@ -59,7 +59,7 @@ test('runtime boundary checks refuse approaching an edge or falling below the ba
 });
 
 function endpoint() {
-  return { pet: { health: 12, maxHealth: 12, air: 300, custom: { harness: true }, tameable: { orderedToSit: false },
+  return { pet: { health: 12, maxHealth: 12, air: 300, maxAir: 300, custom: { harness: true }, tameable: { orderedToSit: false },
     position: { x: 1, y: 220, z: 10 }, inWater: false, onGround: true }, owner: { position: { x: 0, y: 220, z: 10 } },
     footBlock: { block: 'minecraft:grass_block' }, ownerFootBlock: { block: 'minecraft:grass_block' }, initialSit: false, sawWet: true };
 }
@@ -79,8 +79,11 @@ test('recovery needs block support, breathing, the expected order and the owner 
     assert.throws(() => assertShoreEndpoint(e), fault);
   }
 });
-test('dry sitting retains its order while observed wet sitting requires release and recovery', () => {
+test('dry sitting needs original support while observed wet sitting requires release and recovery', () => {
   const e = endpoint();e.initialSit = true;e.sawWet = false;e.pet.tameable.orderedToSit = true;e.pet.position.x = 15;
+  e.geometry = shoreGeometry(base);e.boatUuid = 'boat';e.restAnchor = { ...e.pet.position };
+  e.snapshot = { players: [{ nearbyEntities: [{ uuid: 'boat', id: 2, type: 'minecraft:oak_boat', position: { x: 15, y: 219.4375, z: 10 } }] }] };
+  e.pet.position.y = 220;e.snapshot.players[0].nearbyEntities[0].position.y = 219.4375;
   assertShoreEndpoint(e);
   e.sawWet = true;assert.throws(() => assertShoreEndpoint(e));
   e.pet.tameable.orderedToSit = false;e.pet.position.x = 1;assertShoreEndpoint(e);
@@ -109,4 +112,63 @@ test('a good final endpoint cannot hide a late recovery loss or skipped world sa
     if (fault === 'short-window') changed.shift();
     assert.throws(() => assertStableShore(changed, identity), fault);
   }
+});
+
+test('dry sitting rejects unsupported hulls, late drift and lost air while allowing native reboarding', () => {
+  const geometry = shoreGeometry(base);
+  const pet = { id: 1, uuid: 'pet', inWater: false, onGround: true, noGravity: false, air: 300, maxAir: 300,
+    position: { x: 0.5, y: 220, z: 0.5 } };
+  const boat = { id: 2, uuid: 'boat', type: 'minecraft:oak_boat', position: { x: 0.5, y: 219.4375, z: 0.5 }, passengers: [] };
+  const snapshot = { players: [{ nearbyEntities: [pet, boat] }] };
+  const rest = { geometry, boatUuid: 'boat', restAnchor: { ...pet.position } };
+  assert.equal(dryRestSupport(pet, snapshot, rest), 'original-boat-hull');
+  for (const fault of ['wet', 'unsupported', 'drift', 'missing-boat', 'low-air', 'flying', 'wrong-vehicle']) {
+    const s = structuredClone(snapshot), p = s.players[0].nearbyEntities[0], b = s.players[0].nearbyEntities[1];
+    if (fault === 'wet') p.inWater = true;
+    if (fault === 'unsupported') p.position.y += 0.2;
+    if (fault === 'drift') { p.position.x += 1.1;b.position.x += 1.1; }
+    if (fault === 'missing-boat') b.uuid = 'replacement';
+    if (fault === 'low-air') p.air = 299;
+    if (fault === 'flying') p.noGravity = true;
+    if (fault === 'wrong-vehicle') p.vehicle = { id: 3 };
+    assert.throws(() => dryRestSupport(p, s, rest), fault);
+  }
+  pet.vehicle = { id: 2 };pet.onGround = false;boat.passengers = [{ id: 1 }];
+  assert.equal(dryRestSupport(pet, snapshot, rest), 'original-boat-passenger');
+  const frames = Array.from({ length: 40 }, (_, i) => {
+    const s = structuredClone(snapshot);Object.assign(s.players[0].nearbyEntities[0], { health: 12, maxHealth: 12,
+      custom: { harness: true }, tameable: { ownedByPlayer: true, orderedToSit: true } });
+    return { ...s, worldFrozen: true, tickAudit: { before: i, after: i + 1, elapsedTicks: 1 } };
+  });
+  assertStableShore(frames, { ...rest, petUuid: 'pet', initialSit: true, sawWet: false });
+  frames[30].players[0].nearbyEntities[0].position.x += 1.1;
+  assert.throws(() => assertStableShore(frames, { ...rest, petUuid: 'pet', initialSit: true, sawWet: false }), /drifted/);
+});
+
+for (const released of [true, false]) test(`missing receipt snapshot cannot hide release confirmed=${released}`, async () => {
+  const pet = { id: 1, uuid: 'pet', type: 'mushroom_yorkie:mushroom_yorkie', health: 12, maxHealth: 12,
+    air: 300, fallDistance: 0, lastDamageType: 'unavailable', inWater: false, noGravity: false,
+    custom: { harness: true }, tameable: { ownedByPlayer: true }, position: { x: 0.5, y: 220, z: 0.5 } };
+  const boat = { id: 2, uuid: 'boat', type: 'minecraft:oak_boat' };
+  const before = { saveName: 'Codex Shore', singleplayer: true, worldFrozen: false, overworldGameTime: '1',
+    players: [{ uuid: 'owner', health: 20, dimension: 'minecraft:overworld', shiftKeyDown: false,
+      vehicle: { id: 2 }, position: { x: 0.5, y: 220, z: 0.5 }, nearbyEntities: [pet, boat] }] };
+  let start, cancelled = false;
+  const context = { state: async () => before, entity: () => pet, expectedSave: before.saveName, playerUuid: 'owner',
+    request: async (route, body) => {
+      assert.equal(route, '/client-input');
+      if (body.action === 'start') start = body;
+      else { assert.equal(body.action, 'cancel');cancelled = true; }
+      return { operationId: body.operationId, request: start, phase: cancelled ? 'complete' : 'active',
+        controlsReleased: cancelled && released, outcome: cancelled ? 'cancelled' : 'running' };
+    } };
+  const result = {};
+  await assert.rejects(nativeShoreCases(context)[0].run({ before, petUuid: 'pet', boatUuid: 'boat',
+    bank: { geometry: shoreGeometry(base) } }, result, () => {}), error => {
+    assert.match(error.message, /missing its server snapshot/);
+    if (!released) assert.match(error.message, /release unconfirmed/);
+    return true;
+  });
+  assert(cancelled);assert.equal(result.observed.inputRelease.confirmed, released);
+  if (!released) assert.match(result.observed.inputRelease.cleanupError, /confirmed release/);
 });

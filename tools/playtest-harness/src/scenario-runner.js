@@ -34,7 +34,7 @@ async function runCases(cases, { reportFile, metadata = {}, capture = async () =
       catch (captureError) { result.captureError = captureError.message; }
     } finally {
       if (scenario.cleanup) {
-        try { await scenario.cleanup(); }
+        try { await scenario.cleanup(result); }
         catch (error) { result.cleanupError = error.message; result.status = 'cleanup_failed'; }
       }
       save();

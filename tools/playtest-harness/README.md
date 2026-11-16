@@ -239,14 +239,24 @@ Unknown groups/cases fail instead of running a different suite.
 hungry/fed and sit/follow using a native owner exit, an empty-hand pet interaction
 within survival reach, 80 native forward walking ticks and 120 subsequent world
 ticks. Before movement it checks the entire walking bank's floor, headroom,
-shallow pool support and half-block step. Runtime bounds cancel native input
+30 pool-water blocks, walls, bottom, pool headroom and half-block step. Runtime bounds cancel native input
 before the owner reaches an edge. Following recovery requires 40 final consecutive
 world samples with full air, normal gravity, dry grounded posture and the original
 owner nearby, followed by a native block-support check. Dry sitting keeps its
-order; real wet sitting must release it and recover. All cases retain original
+order, full air and actual support on audited blocks or the original boat hull.
+Ordinary reboarding of that same boat after the grace period is allowed; drift
+over one block from the help position fails. Observed water contact requires
+release and recovery, but these eight cases do not guarantee wet-sit coverage.
+The empty-hand help is frozen, with its first subsequent native world tick
+inspected separately. Walking is sampled by request snapshots, not every world
+tick; a short contact between those polls can remain unseen. The world freezes
+before post-walk block queries. All cases retain original
 actors, health, air/fall/damage facts and possessions, and disable inspection care.
 These investigative cases stop at the first failure so a later setup cannot
-replace its original actors. The report distinguishes terminal completion from
+replace its original actors. A failed fixture stays frozen with its owner mode
+and time retained; player ticks can still advance, so check owner safety before
+resuming. Input release failures are visible in the case error and observations.
+The report distinguishes terminal completion from
 whether every requested case ran.
 The matrix's 490 defined cases are not a claim that a full sweep has passed.
 
