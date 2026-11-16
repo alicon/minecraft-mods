@@ -14,7 +14,9 @@ final class SquirrelFindTreeGoal extends Goal {
 	private static final int MIN_CLIMB_BLOCKS = 2;
 	private static final int MAX_CLIMB_BLOCKS = 4;
 	// Reach the selected face before climbing; a loose corner radius can hit a blocked neighbor face.
-	private static final double REACHED_APPROACH_DISTANCE_SQR = 0.36D;
+	private static final double REACHED_APPROACH_DISTANCE_SQR = 0.09D;
+	// Wall contact needs slower horizontal steering than the run to the tree.
+	private static final double CLIMB_SPEED = 0.45D;
 	private static final Direction[] APPROACH_DIRECTIONS = {
 		Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
 	};
@@ -88,7 +90,7 @@ final class SquirrelFindTreeGoal extends Goal {
 		);
 		if (!this.climbing) {
 			if (!this.reachedApproach()) {
-				this.moveTo(Vec3.atBottomCenterOf(this.approachPos));
+				this.moveToApproach();
 				return;
 			}
 			this.climbing = true;
@@ -111,7 +113,11 @@ final class SquirrelFindTreeGoal extends Goal {
 
 		this.squirrel.setFoundTree(false);
 		this.squirrel.setNoGravity(false);
-		this.moveTo(Vec3.atCenterOf(this.climbPos));
+		// Keep pressing into the trunk center from the chosen clear face. Native
+		// collision and onClimbable provide the ascent; a new ground path here
+		// would send us around the trunk instead of maintaining wall contact.
+		Vec3 target = Vec3.atCenterOf(this.climbPos);
+		this.squirrel.getMoveControl().setWantedPosition(target.x, target.y, target.z, CLIMB_SPEED);
 	}
 
 	private boolean reachedApproach() {
@@ -119,12 +125,22 @@ final class SquirrelFindTreeGoal extends Goal {
 				<= REACHED_APPROACH_DISTANCE_SQR;
 	}
 
-	private void moveTo(Vec3 target) {
+	private void moveToApproach() {
+		var navigation = this.squirrel.getNavigation();
+		Vec3 target = Vec3.atBottomCenterOf(this.approachPos);
+		// Native path completion allows more slack than a clean climbing face.
+		// Finish only this short, collision-checked final step at climbing speed.
+		if (navigation.isDone() && this.squirrel.distanceToSqr(target) <= 1.0D) {
+			this.squirrel.getMoveControl().setWantedPosition(target.x, target.y, target.z, CLIMB_SPEED);
+			return;
+		}
 		if (this.nextMoveTick-- > 0 && !this.squirrel.getNavigation().isDone()) {
 			return;
 		}
 
-		this.squirrel.getNavigation().moveTo(target.x, target.y, target.z, 1.35D);
+		// A path ending one block short can stop at the blocked corner. Reach
+		// the actual standable face before handing control to the climb.
+		navigation.moveTo(navigation.createPath(this.approachPos, 0), 1.35D);
 		this.nextMoveTick = 10;
 	}
 

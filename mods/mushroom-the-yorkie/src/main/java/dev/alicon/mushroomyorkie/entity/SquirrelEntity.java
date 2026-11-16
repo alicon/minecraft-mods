@@ -11,8 +11,8 @@ import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.RandomStrollGoal;
 import net.minecraft.world.entity.ai.goal.TemptGoal;
+import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
-import net.minecraft.world.entity.ai.navigation.WallClimberNavigation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -36,7 +36,9 @@ public final class SquirrelEntity extends net.minecraft.world.entity.animal.Anim
 
 	@Override
 	protected PathNavigation createNavigation(Level level) {
-		return new WallClimberNavigation(this, level);
+		// The tree goal owns wall contact. Spider navigation's fallback aims at
+		// an integer trunk corner and can steer us away from the selected face.
+		return new GroundPathNavigation(this, level);
 	}
 
 	@Override

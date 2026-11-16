@@ -266,7 +266,7 @@ Set `BRIDGE_REPORT_FILE=build/playtest-reports/<name>.json` to save the full bri
 ## State-combination testing
 
 The [Mushroom state matrix](../tools/playtest-harness/README.md#mushroom-state-matrix)
-checks 144 combinations, nineteen interruption/owner-mode/flight/feeding/tree-approach sequences, 36 terrain cases, 20 outdoor-care sequences, 22 water/rest sequences, eight sleep-spot controls, 100 dry vehicle cases (96 full-entity sequences plus four controlled boarding-refusal challenges), and 112 controlled water/rail journeys (including 16 actual offshore immersion controls) in a disposable live world and preserves partial failure
+checks 144 combinations, 26 interruption/owner-mode/flight/feeding/tree-approach sequences, 36 terrain cases, 20 outdoor-care sequences, 22 water/rest sequences, eight sleep-spot controls, 100 dry vehicle cases (96 full-entity sequences plus four controlled boarding-refusal challenges), and 112 controlled water/rail journeys (including 16 actual offshore immersion controls) in a disposable live world and preserves partial failure
 reports. Run `npm --prefix tools/playtest-harness test` for the harness's runner,
 command-rejection, and save-safety regression tests. These tests also run in CI.
 Gameplay assertions still need the live Minecraft client and bridge. Matrix
@@ -281,10 +281,23 @@ ticks and require two blocks of actual movement before the owner action. Offshor
 controls sample every tick and stop after three blocks to retain departure room;
 dock and rail controls sample every five ticks. Short travel is a setup failure,
 even when the movement command succeeded.
-The clear-tree-face squirrel sequence samples progress up to 400 ticks, checks
-the original healthy squirrel reaches the safe height, then requires 40 more
-ticks of stable clinging. A single sample at 120 ticks can miss a valid slower
-route around the blocked side; the observed completion time remains in the report.
+Eight squirrel starts around a partly blocked tree sample every native world tick,
+retain the original healthy squirrel, and require 40 consecutive safe clinging
+ticks within a 400-tick bound. The live observer starts measuring horizontal
+travel after the first half-block ascent; more than three blocks of travel or
+more than one block of lost height fails even when the squirrel eventually
+reaches safety. Ordinary contact hops remain allowed. Every case preserves its
+per-tick trace and native clock audit, then unfreezes the world during cleanup.
+These are gameplay observations, not success-only pet care.
+
+Native GameTests additionally cover eight approach positions, bound horizontal
+travel from the actual goal's climb handoff, and remove a climbed tree to require
+released gravity and a real landing. They run complete entity ticks without
+post-start positioning, manual goal ticks, NoAI gameplay substitutes or forced
+success flags. Set `MUSHROOM_SQUIRREL_TRACE_DIR=/absolute/output/directory` alongside
+`MUSHROOM_GAME_TEST_SEED=0` to save optional per-tick route reports. The trace reads
+selected goal/path/movement state through test-only reflection and never changes
+it. CI runs the behavioral assertions without writing optional trace files.
 Successful matrix runs persist their original case observations before separately feeding
 and healing the same tagged pet for inspection. The postRun record is maintenance,
 not gameplay evidence; its failure cannot turn a case failure into a pass. Failed

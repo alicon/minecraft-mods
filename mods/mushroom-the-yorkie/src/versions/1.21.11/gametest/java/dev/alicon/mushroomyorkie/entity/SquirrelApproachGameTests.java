@@ -6,6 +6,60 @@ import net.minecraft.world.level.block.Blocks;
 
 /** A blocked nearby trunk face must not hide an otherwise usable tree. */
 public final class SquirrelApproachGameTests {
+	/** Observe the centered north start that previously circled before climbing. */
+	@GameTest(maxTicks = 340)
+	public void squirrelCenteredNorthRoute(GameTestHelper helper) {
+		SquirrelRouteScenarios.observe(helper, "centered-north", 4.5D, 1.5D);
+	}
+
+	/** Observe the offset north start without replacing its native navigation. */
+	@GameTest(maxTicks = 340)
+	public void squirrelOffsetNorthRoute(GameTestHelper helper) {
+		SquirrelRouteScenarios.observe(helper, "offset-north", 4.8D, 1.5D);
+	}
+
+	/** Observe the nearer blocked-branch start from the live trace. */
+	@GameTest(maxTicks = 340)
+	public void squirrelNearBranchRoute(GameTestHelper helper) {
+		SquirrelRouteScenarios.observe(helper, "near-branch", 4.8D, 2.5D);
+	}
+
+	/** Keep the previously faster start as a neighboring route control. */
+	@GameTest(maxTicks = 340)
+	public void squirrelWestNorthRoute(GameTestHelper helper) {
+		SquirrelRouteScenarios.observe(helper, "west-north", 3.8D, 1.5D);
+	}
+
+	/** Keep native approach and climb stable from the south side. */
+	@GameTest(maxTicks = 340)
+	public void squirrelSouthRoute(GameTestHelper helper) {
+		SquirrelRouteScenarios.observe(helper, "south", 4.8D, 6.2D);
+	}
+
+	/** Keep native approach and climb stable from the east side. */
+	@GameTest(maxTicks = 340)
+	public void squirrelEastRoute(GameTestHelper helper) {
+		SquirrelRouteScenarios.observe(helper, "east", 6.2D, 4.8D);
+	}
+
+	/** Keep native approach and climb stable from the west side. */
+	@GameTest(maxTicks = 340)
+	public void squirrelWestRoute(GameTestHelper helper) {
+		SquirrelRouteScenarios.observe(helper, "west", 2.2D, 4.8D);
+	}
+
+	/** Keep native approach and climb stable from the near-west side. */
+	@GameTest(maxTicks = 340)
+	public void squirrelNearWestRoute(GameTestHelper helper) {
+		SquirrelRouteScenarios.observe(helper, "near-west", 3.2D, 4.2D);
+	}
+
+	/** Removing the climbed trunk must restore gravity and allow a native landing. */
+	@GameTest(maxTicks = 340)
+	public void squirrelReleasesRemovedTree(GameTestHelper helper) {
+		SquirrelRouteScenarios.removeClimbedTree(helper);
+	}
+
 	/** Select a clear climbing face when a low branch blocks the nearest standable approach. */
 	@GameTest(maxTicks = 240)
 	public void squirrelUsesAnotherTreeFace(GameTestHelper helper) {

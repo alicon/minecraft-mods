@@ -172,7 +172,7 @@ care, and missing/dead/unowned/untagged pets are never replaced. Every maintenan
 mutation rechecks the copied Overworld and original player. A care/verification
 failure makes overall `ok` false while retaining `gameplayOk`, original case
 statuses and evidence. `complete` stays false until maintenance finishes. A final fixture explicitly
-marked pet-free (the standalone squirrel case) records care as skipped; a pet
+marked pet-free (the standalone squirrel cases) records care as skipped; a pet
 unexpectedly missing from another fixture remains a failure. World-reset errors
 preserve the original failed report or interruption. Direct CLI calls also honor
 `BRIDGE_REPORT_FILE`; an explicit `--report-file` takes precedence.
@@ -182,7 +182,7 @@ The 144 base cases combine four times (day, dusk, night, dawn), three shelter ty
 and three owner states (survival walking, creative walking, creative flying). Each fresh-pet fixture checks sleep, orders,
 gravity, health, need bounds, and the transition back to daylight and landing.
 Each fixture verifies the owner mode and flight flags. The suite does not claim
-every state transition. Thirteen additional sequences interrupt carried fetches with sit/sleep (bone, ball,
+every state transition. Twenty additional sequences interrupt carried fetches with sit/sleep (bone, ball,
 chew toy) exercise sleep-to-flight-to-sleep transitions at two hunger levels, and verify
 that a starving pet eats an available nighttime meal and settles back to sleep.
 Three fetch cases switch from survival pickup to grounded creative delivery and
@@ -199,7 +199,16 @@ six-block drop for each toy and owner locomotion state. It requires ordinary
 returns in accessible terrain and safe refusal under covered water or a survival
 cliff. A grounded creative cliff attempt may return or safely give up; it must
 conserve the toy, avoid damage, and end near the owner. Flying fetches must return.
-Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, the water/rest group adds 22, and sleep-spot controls add eight, making 249 cases before vehicle coverage. The vehicle group adds 100 cases; the journeys group adds 112, for 461 total. Run one group with `--group base`,
+Eight squirrel routes reuse the clear-face fixture at neighboring starts, including
+starts that previously circled for about nine seconds. Each records every native
+world tick and requires healthy, stable clinging for 40 ticks. The observer also
+rejects more than three horizontal blocks of travel after the first half-block
+ascent or more than one block of lost height, so eventual success cannot hide a
+clumsy route. Contact hops are allowed. The original `squirrel-clear-tree-face`
+case name is retained; use the other `squirrel-*` cases for nearby starts. These
+cases have no inspection pet and do not run success-only pet care.
+
+Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, the water/rest group adds 22, and sleep-spot controls add eight, making 256 cases before vehicle coverage. The vehicle group adds 100 cases; the journeys group adds 112, for 468 total. Run one group with `--group base`,
 `--group transitions`, `--group terrain`, `--group outdoors`, `--group water`, `--group rest`, `--group vehicles`, or `--group journeys`; combine it with an exact `--case`.
 Unknown groups/cases fail instead of running a different suite.
 
