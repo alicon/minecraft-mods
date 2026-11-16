@@ -354,14 +354,15 @@ normal gravity afterward, and appropriate dry sleep/nap resumption. Bridge
 entity state includes `custom.relief.tripActive` and `lastReliefDay` to observe active outside trips during water recovery (not every brief transition between samples), plus `onGround`; sleeping during an airborne hop fails. Native sleep guards also require center
 support, so partial bank contact cannot count as a safe place to rest. The owner
 steps farther onto shore after the reachable interaction. Each fixture resets
-and verifies owner yaw/pitch so an earlier failure camera cannot change flight
-targets and mask a stall.
+and verifies owner yaw/pitch so earlier interactions cannot change flight targets
+and mask a stall.
 
-Failure captures preserve the initial server state, wait 300 ms for client
-interpolation, then record a separate camera state and aim at the current pet's
-coordinates. After another 150 ms, they capture with the GUI/chat hidden. The
-screenshot is a later visual observation, not the exact assertion tick; both
-states and camera coordinates remain in the report.
+Failure capture checks the original world/owner and preserves its initial state,
+freezes an investigative fixture, waits 300 ms, then checks context and frozen
+state again. After another 150 ms it saves the current view, retaining the
+screen, HUD and chat. The screenshot is a later visual observation, not the
+exact assertion tick; both state snapshots remain in the report. Capture never
+teleports or rotates the owner for framing.
 
 Water recovery also checks the actual solid block under the landed pet. Safe
 nighttime rest may start within four blocks of the owner; it need not reach the
