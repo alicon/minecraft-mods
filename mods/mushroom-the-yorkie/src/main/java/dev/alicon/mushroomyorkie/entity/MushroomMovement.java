@@ -2,12 +2,12 @@ package dev.alicon.mushroomyorkie.entity;
 
 import net.minecraft.world.phys.Vec3;
 
-/** Drops movement queued at the old seat before an owner-assisted landing starts. */
-final class MushroomOwnerDismount {
-	private MushroomOwnerDismount() {
+/** Cancels navigation, queued steering and movement inputs before a new movement intent. */
+final class MushroomMovement {
+	private MushroomMovement() {
 	}
 
-	static void clearMovement(MushroomYorkieEntity yorkie) {
+	static void stop(MushroomYorkieEntity yorkie) {
 		yorkie.getNavigation().stop();
 		yorkie.getMoveControl().setWantedPosition(yorkie.getX(), yorkie.getY(), yorkie.getZ(), 0.0D);
 		yorkie.setDeltaMovement(Vec3.ZERO);

@@ -6,11 +6,12 @@ Owner-assisted dismount clears movement queued at the old seat so a sitting
 Mushroom can stay on his new landing spot. The sit order and boarding grace are
 preserved. Ordinary gravity, collision and fall damage still apply.
 
-A survival companion blocked beneath a boat or other low overhang searches up
-to three blocks for a reachable clear water column, swims around the obstruction,
-and surfaces before following again. This uses normal collisions and buoyancy;
-it does not teleport or prevent drowning when no escape exists. Creative-owner
-recovery continues to use its existing flight route.
+When his eyes are submerged and he makes no progress for 20 ticks beneath a
+boat or other low overhang, Mushroom searches up to three blocks for a reachable
+clear water column. He swims around the obstruction, resumes following once he
+can breathe, and replans a stalled escape. Native collisions, buoyancy and damage
+remain active. This also helps stalled recovery near a grounded creative owner;
+owner-directed flight and active fetch retain control.
 
 ## Gameplay Configuration
 

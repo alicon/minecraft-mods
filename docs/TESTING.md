@@ -98,7 +98,10 @@ retain their sit order; real water hazards still release it. Non-fetch vehicle
 owners use the shared player fixture without deleting neighboring fetch toys.
 This improves isolation without claiming the older intermittent throw setup is fixed.
 Boat-bank escape controls compare a swimmer trapped beneath a boat with the same
-clear bank without a boat, using full native ticks and real air/health. Native
+clear bank without a boat, including a close grounded creative owner. They require
+dry support, restored air and normal close following. A breathing surface swimmer
+beneath a low deck keeps ordinary following; only submerged stalled movement
+triggers escape. These use full native ticks and real air/health. Native
 dismount controls also seed old movement/steering and require owner help to clear
 it for boats, chest boats and carts. Live dock sequences separately check the
 complete landing and settling behavior.

@@ -205,7 +205,7 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	/** Leave enough time to move away; vanilla's three-second cooldown allowed immediate reboarding. */
 	void dismountForOwner() {
 		this.stopRiding();
-		MushroomOwnerDismount.clearMovement(this);
+		MushroomMovement.stop(this);
 		this.boardingCooldown = Math.max(this.boardingCooldown, MushroomOwnerCommandInteractions.DISMOUNT_GRACE_TICKS);
 	}
 

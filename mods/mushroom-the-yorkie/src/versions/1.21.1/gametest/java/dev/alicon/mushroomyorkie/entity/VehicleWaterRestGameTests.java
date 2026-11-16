@@ -6,6 +6,18 @@ import net.minecraft.world.entity.EntityType;
 
 /** Version-specific registration for water passenger rest controls. */
 public final class VehicleWaterRestGameTests {
+	/** Close grounded creative owners still need a safe escape from boat obstructions. */
+	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 200)
+	public void closeCreativeBoatBankSwimmerEscapes(GameTestHelper helper) {
+		BoatBankEscapeScenarios.closeCreativeEscapeBank(helper, EntityType.BOAT);
+	}
+
+	/** A breathing swimmer keeps normal following beneath a low deck. */
+	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 120)
+	public void surfaceSwimmerFollowsUnderDeck(GameTestHelper helper) {
+		SurfaceSwimmingScenarios.followUnderDeck(helper);
+	}
+
 	/** A swimmer must get around a floating boat to reach its owner's bank. */
 	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 200)
 	public void boatBankSwimmerEscapes(GameTestHelper helper) {

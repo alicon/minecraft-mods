@@ -23,6 +23,7 @@ function journeyInputs() {
       for (const hunger of [0, 90])
         for (const ownerMode of ['survival', 'creative'])
           rows.push({ vehicle, time, hunger, ownerMode, sitting: true, flying: false, offshore: true,
+            immersionMethod: ownerMode === 'creative' ? 'controlled-submerge' : 'native-fall-after-boat-departure',
             layout: 'water', shelter: time === 18000 ? 'inside' : 'outside', action: 'assist-immersion' });
   return rows;
 }
@@ -158,11 +159,12 @@ function journeyCases(context) {
             // before horizontal travel. The east-bank obstruction stays in play.
             observed.departureMotion = await command(`data merge entity ${fixture.vehicleUuid} {Motion:[0.4d,-0.08d,0.0d]}`);
             for (let tick = 1; tick <= 24; tick++) {
-              if (tick === 3) {
-                // Model a downward slip after the hull starts leaving. Without
-                // it, creative recovery can catch mere foot contact before the
-                // body ever enters water, which cannot validate immersion.
-                observed.entryMotion = await command(`data merge entity ${fixture.petUuid} {Motion:[0.0d,-0.25d,0.0d]}`);
+              if (tick === 3 && inputs.ownerMode === 'creative') {
+                // Creative recovery can preempt bodily immersion at first foot
+                // contact. Explicitly seed a submerged state for this control;
+                // the survival arm separately observes a native fall into water.
+                observed.entryPlacement = { x: beforeDeparture.x, y: base.y - 0.94, z: beforeDeparture.z, method: inputs.immersionMethod };
+                observed.entryCommand = await command(`tp ${fixture.petUuid} ${beforeDeparture.x} ${base.y - 0.94} ${beforeDeparture.z}`);
               }
               await observe(await frozenStep(1), `offshore-immersion-${tick}`, { afterDismount: true });
             }
