@@ -32,6 +32,7 @@ final class BridgeEntityState {
 		state.addProperty("uuid", player.getGameProfile().id().toString());
 		state.addProperty("health", player.getHealth());
 		state.addProperty("food", player.getFoodData().getFoodLevel());
+		state.addProperty("shiftKeyDown", player.isShiftKeyDown());
 		state.addProperty("dimension", player.level().dimension().toString());
 		if (player.level() instanceof ServerLevel level) {
 			state.addProperty("biome", biomeId(level, player.blockPosition()));

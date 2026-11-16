@@ -16,6 +16,7 @@ class BridgeInputControllerTest {
 		for (int tick = 0; tick < 3; tick++) fixture.tick();
 		assertEquals(3, fixture.target.applied);
 		assertEquals("releasing", fixture.status().get("phase").getAsString());
+		assertFalse(fixture.status().get("controlsReleased").getAsBoolean());
 		fixture.tick();
 		assertEquals("complete", fixture.status().get("phase").getAsString());
 		assertEquals("completed", fixture.status().get("outcome").getAsString());
@@ -111,6 +112,79 @@ class BridgeInputControllerTest {
 		assertEquals(6, fixture.status().getAsJsonArray("clientFrames").size());
 	}
 
+	@Test
+	void nativeActionAcknowledgementCanArriveAfterKeyReleaseWithoutAnotherPress() {
+		Fixture fixture = new Fixture();fixture.start(2);fixture.target.ready = false;
+		for (int tick = 0; tick < 10; tick++) fixture.tick();
+		assertEquals("releasing", fixture.status().get("phase").getAsString());
+		assertEquals(2, fixture.target.applied);
+		assertTrue(fixture.target.neutral());
+		fixture.target.ready = true;fixture.tick();
+		assertEquals("completed", fixture.status().get("outcome").getAsString());
+		assertTrue(fixture.status().get("controlsReleased").getAsBoolean());
+		assertEquals(2, fixture.target.applied);
+	}
+
+	@Test
+	void unconfirmedActionRetainsAConfirmedReleaseAndCancellationDoesNotWaitForAction() {
+		Fixture fixture = new Fixture();fixture.start(2);fixture.target.ready = false;
+		for (int tick = 0; tick < 50; tick++) fixture.tick();
+		assertEquals("action_unconfirmed", fixture.status().get("outcome").getAsString());
+		assertTrue(fixture.status().get("controlsReleased").getAsBoolean());
+		assertEquals(2, fixture.target.applied);
+		fixture.start(2);fixture.controller.cancel(fixture.id, "cancelled");fixture.tick();
+		assertEquals("cancelled", fixture.status().get("outcome").getAsString());
+		assertEquals("complete", fixture.status().get("phase").getAsString());
+	}
+
+	@Test
+	void provenReleaseIsNotLostOnAStaleSampleAndDoesNotKeepWritingKeys() {
+		Fixture fixture = new Fixture();fixture.target.ready = false;fixture.start(2);
+		fixture.tick();fixture.tick();fixture.tick();
+		int releases = fixture.target.forces.size();
+		fixture.target.staleNeutral = true;fixture.tick();fixture.tick();
+		assertEquals("releasing", fixture.status().get("phase").getAsString());
+		assertTrue(fixture.status().get("controlsReleased").getAsBoolean());
+		assertEquals(releases, fixture.target.forces.size());
+		fixture.target.ready = true;fixture.tick();
+		assertEquals("completed", fixture.status().get("outcome").getAsString());
+	}
+
+	@Test
+	void inputOrContextChangedAfterReleaseCannotClearNewUserInput() {
+		for (boolean contextChanged : new boolean[] {false, true}) {
+			Fixture fixture = new Fixture();fixture.target.ready = false;fixture.start(2);
+			fixture.tick();fixture.tick();fixture.tick();
+			int releases = fixture.target.forces.size();
+			if (contextChanged) fixture.target.invalid = "player_changed";
+			else fixture.target.held = true;
+			fixture.tick();
+			assertEquals("complete", fixture.status().get("phase").getAsString());
+			assertTrue(fixture.status().get("controlsReleased").getAsBoolean());
+			assertEquals(releases, fixture.target.forces.size());
+			assertEquals(contextChanged ? "player_changed" : "external_movement_input", fixture.status().get("outcome").getAsString());
+			if (!contextChanged) assertTrue(fixture.target.held);
+		}
+	}
+
+	@Test
+	void terminalPathsAfterProvenReleaseDoNotWriteKeysAgain() {
+		for (String action : new String[] {"cancelled", "client_stopping", "wall_timeout", "input_adapter_failed"}) {
+			Fixture fixture = new Fixture();fixture.target.ready = false;fixture.start(2);
+			fixture.tick();fixture.tick();fixture.tick();
+			int releases = fixture.target.forces.size();
+			if (action.equals("cancelled")) fixture.controller.cancel(fixture.id, action);
+			if (action.equals("client_stopping")) fixture.controller.shutdown();
+			if (action.equals("wall_timeout")) fixture.now += BridgeInputController.MAX_WALL_MILLIS;
+			if (action.equals("input_adapter_failed")) fixture.target.failSample = true;
+			fixture.tick();
+			assertEquals(action, fixture.status().get("outcome").getAsString());
+			assertEquals("complete", fixture.status().get("phase").getAsString());
+			assertTrue(fixture.status().get("controlsReleased").getAsBoolean());
+			assertEquals(releases, fixture.target.forces.size());
+		}
+	}
+
 	private static final class Fixture {
 		private long now;
 		private String id;
@@ -133,6 +207,7 @@ class BridgeInputControllerTest {
 
 	private static final class FakeTarget implements BridgeInputController.Target {
 		private boolean held, failSample, ignoreRelease;
+		private boolean ready = true, staleNeutral;
 		private int applied;
 		private final java.util.List<Boolean> forces = new java.util.ArrayList<>();
 		private String invalid;
@@ -141,7 +216,9 @@ class BridgeInputControllerTest {
 		@Override public String invalidContext() { return this.invalid; }
 		@Override public void apply(BridgeInputRequest request) { this.held = true;this.applied++; }
 		@Override public void release(boolean forceCachedInput) { this.forces.add(forceCachedInput);if (!this.ignoreRelease) this.held = false; }
-		@Override public boolean neutral() { return !this.held; }
+		@Override public boolean neutral() { return !this.held && !this.staleNeutral; }
+		@Override public boolean completionReady() { return this.ready; }
+		@Override public boolean controlsDown() { return this.held; }
 		@Override public JsonObject sample() {
 			if (this.failSample) throw new IllegalStateException("synthetic adapter failure");
 			return new JsonObject();

@@ -390,7 +390,8 @@ never kills or relaunches a process; inspect it before attempting another launch
 
 The development bridge can hold forward/backward/left/right through Minecraft's
 key mappings, before native `KeyboardInput` runs. It supports a walking player
-or the driver of an identified boat. It does not set velocity, teleport the
+or the driver of an identified boat, and can press the native dismount key for
+an identified boat or minecart. It does not set velocity, teleport the
 player, or use OS keyboard automation. Start with a clear copied-world route
 and no movement keys held. An open screen, frozen world, flying/spectator player,
 wrong vehicle or changed save/player prevents input or releases an active burst.
@@ -410,6 +411,24 @@ context loss and shutdown release injected controls; an unconfirmed release is
 reported as failure, not movement success. Physical jumping, sprinting or
 sneaking interrupts the burst. Native momentum can continue after keys release.
 
+Use `--mode dismount --vehicle-uuid <original vehicle UUID> --ticks 2` to leave
+a boat or minecart through native Shift input. This mode defaults to two client
+ticks, accepts only 2–5, and forbids directional controls. It owns and releases
+Shift; other input modes still reject external sneaking. Toggle-sneak settings
+are refused before a dismount burst. Cancellation still clears the owned key if
+the setting changes while a burst is active. After release, up to 40 neutral
+client ticks may await the native exit; no additional key presses occur.
+Once a fresh neutral sample proves release, the bridge stops writing keys.
+Later physical movement ends the operation without clearing that new user input.
+The original client
+must show the key press, key release and on-foot state. The driver then waits
+up to two seconds within its overall timeout for server-side exit, a released
+server shift flag and world-clock progress. That server flag is a final-state
+check; the fresh native client sample proves actual key release. The original source vehicle must
+remain observable. Request acceptance alone cannot pass this check. No server
+dismount command is used. `/state` exposes read-only player `shiftKeyDown` for
+this final-state check.
+
 The CLI holds the shared bridge lock and saves incremental reports. It checks
 fresh native keyboard records and player ticks, neutral release, actual server-world progress and measured
 owner/vehicle displacement. A valid burst can have zero movement against an
@@ -418,7 +437,8 @@ It does not reset the arena or apply pet care.
 
 Direct `POST /client-input` requests use `action: start|status|cancel`, the exact
 `expectedSave`, `playerUuid` and a caller-generated UUID `operationId`. Starts add
-`mode`, integer `ticks`, Boolean direction flags and, for boats, `vehicleUuid`.
+`mode`, integer `ticks`, Boolean direction flags and, for boats or dismount,
+`vehicleUuid`. Dismount direction flags must all be false.
 Status/cancel use only the common fields. The current operation's identical start
 can be retried without applying input twice. Other overlapping starts fail.
 Only the most recent receipt is retained. Poll until `phase=complete`, then

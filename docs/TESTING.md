@@ -373,8 +373,11 @@ release. Harness controls reject wrong identity, unapplied native buttons and a
 stalled server clock, and cancel by a known operation ID if acceptance is lost.
 The [native input CLI](../tools/playtest-harness/README.md#bounded-native-client-input)
 records actual input and displacement; accepting a key request alone does not
-prove a walking or rowing scenario. These controls do not add cases to the 461
-Mushroom matrix until explicit gameplay sequences use them.
+prove a walking or rowing scenario. The short dismount mode additionally proves
+native Shift press/release, a client exit and the original server player on foot
+with its shift flag released. A pending server acknowledgement, another vehicle
+or missing source cannot pass on key acknowledgement alone. These controls do
+not add matrix cases until explicit gameplay sequences use them.
 Nearby living-entity snapshots also retain native air, accumulated fall distance,
 hurt timer and recent damage type for diagnosing a health change. These fields
 do not change damage rules, and unavailable retained history cannot identify the
