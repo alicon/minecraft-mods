@@ -416,8 +416,8 @@ original player is already its driver. Omitting direction flags requests an idle
 control. Durations are 1–100 client ticks, with a 15-second wall-time cleanup
 callback. Normal completion includes a later neutral input tick. Cancellation,
 context loss and shutdown release injected controls; an unconfirmed release is
-reported as failure, not movement success. Physical jumping, sprinting or
-sneaking interrupts the burst. Native momentum can continue after keys release.
+reported as failure, not movement success. Unowned jump, sprint or sneak input
+interrupts the burst. Native momentum can continue after keys release.
 
 Use `--mode dismount --vehicle-uuid <original vehicle UUID> --ticks 2` to leave
 a boat or minecart through native Shift input. This mode defaults to two client
@@ -436,6 +436,29 @@ check; the fresh native client sample proves actual key release. The original so
 remain observable. Request acceptance alone cannot pass this check. No server
 dismount command is used. `/state` exposes read-only player `shiftKeyDown` for
 this final-state check.
+
+Use `--mode jump --ticks 2 --forward true` for an ordinary forward hop from a
+grounded, dry, on-foot non-creative owner. Jump allows 2–5 ticks and defaults to
+two. It refuses recent hurt, climbing, water/bubbles and active effects. It owns
+the native jump key through the shared lifecycle and requires a grounded press
+followed by an airborne upward impulse without a vertical collision at launch.
+The native code records whether that launch occurred during its own press;
+movement after release cannot create the witness.
+
+Client/server starting heights must agree within 0.125 blocks. The bridge binds
+the request to the fresh server-origin snapshot and records monotonic input and
+snapshot intervals from the same process. A separate server snapshot must show
+accepted airborne rise over 0.05 blocks during input ownership. Minecraft takes
+player movement packets from the client, so this confirms accepted position; it
+does not constitute another physics calculation. A late jump after completion
+cannot supply missing evidence. Recorded in-window rise still counts if the
+owner has landed by the final read. Missing proof is failure. The action does
+not establish a safe landing or explain a blocked forward-only walk.
+
+Player state includes read-only `onGround`, `inWater`, `inWaterOrBubble`,
+`onClimbable`, `hasEffects`, `hurtTime`, `crouching`, `pose`, collision flags,
+`stepHeight`, `velocity` and `positionPrecise`. Client frames retain native
+launch, pose/collision and timing facts. These observations do not alter physics.
 
 The CLI holds the shared bridge lock and saves incremental reports. It checks
 fresh native keyboard records and player ticks, neutral release, actual server-world progress and measured

@@ -3441,7 +3441,7 @@ Actions:
 	  respawn (--expected-save <copied save>, --player-uuid <original owner UUID>)
 	  player-abilities, use-entity, clear-entities
 	  set-block-near-entity, set-block, block, use-block, count-blocks, terrain-scan
-	  client-input (--expected-save <copied save>, --mode walk|boat|dismount, --ticks <1-100; dismount 2-5>, --forward true)
+	  client-input (--expected-save <copied save>, --mode walk|boat|dismount|jump, --ticks <1-100; dismount/jump 2-5>, --forward true)
 	  yorkie-matrix (--expected-save <copied save>), yorkie-smoke, yorkie-water-smoke, yorkie-adventure-smoke, yorkie-home-squirrel, yorkie-visual-sweep, yorkie-biome-scout, yorkie-natural-gallery
 	  cops-smoke, cops-structures-smoke, cops-visual-sweep, screenshot
 
@@ -3615,7 +3615,7 @@ async function main() {
     result = await require('./native-input-runner').runNativeInput(baseUrl, {
       expectedSave: option(args, 'expectedSave', 'PLAYTEST_WORLD', ''),
       mode: inputMode,
-      ticks: optionNumber(args, 'ticks', 'BRIDGE_INPUT_TICKS', inputMode === 'dismount' ? 2 : 20),
+      ticks: optionNumber(args, 'ticks', 'BRIDGE_INPUT_TICKS', ['dismount', 'jump'].includes(inputMode) ? 2 : 20),
       vehicleUuid: option(args, 'vehicleUuid', 'BRIDGE_VEHICLE_UUID', ''),
       ...Object.fromEntries(['forward', 'backward', 'left', 'right'].map(key => [key, optionBoolean(args, key, `BRIDGE_INPUT_${key.toUpperCase()}`, false)])),
       reportFile: option(args, 'reportFile', 'BRIDGE_REPORT_FILE', '')
