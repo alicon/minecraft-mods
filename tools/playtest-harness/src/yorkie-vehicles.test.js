@@ -13,6 +13,28 @@ test('unreachable or missing interaction distance is a setup failure before a jo
   }
 });
 
+test('journey bank staging reaches a short valid boat trip without relaxing survival reach', () => {
+  const { journeyOwnerPosition } = require('./yorkie-vehicle-journeys');
+  const { assertVehicleReach } = require('./yorkie-vehicle-fixture');
+  const base = { x: -61, y: 220, z: 106 };
+  // Actual stopped audit geometry: the former bank point was 3.7 blocks away.
+  const pet = { x: -58.69, y: 219.71, z: 106.5 };
+  const distance = (owner, passenger) => Math.hypot(owner.x - passenger.x, owner.y - passenger.y, owner.z - passenger.z);
+  assert.throws(() => assertVehicleReach({ distance: distance({ x: base.x + 6, y: base.y, z: base.z + 0.5 }, pet) }, 'survival'), e => e.phase === 'setup');
+  for (const offshore of [false, true]) {
+    const owner = journeyOwnerPosition({ layout: 'water', offshore }, base);
+    assert.equal(Math.floor(owner.x), base.x + 4, 'Owner must stand on the audited dry doorway column');
+    assert.equal(Math.floor(owner.z), base.z);
+    assertVehicleReach({ distance: distance(owner, pet) }, 'survival');
+    // Ordinary dock spawn is base.x - 0.5; two blocks east is the minimum
+    // accepted travel. Include the full allowed floating-height range.
+    for (const y of [base.y - 0.8, base.y + 0.2])
+      assertVehicleReach({ distance: distance(owner, { x: base.x + 1.5, y, z: base.z + 0.5 }) }, 'survival');
+    assert.throws(() => assertVehicleReach({ distance: distance(owner, { ...pet, x: base.x }) }, 'survival'), e => e.phase === 'setup');
+  }
+  assert.deepEqual(journeyOwnerPosition({ layout: 'rail' }, base, { position: { x: -60.2 } }), { x: -60.2, y: 220, z: 104.5 });
+});
+
 test('lost owner flight is a fixture failure rather than a trapped-pet verdict', () => {
   const state = { players: [{ abilities: { creative: true, flying: false } }] };
   assertVehicleOwnerState(state, 'creative', false);

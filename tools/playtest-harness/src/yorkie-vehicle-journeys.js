@@ -6,6 +6,14 @@ const { readWorldTime } = require('./yorkie-clock');
 const { advanceJourneyOrder } = require('./yorkie-journey-order');
 const { exerciseMountedCare } = require('./yorkie-vehicle-care');
 
+function journeyOwnerPosition(inputs, base, traveled) {
+  // The first dry bank column has a nighttime doorway. Stay on its inner
+  // quarter so even a boat that only just met the travel minimum is in reach.
+  return inputs.layout === 'water'
+    ? { x: base.x + 4.25, y: base.y, z: base.z + 0.5 }
+    : { x: traveled.position.x, y: base.y, z: base.z - 1.5 };
+}
+
 function journeyInputs() {
   const rows = [];
   for (const vehicle of VEHICLES)
@@ -137,9 +145,7 @@ function journeyCases(context) {
       }
       // Bank/trackside interaction is reachable; freezing isolates exact food/item changes.
       await command('tick freeze');
-      const owner = inputs.layout === 'water'
-        ? { x: base.x + (inputs.offshore ? 4.25 : 6), y: base.y, z: base.z + 0.5 }
-        : { x: traveled.position.x, y: base.y, z: base.z - 1.5 };
+      const owner = journeyOwnerPosition(inputs, base, traveled);
       await request('/teleport', { player, ...owner });
       if (inputs.layout === 'water' && !inputs.offshore) {
         // Vanilla boat exits use the passenger's yaw. This is a controlled dock
@@ -252,4 +258,4 @@ function journeyCases(context) {
   }));
 }
 
-module.exports = { journeyInputs, journeyCases };
+module.exports = { journeyInputs, journeyCases, journeyOwnerPosition };
