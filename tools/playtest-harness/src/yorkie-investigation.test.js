@@ -127,13 +127,15 @@ test('real matrix CLI forwards investigate, retains failures and rejects ambiguo
     assert.equal(requests.length, 0);
     await assert.rejects(execFile(process.execPath, [args[0], 'health', '--investigate', '--port', String(server.address().port)], { timeout: 5000 }), /only supported by yorkie-matrix/);
     assert.equal(requests.length, 0);
-    for (const failScreenshot of [false, true]) {
+    for (const [failScreenshot, allGroups] of [[false, false], [true, false], [false, true]]) {
       frozen = false;captureFails = failScreenshot;requests.length = 0;
-      const file = path.join(directory, `report-${failScreenshot}.json`);
-      await assert.rejects(execFile(process.execPath, [...args, '--investigate', '--report-file', file], { timeout: 10000 }), error => error.code === 1);
+      const file = path.join(directory, `report-${failScreenshot}-${allGroups}.json`);
+      const selectedArgs = allGroups ? args.slice(0, -2) : args;
+      await assert.rejects(execFile(process.execPath, [...selectedArgs, '--investigate', '--report-file', file], { timeout: 10000 }), error => error.code === 1);
       const report = JSON.parse(fs.readFileSync(file));
-      assert.equal(report.investigativeAudit, true);assert.equal(report.requestedCases.length, 112);
-      assert.equal(report.requestedCaseCount, 112);assert.equal(report.cases.length, 1);
+      const requested = allGroups ? 490 : 112;
+      assert.equal(report.investigativeAudit, true);assert.equal(report.requestedCases.length, requested);
+      assert.equal(report.requestedCaseCount, requested);assert.equal(report.cases.length, 1);
       assert.equal(report.complete, true);assert.equal(report.gameplayComplete, false);assert.equal(report.ok, false);
       assert.equal(report.cases[0].status, 'setup_failed');assert.equal(report.stoppedAfterFailure, true);
       assert.equal(report.cases[0].investigativeCleanup.status, 'skipped');
