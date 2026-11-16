@@ -11,6 +11,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.AgeableMob;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -198,6 +199,17 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	/** Clears stuck/passenger state after lost-owner recovery and records fresh owner contact. */
 	public void recoverWithOwner(ServerLevel level) {
 		this.ownerPresence.recoverWithOwner(this, level);
+	}
+
+	/** Leave enough time to move away; vanilla's three-second cooldown allowed immediate reboarding. */
+	void dismountForOwner() {
+		this.stopRiding();
+		this.boardingCooldown = Math.max(this.boardingCooldown, MushroomOwnerCommandInteractions.DISMOUNT_GRACE_TICKS);
+	}
+
+	@Override
+	protected boolean canRide(Entity vehicle) {
+		return !MushroomYorkieStateQueries.ownerIsCreativeFlying(this) && super.canRide(vehicle);
 	}
 
 	@Override

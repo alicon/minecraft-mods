@@ -6,6 +6,8 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
 final class MushroomOwnerCommandInteractions {
+	// Ten seconds after owner help or takeoff gives the player time to leave the vehicle.
+	static final int DISMOUNT_GRACE_TICKS = 200;
 	private MushroomOwnerCommandInteractions() {
 	}
 
@@ -23,7 +25,7 @@ final class MushroomOwnerCommandInteractions {
 
 	private static void handleServerCommand(MushroomYorkieEntity yorkie, Player player) {
 		if (yorkie.isPassenger()) {
-			yorkie.stopRiding();
+			yorkie.dismountForOwner();
 			MushroomYorkieSounds.bark(yorkie);
 			player.displayClientMessage(Component.translatable("message.mushroom_yorkie.dismounted"), true);
 			MushroomBehaviorDebugger.debug(yorkie, "vehicle_dismount", "vehicle: owner helped Mushroom hop out", true);

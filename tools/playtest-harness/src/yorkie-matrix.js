@@ -80,6 +80,9 @@ async function executeMatrix(baseUrl, args) {
     await command(`tp ${player} ${base.x} ${base.y + 1} ${base.z} 0 0`);
     // Clear the baseline pet in this disposable save so ownership guards do not block taming.
     await request('/clear-entities', { type: TYPE });
+    // A boat left by an interrupted vehicle run must not board the next fresh pet,
+    // including when that next run selects a different group.
+    for (const type of require('./yorkie-vehicles').VEHICLES) await request('/clear-entities', { type });
     await request('/clear-entities', { type: 'mushroom_yorkie:squirrel' });
     await request('/clear-entities', { type: 'minecraft:item' });
     // CreativeBuildActivity belongs to the owner, not the replaced pet. Let its 1800-tick
@@ -157,7 +160,7 @@ async function executeMatrix(baseUrl, args) {
     };
   });
   const context = { prepare, command, request, state, entity, advance, base, player, selector: SELECTOR, check };
-  const groups = { base: cases, transitions: [...require('./yorkie-transitions').transitionCases(context), ...require('./yorkie-flight-transitions').flightTransitionCases(context)], terrain: require('./yorkie-terrain').terrainCases(context), outdoors: require('./yorkie-outdoor').outdoorCases(context), water: require('./yorkie-water-rest').waterRestCases(context), rest: require('./yorkie-sleep-spots').sleepSpotCases(context) };
+  const groups = { base: cases, transitions: [...require('./yorkie-transitions').transitionCases(context), ...require('./yorkie-flight-transitions').flightTransitionCases(context)], terrain: require('./yorkie-terrain').terrainCases(context), outdoors: require('./yorkie-outdoor').outdoorCases(context), water: require('./yorkie-water-rest').waterRestCases(context), rest: require('./yorkie-sleep-spots').sleepSpotCases(context), vehicles: require('./yorkie-vehicles').vehicleCases(context) };
   const selected = selectCases(groups, args);
   await command('gamerule minecraft:spawn_mobs false');
   await command('gamerule minecraft:advance_time false');
