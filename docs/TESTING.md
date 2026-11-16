@@ -81,11 +81,12 @@ Fetch GameTests cover active flight steering, interruption returning to normal f
 
 Flight and airborne-reload fetch tests declare a 16×16 horizontal arena. Their
 toys at relative x8 and cliff floor through x10 extend past Fabric's default
-8×8 template. Each flight fixture checks that the toy is inside its declared
-horizontal bounds before attempting fetch, and reports ownership, native chunk
+8×8 template. Each flight fixture checks that the pet, owner, toy and cliff footprint are inside
+its declared horizontal bounds before attempting fetch, and reports ownership, native chunk
 state and exact toy-query visibility if setup still fails. A loaded chunk alone
 does not prove that its entities are visible. Vertical out-of-bounds remains
-intentional for below-platform returns. This changes test setup, not gameplay.
+intentional for below-platform returns. A deliberately small-template native control verifies that rejection removes the
+original pet, toy and fake owner. This changes test setup, not gameplay.
 
 Crafting GameTests load every Mushroom recipe and check exact output/count through both native recipe matching and the crafting menu. Vanilla lime/yellow wool and modern copper-nugget controls protect the recipes that previously overlapped the mod. The 1.21.1 build converts modern ingredient strings to the older object schema from the same source definitions; native crafting runs in CI for both targets.
 

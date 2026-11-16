@@ -39,4 +39,9 @@ public final class FetchFlightGameTests {
 		FetchFlightScenarios.landingDuringChaseReturns(helper);
 	}
 
+	/** Reject an out-of-bounds toy and remove the exact failed fixture entities. */
+	@GameTest
+	public void invalidFootprintDoesNotLeakFixtures(GameTestHelper helper) {
+		FetchFlightScenarios.invalidFootprintDoesNotLeakFixtures(helper);
+	}
 }
