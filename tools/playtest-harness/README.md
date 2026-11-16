@@ -182,7 +182,7 @@ The 144 base cases combine four times (day, dusk, night, dawn), three shelter ty
 and three owner states (survival walking, creative walking, creative flying). Each fresh-pet fixture checks sleep, orders,
 gravity, health, need bounds, and the transition back to daylight and landing.
 Each fixture verifies the owner mode and flight flags. The suite does not claim
-every state transition. 28 additional sequences interrupt carried fetches with sit/sleep (bone, ball,
+every state transition. 30 additional sequences interrupt carried fetches with sit/sleep (bone, ball,
 chew toy) exercise sleep-to-flight-to-sleep transitions at two hunger levels, and verify
 that a starving pet eats an available nighttime meal and settles back to sleep.
 Three fetch cases switch from survival pickup to grounded creative delivery and
@@ -223,7 +223,7 @@ observed airborne approach ticks and the intended tree, and stage the owner
 outside new solid blocks. The observer starts counting climbing travel near the
 expected trunk, so crossing the raised strip cannot masquerade as circling.
 
-Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, the water/rest group adds 22, and sleep-spot controls add eight, making 264 cases before vehicle coverage. The vehicle group adds 100 cases; the journeys group adds 112, for 476 total. Run one group with `--group base`,
+Six landing transitions reuse the ledge fixture for every toy: land during the chase or after pickup, then verify safe delivery, no damage, one play reward, and normal grounded following. The outdoor-care group adds 20 cases, the water/rest group adds 22, and sleep-spot controls add eight, making 266 cases before vehicle coverage. The vehicle group adds 100 cases; the journeys group adds 112, for 478 total. Run one group with `--group base`,
 `--group transitions`, `--group terrain`, `--group outdoors`, `--group water`, `--group rest`, `--group vehicles`, or `--group journeys`; combine it with an exact `--case`.
 Unknown groups/cases fail instead of running a different suite.
 
@@ -566,3 +566,9 @@ The response reports `mode: read_only_recipe_resolution`, `matched`, `selectedRe
 and `matchingRecipes`. A rejected grid returns `ok:false` with an error. This queries loaded
 server recipes; it does not open a UI or consume inventory ingredients. Separate headless native
 tests verify actual crafting-menu output on both Minecraft targets.
+
+The two `squirrel-climbing-face-*` transition cases compare an ascent interrupted
+by a solid block with the same open route. They verify exact native ticks,
+body-safe placement, the original healthy UUID and 40 recovered perch ticks
+within a 300-tick bound. A failed climb preserves its trace and unfreezes during
+cleanup; neither case receives success-only pet care.

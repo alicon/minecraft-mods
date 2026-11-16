@@ -165,6 +165,54 @@ public final class SquirrelApproachGameTests {
 				"Squirrel never reached the clear tree face: " + squirrel.position()));
 	}
 
+	/** Observe recovery after a reachable native sprint attack. */
+	@GameTest(maxTicks = 340)
+	public void squirrelAttackMidClimbNorth(GameTestHelper helper) {
+		SquirrelInterruptionScenarios.attack(helper, false, false);
+	}
+
+	/** Observe recovery after a reachable native sprint attack. */
+	@GameTest(maxTicks = 340)
+	public void squirrelAttackMidClimbSouth(GameTestHelper helper) {
+		SquirrelInterruptionScenarios.attack(helper, false, true);
+	}
+
+	/** Observe recovery after a reachable native sprint attack. */
+	@GameTest(maxTicks = 340)
+	public void squirrelAttackPerchedNorth(GameTestHelper helper) {
+		SquirrelInterruptionScenarios.attack(helper, true, false);
+	}
+
+	/** Observe recovery after a reachable native sprint attack. */
+	@GameTest(maxTicks = 340)
+	public void squirrelAttackPerchedSouth(GameTestHelper helper) {
+		SquirrelInterruptionScenarios.attack(helper, true, true);
+	}
+
+	/** Adding a solid block during ascent must permit a different usable face. */
+	@GameTest(maxTicks = 340)
+	public void squirrelReplansBlockedClimbingFace(GameTestHelper helper) {
+		SquirrelInterruptionScenarios.closeClimbingFace(helper);
+	}
+
+	/** Changing the old route below a supported perch must not cause a needless fall. */
+	@GameTest(maxTicks = 340)
+	public void squirrelKeepsPerchAboveChangedFace(GameTestHelper helper) {
+		SquirrelInterruptionScenarios.closeBelowPerch(helper);
+	}
+
+	/** Removing a canopy above the original target must not release the existing climb. */
+	@GameTest(maxTicks = 340)
+	public void squirrelKeepsClimbWhenCanopyOpens(GameTestHelper helper) {
+		SquirrelInterruptionScenarios.openCanopy(helper);
+	}
+
+	/** Changing a face below the body must not release an otherwise clear remaining ascent. */
+	@GameTest(maxTicks = 340)
+	public void squirrelKeepsClimbWhenLowerFaceCloses(GameTestHelper helper) {
+		SquirrelInterruptionScenarios.closeBelowAscent(helper);
+	}
+
 	private static SquirrelEntity roundTrip(GameTestHelper helper, SquirrelEntity squirrel) {
 		var output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, helper.getLevel().registryAccess());
 		squirrel.saveWithoutId(output);
