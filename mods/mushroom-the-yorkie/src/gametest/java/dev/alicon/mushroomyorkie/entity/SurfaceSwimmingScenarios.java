@@ -1,5 +1,8 @@
 package dev.alicon.mushroomyorkie.entity;
 
+import dev.alicon.mushroomyorkie.MushroomTheYorkie;
+import net.minecraft.core.BlockPos;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
@@ -17,27 +20,56 @@ final class SurfaceSwimmingScenarios {
 			}
 		}
 		var owner = SurvivalGameTestPlayers.createWithoutToyCleanup(helper);
-		owner.setPos(helper.absoluteVec(new Vec3(9.0D, 4.0D, 3.5D)));
-		MushroomYorkieEntity yorkie = helper.spawn(ModEntities.MUSHROOM_YORKIE, 3, 3, 3);
-		long seed = GameTestSeeds.apply(yorkie, "surface-under-deck");
-		yorkie.setPos(helper.absoluteVec(new Vec3(3.5D, 3.8D, 3.5D)));
-		yorkie.claimFor(owner);
-		Runnable cleanup = () -> {
-			yorkie.discard();
-			if (helper.getLevel().getServer().getPlayerList().getPlayer(owner.getUUID()) == owner) {
-				helper.getLevel().getServer().getPlayerList().remove(owner);
-			}
-			owner.discard();
-		};
-		helper.runAfterDelay(1, () -> {
+		try {
+			owner.setPos(helper.absoluteVec(new Vec3(9.0D, 4.0D, 3.5D)));
+			MushroomYorkieEntity yorkie = helper.spawn(ModEntities.MUSHROOM_YORKIE, 3, 3, 3);
 			try {
-				helper.assertTrue(yorkie.isInWater() && !yorkie.isUnderWater(), "Deck control must have a wet body and breathing eyes");
-				helper.assertTrue(!yorkie.waterEscape.active(), "Breathing surface swimmer was diverted into obstruction escape");
+				long seed = GameTestSeeds.apply(yorkie, "surface-under-deck");
+				yorkie.setPos(helper.absoluteVec(new Vec3(3.5D, 3.8D, 3.5D)));
+				yorkie.claimFor(owner);
+				observe(helper, yorkie, seed, "placed");
+				Runnable cleanup = () -> {
+					yorkie.discard();
+					discardOwner(helper, owner);
+				};
+				// The independent one-tick callback was observed at native tick4.
+				// The recurring probe adds tasks while Minecraft walks its runnable
+				// map; keep the precondition inside the same first native sample.
+				new BoatBankRecoveryProbe(helper, yorkie, owner, false, false, seed, cleanup, () -> {
+					String observation = observe(helper, yorkie, seed, "first-recovery-sample");
+					helper.assertTrue(yorkie.isInWater() && !yorkie.isUnderWater(), "Deck control must have a wet body and breathing eyes: " + observation);
+					helper.assertTrue(!yorkie.waterEscape.active(), "Breathing surface swimmer was diverted into obstruction escape: " + observation);
+				}).start();
 			} catch (RuntimeException | Error failure) {
-				cleanup.run();
+				yorkie.discard();
 				throw failure;
 			}
-		});
-		new BoatBankRecoveryProbe(helper, yorkie, owner, false, false, seed, cleanup).start();
+		} catch (RuntimeException | Error failure) {
+			discardOwner(helper, owner);
+			throw failure;
+		}
+	}
+
+	private static void discardOwner(GameTestHelper helper, net.minecraft.server.level.ServerPlayer owner) {
+		if (helper.getLevel().getServer().getPlayerList().getPlayer(owner.getUUID()) == owner) {
+			helper.getLevel().getServer().getPlayerList().remove(owner);
+		}
+		owner.discard();
+	}
+
+	private static String observe(GameTestHelper helper, MushroomYorkieEntity yorkie, long seed, String stage) {
+		Vec3 origin = helper.absoluteVec(Vec3.ZERO);
+		BlockPos feet = yorkie.blockPosition();
+		BlockPos eyes = BlockPos.containing(yorkie.getX(), yorkie.getEyeY(), yorkie.getZ());
+		String observation = "stage=" + stage + ", seed=" + seed + ", world=" + yorkie.level().getGameTime()
+				+ ", entityTicks=" + yorkie.tickCount + ", wet=" + yorkie.isInWater() + ", underwater=" + yorkie.isUnderWater()
+				+ ", position=" + yorkie.position().subtract(origin) + ", eyeY=" + (yorkie.getEyeY() - origin.y)
+				+ ", velocity=" + yorkie.getDeltaMovement() + ", health=" + yorkie.getHealth() + ", air=" + yorkie.getAirSupply()
+				+ ", onGround=" + yorkie.onGround() + ", noGravity=" + yorkie.isNoGravity()
+				+ ", feetWater=" + yorkie.level().getFluidState(feet).is(FluidTags.WATER)
+				+ ", eyeWater=" + yorkie.level().getFluidState(eyes).is(FluidTags.WATER)
+				+ ", escape=" + yorkie.waterEscape.active();
+		MushroomTheYorkie.LOGGER.info("Native surface setup: {}", observation);
+		return observation;
 	}
 }
