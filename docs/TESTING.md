@@ -116,6 +116,18 @@ observer rejects gaps in both world time and entity tick count, including its
 first sample. Placement and initial deck observations record native ticks,
 relative body/eye position, velocity, health/air, water flags and escape state.
 This changes fixture observation timing; ordinary AI and physics remain active.
+The clear under-deck following case also rejects escape activity at every sample,
+not only at the start. Its brief native submergence occurs while it keeps making
+progress; this expectation does not prohibit the separate trapped-boat escape.
+Set `MUSHROOM_SURFACE_TRACE=1` with a native GameTest run to log structured
+post-tick samples throughout this fixture; any present value enables tracing. Each row records precise seed/clock
+strings, position/velocity, wet/eye flags, escape, passenger/flight inputs and
+health/air. These read-only observations do not invoke or pin the controller.
+An unexpected escape also logs the last 25 samples even with full tracing off.
+Water/underwater flags and air describe the input retained from before native
+movement. Position, velocity, grounded state, fall distance and eye-block contents
+describe the result of movement. An eye block
+containing water alone does not prove the eye is below the fluid surface.
 
 Water movement fixtures record each entity's RNG seed. Use
 `MUSHROOM_GAME_TEST_SEED=42 ./gradlew :mushroom-the-yorkie:runGameTestServer`

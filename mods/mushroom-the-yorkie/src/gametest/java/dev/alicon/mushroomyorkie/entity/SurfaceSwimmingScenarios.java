@@ -1,6 +1,9 @@
 package dev.alicon.mushroomyorkie.entity;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import dev.alicon.mushroomyorkie.MushroomTheYorkie;
+import java.util.ArrayDeque;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -28,6 +31,7 @@ final class SurfaceSwimmingScenarios {
 				yorkie.setPos(helper.absoluteVec(new Vec3(3.5D, 3.8D, 3.5D)));
 				yorkie.claimFor(owner);
 				observe(helper, yorkie, seed, "placed");
+				var recentSamples = new ArrayDeque<JsonObject>();
 				Runnable cleanup = () -> {
 					yorkie.discard();
 					discardOwner(helper, owner);
@@ -35,10 +39,25 @@ final class SurfaceSwimmingScenarios {
 				// The independent one-tick callback was observed at native tick4.
 				// The recurring probe adds tasks while Minecraft walks its runnable
 				// map; keep the precondition inside the same first native sample.
-				new BoatBankRecoveryProbe(helper, yorkie, owner, false, false, seed, cleanup, () -> {
-					String observation = observe(helper, yorkie, seed, "first-recovery-sample");
-					helper.assertTrue(yorkie.isInWater() && !yorkie.isUnderWater(), "Deck control must have a wet body and breathing eyes: " + observation);
-					helper.assertTrue(!yorkie.waterEscape.active(), "Breathing surface swimmer was diverted into obstruction escape: " + observation);
+				new BoatBankRecoveryProbe(helper, yorkie, owner, false, false, seed, cleanup, sample -> {
+					JsonObject frame = SurfaceSwimmingTrace.frame(helper, yorkie, seed, sample);
+					recentSamples.addLast(frame);
+					if (recentSamples.size() > 25) recentSamples.removeFirst();
+					if (System.getenv("MUSHROOM_SURFACE_TRACE") != null) {
+						MushroomTheYorkie.LOGGER.info("Native surface sample: {}", frame);
+					}
+					if (sample == 1) {
+						String observation = observe(helper, yorkie, seed, "first-recovery-sample");
+						helper.assertTrue(yorkie.isInWater() && !yorkie.isUnderWater(), "Deck control must have a wet body and breathing eyes: " + observation);
+					}
+					// This clear route keeps making progress, including its brief
+					// submergence. Low headroom alone must never take over following.
+					if (yorkie.waterEscape.active()) {
+						JsonArray history = new JsonArray();
+						recentSamples.forEach(history::add);
+						MushroomTheYorkie.LOGGER.error("Native surface recent samples: {}", history);
+						helper.assertTrue(false, "Unobstructed deck following entered escape: " + observe(helper, yorkie, seed, "unexpected-escape-" + sample));
+					}
 				}).start();
 			} catch (RuntimeException | Error failure) {
 				yorkie.discard();
