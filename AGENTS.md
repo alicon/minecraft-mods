@@ -42,3 +42,12 @@ save failure evidence, and distinguish setup failures from behavior assertions.
 Run the relevant automated tests and repository checks. Record any unrun checks.
 Java changes require rebuilding, installing the jars, and restarting Minecraft;
 a passing old client does not validate new code.
+
+## Gradle run isolation
+
+Serialize Gradle invocations in one worktree, including different Minecraft
+targets. Versioned build directories do not isolate task history or Loom's
+generated launch configuration. Competing runs can lose runtime classes and
+fail with class-loading errors. Use separate worktrees with independent project
+caches when parallel builds are needed. Preserve such failures as harness
+evidence and verify a serialized run before calling them gameplay regressions.

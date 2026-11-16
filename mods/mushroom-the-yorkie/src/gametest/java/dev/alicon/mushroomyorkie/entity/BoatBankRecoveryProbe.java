@@ -18,6 +18,9 @@ final class BoatBankRecoveryProbe {
 	private final boolean expectFlightHandoff;
 	private final long seed;
 	private final Runnable cleanup;
+	private final Runnable firstObservation;
+	private long previousWorldTick;
+	private int previousEntityTick;
 	private Vec3 lastPosition;
 	private int ticks;
 	private int minimumAir;
@@ -31,6 +34,11 @@ final class BoatBankRecoveryProbe {
 
 	BoatBankRecoveryProbe(GameTestHelper helper, MushroomYorkieEntity yorkie, LivingEntity owner,
 			boolean boatPresent, boolean expectFlightHandoff, long seed, Runnable cleanup) {
+		this(helper, yorkie, owner, boatPresent, expectFlightHandoff, seed, cleanup, () -> {});
+	}
+
+	BoatBankRecoveryProbe(GameTestHelper helper, MushroomYorkieEntity yorkie, LivingEntity owner,
+			boolean boatPresent, boolean expectFlightHandoff, long seed, Runnable cleanup, Runnable firstObservation) {
 		this.helper = helper;
 		this.yorkie = yorkie;
 		this.owner = owner;
@@ -38,10 +46,15 @@ final class BoatBankRecoveryProbe {
 		this.expectFlightHandoff = expectFlightHandoff;
 		this.seed = seed;
 		this.cleanup = cleanup;
+		this.firstObservation = firstObservation;
+		this.previousWorldTick = yorkie.level().getGameTime();
+		this.previousEntityTick = yorkie.tickCount;
 		this.lastPosition = yorkie.position();
 		this.minimumAir = yorkie.getAirSupply();
 	}
 
+	// Keep one scheduled callback for this fixture: adding independent delayed
+	// tasks can postpone native observations. The tick checks reject such gaps.
 	void start() {
 		this.helper.runAfterDelay(1, this::tick);
 	}
@@ -59,6 +72,11 @@ final class BoatBankRecoveryProbe {
 		this.reenteredWater |= this.firstRecoveryTick >= 0 && this.yorkie.isInWater();
 		this.settledTicks = recovered ? this.settledTicks + 1 : 0;
 		try {
+			this.helper.assertTrue(this.yorkie.level().getGameTime() == this.previousWorldTick + 1
+					&& this.yorkie.tickCount == this.previousEntityTick + 1, "Recovery observation skipped native ticks: " + this.summary());
+			this.previousWorldTick = this.yorkie.level().getGameTime();
+			this.previousEntityTick = this.yorkie.tickCount;
+			if (this.ticks == 1) this.firstObservation.run();
 			this.helper.assertTrue(this.yorkie.getHealth() == this.yorkie.getMaxHealth() && this.minimumAir > 0,
 					"Recovery lost health or exhausted air: " + this.summary());
 			this.helper.assertTrue(this.largestStep < 1.0D, "Recovery moved discontinuously: " + this.summary());
@@ -90,6 +108,8 @@ final class BoatBankRecoveryProbe {
 
 	private String summary() {
 		return "seed=" + this.seed + ", ticks=" + this.ticks + ", firstRecovery=" + this.firstRecoveryTick
+				+ ", entityTick=" + this.yorkie.tickCount + ", previousEntityTick=" + this.previousEntityTick
+				+ ", worldTick=" + this.yorkie.level().getGameTime() + ", previousWorldTick=" + this.previousWorldTick
 				+ ", reenteredWater=" + this.reenteredWater + ", settled=" + this.settledTicks
 				+ ", boat=" + this.boatPresent + ", minAir=" + this.minimumAir
 				+ ", maxStep=" + this.largestStep + ", escape=" + this.sawEscape + ", flightHandoff=" + this.sawFlightHandoff

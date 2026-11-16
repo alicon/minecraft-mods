@@ -109,6 +109,14 @@ dismount controls also seed old movement/steering and require owner help to clea
 it for boats, chest boats and carts. Live dock sequences separately check the
 complete landing and settling behavior.
 
+The deck's initial wet-body/breathing-eyes assertion runs inside the recovery
+observer's first sample. An independent delayed callback could run several
+native ticks late and sample a normal dry bob instead. The shared bank/deck
+observer rejects gaps in both world time and entity tick count, including its
+first sample. Placement and initial deck observations record native ticks,
+relative body/eye position, velocity, health/air, water flags and escape state.
+This changes fixture observation timing; ordinary AI and physics remain active.
+
 Water movement fixtures record each entity's RNG seed. Use
 `MUSHROOM_GAME_TEST_SEED=42 ./gradlew :mushroom-the-yorkie:runGameTestServer`
 to replay that RNG stream. This does not pin the complete world or structure
