@@ -56,7 +56,6 @@ class KnockbackObservation {
   assertRecovery() {
     this.assertReaction();
     if (this.perched) assert(this.fallObserved && this.largestFallDistance >= 3, 'Perched hit never accumulated ordinary native fall distance');
-    if (this.perched) assert(this.fallObserved && this.largestFallDistance >= 3, 'Perched hit never accumulated ordinary native fall distance');
   }
 }
 
