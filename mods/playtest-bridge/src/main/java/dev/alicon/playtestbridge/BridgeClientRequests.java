@@ -3,7 +3,9 @@ package dev.alicon.playtestbridge;
 import com.google.gson.JsonObject;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
+import net.minecraft.server.MinecraftServer;
 
 /** Client requests stay separate from world mutations and validate before dispatch. */
 final class BridgeClientRequests {
@@ -31,17 +33,36 @@ final class BridgeClientRequests {
 		return BridgeClientHooks.requestQuit(expectedSave).get(10, TimeUnit.SECONDS);
 	}
 
-	static JsonObject input(JsonObject state, JsonObject body) throws Exception {
+	static JsonObject input(MinecraftServer server, JsonObject state, JsonObject body) throws Exception {
 		BridgeInputRequest request = BridgeInputRequest.parse(state, body);
+		BridgeNativeInputTrace.arm(server, request);
 		var future = BridgeClientHooks.input(request);
 		try {
 			JsonObject response = future.get(5, TimeUnit.SECONDS);
 			response.add("serverSnapshot", state);
+			long started = Long.parseLong(response.get("startedMillis").getAsString());
+			try {
+				response.add("serverInputTrace", awaitInputTrace(server.submit(() -> BridgeNativeInputTrace.snapshot(server, request, started)), 5000));
+			} catch (RuntimeException observerUnavailable) {
+				response.add("serverInputTrace", unavailableInputTrace());
+			}
 			return response;
 		} catch (Exception failure) {
 			future.cancel(false);
 			throw failure;
 		}
+	}
+
+	static JsonObject awaitInputTrace(CompletableFuture<JsonObject> trace, long timeoutMillis) {
+		try { return trace.get(timeoutMillis, TimeUnit.MILLISECONDS); }
+		catch (Exception observerUnavailable) { trace.cancel(false);return unavailableInputTrace(); }
+	}
+
+	private static JsonObject unavailableInputTrace() {
+		JsonObject result = new JsonObject();result.addProperty("status", "unavailable");
+		result.addProperty("coverageComplete", false);result.addProperty("observationFailed", true);
+		result.addProperty("scopeMatches", false);result.add("events", new com.google.gson.JsonArray());
+		return result;
 	}
 
 	// The route invokes this supplier on the server thread; both threads share nanoTime.

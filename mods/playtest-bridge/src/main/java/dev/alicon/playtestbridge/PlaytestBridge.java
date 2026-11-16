@@ -26,6 +26,7 @@ public final class PlaytestBridge implements ModInitializer {
 			bridgeServer.start();
 		});
 		ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+			BridgeNativeInputTrace.clear(server);
 			if (bridgeServer != null) {
 				bridgeServer.stop();
 				bridgeServer = null;

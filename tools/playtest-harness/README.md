@@ -506,6 +506,41 @@ Only the most recent receipt is retained. Poll until `phase=complete`, then
 require `outcome=completed` and `controlsReleased=true`. Receipts include bounded
 client frames and a server snapshot taken before dispatch of that request.
 The CLI takes a separate final server snapshot for movement verification.
+New receipts also retain `serverInputTrace`: ordered native `input_packet`,
+`ride_tick_start` and `ride_tick_end` observations for the original owner. Packet
+events run after the real server handler; riding events bracket native player
+riding logic. They record the packet flags, actual server Shift flag, original
+vehicle, world clock and server/player ticks. No hook changes those values.
+This can distinguish a handled held/released pair before a riding tick from a
+held flag actually seen by the native riding logic.
+This is handler order, not network arrival order. The required Minecraft 1.21.11
+mixin targets must be verified after a rebuild/restart; an incompatible target
+fails startup rather than silently omitting a hook.
+
+The observer arms only after a validated copied-world input request, retains at
+most 1024 events, and stops recording after 30 seconds without another validated
+input request. Server shutdown clears its context. `coverageComplete` is false
+when the requested interval predates its scope, expires, loses events to overflow
+or encounters an observation error; missing events then cannot establish absence.
+If the diagnostic snapshot fails or times out, its status is `unavailable` with
+incomplete coverage; the original input receipt is still returned.
+Sequence numbers preserve order when monotonic millisecond timestamps are equal.
+Unlike `serverSnapshot`, which is taken before request dispatch, this trace is
+copied on the server thread after the client receipt returns, so a snapshot cannot
+split a native hook's read and append. Coverage ends at that snapshot boundary,
+identified by `throughSequence` and `captureMillis`; a later event can have the
+same millisecond and a larger sequence. The final release packet may still be in
+the server queue; a later status poll can observe it. Native dismount clears the
+server Shift flag, so `ride_tick_end` can show false while `lastClientInput.shift`
+still shows the earlier held input. Events may extend beyond `finishedMillis`;
+the packet itself has no bridge operation ID, so timing alone does not prove
+ownership. Existing movement and release acceptance checks remain required.
+
+`firstApplyAttemptMillis` and `releaseRequestedMillis` describe native key-mapping
+attempt/release timing separately from the later neutral keyboard sample. A
+mapping can be released before cached native input is refreshed. These times do
+not replace fresh release proof. Passive observation can still affect scheduling;
+a passing instrumented retry does not explain an earlier failure.
 `/state` also exposes `worldFrozen` and exact string `overworldGameTime`; client
 frame time is a distinct observation. The shared `driveClientInput` helper
 requires its caller to hold the bridge lock and attempts cancellation on failure,

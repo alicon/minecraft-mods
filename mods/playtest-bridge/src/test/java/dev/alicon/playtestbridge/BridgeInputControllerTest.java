@@ -10,6 +10,27 @@ import org.junit.jupiter.api.Test;
 
 class BridgeInputControllerTest {
 	@Test
+	void releaseRequestTimeIsSeparateFromTheLaterNeutralSample() {
+		Fixture fixture = new Fixture();fixture.start(2);
+		fixture.now = 20;fixture.controller.startTick();fixture.controller.endTick();
+		fixture.now = 25;fixture.controller.startTick();fixture.controller.endTick();
+		assertEquals("20", fixture.status().get("firstApplyAttemptMillis").getAsString());
+		assertEquals("25", fixture.status().get("releaseRequestedMillis").getAsString());
+		assertEquals("releasing", fixture.status().get("phase").getAsString());
+		fixture.now = 100;fixture.controller.startTick();fixture.controller.endTick();
+		assertEquals("100", fixture.status().get("finishedMillis").getAsString());
+		assertEquals("25", fixture.status().get("releaseRequestedMillis").getAsString());
+	}
+
+	@Test
+	void cancellationBeforeAnyApplyHasAReleaseTimeAndNoApplyAttempt() {
+		Fixture fixture = new Fixture();fixture.start(2);fixture.now = 10;
+		fixture.controller.cancel(fixture.id, "cancelled");fixture.tick();
+		assertFalse(fixture.status().has("firstApplyAttemptMillis"));
+		assertEquals("10", fixture.status().get("releaseRequestedMillis").getAsString());
+	}
+
+	@Test
 	void identicalJumpRetryReturnsTheBoundReceiptAfterTheOwnerBecomesAirborne() {
 		Fixture fixture = new Fixture();var body = BridgeInputRequestTest.jumpBody();
 		fixture.id = fixture.controller.request(BridgeInputRequest.parse(BridgeInputRequestTest.jumpState(), body)).get("operationId").getAsString();

@@ -42,6 +42,18 @@ when available. An earlier input operation with unconfirmed release blocks
 recovery until a normal client restart; mapped movement controls must also be
 released. This command does not clear keys on the user's behalf.
 
+Native input receipts include a bounded read-only `serverInputTrace` of actual
+input-packet handling and player riding ticks. For short-exit investigations,
+use ordered packet and riding events rather than assuming a polled Shift flag
+captures every held state. Require `coverageComplete` before drawing conclusions
+from absent events; overflow, expired scope and observer errors are explicit.
+The 1024-event journal stops after 30 seconds without a validated input request.
+Its post-dispatch capture differs from the receipt's pre-dispatch server snapshot;
+packet events have no bridge operation ID. Apply/release-request timestamps also
+differ from the eventual fresh neutral-input sample. These observations supplement
+the existing movement/release proof and do not change native key durations or
+gameplay. Their scheduling overhead can affect a timing-sensitive reproduction.
+
 Run all verification:
 
 ```shell
