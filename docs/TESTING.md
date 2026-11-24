@@ -419,7 +419,11 @@ not gameplay evidence; its failure cannot turn a case failure into a pass. Faile
 or interrupted runs never receive this care.
 
 The standalone `yorkie-smoke` also requires the exact copied save and a single local
-Overworld player. It checkpoints original steps and, only after success, feeds/heals
+Overworld player. Each summon uses fixed arena coordinates, checks the grass support
+and air at that cell, then observes the new Yorkie's UUID, health and native ground
+contact before interacting. Starting with a steep camera angle must produce the same
+supported placement. A missing floor or misplaced spawn is a setup failure and retains
+its observations. The smoke checkpoints original steps and, only after success, feeds/heals
 the same tagged live pet for inspection. Raw observations stay unchanged; maintenance
 has a separate verdict and preserves UUID, harness, leash, vehicle and native possessions.
 Missing/dead/unverified fixtures and failed/interrupted runs are never repaired by care.

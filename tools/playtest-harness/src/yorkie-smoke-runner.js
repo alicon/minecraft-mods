@@ -8,6 +8,49 @@ const { checkCommandParsed } = require('./command-result');
 const TYPE = 'mushroom_yorkie:mushroom_yorkie';
 const SMOKE_TAG = 'runtime_smoke_yorkie';
 
+// Use the arena's axes so the owner can start the smoke from any camera angle.
+async function stageSmokeYorkie({ base, radius }, { type, distance, inspectionPet = false }, { state, blockAt, command }) {
+  const position = { x: base.x + 0.5, y: base.y, z: base.z + distance + 0.5 };
+  const feet = { x: Math.floor(position.x), y: position.y, z: Math.floor(position.z) };
+  const evidence = { position };
+  try {
+    assert(Number.isInteger(distance) && distance > 0 && distance <= radius, 'Smoke spawn is outside the arena');
+    assert.match(type, /^[a-z0-9_.-]+:[a-z0-9_./-]+$/);
+    evidence.floor = await blockAt({ ...feet, y: feet.y - 1 });
+    evidence.feet = await blockAt(feet);
+    assert.equal(evidence.floor.block, 'minecraft:grass_block', 'Smoke spawn floor is missing');
+    assert.equal(evidence.feet.block, 'minecraft:air', 'Smoke spawn is blocked');
+    const candidates = snapshot => snapshot.players[0].nearbyEntities.filter(entity => entity.type === type);
+    const previous = new Set(candidates(await state()).map(entity => entity.uuid));
+    const tag = inspectionPet ? ` {Tags:["${SMOKE_TAG}"]}` : '';
+    evidence.summon = await command(`summon ${type} ${position.x} ${position.y} ${position.z}${tag}`);
+    assert.equal(evidence.summon.success, true, 'Minecraft rejected the smoke summon');
+    const deadline = Date.now() + 2000;
+    do {
+      const spawned = candidates(await state()).filter(entity => !previous.has(entity.uuid));
+      assert(spawned.length <= 1, 'Smoke summon produced ambiguous entity identity');
+      if (spawned.length === 1) {
+        const [pet] = spawned;
+        assert(pet.uuid && (!evidence.pet || evidence.pet.uuid === pet.uuid), 'Smoke spawn changed identity');
+        evidence.pet = pet;
+        assert(pet.health > 0 && pet.health === pet.maxHealth, 'Smoke spawn is injured or has no health observation');
+        assert(Math.abs(pet.position.y - position.y) <= 0.01
+          && Math.floor(pet.position.x) === feet.x && Math.floor(pet.position.z) === feet.z,
+        'Smoke summon left its planned floor cell before setup completed');
+        if (pet.onGround === true && pet.inWater === false && pet.noGravity === false && !pet.vehicle) {
+          return { ...pet, spawnSupport: { position, floor: evidence.floor, feet: evidence.feet } };
+        }
+      }
+      await new Promise(resolve => setTimeout(resolve, 50));
+    } while (Date.now() < deadline);
+    throw new Error('Smoke summon never showed native ground contact');
+  } catch (error) {
+    error.phase = 'setup';
+    error.observed = evidence;
+    throw error;
+  }
+}
+
 // One legacy smoke remains a single scenario; its original step observations are checkpointed during the run.
 async function runSmokeWithCare({ runSmoke, state, request, expectedSave, reportFile, metadata = {} }) {
   const initial = await state();
@@ -62,4 +105,4 @@ async function runRuntimeSmoke(baseUrl, args, runSmoke) {
   });
 }
 
-module.exports = { runSmokeWithCare, runRuntimeSmoke };
+module.exports = { runSmokeWithCare, runRuntimeSmoke, stageSmokeYorkie };

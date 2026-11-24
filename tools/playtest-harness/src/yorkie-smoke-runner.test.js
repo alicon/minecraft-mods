@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { runSmokeWithCare } = require('./yorkie-smoke-runner');
+const { runSmokeWithCare, stageSmokeYorkie } = require('./yorkie-smoke-runner');
 const UUID = '00000000-0000-4000-8000-000000000050';
 
 function fixture(options = {}) {
@@ -95,4 +95,51 @@ test('missing original runtime UUID fails care without selecting a replacement',
   const r = await runSmokeWithCare(f.context);
   assert.equal(r.gameplayOk, true); assert.equal(r.ok, false); assert.equal(r.postRun.status, 'failed');
   assert.equal(f.commands.length, 0);
+});
+
+test('steep player pitch cannot shift the smoke spawn below its audited floor', async () => {
+  const type = 'mushroom_yorkie:mushroom_yorkie';
+  const arena = { base: { x: -66, y: 236, z: 122 }, radius: 6 };
+  const position = { x: -65.5, y: 236, z: 125.5 };
+  const original = { type, uuid: 'previous-yorkie' };
+  const pet = { type, uuid: UUID, position, health: 12, maxHealth: 12, inWater: false, noGravity: false };
+  const snapshots = [[original], [original, { ...pet, onGround: false }], [original, { ...pet, onGround: true }]];
+  const reads = [];
+  const commands = [];
+  const result = await stageSmokeYorkie(arena, { type, distance: 3, inspectionPet: true }, {
+    state: async () => ({ players: [{ rotation: [-90, 54.46], nearbyEntities: snapshots.shift() }] }),
+    blockAt: async pos => {
+      reads.push(pos);
+      return { block: pos.y === 235 ? 'minecraft:grass_block' : 'minecraft:air' };
+    },
+    command: async command => { commands.push(command); return { success: true }; }
+  });
+  assert.deepEqual(reads, [{ x: -66, y: 235, z: 125 }, { x: -66, y: 236, z: 125 }]);
+  assert.deepEqual(commands, ['summon mushroom_yorkie:mushroom_yorkie -65.5 236 125.5 {Tags:["runtime_smoke_yorkie"]}']);
+  assert.equal(result.uuid, UUID);
+  assert.equal(result.onGround, true);
+  assert.deepEqual(result.spawnSupport.position, position);
+});
+
+test('unsafe smoke spawn is a setup failure with useful evidence', async () => {
+  const type = 'mushroom_yorkie:mushroom_yorkie';
+  const arena = { base: { x: 0, y: 236, z: 0 }, radius: 6 };
+  for (const badFloor of [true, false]) {
+    let summoned = false;
+    const context = {
+      state: async () => ({ players: [{ nearbyEntities: summoned ? [{
+        type, uuid: UUID, health: 12, maxHealth: 12, position: { x: 0.5, y: 233.84, z: 3.5 }
+      }] : [] }] }),
+      blockAt: async pos => ({ block: pos.y === 235 && !badFloor ? 'minecraft:grass_block' : 'minecraft:air' }),
+      command: async () => { summoned = true; return { success: true }; }
+    };
+    await assert.rejects(stageSmokeYorkie(arena, { type, distance: 3 }, context), error => {
+      assert.equal(error.phase, 'setup');
+      assert.match(error.message, badFloor ? /floor is missing/ : /left its planned floor cell/);
+      assert.equal(error.observed.position.y, 236);
+      if (!badFloor) assert.equal(error.observed.pet.position.y, 233.84);
+      return true;
+    });
+    assert.equal(summoned, !badFloor);
+  }
 });
