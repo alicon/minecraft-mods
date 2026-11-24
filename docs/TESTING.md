@@ -276,6 +276,11 @@ type in reproduction reports rather than converting to JavaScript numbers.
 
 Screenshots close the active client screen before capture by default; set `BRIDGE_SCREENSHOT_RESUME=0` to keep the current screen visible. Set `BRIDGE_SCREENSHOT_HIDE_GUI=1` and `BRIDGE_SCREENSHOT_CLEAR_CHAT=1` for clean visual inspection captures.
 
+For keyboard-driven dev audits, launch the client with the rebuilt bridge and the
+client JVM argument `-Dplaytest.bridge.keepCursorFree=true`. This keeps the OS
+pointer free at world load and when resuming from a screen. The screenshot receipt
+reports `cursorFree` from GLFW. Use this mode for automated keyboard tests.
+
 Launch Modrinth directly into an existing save:
 
 ```shell

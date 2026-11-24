@@ -9,6 +9,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.world.level.storage.LevelResource;
+import org.lwjgl.glfw.GLFW;
 
 /** Client entrypoint that exposes local screenshot capture to the playtest bridge. */
 public final class PlaytestBridgeClient implements ClientModInitializer {
@@ -81,6 +82,7 @@ public final class PlaytestBridgeClient implements ClientModInitializer {
 		try {
 			String fileName = screenshotName(name);
 			File screenshot = new File(new File(client.gameDirectory, Screenshot.SCREENSHOT_DIR), fileName);
+			boolean cursorFree = GLFW.glfwGetInputMode(client.getWindow().handle(), GLFW.GLFW_CURSOR) == GLFW.GLFW_CURSOR_NORMAL;
 			Screenshot.grab(client.gameDirectory, fileName, client.getMainRenderTarget(), 1, message -> {
 				if (hideGui) {
 					client.options.hideGui = previousHideGui;
@@ -90,6 +92,7 @@ public final class PlaytestBridgeClient implements ClientModInitializer {
 				response.addProperty("file", screenshot.getAbsolutePath());
 				response.addProperty("message", message.getString());
 				response.addProperty("resumed", resumed);
+				response.addProperty("cursorFree", cursorFree);
 				response.addProperty("hideGui", hideGui);
 				response.addProperty("clearChat", clearChat);
 				future.complete(response);
