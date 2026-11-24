@@ -13,7 +13,8 @@ Mushroom the Yorkie adds one small, loyal dog companion to your Minecraft world.
 - Craft copper dog bowls, fill them with food or water, and watch Mushroom use one serving per Minecraft day.
 - Mushroom has a simple food bar shown during owner interactions; it drains while following and much more slowly while sitting.
 - If a loaded Mushroom is lost from his owner for a full Minecraft day, the next successful sleep can bring him back to the player's bed.
-- Craft a dog bed from wool and dye so Mushroom has a place to curl up at night.
+- Craft a dog bed from wool and dye, or give Mushroom a doghouse for sheltered rest.
+- Woodland squirrels spawn naturally and look for trees to climb. Mushroom can chase them and come back afterward; squirrels also have their own spawn egg.
 - Craft wool-and-dye toys, including a ball and chew toy you can right-click throw for Mushroom to fetch. Dropped toys and vanilla bones also work, including safe open-water fetches.
 - Mushroom barks when he needs to go outside after being indoors too long, then only resets that potty need once per Minecraft day.
 - At night indoors in a natural day/night dimension, Mushroom curls up to sleep with closed eyes; he stays awake in the Nether.

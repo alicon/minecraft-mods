@@ -1,5 +1,6 @@
 package dev.alicon.mushroomyorkie.entity;
 
+import dev.alicon.mushroomyorkie.MushroomTheYorkie;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -58,7 +59,18 @@ final class BoatBankEscapeScenarios {
 		};
 		boolean scheduled = false;
 		try {
-			new BoatBankRecoveryProbe(helper, yorkie, owner, boat != null, mode == OwnerMode.FAR_CREATIVE, seed, cleanup).start();
+			BoatBankRecoveryProbe probe = new BoatBankRecoveryProbe(helper, yorkie, owner, boat != null, mode == OwnerMode.FAR_CREATIVE, seed, cleanup);
+			if (mode == OwnerMode.CLOSE_CREATIVE) {
+				// Preserve the close-owner escape challenge. Only after actual bank
+				// arrival does the owner step clear, so normal tick200 reboarding
+				// cannot replace the separate recovery/settling observation.
+				probe.afterFirstRecovery(() -> {
+					MushroomTheYorkie.LOGGER.info("Native close-owner recovery complete before owner step: seed={}, entityTick={}, wet={}, grounded={}, noGravity={}, air={}, position={}",
+							seed, yorkie.tickCount, yorkie.isInWater(), yorkie.onGround(), yorkie.isNoGravity(), yorkie.getAirSupply(), yorkie.position());
+					owner.setPos(helper.absoluteVec(new Vec3(10.5D, 4.0D, 3.5D)));
+				});
+			}
+			probe.start();
 			scheduled = true;
 		} finally {
 			if (!scheduled) {
