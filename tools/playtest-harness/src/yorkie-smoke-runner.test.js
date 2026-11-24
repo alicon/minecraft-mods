@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { runSmokeWithCare, stageSmokeYorkie } = require('./yorkie-smoke-runner');
+const { runSmokeWithCare, stageSmokeShelter, stageSmokeYorkie } = require('./yorkie-smoke-runner');
 const UUID = '00000000-0000-4000-8000-000000000050';
 
 function fixture(options = {}) {
@@ -142,4 +142,59 @@ test('unsafe smoke spawn is a setup failure with useful evidence', async () => {
     });
     assert.equal(summoned, !badFloor);
   }
+});
+
+test('smoke shelter waits for the original Yorkie to land and anchors walls to the native roof cell', async () => {
+  const arena = { base: { x: -63, y: 268, z: 125 }, radius: 6 };
+  const settled = {
+    uuid: UUID, health: 12, maxHealth: 12, onGround: true,
+    position: { x: -62, y: 268, z: 127.89 }, velocity: { x: 0, z: 0 },
+    tameable: { ownedByPlayer: true, orderedToSit: true, sittingPose: true }
+  };
+  const airborne = { ...settled, onGround: false, position: { x: -62.22, y: 268.1, z: 128.32 } };
+  const observations = [['10', airborne], ['11', settled], ['11', settled], ['12', settled], ['13', settled], ['14', settled]];
+  const walls = [];
+  const placements = await stageSmokeShelter(arena, UUID, {
+    state: async () => {
+      const [overworldGameTime, pet] = observations.shift();
+      return { overworldGameTime, players: [{ position: { x: -62.5, z: 125.5 }, nearbyEntities: [pet] }] };
+    },
+    setBlockNearYorkie: async request => {
+      assert.equal(observations.length, 2);
+      assert.deepEqual(request, { dx: 0, dy: 3, dz: 0, block: 'minecraft:oak_planks', replace: 'minecraft:air' });
+      return { changed: true, position: { x: -63, y: 271, z: 127 }, target: settled };
+    },
+    setAbsoluteBlock: async (position, block, replace) => {
+      assert.equal(block, 'minecraft:oak_planks');
+      assert.equal(replace, 'minecraft:air');
+      walls.push(position);
+      return { changed: true, position };
+    }
+  });
+  assert.equal(placements.length, 10);
+  assert.deepEqual(walls.filter(position => position.y === 268), [
+    { x: -61, y: 268, z: 127 }, { x: -65, y: 268, z: 127 },
+    { x: -63, y: 268, z: 129 }
+  ]);
+});
+
+test('a shelter blocked at placement is a setup failure with the attempted block recorded', async () => {
+  const arena = { base: { x: 0, y: 268, z: 0 }, radius: 6 };
+  const pet = {
+    uuid: UUID, health: 12, maxHealth: 12, onGround: true,
+    position: { x: 0.5, y: 268, z: 3.5 }, velocity: { x: 0, z: 0 },
+    tameable: { ownedByPlayer: true, orderedToSit: true, sittingPose: true }
+  };
+  const roof = { changed: false, position: { x: 0, y: 271, z: 3 }, previousBlock: 'minecraft:stone', target: pet };
+  let tick = 0;
+  await assert.rejects(stageSmokeShelter(arena, UUID, {
+    state: async () => ({ overworldGameTime: String(++tick), players: [{ nearbyEntities: [pet] }] }),
+    setBlockNearYorkie: async () => roof,
+    setAbsoluteBlock: async () => assert.fail('walls should not be placed')
+  }), error => {
+    assert.equal(error.phase, 'setup');
+    assert.match(error.message, /roof was blocked/);
+    assert.deepEqual(error.observed.placements, [roof]);
+    return true;
+  });
 });

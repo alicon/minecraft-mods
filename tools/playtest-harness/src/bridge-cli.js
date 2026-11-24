@@ -331,34 +331,6 @@ async function runYorkieSmoke(baseUrl, args, { beforeStep, onStep }) {
     return { base, radius, clear, floor, floorBlock };
   }
 
-  const shelterOffsets = [
-    { dx: 0, dy: 3, dz: 0 },
-    { dx: 2, dy: 0, dz: 0 },
-    { dx: 2, dy: 1, dz: 0 },
-    { dx: 2, dy: 2, dz: 0 },
-    { dx: -2, dy: 0, dz: 0 },
-    { dx: -2, dy: 1, dz: 0 },
-    { dx: -2, dy: 2, dz: 0 },
-    { dx: 0, dy: 0, dz: 2 },
-    { dx: 0, dy: 1, dz: 2 },
-    { dx: 0, dy: 2, dz: 2 },
-    { dx: 0, dy: 0, dz: -2 },
-    { dx: 0, dy: 1, dz: -2 },
-    { dx: 0, dy: 2, dz: -2 }
-  ];
-
-  async function setShelterBlocks(block, replace = '') {
-    const placements = [];
-    for (const offset of shelterOffsets) {
-      const body = { ...offset, block };
-      if (replace) {
-        body.replace = replace;
-      }
-      placements.push(await setBlockNearYorkie(body));
-    }
-    return placements;
-  }
-
   const playerName = singlePlayerName(await smokeRequest( '/state'));
   let placedShelterBlocks = [];
   const { arena } = await step('prepare world', async () => {
@@ -376,7 +348,7 @@ async function runYorkieSmoke(baseUrl, args, { beforeStep, onStep }) {
     return { arena, cleared, chat };
   });
 
-  const { stageSmokeYorkie } = require('./yorkie-smoke-runner');
+  const { stageSmokeShelter, stageSmokeYorkie } = require('./yorkie-smoke-runner');
   const summonOnFloor = (distance, inspectionPet = false) => stageSmokeYorkie(
     arena, { type: yorkieType, distance, inspectionPet }, {
       state: beforeStep,
@@ -481,14 +453,22 @@ async function runYorkieSmoke(baseUrl, args, { beforeStep, onStep }) {
 
   const sleeping = await step('sheltered night sleep', async () => {
     await command(`clear ${playerName}`);
-    placedShelterBlocks = await setShelterBlocks('minecraft:oak_planks');
-    await command('time set night');
-    return waitForEntityState(
-      baseUrl,
-      yorkieType,
-      (entity) => entity.custom && entity.custom.curledUpSleeping,
-      15000
-    );
+    placedShelterBlocks = await stageSmokeShelter(arena, spawned.uuid, {
+      state: beforeStep, setBlockNearYorkie, setAbsoluteBlock
+    });
+    try {
+      await command('time set night');
+      const pet = await waitForEntityState(
+        baseUrl,
+        yorkieType,
+        entity => entity.uuid === spawned.uuid && entity.custom?.curledUpSleeping,
+        15000
+      );
+      return { ...pet, shelter: placedShelterBlocks.map(({ position }) => position) };
+    } catch (error) {
+      error.observed = { placements: placedShelterBlocks };
+      throw error;
+    }
   });
   requireCondition(sleeping.custom.curledUpSleeping, 'Yorkie did not curl up sleeping under shelter at night');
 

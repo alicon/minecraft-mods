@@ -422,8 +422,11 @@ The standalone `yorkie-smoke` also requires the exact copied save and a single l
 Overworld player. Each summon uses fixed arena coordinates, checks the grass support
 and air at that cell, then observes the new Yorkie's UUID, health and native ground
 contact before interacting. Starting with a steep camera angle must produce the same
-supported placement. A missing floor or misplaced spawn is a setup failure and retains
-its observations. The smoke checkpoints original steps and, only after success, feeds/heals
+supported placement. For the night case, the runner waits for that same Yorkie to
+settle into a grounded sit. It places the roof above the pet's native block position
+and anchors every wall to that cell. Missing support, a misplaced spawn or a failed
+shelter placement is a setup failure that retains its observations.
+The smoke checkpoints original steps and, only after success, feeds/heals
 the same tagged live pet for inspection. Raw observations stay unchanged; maintenance
 has a separate verdict and preserves UUID, harness, leash, vehicle and native possessions.
 Missing/dead/unverified fixtures and failed/interrupted runs are never repaired by care.
