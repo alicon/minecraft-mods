@@ -249,7 +249,7 @@ async function runYorkieSmoke(baseUrl, args, { beforeStep, onStep }) {
       onStep(steps);
       return value;
     } catch (error) {
-      steps.push({ name, ok: false, error: error.message });
+      steps.push({ name, ok: false, error: error.message, observed: error.observed });
       onStep(steps);
       throw error;
     }
@@ -331,37 +331,9 @@ async function runYorkieSmoke(baseUrl, args, { beforeStep, onStep }) {
     return { base, radius, clear, floor, floorBlock };
   }
 
-  const shelterOffsets = [
-    { dx: 0, dy: 3, dz: 0 },
-    { dx: 2, dy: 0, dz: 0 },
-    { dx: 2, dy: 1, dz: 0 },
-    { dx: 2, dy: 2, dz: 0 },
-    { dx: -2, dy: 0, dz: 0 },
-    { dx: -2, dy: 1, dz: 0 },
-    { dx: -2, dy: 2, dz: 0 },
-    { dx: 0, dy: 0, dz: 2 },
-    { dx: 0, dy: 1, dz: 2 },
-    { dx: 0, dy: 2, dz: 2 },
-    { dx: 0, dy: 0, dz: -2 },
-    { dx: 0, dy: 1, dz: -2 },
-    { dx: 0, dy: 2, dz: -2 }
-  ];
-
-  async function setShelterBlocks(block, replace = '') {
-    const placements = [];
-    for (const offset of shelterOffsets) {
-      const body = { ...offset, block };
-      if (replace) {
-        body.replace = replace;
-      }
-      placements.push(await setBlockNearYorkie(body));
-    }
-    return placements;
-  }
-
   const playerName = singlePlayerName(await smokeRequest( '/state'));
   let placedShelterBlocks = [];
-  await step('prepare world', async () => {
+  const { arena } = await step('prepare world', async () => {
     await command('time set day');
     await command('weather clear');
     await command('gamerule minecraft:spawn_mobs false');
@@ -376,49 +348,39 @@ async function runYorkieSmoke(baseUrl, args, { beforeStep, onStep }) {
     return { arena, cleared, chat };
   });
 
+  const { stageSmokeShelter, stageSmokeYorkie } = require('./yorkie-smoke-runner');
+  const summonOnFloor = (distance, inspectionPet = false) => stageSmokeYorkie(
+    arena, { type: yorkieType, distance, inspectionPet }, {
+      state: beforeStep,
+      blockAt: position => smokeRequest('/block', 'POST', position),
+      command
+    });
+
   await step('duplicate claim guard', async () => {
-    const result = {};
-    try {
-      await command(`execute at ${playerName} run summon ${yorkieType} ^ ^ ^4`);
-      await waitForEntity(baseUrl, yorkieType);
-      const claimed = await useYorkie({
-        item: 'mushroom_yorkie:yorkie_treat',
-        count: 2
-      });
-      requireCondition(
-        claimed.target.tameable && claimed.target.tameable.tame,
-        'Initial Yorkie in duplicate-claim guard did not become tame'
-      );
-      await useYorkie({ emptyHand: true });
+    const first = await summonOnFloor(4);
+    const claimed = await useYorkie({ item: 'mushroom_yorkie:yorkie_treat', count: 2 });
+    requireCondition(claimed.target.uuid === first.uuid && claimed.target.tameable?.ownedByPlayer,
+      'Initial Yorkie in duplicate-claim guard did not become owned');
+    const seated = await useYorkie({ emptyHand: true });
+    requireCondition(seated.target.uuid === first.uuid && seated.target.tameable?.orderedToSit,
+      'Could not seat the original Yorkie for the duplicate-claim check');
 
-      await command(`execute at ${playerName} run summon ${yorkieType} ^ ^ ^1`);
-      await waitForEntityCount(baseUrl, yorkieType, 2);
-      const duplicate = await useYorkie({
-        item: 'mushroom_yorkie:yorkie_treat',
-        count: 2
-      });
-      requireCondition(
-        duplicate.target.tameable && !duplicate.target.tameable.tame,
-        'Second loaded Yorkie became tame despite one-Mushroom-per-player guard'
-      );
-      result.claimed = claimed.target;
-      result.duplicate = duplicate.target;
-      return result;
-    } finally {
-      result.cleared = await clearEntities(yorkieType);
-    }
+    const second = await summonOnFloor(1);
+    const duplicate = await useYorkie({ item: 'mushroom_yorkie:yorkie_treat', count: 2 });
+    requireCondition(duplicate.target.uuid === second.uuid && duplicate.target.tameable && !duplicate.target.tameable.tame,
+      'The second Yorkie did not stay untamed when offered a treat');
+    const cleared = await clearEntities(yorkieType);
+    return { first, second, claimed: claimed.target, duplicate: duplicate.target, cleared };
   });
 
-  await step('summon yorkie', async () => {
-    await command(`execute at ${playerName} run summon ${yorkieType} ^ ^ ^3 {Tags:["runtime_smoke_yorkie"]}`);
-    return waitForEntity(baseUrl, yorkieType);
-  });
+  const spawned = await step('summon yorkie', () => summonOnFloor(3, true));
 
   const tamed = await step('tame with treat', async () => useYorkie({
     item: 'mushroom_yorkie:yorkie_treat',
     count: 2
   }));
   requireCondition(tamed.target.tameable && tamed.target.tameable.tame, 'Yorkie did not become tame after treat interaction');
+  requireCondition(tamed.target.uuid === spawned.uuid, 'Treat interaction targeted a different Yorkie from the smoke spawn');
   requireCondition(tamed.target.tameable.ownedByPlayer, 'Yorkie is tame but not owned by the current player');
   requireCondition(tamed.target.custom && tamed.target.custom.needs, 'Yorkie treat interaction did not expose needs state');
   requireCondition(
@@ -491,14 +453,22 @@ async function runYorkieSmoke(baseUrl, args, { beforeStep, onStep }) {
 
   const sleeping = await step('sheltered night sleep', async () => {
     await command(`clear ${playerName}`);
-    placedShelterBlocks = await setShelterBlocks('minecraft:oak_planks');
-    await command('time set night');
-    return waitForEntityState(
-      baseUrl,
-      yorkieType,
-      (entity) => entity.custom && entity.custom.curledUpSleeping,
-      15000
-    );
+    placedShelterBlocks = await stageSmokeShelter(arena, spawned.uuid, {
+      state: beforeStep, setBlockNearYorkie, setAbsoluteBlock
+    });
+    try {
+      await command('time set night');
+      const pet = await waitForEntityState(
+        baseUrl,
+        yorkieType,
+        entity => entity.uuid === spawned.uuid && entity.custom?.curledUpSleeping,
+        15000
+      );
+      return { ...pet, shelter: placedShelterBlocks.map(({ position }) => position) };
+    } catch (error) {
+      error.observed = { placements: placedShelterBlocks };
+      throw error;
+    }
   });
   requireCondition(sleeping.custom.curledUpSleeping, 'Yorkie did not curl up sleeping under shelter at night');
 
