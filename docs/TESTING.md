@@ -161,6 +161,9 @@ and record the first dry tick and longest stable stretch. Both need 40 consecuti
 dry supported ticks within 120 native ticks, with the original healthy actors
 and normal collision. The official live shore cases still require stability
 through the end of their settling window after the full native walk.
+An additional control installs the one-node partial route beneath the dry slab
+observed in the live far-owner trace. The native follow goal must discard it and
+reach the owner with normal movement.
 
 The deck's initial wet-body/breathing-eyes assertion runs inside the recovery
 observer's first sample. An independent delayed callback could run several

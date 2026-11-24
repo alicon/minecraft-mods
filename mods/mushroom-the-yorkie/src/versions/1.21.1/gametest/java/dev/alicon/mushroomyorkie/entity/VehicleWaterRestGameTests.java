@@ -18,6 +18,12 @@ public final class VehicleWaterRestGameTests {
 		ShallowShoreScenarios.reachDrySupport(helper, EntityType.BOAT, false);
 	}
 
+	/** Following recovers from a one-node path below its dry slab. */
+	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 160)
+	public void shallowShoreRejectsStaleBelowSlabPath(GameTestHelper helper) {
+		ShallowShoreScenarios.recoverFromStalePath(helper, EntityType.BOAT);
+	}
+
 	/** A breathing idle input stays exempt even beyond the twenty-tick stall gate. */
 	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 200)
 	public void pinnedBreathingIdleDoesNotEscape(GameTestHelper helper) {

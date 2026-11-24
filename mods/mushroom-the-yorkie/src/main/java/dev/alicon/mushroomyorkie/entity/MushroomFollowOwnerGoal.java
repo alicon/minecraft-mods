@@ -1,6 +1,7 @@
 package dev.alicon.mushroomyorkie.entity;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.FollowOwnerGoal;
 
@@ -38,7 +39,49 @@ final class MushroomFollowOwnerGoal extends FollowOwnerGoal {
 		if (!owner.onGround() || owner.isInWater() || owner.isPassenger()) {
 			return false;
 		}
-		BlockPos belowFeet = BlockPos.containing(owner.getX(), owner.getY() - 0.05D, owner.getZ());
-		return !owner.level().getBlockState(belowFeet).getCollisionShape(owner.level(), belowFeet).isEmpty();
+		return hasBlockSupport(owner);
+	}
+
+	@Override
+	public boolean canContinueToUse() {
+		var path = this.yorkie.getNavigation().getPath();
+		if (path != null && !path.canReach() && path.getNodeCount() == 1 && this.hasDryFooting()) {
+			BlockPos node = path.getNodePos(0);
+			BlockPos feet = this.yorkie.blockPosition();
+			// A float-start path from this dry slab can be one node underneath it.
+			// Let the goal clear that unusable path and start a new grounded route.
+			if (node.getX() == feet.getX() && node.getZ() == feet.getZ() && node.getY() < feet.getY()) {
+				return false;
+			}
+		}
+		return super.canContinueToUse();
+	}
+
+	@Override
+	public void tick() {
+		var navigation = this.yorkie.getNavigation();
+		if (!navigation.canFloat() || !this.yorkie.isInWater() || !this.hasDryFooting()) {
+			super.tick();
+			return;
+		}
+		// The body still touches water beside the slab. Plan from the supported
+		// feet to avoid a submerged start below it, then restore ordinary swimming.
+		navigation.setCanFloat(false);
+		try {
+			super.tick();
+		} finally {
+			navigation.setCanFloat(true);
+		}
+	}
+
+	private boolean hasDryFooting() {
+		return this.yorkie.onGround() && !this.yorkie.isPassenger()
+				&& !this.yorkie.level().getFluidState(this.yorkie.blockPosition()).is(FluidTags.WATER)
+				&& hasBlockSupport(this.yorkie);
+	}
+
+	private static boolean hasBlockSupport(LivingEntity entity) {
+		BlockPos belowFeet = BlockPos.containing(entity.getX(), entity.getY() - 0.05D, entity.getZ());
+		return !entity.level().getBlockState(belowFeet).getCollisionShape(entity.level(), belowFeet).isEmpty();
 	}
 }
