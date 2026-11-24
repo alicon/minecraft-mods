@@ -176,6 +176,11 @@ async function executeMatrix(baseUrl, args) {
   const careContext = { state, request, expectedSave: args.expectedSave, playerUuid: initial.players[0].uuid };
   let interruptedInvestigation = false;
   async function resetWorld(report) {
+    if (report?.cases.some(result => result.interruption === 'client_paused')) {
+      report.worldReset = { status: 'skipped', reason: 'client_paused_tick_request_retained' };
+      saveReport(reportFile, report);
+      return;
+    }
     if (interruptedInvestigation || report?.cases.some(result => result.status !== 'passed' && selected.find(c => c.name === result.name)?.stopOnFailure)) {
       assertInspectionWorld(await state(), careContext);
       await command('tick freeze');
@@ -203,7 +208,8 @@ async function executeMatrix(baseUrl, args) {
         return careForSuccessfulPet({ ...careContext, petUuid: lastFixtureUuid });
       },
       reportFile, metadata: { scenario: 'yorkie-matrix', runId, group: args.group || 'all', provenance, startScreenshot: startScreenshot.file, saveName: initial.saveName, base, expectedSave: args.expectedSave, ...investigation.metadata },
-      capture: scenario => require('./yorkie-failure-capture').captureMatrixFailure({ ...careContext, command, runId }, scenario),
+      capture: (scenario, error) => require('./yorkie-failure-capture').captureMatrixFailure(
+        { ...careContext, command, runId }, scenario, { clientPaused: error.code === require('./yorkie-clock').CLIENT_PAUSED }),
       onResult: (result) => console.error(`${result.name}: ${result.status}${result.error ? `: ${result.error}` : ''}`)
     }), () => { interruptedInvestigation = true;return resetOnce(); }, investigate)
   });

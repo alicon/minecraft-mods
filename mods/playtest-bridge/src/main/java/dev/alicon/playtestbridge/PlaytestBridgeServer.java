@@ -186,7 +186,12 @@ final class PlaytestBridgeServer {
 		state.addProperty("motd", this.server.getMotd());
 		state.addProperty("hardcore", this.server.isHardcore());
 		state.addProperty("tickCount", this.server.getTickCount());
+		if (this.server.isSingleplayer()) {
+			state.addProperty("integratedServerPaused", this.server.isPaused());
+		}
 		state.addProperty("worldFrozen", this.server.tickRateManager().isFrozen());
+		state.addProperty("frozenTicksRemaining", this.server.tickRateManager().frozenTicksToRun());
+		state.addProperty("worldSprinting", this.server.tickRateManager().isSprinting());
 		state.addProperty("overworldGameTime", Long.toString(this.server.overworld().getGameTime()));
 		BridgeWorldMetadata.addTo(state, this.server.overworld().getSeed(), this.server.getWorldPath(LevelResource.ROOT));
 

@@ -54,6 +54,16 @@ differ from the eventual fresh neutral-input sample. These observations suppleme
 the existing movement/release proof and do not change native key durations or
 gameplay. Their scheduling overhead can affect a timing-sensitive reproduction.
 
+An unfinished native matrix tick wait records the command, acceptance, last
+observed world clock and any terminal bridge observations. For an integrated
+server, `integratedServerPaused` reports the native Game Menu pause independently
+of `worldFrozen`. `frozenTicksRemaining` and `worldSprinting` report native
+tick-manager state. A confirmed pause interrupts the matrix before another
+fixture, preserves the current screen, and leaves the tick request intact.
+After preserving evidence, verify the same owner, actors and save, then observe
+the world clock before and after resuming the client. A pending step can finish
+on resume. The interrupted report retains its verdict.
+
 Run all verification:
 
 ```shell

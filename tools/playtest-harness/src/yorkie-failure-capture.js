@@ -6,15 +6,16 @@ const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 // A failure photo is evidence of the current view, not a new scene. Even a
 // same-position /tp can dismount the owner and reset native movement/ground state.
-async function captureMatrixFailure(context, scenario, { delay = wait } = {}) {
+async function captureMatrixFailure(context, scenario, { delay = wait, clientPaused = false } = {}) {
   const { state, command, request, runId } = context;
   const snapshot = await state();
   assertInspectionWorld(snapshot, context);
-  if (scenario.stopOnFailure) await command('tick freeze');
+  const freeze = scenario.stopOnFailure && !clientPaused;
+  if (freeze) await command('tick freeze');
   await delay(300);
   const cameraState = await state();
   assertInspectionWorld(cameraState, context);
-  if (scenario.stopOnFailure) assert(cameraState.worldFrozen === true, 'Investigative failure capture lost its frozen world');
+  if (freeze) assert(cameraState.worldFrozen === true, 'Investigative failure capture lost its frozen world');
   await delay(150);
   const screenshot = await request('/screenshot', { name: `yorkie-${runId}-${scenario.name}-failure.png`,
     resume: false, hideGui: false, clearChat: false });

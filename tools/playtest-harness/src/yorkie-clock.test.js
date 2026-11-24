@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { GAME_TIME_MODULUS, elapsedWorldTicks, advanceWorldTicks } = require('./yorkie-clock');
+const { CLIENT_PAUSED, GAME_TIME_MODULUS, elapsedWorldTicks, advanceWorldTicks } = require('./yorkie-clock');
 
 test('frozen stepping waits for world progress even when the server counter has advanced', async () => {
   const clocks = [100, 100, 100, 101];
@@ -35,4 +35,44 @@ test('rejected tick commands cannot be passed by an otherwise advancing world', 
     ? { success: true, result: ++queries } : { success: false, result: 0 },
   async () => { throw Error('Must not read completion state'); }, 1, 'step'), /tick request failed/);
   assert.equal(queries, 1);
+});
+
+test('an accepted native step retains its receipt and pending count when the integrated server pauses', async () => {
+  const commands = [];
+  const receipt = { success: true, callbackSeen: true, result: 1 };
+  const command = async text => {
+    commands.push(text);
+    return text === 'time query gametime' ? { success: true, result: 5 } : receipt;
+  };
+  const observation = { integratedServerPaused: true, overworldGameTime: '4294967299', tickCount: 9,
+    worldFrozen: true, frozenTicksRemaining: 1, worldSprinting: false };
+  await assert.rejects(advanceWorldTicks(command, async () => observation, 1, 'step', { timeoutMs: 0, pollIntervalMs: 0 }), error => {
+    assert.equal(error.code, CLIENT_PAUSED);
+    assert.match(error.message, /0\/1 native step ticks/);
+    assert.deepEqual(error.tickInterruption, { command: 'tick step 1t', mode: 'step', expectedTicks: 1, before: 5,
+      dispatch: 'accepted', receipt, lastWorldClock: 5, observation });
+    return true;
+  });
+  assert.deepEqual(commands, ['time query gametime', 'tick step 1t', 'time query gametime']);
+});
+
+test('wait expiry checks the native clock before attributing a stopped wait to a pause', async () => {
+  const command = async text => ({ success: true, result: text.startsWith('time') ? 5 : 1 });
+  const completed = await advanceWorldTicks(command, async () => ({ integratedServerPaused: true, overworldGameTime: '6' }),
+    1, 'step', { timeoutMs: 0, pollIntervalMs: 0 });
+  assert.equal(completed.tickAudit.elapsedTicks, 1);
+  await assert.rejects(advanceWorldTicks(command, async () => ({ integratedServerPaused: false, overworldGameTime: '5' }),
+    1, 'step', { timeoutMs: 0, pollIntervalMs: 0 }), error => error.code === undefined && /did not complete/.test(error.message));
+});
+
+test('lost tick acceptance preserves an unknown dispatch without retrying', async () => {
+  const commands = [];
+  const command = async text => {
+    commands.push(text);
+    if (text.startsWith('tick')) throw new Error('fetch failed');
+    return { success: true, result: 5 };
+  };
+  await assert.rejects(advanceWorldTicks(command, async () => assert.fail('unexpected state'), 1, 'step'),
+    error => error.message === 'fetch failed' && error.tickInterruption.dispatch === 'unknown');
+  assert.deepEqual(commands, ['time query gametime', 'tick step 1t']);
 });
