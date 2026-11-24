@@ -27,6 +27,19 @@ test('staging waits through delayed teleport drift and requires three distinct s
   assert.deepEqual(waits, [150, 50, 50, 50, 50, 50]);
 });
 
+test('staging accepts the observed transition drift after the owner stops on the verified block', async () => {
+  const positions = [-121.704286, -121.731415, -121.746227, -121.754314, -121.758730, -121.758730];
+  const parked = { ...target, x: positions.at(-1) };
+  let reads = 0;
+  const staging = await settleStagingOwner(async () => snapshot(reads + 1, {
+    positionPrecise: { ...target, x: positions[reads++] ?? parked.x }
+  }), identity, target, { delay });
+  assert.equal(staging.samples.length, 6);
+  assert.deepEqual(assertStagedOwnerAfterReset(snapshot(1807, { positionPrecise: parked }), identity, staging).position, parked);
+  assert.throws(() => assertStagedOwnerAfterReset(snapshot(1807, { positionPrecise: { ...parked, x: parked.x + 0.1 } }),
+    identity, staging), /after the builder-focus reset/);
+});
+
 test('bounded staging preserves held input and cannot pass on a stationary server tick', async () => {
   for (const [state, input] of [[() => snapshot(3), {}], [n => snapshot(n, { lastClientInput: { forward: true } }), { forward: true }]]) {
     let reads = 0;

@@ -228,7 +228,7 @@ branch blocks the nearest face (`--case squirrel-clear-tree-face`).
 Replay them by name with `--case fetch-sit-yorkie_ball` or
 `--case sleep-flight-sleep-90`, or `--case starving-night-food-bowl`, or `--case fetch-owner-mode-yorkie_ball`.
 
-Before each fresh pet, the fixture clears the arena, verifies the staging floor, and waits for the owner to settle on it across three server ticks before advancing past the 1800-tick builder-focus window. The bridge reports the owner's last native movement input when available. The fixture requires neutral input and dry, grounded support at the staging position before and after the reset. A staging failure retains the owner samples and stops as a setup failure. The audit records the owner's supported position and health after a successful reset. A dead owner during vehicle observation is a setup failure.
+Before each fresh pet, the fixture clears the arena, verifies the staging floor, and waits for the owner to hold a stable position on the verified block across three server ticks before advancing past the 1800-tick builder-focus window. The bridge reports the owner's last native movement input when available. The fixture requires neutral input and dry, grounded support at the settled position before and after the reset. A staging failure retains the owner samples and stops as a setup failure. The audit records the owner's supported position and health after a successful reset. A dead owner during vehicle observation is a setup failure.
 
 The terrain group adds 36 cases: dry ground, open water, covered water, and a
 six-block drop for each toy and owner locomotion state. It requires ordinary
