@@ -131,7 +131,11 @@ owners use the shared player fixture without deleting neighboring fetch toys.
 This improves isolation without claiming the older intermittent throw setup is fixed.
 Boat-bank escape controls compare a swimmer trapped beneath a boat with the same
 clear bank without a boat, including a close grounded creative owner. They require
-dry support, restored air and normal close following. A breathing surface swimmer
+dry support, restored air and normal close following. The close creative owner
+stays close until witnessed healthy, supported bank arrival, then steps clear
+before ordinary boarding grace expires. The original boat remains; strict native
+tick, movement, health and settling checks continue. This separates bank recovery
+from the reboarding restoration tested elsewhere. A breathing surface swimmer
 beneath a low deck keeps ordinary following; only submerged stalled movement
 triggers escape. A farther creative control requires an observed flight-to-escape
 handoff. These tests sample every world tick, retain minimum air and largest
@@ -423,7 +427,14 @@ not gameplay evidence; its failure cannot turn a case failure into a pass. Faile
 or interrupted runs never receive this care.
 
 The standalone `yorkie-smoke` also requires the exact copied save and a single local
-Overworld player. It checkpoints original steps and, only after success, feeds/heals
+Overworld player. Each summon uses fixed arena coordinates, checks the grass support
+and air at that cell, then observes the new Yorkie's UUID, health and native ground
+contact before interacting. Starting with a steep camera angle must produce the same
+supported placement. For the night case, the runner waits for that same Yorkie to
+settle into a grounded sit. It places the roof above the pet's native block position
+and anchors every wall to that cell. Missing support, a misplaced spawn or a failed
+shelter placement is a setup failure that retains its observations.
+The smoke checkpoints original steps and, only after success, feeds/heals
 the same tagged live pet for inspection. Raw observations stay unchanged; maintenance
 has a separate verdict and preserves UUID, harness, leash, vehicle and native possessions.
 Missing/dead/unverified fixtures and failed/interrupted runs are never repaired by care.

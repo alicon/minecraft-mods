@@ -32,6 +32,7 @@ final class BoatBankRecoveryProbe {
 	private int firstRecoveryTick = -1;
 	private int settledTicks;
 	private boolean reenteredWater;
+	private Runnable afterFirstRecovery = () -> {};
 
 	BoatBankRecoveryProbe(GameTestHelper helper, MushroomYorkieEntity yorkie, LivingEntity owner,
 			boolean boatPresent, boolean expectFlightHandoff, long seed, Runnable cleanup) {
@@ -60,6 +61,12 @@ final class BoatBankRecoveryProbe {
 		this.helper.runAfterDelay(1, this::tick);
 	}
 
+	// Fixture transitions may follow witnessed bank arrival, never manufacture it.
+	BoatBankRecoveryProbe afterFirstRecovery(Runnable action) {
+		this.afterFirstRecovery = action;
+		return this;
+	}
+
 	private void tick() {
 		this.ticks++;
 		this.minimumAir = Math.min(this.minimumAir, this.yorkie.getAirSupply());
@@ -69,7 +76,8 @@ final class BoatBankRecoveryProbe {
 		this.sawEscape |= this.yorkie.waterEscape.active();
 		this.sawFlightHandoff |= this.yorkie.waterEscape.active() && this.yorkie.isNoGravity();
 		boolean recovered = this.complete();
-		if (recovered && this.firstRecoveryTick < 0) this.firstRecoveryTick = this.ticks;
+		boolean firstRecovery = recovered && this.firstRecoveryTick < 0;
+		if (firstRecovery) this.firstRecoveryTick = this.ticks;
 		this.reenteredWater |= this.firstRecoveryTick >= 0 && this.yorkie.isInWater();
 		this.settledTicks = recovered ? this.settledTicks + 1 : 0;
 		try {
@@ -81,6 +89,7 @@ final class BoatBankRecoveryProbe {
 			this.helper.assertTrue(this.yorkie.getHealth() == this.yorkie.getMaxHealth() && this.minimumAir > 0,
 					"Recovery lost health or exhausted air: " + this.summary());
 			this.helper.assertTrue(this.largestStep < 1.0D, "Recovery moved discontinuously: " + this.summary());
+			if (firstRecovery) this.afterFirstRecovery.run();
 			if (this.ticks >= MIN_OBSERVATION_TICKS && this.settledTicks >= SETTLED_TICKS) {
 				this.helper.assertTrue(this.sawWater && (!this.boatPresent || this.sawEscape),
 						"Native fixture did not exercise immersion/obstruction escape: " + this.summary());
