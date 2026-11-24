@@ -8,6 +8,18 @@ const path = require('node:path');
 const { runCases } = require('./scenario-runner');
 const { matrixInputs, assertTestWorld } = require('./yorkie-matrix');
 
+test('setup diagnostics survive thrown audits without replacing partial run observations', async () => {
+  for (const setupFailure of [true, false]) {
+    const report = await runCases([{ name: 'audit', setup: async () => {
+      if (setupFailure) { const e = Error('invalid pool');e.observed = { pool: 'ice' };throw e; }
+    }, run: async (fixture, result) => {
+      result.observed = { originalTrace: true };const e = Error('later audit');e.observed = { different: true };throw e;
+    } }], {});
+    assert.deepEqual(report.cases[0].observed, setupFailure ? { pool: 'ice' } : { originalTrace: true });
+    assert.equal(report.cases[0].status, setupFailure ? 'setup_failed' : 'failed');
+  }
+});
+
 test('continues after failures and persists evidence and complete report', async () => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'yorkie-tests-'));
   const reportFile = path.join(folder, 'report.json');

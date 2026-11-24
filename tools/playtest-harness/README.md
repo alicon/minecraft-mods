@@ -89,6 +89,11 @@ Screenshots close the active client screen before capture by default. Set `BRIDG
 Set `BRIDGE_REPORT_FILE=build/playtest-reports/<name>.json` on any bridge scenario target to persist the full JSON result, including every step payload and screenshot path, outside the terminal output.
 The `set-block` and `set-block-near-entity` bridge actions accept namespaced block IDs or full block-state strings such as `minecraft:cherry_leaves[persistent=true]`.
 
+`/block` also reports native `blockLight`, `skyLight` and `waterFreezeEligible`.
+The last field is Minecraft's current biome/light/water/edge eligibility check,
+not a prediction that a weather tick will select that cell. Use block light,
+which differs from daylight, when auditing controlled pools against ice formation.
+
 You can launch Modrinth directly into a save without using the launcher UI:
 
 ```shell
@@ -300,8 +305,20 @@ Every motion request is recorded. A single initial impulse was observed to stop
 short, so the fixture reapplies motion at five-tick samples until its travel
 target is observed. Offshore controls sample every tick and stop the hull after three
 blocks, leaving room for its later departure; dock and rail controls sample every
-five ticks. The original short-travel cause is unconfirmed. Short travel remains a setup failure; command success alone does
+five ticks. Earlier short-travel causes remain unconfirmed. Short travel remains a setup failure; command success alone does
 not establish movement. These inputs do not simulate player rowing.
+
+A later stopped journey was blocked by ice in its authored pool. A same-actor
+continuation moved again after only that ice cell was cleared. Controlled water
+journeys now use a submerged sea-lantern floor without changing biome, depth or
+sky exposure. All 36 source-water cells must have native block light at least 10
+and native freezing eligibility false. Full bottom and wall volumes are audited
+too. Setup allows a bounded light-propagation wait while frozen; it never refills
+or melts changed water during observation. Audits run before travel, at each
+travel sample, before the owner action and at the end. A changed cell/light/support
+is a setup failure with retained observations. Health failures retain their gameplay
+classification even when the environment also changed. These are controlled
+liquid-water journeys, not natural freezing or dark-pool coverage.
 Boat bank-exit cases have a real dock doorway, a controlled shore-facing passenger
 yaw, and an owner on the inner quarter of the first dry bank column. This keeps
 short valid trips within survival reach; actual support and reach are still

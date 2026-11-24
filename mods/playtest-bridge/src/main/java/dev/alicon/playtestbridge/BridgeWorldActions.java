@@ -19,6 +19,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -266,6 +267,10 @@ final class BridgeWorldActions {
 		response.addProperty("ok", true);
 		response.addProperty("block", blockId(level.getBlockState(position)));
 		response.addProperty("state", blockStateId(level.getBlockState(position)));
+		response.addProperty("blockLight", level.getBrightness(LightLayer.BLOCK, position));
+		response.addProperty("skyLight", level.getBrightness(LightLayer.SKY, position));
+		// Native eligibility, not a promise that a precipitation tick will select this cell.
+		response.addProperty("waterFreezeEligible", level.getBiome(position).value().shouldFreeze(level, position));
 		response.add("position", BridgeEntityState.blockPosition(position));
 		return response;
 	}
