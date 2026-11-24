@@ -155,6 +155,13 @@ dismount controls also seed old movement/steering and require owner help to clea
 it for boats, chest boats and carts. Live dock sequences separately check the
 complete landing and settling behavior.
 
+Paired shallow-shore GameTests start a breathing swimmer overlapping the dry
+half-slab edge. They vary only the survival owner's distance along the bank
+and record the first dry tick and longest stable stretch. Both need 40 consecutive
+dry supported ticks within 120 native ticks, with the original healthy actors
+and normal collision. The official live shore cases still require stability
+through the end of their settling window after the full native walk.
+
 The deck's initial wet-body/breathing-eyes assertion runs inside the recovery
 observer's first sample. An independent delayed callback could run several
 native ticks late and sample a normal dry bob instead. The shared bank/deck

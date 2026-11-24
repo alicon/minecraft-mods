@@ -1,7 +1,6 @@
 package dev.alicon.mushroomyorkie.entity;
 
 import net.minecraft.world.entity.ai.goal.FloatGoal;
-import net.minecraft.world.entity.ai.goal.FollowOwnerGoal;
 import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.RandomStrollGoal;
@@ -26,7 +25,7 @@ final class MushroomYorkieGoals {
 		yorkie.addYorkieGoal(9, new HesitantHostileMobGoal(yorkie));
 		yorkie.addYorkieGoal(10, new UntamedStayNearPlayerGoal(yorkie));
 		yorkie.addYorkieGoal(11, new SitWhenOrderedToGoal(yorkie));
-		yorkie.addYorkieGoal(12, new FollowOwnerGoal(yorkie, 1.25D, 2.0F, 1.0F));
+		yorkie.addYorkieGoal(12, new MushroomFollowOwnerGoal(yorkie));
 		yorkie.addYorkieGoal(13, new CreativeProfileGoal(yorkie));
 		yorkie.addYorkieGoal(14, new DaytimeBumShuffleGoal(yorkie));
 		yorkie.addYorkieGoal(15, new RandomStrollGoal(yorkie, 0.9D, 80));

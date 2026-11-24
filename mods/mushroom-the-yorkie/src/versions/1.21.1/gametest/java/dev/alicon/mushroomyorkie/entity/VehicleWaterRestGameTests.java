@@ -6,6 +6,18 @@ import net.minecraft.world.entity.EntityType;
 
 /** Version-specific registration for water passenger rest controls. */
 public final class VehicleWaterRestGameTests {
+	/** A breathing swimmer can reach the dry step even with an owner less than two blocks away. */
+	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 160)
+	public void shallowShoreNearOwner(GameTestHelper helper) {
+		ShallowShoreScenarios.reachDrySupport(helper, EntityType.BOAT, true);
+	}
+
+	/** The same wet start still recovers with a farther owner. */
+	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 160)
+	public void shallowShoreFarOwner(GameTestHelper helper) {
+		ShallowShoreScenarios.reachDrySupport(helper, EntityType.BOAT, false);
+	}
+
 	/** A breathing idle input stays exempt even beyond the twenty-tick stall gate. */
 	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 200)
 	public void pinnedBreathingIdleDoesNotEscape(GameTestHelper helper) {

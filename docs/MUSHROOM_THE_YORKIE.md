@@ -14,6 +14,10 @@ for a 40-tick cooldown before another attempt. Native collisions, buoyancy and d
 remain active. This also helps stalled recovery near a grounded creative owner;
 owner-directed flight and airborne fetch retain control.
 
+At a shallow bank, a breathing Mushroom can resume following a nearby owner
+standing on dry block support even after bobbing inside his usual two-block
+follow range. He uses normal pathfinding and collision to finish getting out.
+
 ## Gameplay Configuration
 
 `mushroom_yorkie.json` is generated in the Fabric config directory. Values that change gameplay are centralized in `MushroomYorkieConfig` and exposed through small value objects so entity code reads tuning, not raw JSON fields.
