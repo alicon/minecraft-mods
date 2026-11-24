@@ -54,12 +54,20 @@ test('journey takeoff stays outside the nighttime bank doorway lintel', () => {
 });
 
 test('lost owner flight is a fixture failure rather than a trapped-pet verdict', () => {
-  const state = { players: [{ abilities: { creative: true, flying: false } }] };
+  const state = { players: [{ health: 20, abilities: { creative: true, flying: false } }] };
   assertVehicleOwnerState(state, 'creative', false);
   assert.throws(() => assertVehicleOwnerState(state, 'creative', true), e => e.phase === 'setup' && /fixture lost/.test(e.message));
   state.players[0].abilities.flying = true;
   assertVehicleOwnerState(state, 'creative', true);
   assert.throws(() => assertVehicleOwnerState(state, 'survival', false), e => e.phase === 'setup');
+});
+
+test('owner death or unavailable health during vehicle observation is a setup failure', () => {
+  for (const health of [0, undefined, NaN]) {
+    const state = { players: [{ health, abilities: { creative: false, flying: false } }] };
+    assert.throws(() => assertVehicleOwnerState(state, 'survival', false),
+      error => error.phase === 'setup' && /Vehicle owner fixture is dead or health is unavailable/.test(error.message));
+  }
 });
 
 test('vehicle scenarios independently cover passenger actions, owner modes, hunger, night and sit orders', () => {

@@ -4,7 +4,12 @@ const assert = require('node:assert/strict');
 const VEHICLES = ['minecraft:oak_boat', 'minecraft:oak_chest_boat', 'minecraft:minecart'];
 
 function assertVehicleOwnerState(snapshot, mode, flying) {
-  const abilities = snapshot.players[0].abilities;
+  const { abilities, health } = snapshot.players[0];
+  if (!Number.isFinite(health) || health <= 0) {
+    const error = new Error(`Vehicle owner fixture is dead or health is unavailable: ${health}`);
+    error.phase = 'setup';
+    throw error;
+  }
   if (abilities?.creative !== (mode === 'creative') || abilities?.flying !== flying) {
     const error = new Error(`Vehicle owner fixture lost ${mode}/flying=${flying}: ${JSON.stringify(abilities)}`);
     error.phase = 'setup';

@@ -228,7 +228,7 @@ branch blocks the nearest face (`--case squirrel-clear-tree-face`).
 Replay them by name with `--case fetch-sit-yorkie_ball` or
 `--case sleep-flight-sleep-90`, or `--case starving-night-food-bowl`, or `--case fetch-owner-mode-yorkie_ball`.
 
-Before each fresh pet, the fixture advances an empty arena past the owner’s 1800-tick builder-focus window. Replacing the pet alone does not clear that owner activity. The audit records this reset so case ordering cannot silently trigger a leftover creative nap.
+Before each fresh pet, the fixture clears the arena, verifies the staging floor, and places the owner on it before advancing past the 1800-tick builder-focus window. Replacing the pet alone does not clear that owner activity. The audit records the owner's supported position and health after the reset. A dead owner during vehicle observation is a setup failure.
 
 The terrain group adds 36 cases: dry ground, open water, covered water, and a
 six-block drop for each toy and owner locomotion state. It requires ordinary

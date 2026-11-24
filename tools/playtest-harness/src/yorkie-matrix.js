@@ -72,7 +72,13 @@ async function executeMatrix(baseUrl, args) {
     await command('tick unfreeze');
     await command(`gamemode creative ${player}`);
     await request('/player-abilities', { player, flying: false, mayfly: true });
-    await command(`tp ${player} ${base.x} ${base.y + 1} ${base.z} 0 0`);
+    // A fresh high-altitude arena has no support. Build and verify the floor
+    // before parking the owner there for the builder-focus sprint.
+    await command(`fill ${base.x - 7} ${base.y - 1} ${base.z - 7} ${base.x + 7} 319 ${base.z + 7} minecraft:air`);
+    await command(`fill ${base.x - 7} ${base.y - 1} ${base.z - 7} ${base.x + 7} ${base.y - 1} ${base.z + 7} minecraft:grass_block`);
+    const stagingFloor = await request('/block', { x: base.x, y: base.y - 1, z: base.z });
+    check(stagingFloor.block === 'minecraft:grass_block', 'Matrix owner staging floor is missing');
+    await command(`tp ${player} ${base.x + 0.5} ${base.y} ${base.z + 0.5} 0 0`);
     // Clear the baseline pet in this disposable save so ownership guards do not block taming.
     await request('/clear-entities', { type: TYPE });
     // A boat left by an interrupted vehicle run must not board the next fresh pet,
@@ -82,9 +88,12 @@ async function executeMatrix(baseUrl, args) {
     await request('/clear-entities', { type: 'minecraft:item' });
     // CreativeBuildActivity belongs to the owner, not the replaced pet. Let its 1800-tick
     // focus expire before creating a fixture, so earlier real building cannot induce a nap.
-    await advance(1801);
-    await command(`fill ${base.x - 7} ${base.y - 1} ${base.z - 7} ${base.x + 7} 319 ${base.z + 7} minecraft:air`);
-    await command(`fill ${base.x - 7} ${base.y - 1} ${base.z - 7} ${base.x + 7} ${base.y - 1} ${base.z + 7} minecraft:grass_block`);
+    const afterReset = await advance(1801);
+    assertLivingTestOwner(afterReset, args.expectedSave);
+    const stagedOwner = afterReset.players[0];
+    const { position, onGround, health } = stagedOwner;
+    check(onGround && Math.hypot(position.x - base.x - 0.5, position.y - base.y, position.z - base.z - 0.5) <= 0.05,
+      'Matrix owner was off the staging floor after the builder-focus reset');
     if (inputs.shelter === 'inside') {
       await command(`fill ${base.x - 4} ${base.y - 1} ${base.z - 4} ${base.x + 4} ${base.y + 4} ${base.z + 4} minecraft:oak_planks hollow`);
       await command(`setblock ${base.x} ${base.y + 4} ${base.z} minecraft:glowstone`);
@@ -114,10 +123,12 @@ async function executeMatrix(baseUrl, args) {
     const sky = await request('/count-blocks', { x1: base.x - 7, y1: base.y + 5, z1: base.z - 7, x2: base.x + 7, y2: 319, z2: base.z + 7 });
     check(sky.counts['minecraft:air'] === sky.volume, 'Old overhead blocks invalidate the shelter fixture');
     const snapshot = await state();
+    assertLivingTestOwner(snapshot, args.expectedSave);
     const yaw = (await command(`data get entity ${player} Rotation[0]`)).result;
     const pitch = (await command(`data get entity ${player} Rotation[1]`)).result;
     check(yaw === 0 && pitch === 0, 'Fixture owner view was not reset after earlier camera movement');
-    snapshot.fixtureAudit = { upperAirVolume: sky, ownerMode, flying: Boolean(inputs.flying), ownerView: { yaw, pitch }, buildFocusResetTicks: 1801 };
+    snapshot.fixtureAudit = { upperAirVolume: sky, ownerMode, flying: Boolean(inputs.flying), ownerView: { yaw, pitch },
+      buildFocusResetTicks: 1801, buildFocusResetOwner: { position, onGround, health } };
     check(entity(snapshot), 'Fresh fixture is not observable');
     lastFixtureUuid = entity(snapshot).uuid;
     check(snapshot.players[0].abilities.creative === (ownerMode === 'creative')
