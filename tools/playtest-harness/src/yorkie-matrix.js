@@ -4,6 +4,7 @@ const { runCases, saveReport } = require('./scenario-runner');
 const { OWNER_STATES } = require('./yorkie-inputs');
 const { assertTestWorld, assertLivingTestOwner } = require('./yorkie-world');
 const { assertInspectionWorld, careForSuccessfulPet, withWorldReset } = require('./yorkie-post-run');
+const { settleStagingOwner, assertStagedOwnerAfterReset } = require('./yorkie-owner-staging');
 const { randomUUID } = require('node:crypto');
 const TYPE = 'mushroom_yorkie:mushroom_yorkie';
 const SELECTOR = '@e[type=mushroom_yorkie:mushroom_yorkie,tag=matrix_yorkie,limit=1]';
@@ -52,6 +53,7 @@ async function executeMatrix(baseUrl, args) {
   const startScreenshot = await request('/screenshot', { name: `yorkie-matrix-${runId}-start.png`, resume: true });
   const provenance = require('./bridge-provenance').provenance(initial.savePath);
   const player = initial.players[0].name;
+  const ownerIdentity = { expectedSave: args.expectedSave, playerUuid: initial.players[0].uuid };
   const base = { x: Math.floor(initial.players[0].position.x), y: 220, z: Math.floor(initial.players[0].position.z) };
   const command = (text) => request('/command', { command: text }, /^(fill|setblock) /.test(text));
   const state = () => request('/state');
@@ -67,6 +69,7 @@ async function executeMatrix(baseUrl, args) {
     const current = await state();
     assertTestWorld(current, args.expectedSave);
     assertLivingTestOwner(current, args.expectedSave);
+    check(current.players[0].uuid === ownerIdentity.playerUuid, 'Matrix fixture owner changed');
     check(current.players[0].dimension.includes('minecraft:overworld'), 'Matrix arena requires the Overworld');
     await command('tick sprint stop');
     await command('tick unfreeze');
@@ -78,7 +81,8 @@ async function executeMatrix(baseUrl, args) {
     await command(`fill ${base.x - 7} ${base.y - 1} ${base.z - 7} ${base.x + 7} ${base.y - 1} ${base.z + 7} minecraft:grass_block`);
     const stagingFloor = await request('/block', { x: base.x, y: base.y - 1, z: base.z });
     check(stagingFloor.block === 'minecraft:grass_block', 'Matrix owner staging floor is missing');
-    await command(`tp ${player} ${base.x + 0.5} ${base.y} ${base.z + 0.5} 0 0`);
+    const target = { x: base.x + 0.5, y: base.y, z: base.z + 0.5 };
+    await command(`tp ${player} ${target.x} ${target.y} ${target.z} 0 0`);
     // Clear the baseline pet in this disposable save so ownership guards do not block taming.
     await request('/clear-entities', { type: TYPE });
     // A boat left by an interrupted vehicle run must not board the next fresh pet,
@@ -86,14 +90,10 @@ async function executeMatrix(baseUrl, args) {
     for (const type of require('./yorkie-vehicles').VEHICLES) await request('/clear-entities', { type });
     await request('/clear-entities', { type: 'mushroom_yorkie:squirrel' });
     await request('/clear-entities', { type: 'minecraft:item' });
+    const ownerStaging = await settleStagingOwner(state, ownerIdentity, target);
     // CreativeBuildActivity belongs to the owner, not the replaced pet. Let its 1800-tick
     // focus expire before creating a fixture, so earlier real building cannot induce a nap.
-    const afterReset = await advance(1801);
-    assertLivingTestOwner(afterReset, args.expectedSave);
-    const stagedOwner = afterReset.players[0];
-    const { position, onGround, health } = stagedOwner;
-    check(onGround && Math.hypot(position.x - base.x - 0.5, position.y - base.y, position.z - base.z - 0.5) <= 0.05,
-      'Matrix owner was off the staging floor after the builder-focus reset');
+    const { position, onGround, health } = assertStagedOwnerAfterReset(await advance(1801), ownerIdentity, ownerStaging);
     if (inputs.shelter === 'inside') {
       await command(`fill ${base.x - 4} ${base.y - 1} ${base.z - 4} ${base.x + 4} ${base.y + 4} ${base.z + 4} minecraft:oak_planks hollow`);
       await command(`setblock ${base.x} ${base.y + 4} ${base.z} minecraft:glowstone`);
