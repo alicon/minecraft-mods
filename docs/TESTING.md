@@ -131,7 +131,11 @@ owners use the shared player fixture without deleting neighboring fetch toys.
 This improves isolation without claiming the older intermittent throw setup is fixed.
 Boat-bank escape controls compare a swimmer trapped beneath a boat with the same
 clear bank without a boat, including a close grounded creative owner. They require
-dry support, restored air and normal close following. A breathing surface swimmer
+dry support, restored air and normal close following. The close creative owner
+stays close until witnessed healthy, supported bank arrival, then steps clear
+before ordinary boarding grace expires. The original boat remains; strict native
+tick, movement, health and settling checks continue. This separates bank recovery
+from the reboarding restoration tested elsewhere. A breathing surface swimmer
 beneath a low deck keeps ordinary following; only submerged stalled movement
 triggers escape. A farther creative control requires an observed flight-to-escape
 handoff. These tests sample every world tick, retain minimum air and largest
