@@ -18,6 +18,7 @@ WORLD = "Mushroom Bedrock Smoke"
 PROBE_ID = "836a477e-ab53-4084-8ff3-600c098fb836"
 PROBE_SOURCE = Path(__file__).with_name("fixtures") / "mushroom-bedrock-smoke.js"
 PLAYER_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-player-probe.js")
+ADOPTION_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-adoption-probe.js")
 SERVER_PROPERTIES = {
     "level-name": WORLD,
     "gamemode": "survival",
@@ -109,7 +110,7 @@ def enable_beta_test_apis(server_dir):
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["dependencies"].append({"module_name": "@minecraft/server-gametest", "version": "1.0.0-beta"})
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-    shutil.copyfile(PLAYER_PROBE_SOURCE, probe / "scripts" / "probe.js")
+    return probe / "scripts" / "probe.js"
 
 
 def collect_output(stream, lines):
@@ -178,6 +179,7 @@ def main():
     parser.add_argument("--upgrade-from", type=Path)
     parser.add_argument("--verify-care-persistence", action="store_true")
     parser.add_argument("--verify-fetch", action="store_true", help="run an opt-in simulated-player fetch test")
+    parser.add_argument("--verify-adoption", action="store_true", help="run an opt-in simulated-player sleep adoption test")
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="mushroom-bedrock-smoke-") as directory:
         server_dir = Path(directory)
@@ -195,10 +197,15 @@ def main():
         exercise_world(server_dir, "MUSHROOM_TEST_REOPENED")
         if args.verify_care_persistence:
             exercise_world(server_dir, "MUSHROOM_TEST_CARE_PERSISTED")
-        if args.verify_fetch:
-            enable_beta_test_apis(server_dir)
-            exercise_world(server_dir, "MUSHROOM_SIM_PASS")
-            exercise_world(server_dir, "MUSHROOM_SIM_CARGO_SAVED")
+        if args.verify_fetch or args.verify_adoption:
+            probe = enable_beta_test_apis(server_dir)
+            if args.verify_fetch:
+                shutil.copyfile(PLAYER_PROBE_SOURCE, probe)
+                exercise_world(server_dir, "MUSHROOM_SIM_PASS")
+                exercise_world(server_dir, "MUSHROOM_SIM_CARGO_SAVED")
+            if args.verify_adoption:
+                shutil.copyfile(ADOPTION_PROBE_SOURCE, probe)
+                exercise_world(server_dir, "MUSHROOM_ADOPTION_RECOVERY")
         print("Mushroom spawned and remained in the world after a server restart.")
 
 
