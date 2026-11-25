@@ -178,7 +178,8 @@ function updateFetch(pup, state, tick, now) {
   if (practice || carried) {
     stopSeeking(pup);
     setBusy(pup, true);
-    if (distanceSquared(pup.location, owner.location) <= RETURN_REACH_SQUARED) {
+    const ownerDistance = distanceSquared(pup.location, owner.location);
+    if (ownerDistance <= RETURN_REACH_SQUARED) {
       const finished = practice || (cargo && carried && returnToy(pup, owner, cargo, carried));
       if (finished) {
         pup.setDynamicProperty(PRACTICE_CARRY, undefined);
@@ -188,7 +189,7 @@ function updateFetch(pup, state, tick, now) {
         state.nextInventoryHint = tick + 100;
         owner.onScreenDisplay.setActionBar({ translate: "mushroom.fetch.inventory_full" });
       }
-    } else if (distanceSquared(pup.location, owner.location) < 5 ** 2) {
+    } else if (pup.isInWater || ownerDistance < 5 ** 2) {
       nudgeToward(pup, owner.location);
     }
     return;

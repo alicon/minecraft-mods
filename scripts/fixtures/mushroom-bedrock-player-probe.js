@@ -54,15 +54,93 @@ function carried(pupil) {
   return pupil.getComponent("minecraft:inventory").container.getItem(0);
 }
 
-function looseToys(dimension, name) {
-  return dimension.getEntities({ type: "minecraft:item", location: { x: 10, y: 231, z: 6 }, maxDistance: 17 })
+function looseToys(dimension, name, location = { x: 10, y: 231, z: 6 }) {
+  return dimension.getEntities({ type: "minecraft:item", location, maxDistance: 17 })
     .filter((item) => item.getComponent("minecraft:item")?.itemStack.nameTag === name);
+}
+
+function placeFetchTarget(dimension, owner, name, position) {
+  const ball = new ItemStack(TOY);
+  ball.nameTag = name;
+  const item = dimension.spawnItem(ball, position);
+  item.addTag("mushroom_fetch_toy");
+  item.setDynamicProperty("mushroom_yorkie:fetch_thrower", owner.id);
+  item.setDynamicProperty("mushroom_yorkie:fetch_drop_amount", 1);
+  return item;
+}
+
+async function testWaterFetch(dimension, owner, pupil) {
+  const start = { x: 5.5, y: 231, z: 25.5 };
+  await world.tickingAreaManager.createTickingArea("mushroom_water", {
+    dimension, from: { x: 0, y: 229, z: 22 }, to: { x: 16, y: 234, z: 29 },
+  });
+  dimension.fillBlocks(new BlockVolume({ x: 0, y: 230, z: 22 }, { x: 16, y: 230, z: 29 }), "minecraft:stone");
+  for (const x of [2, 14]) {
+    dimension.fillBlocks(new BlockVolume({ x, y: 231, z: 23 }, { x, y: 234, z: 28 }), "minecraft:glass");
+  }
+  for (const z of [23, 28]) {
+    dimension.fillBlocks(new BlockVolume({ x: 2, y: 231, z }, { x: 14, y: 234, z }), "minecraft:glass");
+  }
+  dimension.fillBlocks(new BlockVolume({ x: 8, y: 231, z: 24 }, { x: 13, y: 231, z: 27 }), "minecraft:water");
+  await system.waitTicks(40);
+  owner.teleport(start);
+  pupil.teleport({ ...start, x: 7.5 });
+  const name = "Shallow pool ball";
+  throwToy(owner, TOY, name);
+  await waitFor(() => looseToys(dimension, name, start).length === 1, "a ball to be launched into the pool");
+  let sawToyInWater = false;
+  let carriedInWater = false;
+  await waitFor(() => {
+    sawToyInWater ||= looseToys(dimension, name, start).some((item) => dimension.getBlock(item.location)?.isLiquid);
+    carriedInWater ||= pupil.isInWater && carried(pupil)?.nameTag === name;
+    return inventoryCount(owner, TOY, name) === 1;
+  }, "one original ball to come back from shallow water", 260);
+  if (!sawToyInWater || !carriedInWater || looseToys(dimension, name, start).length || carried(pupil)) {
+    throw new Error("Mushroom did not complete a single water retrieval");
+  }
+  await waitFor(() => !pupil.getProperty("mushroom_yorkie:fetch_busy"), "the water retrieval to finish");
+  console.warn("MUSHROOM_SIM_SHALLOW_FETCH");
+
+  dimension.fillBlocks(new BlockVolume({ x: 8, y: 232, z: 24 }, { x: 14, y: 232, z: 27 }), "minecraft:glass");
+  dimension.setBlockType({ x: 10, y: 231, z: 25 }, "minecraft:glass");
+  dimension.setBlockType({ x: 12, y: 231, z: 25 }, "minecraft:glass");
+  dimension.setBlockType({ x: 11, y: 231, z: 24 }, "minecraft:glass");
+  dimension.setBlockType({ x: 11, y: 231, z: 26 }, "minecraft:glass");
+  owner.teleport(start);
+  pupil.teleport({ ...start, x: 7.2 });
+  const covered = placeFetchTarget(dimension, owner, "Covered pool ball", { x: 11.5, y: 231.2, z: 25.5 });
+  for (let tick = 0; tick < 60; tick += 2) {
+    if (!covered.isValid || carried(pupil) || pupil.getProperty("mushroom_yorkie:fetch_busy")) {
+      throw new Error("Mushroom tried to collect the ball under the pool roof");
+    }
+    await system.waitTicks(2);
+  }
+  console.warn("MUSHROOM_SIM_COVERED_WATER");
+}
+
+async function testLedgeFetch(dimension, owner, pupil) {
+  const start = { x: 5.5, y: 231, z: 3.5 };
+  dimension.fillBlocks(new BlockVolume({ x: 10, y: 230, z: 2 }, { x: 15, y: 230, z: 4 }), "minecraft:air");
+  dimension.fillBlocks(new BlockVolume({ x: 10, y: 226, z: 2 }, { x: 15, y: 226, z: 4 }), "minecraft:stone");
+  owner.teleport(start);
+  pupil.teleport({ ...start, x: 8.5 });
+  const dropped = placeFetchTarget(dimension, owner, "Ball at the foot of a ledge", { x: 12.5, y: 227.2, z: 3.5 });
+  await waitFor(() => pupil.getProperty("mushroom_yorkie:fetch_busy"), "Mushroom to notice a ball below the ledge");
+  await waitFor(() => !pupil.getProperty("mushroom_yorkie:fetch_busy"), "Mushroom to give up on the unsafe drop");
+  if (!dropped.isValid || carried(pupil) || pupil.location.y < 230.9) {
+    throw new Error("Mushroom attempted the unsafe descent or lost its toy");
+  }
+  owner.teleport({ ...start, x: 2.5 });
+  await waitFor(() => pupil.location.x < 5.5, "Mushroom to follow his owner after giving up");
+  dropped.remove();
+  dimension.fillBlocks(new BlockVolume({ x: 10, y: 230, z: 2 }, { x: 15, y: 230, z: 4 }), "minecraft:stone");
+  console.warn("MUSHROOM_SIM_UNSAFE_LEDGE");
 }
 
 world.afterEvents.worldLoad.subscribe(async () => {
   try {
     const dimension = world.getDimension("overworld");
-    const from = { x: 1, y: 228, z: 1 };
+    const from = { x: 1, y: 226, z: 1 };
     const to = { x: 23, y: 233, z: 13 };
     await world.tickingAreaManager.createTickingArea("mushroom_owners", { dimension, from, to });
     const savedPet = world.getDynamicProperty(SAVED_PET);
@@ -194,6 +272,8 @@ world.afterEvents.worldLoad.subscribe(async () => {
 
     owner.setGameMode(GameMode.Survival);
     pocket.clearAll();
+    await testLedgeFetch(dimension, owner, pupil);
+    await testWaterFetch(dimension, owner, pupil);
     owner.teleport(ownerStart);
     pupil.teleport(pupStart);
     throwToy(owner, TOY, OFFLINE_TOY);

@@ -45,6 +45,12 @@ Use **right-click** on Windows, the touch layout's **Interact/Use** action on iP
 
 The development build also attempts adoption after a full night in an Overworld bed. It can bring a loaded, following Yorkie back after a full day apart. Test both routes with two players and check that a second adoption does not replace an existing pet. The outdoor request routine is tracked in [the home routine issue](https://github.com/alicon/minecraft-mods/issues/129).
 
+## Edition differences
+
+Java Mushroom can scent nearby generated structures. On Bedrock 26.66.1, the stable scripting surface has no bounded way to locate a nearby generated structure and get its coordinates. The Bedrock release scope covers adoption, care, and fetch. Structure scenting, travel, and squirrels have separate parity tickets. [Structure scenting](https://github.com/alicon/minecraft-mods/issues/133) · [Travel and recovery](https://github.com/alicon/minecraft-mods/issues/131) · [Squirrels](https://github.com/alicon/minecraft-mods/issues/132)
+
+## Automated checks
+
 Check the scripts against the same stable API version used by the behavior pack:
 
 ```shell
@@ -60,6 +66,6 @@ python3 scripts/smoke-mushroom-bedrock.py /path/to/bedrock-server.zip /path/to/m
 
 Use `--upgrade-from /path/to/earlier-mushroom.mcaddon` to spawn the Yorkie in an earlier build and reopen the same disposable world with the newer pack. Add `--verify-care-persistence` to verify that the food limit and the tamed component state survive a further restart. Client import, visuals, ordinary player interactions and Realm delivery require the in-game checks above.
 
-Add `--verify-fetch` to exercise interaction with two simulated players on Bedrock Dedicated Server 26.66. The fixture enables GameTest in its disposable world after the ordinary add-on checks. The add-on uses the stable Script API.
+Add `--verify-fetch` to exercise interaction with two simulated players on Bedrock Dedicated Server 26.66. It checks ownership, inventory limits, cargo persistence, shallow-water returns, covered pools and an unsafe ledge. The fixture enables GameTest in its disposable world after the ordinary add-on checks. The add-on uses the stable Script API.
 
 [Importing Add-Ons](https://learn.microsoft.com/en-us/minecraft/creator/documents/gettingstarted?view=minecraft-bedrock-stable) · [Activating Add-Ons on a Realm](https://help.minecraft.net/hc/en-us/articles/24120525083533-How-to-activate-Minecraft-Add-On)
