@@ -49,6 +49,7 @@ Distributable jars are written under the active Minecraft target:
 build/mods/narwhal-together/<minecraft-version>/libs/narwhal-together-<version>.jar
 build/mods/mushroom-the-yorkie/<minecraft-version>/libs/mushroom-the-yorkie-<version>.jar
 build/mods/cops-and-robbers/<minecraft-version>/libs/cops-and-robbers-<version>.jar
+build/mods/playtest-bridge/1.21.11/libs/playtest-bridge-<version>.jar
 ```
 
 Pass `-Ptarget_minecraft_version=1.21.1` to build NARwhal Together or Mushroom the Yorkie for that target. Use the matching Minecraft directory when selecting a jar.

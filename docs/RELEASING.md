@@ -98,7 +98,7 @@ Run **Sync Modrinth Metadata** from the repository's Actions tab whenever the na
    make release-dry-run RELEASE_MODS=cops-and-robbers RELEASE_SKIP_PROFILE=1
    ```
 
-6. To upload the exact tested bytes, select the verified jar in Modrinth's **Create version** form. Use the target and version number from the catalog, mark Fabric API as required, and attach the matching changelog. For multi-target mods, upload one version per Minecraft target. To have the local script rebuild and publish, use the command below and verify the published checksum against the tested artifact.
+6. To upload the exact tested bytes, select the verified jar in Modrinth's **Create version** form. Use the target and version number from the catalog, mark Fabric API as required, and attach the matching changelog. For NARwhal Together, mark Controlify as optional. For multi-target mods, upload one version per Minecraft target. To have the local script rebuild and publish, use the command below and verify the published checksum against the tested artifact.
 
    ```shell
    make release RELEASE_MODS=cops-and-robbers RELEASE_SKIP_PROFILE=1 MODRINTH_VERSION_TYPE=alpha

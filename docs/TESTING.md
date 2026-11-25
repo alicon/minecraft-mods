@@ -27,7 +27,7 @@ Preserve the original failure first. For an already-dead owner in the disposable
 Overworld test save, explicitly run:
 
 ```shell
-npm --prefix tools/playtest-harness run bridge -- respawn --expected-save "Codex Test Copy" --player-uuid "<original owner UUID>" --report-file build/playtest-reports/owner-respawn.json
+npm --prefix tools/playtest-harness run bridge -- respawn --expected-save "Codex Test Copy" --player-uuid "<original owner UUID>" --report-file "$PWD/build/playtest-reports/owner-respawn.json"
 ```
 
 This sends Minecraft's native respawn request after exact save/player checks,
@@ -240,14 +240,14 @@ make harness-install
 Join a world and follow the human player:
 
 ```shell
-make harness-companion HARNESS_PORT=<lan-or-server-port> HARNESS_TARGET=<your-player-name>
+make harness-companion HARNESS_PORT=25565 HARNESS_TARGET=YourMinecraftName
 ```
 
 Run op-only smoke scenarios in a local test world:
 
 ```shell
-make harness-mushroom-smoke HARNESS_PORT=<lan-or-server-port>
-make harness-cops-smoke HARNESS_PORT=<lan-or-server-port>
+make harness-mushroom-smoke HARNESS_PORT=25565
+make harness-cops-smoke HARNESS_PORT=25565
 ```
 
 The Make targets start a Prismarine viewer by default at `http://localhost:3007` and write JSON event logs/snapshots to `tools/playtest-harness/artifacts/`. Set `HARNESS_VIEWER=0` to disable the viewer.
@@ -261,7 +261,7 @@ make bridge-state
 make bridge-smoke BRIDGE_MESSAGE="Codex bridge smoke passed."
 make bridge-chat BRIDGE_MESSAGE="Codex can see the world."
 make bridge-command BRIDGE_COMMAND="time set day"
-make bridge-look BRIDGE_PLAYER=<your-player-name>
+make bridge-look BRIDGE_PLAYER=YourMinecraftName
 make bridge-give BRIDGE_ITEM=minecraft:apple BRIDGE_COUNT=1
 make bridge-summon BRIDGE_ENTITY=cops_robbers:police_cruiser
 make bridge-teleport BRIDGE_X=0 BRIDGE_Y=100 BRIDGE_Z=0
