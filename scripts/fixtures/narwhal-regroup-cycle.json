@@ -1,0 +1,4 @@
+{
+  "joinOrder": ["Casey", "Birch", "Ash"],
+  "expectedCycle": ["Ash", "Birch", "Casey", "Ash"]
+}

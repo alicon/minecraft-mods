@@ -1,11 +1,14 @@
 """Exercise the packaged NARwhal Together add-on in a disposable Bedrock world."""
 
 import argparse
+import json
 import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from bedrock_smoke import SmokeWorld, enable_beta_test_apis, exercise_world, install_addon, install_probe, prepare_server
+from bedrock_smoke import (
+    SmokeWorld, enable_beta_test_apis, exercise_world, install_addon, install_companion_addons, install_probe, prepare_server,
+)
 
 WORLD = SmokeWorld(
     "NARwhal Together Bedrock Smoke", "narwhal_together",
@@ -19,18 +22,23 @@ def main():
     parser.add_argument("server_zip", type=Path)
     parser.add_argument("addon", type=Path)
     parser.add_argument("--upgrade-from", type=Path)
+    parser.add_argument("--with-addon", action="append", type=Path, default=[],
+                        help="keep another .mcaddon active during this test; repeat to add more")
     args = parser.parse_args()
     with TemporaryDirectory(prefix="narwhal-bedrock-smoke-") as directory:
         server_dir = Path(directory)
         prepare_server(args.server_zip, server_dir, WORLD)
         install_probe(server_dir, WORLD, PROBE)
         install_addon(args.upgrade_from or args.addon, server_dir, WORLD)
+        install_companion_addons(args.with_addon, server_dir, WORLD)
         exercise_world(server_dir, "NARWHAL_CHARM_REGISTERED")
         if args.upgrade_from:
             install_addon(args.addon, server_dir, WORLD)
         exercise_world(server_dir, "NARWHAL_CHARM_PERSISTED")
         runtime_probe = enable_beta_test_apis(server_dir, WORLD)
         shutil.copyfile(PROBE.with_name("narwhal-bedrock-regroup-probe.js"), runtime_probe)
+        cycle = json.loads(PROBE.with_name("narwhal-regroup-cycle.json").read_text(encoding="utf-8"))
+        runtime_probe.with_name("regroup-cycle.js").write_text("export default " + json.dumps(cycle) + ";\n", encoding="utf-8")
         exercise_world(server_dir, "NARWHAL_REGROUP_PLAYABLE")
 
 

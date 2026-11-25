@@ -34,6 +34,20 @@ Development packs target Bedrock 26.60 with stable pack schemas. Release support
 
 Run `npm --prefix tools/bedrock ci` and `npm --prefix tools/bedrock run check` to type-check Bedrock scripts against the pinned stable API. Keep the API typings in sync with the behavior pack's dependency when updating a script.
 
+Each server smoke runner accepts one `--with-addon` argument per additional archive. This command tests NARwhal's upgrade and regrouping while Mushroom and Cops and Robbers stay active.
+
+```shell
+python3 scripts/smoke-narwhal-bedrock.py /path/to/bedrock-server.zip /path/to/narwhal.mcaddon \
+  --upgrade-from /path/to/prior-narwhal.mcaddon \
+  --with-addon /path/to/mushroom.mcaddon \
+  --with-addon /path/to/cops.mcaddon
+```
+
+Use the [Bedrock release checklist](RELEASING.md#publish-a-bedrock-add-on) to record client and Realm evidence alongside server results.
+
+NARwhal's Fabric selector test and Bedrock Survival-player smoke use the same
+[regroup cycle fixture](../scripts/fixtures/narwhal-regroup-cycle.json) for alphabetical selection and wraparound.
+
 See [Add-On development](https://learn.microsoft.com/en-us/minecraft/creator/documents/addondevelopmentworkflow?view=minecraft-bedrock-stable) and [Script API versioning](https://learn.microsoft.com/en-us/minecraft/creator/documents/scripting/versioning?view=minecraft-bedrock-stable).
 
 ## Non-Goals For Now

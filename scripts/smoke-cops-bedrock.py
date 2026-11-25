@@ -5,7 +5,9 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from bedrock_smoke import SmokeWorld, enable_beta_test_apis, exercise_world, install_addon, install_probe, prepare_server
+from bedrock_smoke import (
+    SmokeWorld, enable_beta_test_apis, exercise_world, install_addon, install_companion_addons, install_probe, prepare_server,
+)
 
 WORLD = SmokeWorld(
     "Cops and Robbers Bedrock Smoke", "cops_robbers",
@@ -24,6 +26,8 @@ def main():
     parser.add_argument("server_zip", type=Path)
     parser.add_argument("addon", type=Path)
     parser.add_argument("--upgrade-from", type=Path)
+    parser.add_argument("--with-addon", action="append", type=Path, default=[],
+                        help="keep another .mcaddon active during this test; repeat to add more")
     parser.add_argument("--verify-vehicles", action="store_true")
     parser.add_argument("--verify-patrol", action="store_true")
     parser.add_argument("--verify-fire", action="store_true")
@@ -34,6 +38,7 @@ def main():
         prepare_server(args.server_zip, server_dir, WORLD)
         install_probe(server_dir, WORLD, PROBE_SOURCE)
         install_addon(args.upgrade_from or args.addon, server_dir, WORLD)
+        install_companion_addons(args.with_addon, server_dir, WORLD)
         exercise_world(server_dir, "COPS_KITS_REGISTERED")
         probe = enable_beta_test_apis(server_dir, WORLD)
         shutil.copyfile(KIT_PROBE_SOURCE, probe)
@@ -50,7 +55,7 @@ def main():
         if args.verify_patrol:
             shutil.copyfile(PATROL_PROBE_SOURCE, probe)
             exercise_world(server_dir, "COPS_PATROL_CONTESTED_CAPTURE")
-            exercise_world(server_dir, "COPS_PATROL_REPLAYED", timeout=150)
+            exercise_world(server_dir, "COPS_PATROL_REPLAYED")
             exercise_world(server_dir, "COPS_PATROL_REPLAY_PERSISTED")
             print("The patrol was completed and replayed across server restarts.")
         if args.verify_fire:

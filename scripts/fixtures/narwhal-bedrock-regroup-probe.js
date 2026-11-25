@@ -1,5 +1,6 @@
 import { BlockVolume, GameMode, ItemStack, system, WeatherType, world } from "@minecraft/server";
 import { spawnSimulatedPlayer } from "@minecraft/server-gametest";
+import cycle from "./regroup-cycle.js";
 
 const CHARM = "narwhal_together:regroup_charm";
 
@@ -93,18 +94,20 @@ world.afterEvents.worldLoad.subscribe(async () => {
     if (distance(indigo.location, initial) > 0.5) {
       throw new Error("A solo player moved after using the charm: " + JSON.stringify({ initial, now: indigo.location }));
     }
-    const casey = playerAt(nether, 13.5, 101, 12.5, "Casey");
-    const birch = playerAt(overworld, 46.5, 235, 12.5, "Birch");
-    const ash = playerAt(overworld, 23.5, 235, 17.5, "Ash");
+    const casey = playerAt(nether, 13.5, 101, 12.5, cycle.joinOrder[0]);
+    const birch = playerAt(overworld, 46.5, 235, 12.5, cycle.joinOrder[1]);
+    const ash = playerAt(overworld, 23.5, 235, 17.5, cycle.joinOrder[2]);
+    const joined = new Map([casey, birch, ash].map((player) => [player.name, player]));
+    const [first, second, third, wrapped] = cycle.expectedCycle.map((name) => joined.get(name));
     const spectator = playerAt(overworld, 9.5, 235, 27.5, "Aardvark", GameMode.Spectator);
     await use(indigo);
-    assertRegrouped(indigo, ash);
+    assertRegrouped(indigo, first);
     await use(indigo);
-    assertRegrouped(indigo, ash);
+    assertRegrouped(indigo, first);
     console.warn("NARWHAL_ORDER_SPECTATOR_COOLDOWN");
     await system.waitTicks(27);
     await use(indigo);
-    assertRegrouped(indigo, birch);
+    assertRegrouped(indigo, second);
 
     const yara = playerAt(overworld, 6.5, 235, 5.5, "Yara");
     yara.setItem(new ItemStack(CHARM), 0, true);
@@ -113,18 +116,18 @@ world.afterEvents.worldLoad.subscribe(async () => {
     casey.teleport({ x: 16.5, y: 243, z: 32.5 }, { dimension: overworld, forceProvidedPositionOnDimensionChange: true });
     await system.waitTicks(27);
     await use(indigo);
-    assertRegrouped(indigo, birch);
+    assertRegrouped(indigo, second);
     casey.teleport({ x: 13.5, y: 101, z: 12.5 }, { dimension: nether, forceProvidedPositionOnDimensionChange: true });
     await Promise.all([use(indigo), use(yara)]);
-    assertRegrouped(indigo, casey);
-    assertRegrouped(yara, ash);
+    assertRegrouped(indigo, third);
+    assertRegrouped(yara, first);
     console.warn("NARWHAL_SAFE_CROSS_DIMENSION_CONCURRENT");
 
     await system.waitTicks(26);
     // Yara comes after the other eligible names. Removing that target tests the ordinary wrap to Ash.
     yara.disconnect();
     await use(indigo);
-    assertRegrouped(indigo, ash);
+    assertRegrouped(indigo, wrapped);
     await verifyMountedAndFalling(indigo, birch, casey);
 
     const end = world.getDimension("the_end");

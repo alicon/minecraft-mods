@@ -1,6 +1,6 @@
 """Shared runner for Bedrock Dedicated Server tests in disposable worlds."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import io
 import json
 import os
@@ -44,19 +44,48 @@ def prepare_server(server_zip, server_dir, world):
 def install_addon(addon_path, server_dir, world):
     world_dir = server_dir / "worlds" / world.name
     world_dir.mkdir(parents=True, exist_ok=True)
+    installation = []
     with ZipFile(addon_path) as addon:
         for role, kind in (("data", "behavior"), ("resources", "resource")):
             [bundle] = [name for name in addon.namelist() if name.endswith(f"-{role}.mcpack")]
             pack_dir = server_dir / f"{kind}_packs" / world.addon_folder
-            if pack_dir.is_dir():
-                shutil.rmtree(pack_dir)
-            with ZipFile(io.BytesIO(addon.read(bundle))) as pack:
-                pack.extractall(pack_dir)
+            content = addon.read(bundle)
+            with ZipFile(io.BytesIO(content)) as pack:
                 header = json.loads(pack.read("manifest.json"))["header"]
-            link = [{"pack_id": header["uuid"], "version": header["version"]}]
-            if kind == "behavior":
-                link.append({"pack_id": world.probe_id, "version": [1, 0, 0]})
-            (world_dir / f"world_{kind}_packs.json").write_text(json.dumps(link), encoding="utf-8")
+            manifest_path = pack_dir / "manifest.json"
+            links_path = world_dir / f"world_{kind}_packs.json"
+            links = json.loads(links_path.read_text(encoding="utf-8")) if links_path.exists() else []
+            version = {"pack_id": header["uuid"], "version": header["version"]}
+            index = next((i for i, link in enumerate(links) if link["pack_id"] == header["uuid"]), None)
+            if header["uuid"] == world.probe_id:
+                raise ValueError(f"{addon_path} conflicts with the test fixture pack ID")
+            if manifest_path.exists():
+                installed = json.loads(manifest_path.read_text(encoding="utf-8"))["header"]
+                if installed["uuid"] != header["uuid"]:
+                    raise ValueError(f"{addon_path} changes the installed {kind} pack ID")
+            elif index is not None:
+                raise ValueError(f"{addon_path} duplicates an installed {kind} pack ID")
+
+            if index is None:
+                links.append(version)
+            else:
+                links[index] = version
+            if kind == "behavior" and not any(link["pack_id"] == world.probe_id for link in links):
+                links.append({"pack_id": world.probe_id, "version": [1, 0, 0]})
+            installation.append((pack_dir, content, links_path, links))
+
+    for pack_dir, content, links_path, links in installation:
+        if pack_dir.is_dir():
+            shutil.rmtree(pack_dir)
+        with ZipFile(io.BytesIO(content)) as pack:
+            pack.extractall(pack_dir)
+        links_path.write_text(json.dumps(links), encoding="utf-8")
+
+
+def install_companion_addons(addon_paths, server_dir, world):
+    for number, addon_path in enumerate(addon_paths, start=1):
+        companion = replace(world, addon_folder=f"{world.addon_folder}_companion_{number}")
+        install_addon(addon_path, server_dir, companion)
 
 
 def install_probe(server_dir, world, source):
@@ -151,7 +180,7 @@ def expect_line(lines, marker, timeout=90):
     raise RuntimeError(f"Server did not report {marker!r} in {timeout}s")
 
 
-def exercise_world(server_dir, marker, *, timeout=90):
+def exercise_world(server_dir, marker, *, timeout=150):
     with subprocess.Popen(
         [str(server_dir / "bedrock_server")],
         cwd=server_dir,
@@ -174,7 +203,7 @@ def exercise_world(server_dir, marker, *, timeout=90):
                 server.stdin.write("stop\n")
                 server.stdin.flush()
                 try:
-                    server.wait(timeout=20)
+                    server.wait(timeout=45)
                 except subprocess.TimeoutExpired:
                     server.kill()
                     server.wait()

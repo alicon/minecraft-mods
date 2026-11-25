@@ -1,6 +1,6 @@
 # Minecraft Mods
 
-Fabric mod workspace for small Minecraft projects.
+Minecraft projects with Java Fabric mods and Bedrock add-ons.
 
 ## Mods
 
@@ -22,7 +22,7 @@ gradle/
   fabric-mod.gradle
 ```
 
-Each mod has its own `fabric.mod.json`, Java package, assets, and jar. Shared Fabric/Loom/Modrinth build setup lives in `gradle/fabric-mod.gradle`.
+Each Java mod has its own `fabric.mod.json`, Java package, assets, and JAR. Shared Fabric/Loom/Modrinth build setup lives in `gradle/fabric-mod.gradle`. Each Bedrock add-on has its own linked packs under the mod's `bedrock/` folder.
 
 ## Requirements
 
@@ -38,8 +38,6 @@ Each mod has its own `fabric.mod.json`, Java package, assets, and jar. Shared Fa
 ./gradlew build
 ```
 
-For Mushroom's Bedrock development build, see the [Bedrock build and playtest guide](mods/mushroom-the-yorkie/bedrock/README.md).
-
 Distributable jars are written under the active Minecraft target:
 
 ```text
@@ -47,6 +45,14 @@ build/mods/narwhal-together/<minecraft-version>/libs/narwhal-together-<version>.
 build/mods/mushroom-the-yorkie/<minecraft-version>/libs/mushroom-the-yorkie-<version>.jar
 build/mods/cops-and-robbers/<minecraft-version>/libs/cops-and-robbers-<version>.jar
 ```
+
+## Bedrock add-ons
+
+Find published `.mcaddon` files under the release's **Assets**. Each release lists the Minecraft versions, devices, and ways to join that were tested. [GitHub Releases](https://github.com/alicon/minecraft-mods/releases)
+
+- [Mushroom the Yorkie](mods/mushroom-the-yorkie/bedrock/README.md)
+- [Cops and Robbers](mods/cops-and-robbers/bedrock/README.md)
+- [NARwhal Together](mods/narwhal-together/bedrock/README.md)
 
 ## Verification
 
