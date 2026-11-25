@@ -151,7 +151,7 @@ def expect_line(lines, marker, timeout=90):
     raise RuntimeError(f"Server did not report {marker!r} in {timeout}s")
 
 
-def exercise_world(server_dir, marker):
+def exercise_world(server_dir, marker, *, timeout=90):
     with subprocess.Popen(
         [str(server_dir / "bedrock_server")],
         cwd=server_dir,
@@ -168,7 +168,7 @@ def exercise_world(server_dir, marker):
         reader.start()
 
         try:
-            expect_line(lines, marker)
+            expect_line(lines, marker, timeout=timeout)
         finally:
             if server.poll() is None:
                 server.stdin.write("stop\n")
