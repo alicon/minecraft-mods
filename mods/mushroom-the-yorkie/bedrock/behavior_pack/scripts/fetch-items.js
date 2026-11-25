@@ -98,8 +98,10 @@ export function installToyEvents() {
 
   world.afterEvents.entityItemDrop.subscribe(({ entity, items }) => {
     if (entity instanceof Player) {
-      for (const item of items) {
-        const stack = item.isValid ? fetchStack(item) : undefined;
+      // Bedrock 26.66 exposes indexed drops here without an iterator.
+      for (let index = 0; index < items.length; ++index) {
+        const item = items[index];
+        const stack = item?.isValid ? fetchStack(item) : undefined;
         if (stack) {
           markToy(item, entity.id, stack.amount);
         }

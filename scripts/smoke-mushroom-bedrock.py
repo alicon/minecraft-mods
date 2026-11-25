@@ -198,6 +198,7 @@ def main():
         if args.verify_fetch:
             enable_beta_test_apis(server_dir)
             exercise_world(server_dir, "MUSHROOM_SIM_PASS")
+            exercise_world(server_dir, "MUSHROOM_SIM_CARGO_SAVED")
         print("Mushroom spawned and remained in the world after a server restart.")
 
 

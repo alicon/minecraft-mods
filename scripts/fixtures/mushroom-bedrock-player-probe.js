@@ -6,6 +6,8 @@ const TOY = "mushroom_yorkie:yorkie_ball";
 const ITEM_NAME = "Mushroom's Test Ball";
 const CHEW = "mushroom_yorkie:yorkie_chew_toy";
 const OTHER_NAME = "Mushroom's Second Toy";
+const OFFLINE_TOY = "Real ball with an offline owner";
+const SAVED_PET = "mushroom_smoke:offline_pet";
 
 async function waitFor(predicate, description, ticks = 180) {
   for (let elapsed = 0; elapsed < ticks; elapsed += 2) {
@@ -63,6 +65,15 @@ world.afterEvents.worldLoad.subscribe(async () => {
     const from = { x: 1, y: 228, z: 1 };
     const to = { x: 23, y: 233, z: 13 };
     await world.tickingAreaManager.createTickingArea("mushroom_owners", { dimension, from, to });
+    const savedPet = world.getDynamicProperty(SAVED_PET);
+    if (typeof savedPet === "string") {
+      const pet = world.getEntity(savedPet);
+      if (!pet?.isValid || carried(pet)?.nameTag !== OFFLINE_TOY || looseToys(dimension, OFFLINE_TOY).length) {
+        throw new Error("The same Yorkie did not keep the exact toy across a restart without his owner");
+      }
+      console.warn("MUSHROOM_SIM_CARGO_SAVED");
+      return;
+    }
     dimension.fillBlocks(new BlockVolume({ ...from, y: 230 }, { ...to, y: 230 }), "minecraft:stone");
     world.setTimeOfDay(1000);
 
@@ -116,9 +127,86 @@ world.afterEvents.worldLoad.subscribe(async () => {
     }
     console.warn("MUSHROOM_SIM_CREATIVE");
 
+    owner.setGameMode(GameMode.Survival);
+    const pocket = owner.getComponent("minecraft:inventory").container;
+    pocket.clearAll();
+    owner.teleport(ownerStart);
+    pupil.teleport(pupStart);
+    owner.interactWithEntity(pupil);
+    await waitFor(() => pupil.getProperty("mushroom_yorkie:ordered_sit") === true, "Mushroom to sit");
+    const paused = "Ball thrown while Mushroom is sitting";
+    throwToy(owner, TOY, paused);
+    await waitFor(() => looseToys(dimension, paused).length === 1, "a ball for the sitting test");
+    await system.waitTicks(32);
+    if (carried(pupil) || looseToys(dimension, paused).length !== 1) {
+      throw new Error("Mushroom disturbed the toy while ordered to sit");
+    }
+    owner.interactWithEntity(pupil);
+    await waitFor(() => pupil.getProperty("mushroom_yorkie:ordered_sit") === false, "Mushroom to stand");
+    await waitFor(() => inventoryCount(owner, TOY, paused) === 1, "one original ball to return after standing");
+    console.warn("MUSHROOM_SIM_SIT_FETCH");
+
+    owner.teleport(ownerStart);
+    pupil.teleport(pupStart);
+    const bone = new ItemStack("minecraft:bone");
+    bone.nameTag = "Bone tossed using Drop Item";
+    owner.setItem(bone, 0, true);
+    owner.setRotation({ x: 4, y: -90 });
+    const dropped = owner.dropSelectedItem();
+    owner.teleport({ ...ownerStart, x: 4 });
+    await waitFor(() => carried(pupil)?.nameTag === bone.nameTag,
+      "Mushroom to pick up a bone from Drop Item (" + dropped + ")");
+    await waitFor(() => inventoryCount(owner, bone.typeId, bone.nameTag) === 1,
+      "Mushroom to return exactly one original bone");
+    console.warn("MUSHROOM_SIM_BONE_FETCH");
+
+    owner.teleport(ownerStart);
+    pupil.teleport(pupStart);
+    const full = "A ball to return with full pockets";
+    throwToy(owner, TOY, full);
+    await waitFor(() => looseToys(dimension, full).length === 1, "the full-inventory scenario to start");
+    for (let slot = 0; slot < pocket.size; ++slot) {
+      pocket.setItem(slot, new ItemStack("minecraft:cobblestone", 64));
+    }
+    await waitFor(() => carried(pupil)?.nameTag === full, "Mushroom to carry the full-inventory toy");
+    await waitFor(() => !carried(pupil) && looseToys(dimension, full).length === 1,
+      "one recoverable Survival toy to be left on the ground");
+    console.warn("MUSHROOM_SIM_SURVIVAL_OVERFLOW");
+
+    pocket.clearAll();
+    owner.teleport(ownerStart);
+    pupil.teleport(pupStart);
+    const returnAfterModeChange = "Real ball with Creative pockets";
+    throwToy(owner, TOY, returnAfterModeChange);
+    await waitFor(() => carried(pupil)?.nameTag === returnAfterModeChange, "the real toy to be picked up");
+    owner.setGameMode(GameMode.Creative);
+    for (let slot = 0; slot < pocket.size; ++slot) {
+      pocket.setItem(slot, new ItemStack("minecraft:cobblestone", 64));
+    }
+    await system.waitTicks(55);
+    if (carried(pupil)?.nameTag !== returnAfterModeChange || looseToys(dimension, returnAfterModeChange).length) {
+      throw new Error("A real toy was lost or dropped when the owner's Creative inventory filled");
+    }
+    pocket.setItem(0, undefined);
+    await waitFor(() => inventoryCount(owner, TOY, returnAfterModeChange) === 1,
+      "the carried Survival toy to be returned after creating a slot in Creative");
+    console.warn("MUSHROOM_SIM_CREATIVE_OVERFLOW");
+
+    owner.setGameMode(GameMode.Survival);
+    pocket.clearAll();
+    owner.teleport(ownerStart);
+    pupil.teleport(pupStart);
+    throwToy(owner, TOY, OFFLINE_TOY);
+    await waitFor(() => carried(pupil)?.nameTag === OFFLINE_TOY, "the toy to be held before disconnect");
+    owner.disconnect();
+    await system.waitTicks(40);
+    if (carried(pupil)?.nameTag !== OFFLINE_TOY || looseToys(dimension, OFFLINE_TOY).length) {
+      throw new Error("Mushroom did not retain the toy for his offline owner");
+    }
+    world.setDynamicProperty(SAVED_PET, pupil.id);
+    console.warn("MUSHROOM_SIM_OFFLINE_HOLD");
     console.warn("MUSHROOM_SIM_PASS");
     other.disconnect();
-    owner.disconnect();
   } catch (error) {
     console.warn("MUSHROOM_TEST_FAIL " + String(error) + "\n" + (error.stack ?? ""));
   }
