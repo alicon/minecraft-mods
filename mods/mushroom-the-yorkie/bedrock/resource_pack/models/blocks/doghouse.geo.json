@@ -1,0 +1,399 @@
+{
+  "format_version": "1.21.0",
+  "minecraft:geometry": [
+    {
+      "description": {
+        "identifier": "geometry.mushroom_yorkie.doghouse",
+        "texture_width": 16,
+        "texture_height": 16
+      },
+      "bones": [
+        {
+          "name": "block",
+          "pivot": [0, 0, 0],
+          "cubes": [
+            {
+              "origin": [-8, 0, -10],
+              "size": [16, 2, 18],
+              "uv": {
+                "down": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "trim"
+                },
+                "up": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "bed"
+                },
+                "north": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "trim"
+                },
+                "south": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "trim"
+                },
+                "west": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "trim"
+                },
+                "east": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "trim"
+                }
+              }
+            },
+            {
+              "origin": [-8, 2, -7],
+              "size": [3, 13, 15],
+              "uv": {
+                "up": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "wall"
+                },
+                "down": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "wall"
+                },
+                "north": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "trim"
+                },
+                "south": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "wall"
+                },
+                "west": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "wall"
+                },
+                "east": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "wall"
+                }
+              }
+            },
+            {
+              "origin": [5, 2, -7],
+              "size": [3, 13, 15],
+              "uv": {
+                "up": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "wall"
+                },
+                "down": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "wall"
+                },
+                "north": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "trim"
+                },
+                "south": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "wall"
+                },
+                "west": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "wall"
+                },
+                "east": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "wall"
+                }
+              }
+            },
+            {
+              "origin": [-5, 2, 5],
+              "size": [10, 13, 3],
+              "uv": {
+                "up": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "wall"
+                },
+                "down": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "wall"
+                },
+                "north": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "wall"
+                },
+                "south": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "wall"
+                },
+                "west": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "wall"
+                },
+                "east": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "wall"
+                }
+              }
+            },
+            {
+              "origin": [-5, 12, -7],
+              "size": [10, 3, 2],
+              "uv": {
+                "up": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "trim"
+                },
+                "down": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "trim"
+                },
+                "north": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "trim"
+                },
+                "south": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "wall"
+                },
+                "west": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "trim"
+                },
+                "east": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "trim"
+                }
+              }
+            },
+            {
+              "origin": [-4.5, 2, 2.5],
+              "size": [9.0, 2, 4.0],
+              "uv": {
+                "up": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "pillow"
+                },
+                "north": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "pillow"
+                },
+                "south": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "pillow"
+                },
+                "west": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "pillow"
+                },
+                "east": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "pillow"
+                }
+              }
+            },
+            {
+              "origin": [-1, 10.5, 5],
+              "size": [2, 2.0, 2],
+              "uv": {
+                "down": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "light"
+                },
+                "up": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "light"
+                },
+                "north": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "light"
+                },
+                "south": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "light"
+                },
+                "west": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "light"
+                },
+                "east": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "light"
+                }
+              }
+            },
+            {
+              "origin": [-9, 13.5, -8],
+              "size": [10, 3.5, 17],
+              "uv": {
+                "down": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "roof"
+                },
+                "up": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "roof"
+                },
+                "north": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "roof"
+                },
+                "south": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "roof"
+                },
+                "west": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "roof"
+                },
+                "east": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "roof"
+                }
+              },
+              "pivot": [0, 15, 0],
+              "rotation": [0, 0, -22.5]
+            },
+            {
+              "origin": [-1, 13.5, -8],
+              "size": [10, 3.5, 17],
+              "uv": {
+                "down": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "roof"
+                },
+                "up": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "roof"
+                },
+                "north": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "roof"
+                },
+                "south": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "roof"
+                },
+                "west": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "roof"
+                },
+                "east": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "roof"
+                }
+              },
+              "pivot": [0, 15, 0],
+              "rotation": [0, 0, 22.5]
+            },
+            {
+              "origin": [-0.7000000000000002, 14.5, -8.25],
+              "size": [1.4, 4.0, 1.0],
+              "uv": {
+                "north": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "pillow"
+                },
+                "south": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "pillow"
+                },
+                "west": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "pillow"
+                },
+                "east": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "pillow"
+                }
+              },
+              "pivot": [0, 16.5, -7.75],
+              "rotation": [0, 0, 45]
+            },
+            {
+              "origin": [-0.7000000000000002, 14.5, -8.3],
+              "size": [1.4, 4.0, 1.0],
+              "uv": {
+                "north": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "pillow"
+                },
+                "south": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "pillow"
+                },
+                "west": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "pillow"
+                },
+                "east": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "pillow"
+                }
+              },
+              "pivot": [0, 16.5, -7.8],
+              "rotation": [0, 0, -45]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

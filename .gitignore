@@ -27,4 +27,5 @@ __pycache__/
 *.py[cod]
 
 tools/playtest-harness/node_modules/
+tools/bedrock/node_modules/
 tools/playtest-harness/artifacts/

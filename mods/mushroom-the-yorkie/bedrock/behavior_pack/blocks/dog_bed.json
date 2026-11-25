@@ -1,0 +1,74 @@
+{
+  "format_version": "1.26.50",
+  "minecraft:block": {
+    "description": {
+      "identifier": "mushroom_yorkie:dog_bed",
+      "menu_category": {
+        "category": "items"
+      },
+      "traits": {
+        "minecraft:placement_direction": {
+          "enabled_states": [
+            "minecraft:cardinal_direction"
+          ],
+          "y_rotation_offset": 180
+        }
+      }
+    },
+    "components": {
+      "minecraft:selection_box": {
+        "origin": [-7, 0, -7],
+        "size": [14, 4, 14]
+      },
+      "minecraft:collision_box": {
+        "origin": [-7, 0, -7],
+        "size": [14, 3, 14]
+      },
+      "minecraft:geometry": "geometry.mushroom_yorkie.dog_bed",
+      "minecraft:material_instances": {
+        "*": {
+          "texture": "wool_colored_red",
+          "render_method": "opaque"
+        },
+        "bed": {
+          "texture": "wool_colored_red",
+          "render_method": "opaque"
+        },
+        "pillow": {
+          "texture": "wool_colored_white",
+          "render_method": "opaque"
+        }
+      },
+      "minecraft:destructible_by_mining": {
+        "seconds_to_destroy": 0.4
+      },
+      "minecraft:light_dampening": 0
+    },
+    "permutations": [
+      {
+        "condition": "query.block_state('minecraft:cardinal_direction') == 'east'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [0, -90, 0]
+          }
+        }
+      },
+      {
+        "condition": "query.block_state('minecraft:cardinal_direction') == 'south'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [0, 180, 0]
+          }
+        }
+      },
+      {
+        "condition": "query.block_state('minecraft:cardinal_direction') == 'west'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [0, 90, 0]
+          }
+        }
+      }
+    ]
+  }
+}

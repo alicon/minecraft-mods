@@ -1,0 +1,27 @@
+{
+  "format_version": "1.8.0",
+  "render_controllers": {
+    "controller.render.mushroom_yorkie": {
+      "geometry": "Geometry.default",
+      "materials": [
+        {
+          "*": "Material.default"
+        }
+      ],
+      "textures": [
+        "Texture.default"
+      ],
+      "part_visibility": [
+        {
+          "harness": "query.property('mushroom_yorkie:wearing_harness')"
+        },
+        {
+          "left_eye": "!(query.property('mushroom_yorkie:home_goal') == 'sleep')"
+        },
+        {
+          "right_eye": "!(query.property('mushroom_yorkie:home_goal') == 'sleep')"
+        }
+      ]
+    }
+  }
+}

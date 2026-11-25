@@ -1,6 +1,6 @@
 # Compatibility Policy
 
-This repo optimizes for simple, maintainable Fabric mods for family Minecraft play.
+This repo maintains native Java Fabric mods and is adding native Bedrock Add-Ons for family Minecraft play.
 
 ## Supported Platform
 
@@ -18,6 +18,19 @@ Current Minecraft target support:
 - NARwhal Together: Minecraft Java Edition `1.21.11` and `1.21.1`
 - Mushroom the Yorkie: Minecraft Java Edition `1.21.11` and `1.21.1`
 - Cops and Robbers: Minecraft Java Edition `1.21.11`
+
+## Bedrock development
+
+Mushroom's development packs target Bedrock 26.60 with stable pack schemas. Release support is based on the exact versions and devices that pass playtesting. Cops and Robbers and NARwhal Together are planned.
+
+- Keep each Bedrock implementation under `mods/<mod-name>/bedrock/` with independent release versions and stable pack UUIDs. Keep Bedrock-specific behavior, models, and interactions there. Reuse matching art and test data and compare player-visible behavior across editions.
+- Use stable Bedrock Script API modules when scripts are needed. Check the pack's minimum engine version against the modules and content in its manifests. Track important edition differences with each release.
+- Record the effects on Java and Bedrock in gameplay changes. Run the affected Fabric checks and Bedrock package checks, and test the exact package on a supported client for as many affected scenarios as apply. Include save/reopen, upgrade, controller or touch, and multiplayer or Realm checks for release.
+- Keep released identifiers and save keys stable. Increment both Bedrock pack versions together. Exercise previous saves in disposable copies before releasing changes to saved state or assets.
+
+Run `npm --prefix tools/bedrock ci` and `npm --prefix tools/bedrock run check` to type-check Bedrock scripts against the pinned stable API. Keep the API typings in sync with the behavior pack's dependency when updating a script.
+
+See [Add-On development](https://learn.microsoft.com/en-us/minecraft/creator/documents/addondevelopmentworkflow?view=minecraft-bedrock-stable) and [Script API versioning](https://learn.microsoft.com/en-us/minecraft/creator/documents/scripting/versioning?view=minecraft-bedrock-stable).
 
 ## Non-Goals For Now
 

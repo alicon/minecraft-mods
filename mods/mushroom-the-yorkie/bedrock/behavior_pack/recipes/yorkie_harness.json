@@ -1,0 +1,36 @@
+{
+  "format_version": "1.21.30",
+  "minecraft:recipe_shaped": {
+    "description": {
+      "identifier": "mushroom_yorkie:yorkie_harness"
+    },
+    "tags": [
+      "crafting_table"
+    ],
+    "pattern": [
+      "S S",
+      "LBL",
+      " S "
+    ],
+    "key": {
+      "B": {
+        "item": "minecraft:black_dye"
+      },
+      "L": {
+        "item": "minecraft:leather"
+      },
+      "S": {
+        "item": "minecraft:string"
+      }
+    },
+    "result": {
+      "item": "mushroom_yorkie:yorkie_harness",
+      "count": 1
+    },
+    "unlock": [
+      {
+        "item": "minecraft:leather"
+      }
+    ]
+  }
+}

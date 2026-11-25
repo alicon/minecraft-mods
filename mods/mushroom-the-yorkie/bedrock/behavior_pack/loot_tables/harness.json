@@ -1,0 +1,14 @@
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "item",
+          "name": "mushroom_yorkie:yorkie_harness",
+          "weight": 1
+        }
+      ]
+    }
+  ]
+}

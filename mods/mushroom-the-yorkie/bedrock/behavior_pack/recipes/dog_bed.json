@@ -1,0 +1,32 @@
+{
+  "format_version": "1.21.30",
+  "minecraft:recipe_shaped": {
+    "description": {
+      "identifier": "mushroom_yorkie:dog_bed"
+    },
+    "tags": [
+      "crafting_table"
+    ],
+    "result": {
+      "item": "mushroom_yorkie:dog_bed",
+      "count": 1
+    },
+    "unlock": [
+      {
+        "item": "minecraft:white_wool"
+      }
+    ],
+    "pattern": [
+      "WWW",
+      " D "
+    ],
+    "key": {
+      "D": {
+        "item": "minecraft:red_dye"
+      },
+      "W": {
+        "item": "minecraft:white_wool"
+      }
+    }
+  }
+}

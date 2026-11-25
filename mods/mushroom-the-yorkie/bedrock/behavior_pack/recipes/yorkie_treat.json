@@ -1,0 +1,31 @@
+{
+  "format_version": "1.21.30",
+  "minecraft:recipe_shapeless": {
+    "description": {
+      "identifier": "mushroom_yorkie:yorkie_treat"
+    },
+    "tags": [
+      "crafting_table"
+    ],
+    "ingredients": [
+      {
+        "item": "minecraft:mutton"
+      },
+      {
+        "item": "minecraft:bone"
+      },
+      {
+        "item": "minecraft:bone"
+      }
+    ],
+    "result": {
+      "item": "mushroom_yorkie:yorkie_treat",
+      "count": 8
+    },
+    "unlock": [
+      {
+        "item": "minecraft:mutton"
+      }
+    ]
+  }
+}

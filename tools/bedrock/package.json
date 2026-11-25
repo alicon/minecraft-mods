@@ -1,0 +1,11 @@
+{
+  "name": "minecraft-mods-bedrock-tools",
+  "private": true,
+  "scripts": {
+    "check": "tsc --project tsconfig.json"
+  },
+  "devDependencies": {
+    "@minecraft/server": "2.11.0",
+    "typescript": "5.9.3"
+  }
+}
