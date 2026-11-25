@@ -27,6 +27,14 @@
         "mushroom_yorkie:ordered_sit": {
           "type": "bool",
           "default": false
+        },
+        "mushroom_yorkie:fetch_seeking": {
+          "type": "bool",
+          "default": false
+        },
+        "mushroom_yorkie:fetch_busy": {
+          "type": "bool",
+          "default": false
         }
       }
     },
@@ -254,6 +262,11 @@
                   "test": "has_component",
                   "value": "minecraft:behavior.random_stroll",
                   "operator": "!="
+                },
+                {
+                  "test": "bool_property",
+                  "domain": "mushroom_yorkie:fetch_seeking",
+                  "value": false
                 }
               ]
             },
@@ -292,6 +305,12 @@
             "event": "mushroom_yorkie:ordered_stand"
           }
         ]
+      },
+      "minecraft:inventory": {
+        "inventory_size": 1,
+        "container_type": "inventory",
+        "private": false,
+        "restrict_to_owner": true
       }
     },
     "events": {
@@ -450,6 +469,21 @@
         },
         "set_property": {
           "mushroom_yorkie:home_goal": "sleep"
+        }
+      },
+      "mushroom_yorkie:fetch_seek_on": {
+        "remove": {
+          "component_groups": [
+            "mushroom_yorkie:awake"
+          ]
+        },
+        "set_property": {
+          "mushroom_yorkie:fetch_seeking": true
+        }
+      },
+      "mushroom_yorkie:fetch_seek_off": {
+        "set_property": {
+          "mushroom_yorkie:fetch_seeking": false
         }
       }
     }

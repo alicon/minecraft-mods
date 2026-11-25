@@ -1,4 +1,4 @@
-import { BlockPermutation, BlockTypes, BlockVolume, ItemTypes, system, world } from "@minecraft/server";
+import { BlockPermutation, BlockTypes, BlockVolume, ItemStack, ItemTypes, system, world } from "@minecraft/server";
 
 const YORKIE = "mushroom_yorkie:mushroom_yorkie";
 const ENTITY_ID = "mushroom_smoke:original_entity";
@@ -53,6 +53,36 @@ function testFurniture(dimension) {
     dimension.setBlockType(location, "minecraft:air");
   }
   console.warn("MUSHROOM_TEST_FURNITURE");
+}
+
+async function testFetchEquipment(dimension) {
+  const id = NAMESPACE + "yorkie_ball";
+  if (!ItemTypes.get(id)) {
+    return;
+  }
+  const toy = new ItemStack(id);
+  toy.nameTag = "Bedrock Fetch Fixture";
+  const thrown = dimension.spawnItem(toy, { x: 10.5, y: 202.5, z: 9.5 });
+  thrown.applyImpulse({ x: 0.3, y: 0.05, z: 0 });
+  await waitFor(() => thrown.location.x > 10.75, "the dropped toy to move under impulse", 30);
+  thrown.remove();
+
+  const carrier = dimension.spawnEntity(YORKIE, { x: 10.5, y: 201, z: 9.5 }, { spawnEvent: "minecraft:entity_spawned" });
+  const cargo = carrier.getComponent("minecraft:inventory")?.container;
+  cargo?.setItem(0, toy);
+  if (cargo?.getItem(0)?.nameTag !== toy.nameTag) {
+    throw new Error("The Yorkie's carried slot did not keep the real item metadata");
+  }
+  carrier.kill();
+  const findToys = () => dimension.getEntities({ type: "minecraft:item", location: CENTER, maxDistance: 8 })
+    .map((item) => item.getComponent("minecraft:item")?.itemStack)
+    .filter((stack) => stack?.nameTag === toy.nameTag);
+  await waitFor(() => findToys().length !== 0, "the native death drop of the carried toy", 50);
+  const [returned] = findToys();
+  if (findToys().length !== 1 || returned.amount !== 1 || returned.typeId !== id) {
+    throw new Error("The carrier failed to drop exactly one real toy");
+  }
+  console.warn("MUSHROOM_TEST_FETCH_EQUIPMENT");
 }
 
 async function testDomesticCare(puppy, dimension) {
@@ -159,6 +189,7 @@ world.afterEvents.worldLoad.subscribe(async () => {
       }
       await testHarness(pups[0]);
       testFurniture(dimension);
+      await testFetchEquipment(dimension);
       await testDomesticCare(pups[0], dimension);
       console.warn("MUSHROOM_TEST_REOPENED");
       return;

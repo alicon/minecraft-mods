@@ -21,6 +21,7 @@ Open the generated `build/bedrock/mushroom-the-yorkie-bedrock-*.mcaddon` on a Be
 4. Craft a Yorkie Harness from string, leather, and black dye. Use the harness on Mushroom before attaching a lead. To remove it in Bedrock, use shears and pick up the harness.
 5. Craft a copper bowl and combine it with a Yorkie Treat or a water bucket. Place the full bowl nearby. Mushroom can finish one food bowl and one water bowl each Minecraft day, and returns each to an empty bowl.
 6. Set a dog bed or doghouse on solid ground. A following Mushroom seeks a clear, dry spot at night and prefers the doghouse. Keep the entrance open so he can reach the mattress.
+7. Craft a Yorkie Ball with white wool, lime dye, and string, or use yellow dye for a Yorkie Chew Toy. Use either toy to throw it. You can also use Minecraft's Drop Item action to toss a bone. Play while Mushroom is following on safe terrain.
 
 ## Verify the add-on
 
@@ -32,6 +33,7 @@ Open the generated `build/bedrock/mushroom-the-yorkie-bedrock-*.mcaddon` on a Be
 
 - Verify furniture placement, facing, lighting and the visible models. Check that an obstructed or wet doghouse does not leave Mushroom stuck, that he wakes at dawn, and that a nearby nighttime threat interrupts sleep.
 - Refill both bowls on the same Minecraft day, reopen the world and check the daily limits. Keep both tamed pets in the world during a multiplayer test and verify that the care messages go to their own players.
+- Throw and recover each toy in Survival and Creative. Verify the original item comes back once, then test a full inventory, multiplayer throws, interrupted fetch and covered water or unsafe terrain.
 
 The development build also attempts adoption after a full night in an Overworld bed. It can bring a loaded, following Yorkie back after a full day apart. Test both routes with two players and check that a second adoption does not replace an existing pet. The outdoor request routine is tracked in [the home routine issue](https://github.com/alicon/minecraft-mods/issues/129).
 
@@ -49,5 +51,7 @@ python3 scripts/smoke-mushroom-bedrock.py /path/to/bedrock-server.zip /path/to/m
 ```
 
 Use `--upgrade-from /path/to/earlier-mushroom.mcaddon` to spawn the Yorkie in an earlier build and reopen the same disposable world with the newer pack. Add `--verify-care-persistence` to verify that the food limit and the tamed component state survive a further restart. Client import, visuals, ordinary player interactions and Realm delivery require the in-game checks above.
+
+Add `--verify-fetch` to exercise interaction with two simulated players on Bedrock Dedicated Server 26.66. The fixture enables GameTest in its disposable world after the ordinary add-on checks. The add-on uses the stable Script API.
 
 [Importing Add-Ons](https://learn.microsoft.com/en-us/minecraft/creator/documents/gettingstarted?view=minecraft-bedrock-stable) · [Activating Add-Ons on a Realm](https://help.minecraft.net/hc/en-us/articles/24120525083533-How-to-activate-Minecraft-Add-On)

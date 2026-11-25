@@ -6,6 +6,7 @@ import json
 import os
 import queue
 import shutil
+import struct
 import subprocess
 import tempfile
 import threading
@@ -16,6 +17,7 @@ from zipfile import ZipFile
 WORLD = "Mushroom Bedrock Smoke"
 PROBE_ID = "836a477e-ab53-4084-8ff3-600c098fb836"
 PROBE_SOURCE = Path(__file__).with_name("fixtures") / "mushroom-bedrock-smoke.js"
+PLAYER_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-player-probe.js")
 SERVER_PROPERTIES = {
     "level-name": WORLD,
     "gamemode": "survival",
@@ -69,6 +71,45 @@ def install_probe(server_dir):
         "dependencies": [{"module_name": "@minecraft/server", "version": "2.11.0"}],
     }
     (pack_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+
+def enable_beta_test_apis(server_dir):
+    # The production packs have already been exercised in a normal world.
+    # This edit is limited to the newly generated, disposable GameTest world.
+    level = server_dir / "worlds" / WORLD / "level.dat"
+    raw = level.read_bytes()
+    version, length = struct.unpack_from("<II", raw)
+    payload = raw[8:]
+    if len(payload) != length or payload[0] != 10 or payload[-1] != 0:
+        raise ValueError("Unexpected Bedrock level.dat header or compound terminator")
+
+    experiments = b"\x0a\x0b\x00experiments"
+    game_test = b"\x01\x08\x00gametest"
+    offset = payload.find(experiments)
+    if offset < 0:
+        payload = payload[:-1] + experiments + game_test + b"\x01\x00\x00"
+    else:
+        start = offset + len(experiments)
+        cursor = start
+        while payload[cursor] == 1:
+            name_length = struct.unpack_from("<H", payload, cursor + 1)[0]
+            value = cursor + 3 + name_length
+            if payload[cursor:value] == game_test:
+                payload = payload[:value] + b"\x01" + payload[value + 1:]
+                break
+            cursor = value + 1
+        else:
+            if payload[cursor] != 0:
+                raise ValueError("Expected byte flags in the generated experiments compound")
+            payload = payload[:cursor] + game_test + b"\x01" + payload[cursor:]
+    level.write_bytes(struct.pack("<II", version, len(payload)) + payload)
+
+    probe = server_dir / "behavior_packs" / "mushroom_smoke_test"
+    manifest_path = probe / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["dependencies"].append({"module_name": "@minecraft/server-gametest", "version": "1.0.0-beta"})
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    shutil.copyfile(PLAYER_PROBE_SOURCE, probe / "scripts" / "probe.js")
 
 
 def collect_output(stream, lines):
@@ -136,6 +177,7 @@ def main():
     parser.add_argument("addon", type=Path)
     parser.add_argument("--upgrade-from", type=Path)
     parser.add_argument("--verify-care-persistence", action="store_true")
+    parser.add_argument("--verify-fetch", action="store_true", help="run an opt-in simulated-player fetch test")
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="mushroom-bedrock-smoke-") as directory:
         server_dir = Path(directory)
@@ -153,6 +195,9 @@ def main():
         exercise_world(server_dir, "MUSHROOM_TEST_REOPENED")
         if args.verify_care_persistence:
             exercise_world(server_dir, "MUSHROOM_TEST_CARE_PERSISTED")
+        if args.verify_fetch:
+            enable_beta_test_apis(server_dir)
+            exercise_world(server_dir, "MUSHROOM_SIM_PASS")
         print("Mushroom spawned and remained in the world after a server restart.")
 
 

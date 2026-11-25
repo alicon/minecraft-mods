@@ -58,7 +58,8 @@ class BedrockPackageTests(unittest.TestCase):
         java_recipes = MOD / "src/main/resources/data/mushroom_yorkie/recipe"
         bedrock_recipes = ADDON / "behavior_pack/recipes"
         for name in (
-            "yorkie_treat", "yorkie_harness", "dog_bowl", "dog_food_bowl", "dog_water_bowl", "dog_bed", "doghouse"
+            "yorkie_treat", "yorkie_harness", "dog_bowl", "dog_food_bowl", "dog_water_bowl",
+            "dog_bed", "doghouse", "yorkie_ball", "yorkie_chew_toy",
         ):
             with self.subTest(recipe=name):
                 java = builder.read_json(java_recipes / f"{name}.json")

@@ -111,6 +111,10 @@ function update(pup, state, day, time, now) {
   }
 
   const night = nightFor(pup, time);
+  if (!night && pup.getProperty(storage("fetch_busy"))) {
+    state.name = undefined;
+    return;
+  }
   if (night && alertAtNight(pup, owner, state, now)) {
     requestGoal(pup, "idle");
     state.name = undefined;
