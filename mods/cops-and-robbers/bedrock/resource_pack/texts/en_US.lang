@@ -1,0 +1,15 @@
+item.cops_robbers:bank_kit.name=Bank Kit
+item.cops_robbers:police_station_kit.name=Police Station Kit
+item.cops_robbers:fire_station_kit.name=Fire Station Kit
+entity.cops_robbers:cop.name=Police Officer
+item.spawn_egg.entity.cops_robbers:cop.name=Police Officer
+entity.cops_robbers:teller.name=Bank Teller
+item.spawn_egg.entity.cops_robbers:teller.name=Bank Teller
+entity.cops_robbers:fireman.name=Firefighter
+item.spawn_egg.entity.cops_robbers:fireman.name=Firefighter
+action.interact.cops_robbers_place_kit=Place kit
+cops_robbers.kit.preview=Use the kit again on this block to build. The lights show the corners.
+cops_robbers.kit.empty=Choose an empty, level site for this kit.
+cops_robbers.kit.top=Use the kit on the top of a ground block.
+cops_robbers.kit.players=Everyone must step outside the build area.
+cops_robbers.kit.built=Ready for patrol!

@@ -1,6 +1,8 @@
 import importlib.util
 import io
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from collections import Counter
@@ -45,6 +47,32 @@ class BedrockPackageTests(unittest.TestCase):
                     [script] = [module for module in status["behavior_pack"]["modules"] if module["type"] == "script"]
                     expected = (ADDON / "behavior_pack" / script["entry"]).read_bytes()
                     self.assertEqual(behavior.read(script["entry"]), expected)
+
+    def test_cops_kit_archive_uses_current_templates_and_separate_ids(self):
+        cops = builder.ROOT / "mods" / "cops-and-robbers"
+        bedrock = cops / "bedrock"
+        subprocess.run([sys.executable, str(bedrock / "tools/build-structures.py"), "--check"], check=True)
+        with tempfile.TemporaryDirectory() as directory:
+            archive = builder.build(cops, Path(directory))
+            self.assertEqual(archive.read_bytes(), builder.build(cops, Path(directory) / "again").read_bytes())
+            with ZipFile(archive) as addon:
+                with (
+                    ZipFile(io.BytesIO(addon.read(f"{cops.name}-data.mcpack"))) as behavior,
+                    ZipFile(io.BytesIO(addon.read(f"{cops.name}-resources.mcpack"))) as resource,
+                ):
+                    for name in ("bank", "police_station", "fire_station"):
+                        path = f"structures/cops_robbers/{name}.mcstructure"
+                        self.assertEqual(behavior.read(path), (bedrock / "behavior_pack" / path).read_bytes())
+                        self.assertIn(f"items/{name}_kit.json", behavior.namelist())
+                        art = cops / "src/main/resources/assets/cops_robbers" / f"textures/item/{name}_kit.png"
+                        self.assertEqual(resource.read(f"textures/items/{name}_kit.png"), art.read_bytes())
+
+        identifiers = []
+        for addon in (ADDON, bedrock):
+            for kind in builder.PACK_TYPES:
+                manifest = builder.read_json(addon / kind / "manifest.json")
+                identifiers.extend(entry["uuid"] for entry in (manifest["header"], *manifest["modules"]))
+        self.assertEqual(len(identifiers), len(set(identifiers)))
 
     def test_mismatched_dependency_cannot_be_packaged(self):
         manifests = {

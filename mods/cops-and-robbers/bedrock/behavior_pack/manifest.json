@@ -1,0 +1,54 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "Cops and Robbers (Behavior)",
+    "description": "Set up a town for the Cops and Robbers patrol.",
+    "uuid": "4da49bba-bf03-4104-be22-002c8de79336",
+    "version": [
+      0,
+      1,
+      0
+    ],
+    "min_engine_version": [
+      1,
+      26,
+      60
+    ]
+  },
+  "modules": [
+    {
+      "type": "data",
+      "uuid": "565082a5-e419-442f-908e-406684ec23d4",
+      "version": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "type": "script",
+      "language": "javascript",
+      "uuid": "372a0f2f-7c0e-4620-97de-9b44c091f0ab",
+      "version": [
+        0,
+        1,
+        0
+      ],
+      "entry": "scripts/main.js"
+    }
+  ],
+  "dependencies": [
+    {
+      "uuid": "e7ed5890-d98c-4beb-91bd-73235b289075",
+      "version": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "module_name": "@minecraft/server",
+      "version": "2.11.0"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "behavior_pack": {
+    "pack_icon.png": "src/main/resources/assets/cops_robbers/icon.png"
+  },
+  "resource_pack": {
+    "pack_icon.png": "src/main/resources/assets/cops_robbers/icon.png",
+    "textures/items/bank_kit.png": "src/main/resources/assets/cops_robbers/textures/item/bank_kit.png",
+    "textures/items/police_station_kit.png": "src/main/resources/assets/cops_robbers/textures/item/police_station_kit.png",
+    "textures/items/fire_station_kit.png": "src/main/resources/assets/cops_robbers/textures/item/fire_station_kit.png",
+    "textures/entity/cop.png": "src/main/resources/assets/cops_robbers/textures/entity/cop.png",
+    "textures/entity/teller.png": "src/main/resources/assets/cops_robbers/textures/entity/teller.png",
+    "textures/entity/fireman.png": "src/main/resources/assets/cops_robbers/textures/entity/fireman.png"
+  }
+}
