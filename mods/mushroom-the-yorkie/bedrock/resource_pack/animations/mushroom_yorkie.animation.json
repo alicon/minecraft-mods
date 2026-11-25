@@ -1,0 +1,136 @@
+{
+  "format_version": "1.8.0",
+  "animations": {
+    "animation.mushroom_yorkie.look": {
+      "loop": true,
+      "bones": {
+        "head": {
+          "rotation": [
+            "query.target_x_rotation",
+            "query.target_y_rotation",
+            0
+          ]
+        }
+      }
+    },
+    "animation.mushroom_yorkie.idle": {
+      "loop": true,
+      "bones": {
+        "tail": {
+          "rotation": [
+            0,
+            "math.sin(query.life_time * 630) * 26",
+            0
+          ]
+        },
+        "left_ear": {
+          "rotation": [
+            0,
+            0,
+            "math.sin(query.life_time * 170) * 2"
+          ]
+        },
+        "right_ear": {
+          "rotation": [
+            0,
+            0,
+            "-math.sin(query.life_time * 170) * 2"
+          ]
+        }
+      }
+    },
+    "animation.mushroom_yorkie.walk": {
+      "loop": true,
+      "anim_time_update": "query.modified_distance_moved",
+      "bones": {
+        "front_left_leg": {
+          "rotation": [
+            "math.cos(query.anim_time * 180 + 0) * 40",
+            0,
+            0
+          ]
+        },
+        "back_right_leg": {
+          "rotation": [
+            "math.cos(query.anim_time * 180 + 0) * 40",
+            0,
+            0
+          ]
+        },
+        "front_right_leg": {
+          "rotation": [
+            "math.cos(query.anim_time * 180 + 180) * 40",
+            0,
+            0
+          ]
+        },
+        "back_left_leg": {
+          "rotation": [
+            "math.cos(query.anim_time * 180 + 180) * 40",
+            0,
+            0
+          ]
+        }
+      }
+    },
+    "animation.mushroom_yorkie.sit": {
+      "loop": true,
+      "bones": {
+        "body": {
+          "position": [
+            0,
+            -2.1,
+            0
+          ],
+          "rotation": [
+            22,
+            0,
+            0
+          ]
+        },
+        "head": {
+          "position": [
+            0,
+            -0.1,
+            0
+          ]
+        },
+        "tail": {
+          "rotation": [
+            -52,
+            0,
+            0
+          ]
+        },
+        "front_left_leg": {
+          "rotation": [
+            54,
+            0,
+            0
+          ]
+        },
+        "front_right_leg": {
+          "rotation": [
+            54,
+            0,
+            0
+          ]
+        },
+        "back_left_leg": {
+          "rotation": [
+            54,
+            0,
+            0
+          ]
+        },
+        "back_right_leg": {
+          "rotation": [
+            54,
+            0,
+            0
+          ]
+        }
+      }
+    }
+  }
+}

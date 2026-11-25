@@ -1,0 +1,103 @@
+{
+  "format_version": "1.26.60",
+  "minecraft:entity": {
+    "description": {
+      "identifier": "mushroom_yorkie:mushroom_yorkie",
+      "is_spawnable": true,
+      "is_summonable": true
+    },
+    "component_groups": {
+      "mushroom_yorkie:untamed": {
+        "minecraft:tameable": {
+          "probability": 1,
+          "tame_items": [
+            "mushroom_yorkie:yorkie_treat"
+          ],
+          "tame_event": {
+            "event": "mushroom_yorkie:on_tame",
+            "target": "self"
+          }
+        }
+      },
+      "mushroom_yorkie:tamed": {
+        "minecraft:is_tamed": {},
+        "minecraft:sittable": {},
+        "minecraft:leashable": {
+          "can_be_stolen": false
+        },
+        "minecraft:behavior.stay_while_sitting": {
+          "priority": 1
+        },
+        "minecraft:behavior.follow_owner": {
+          "priority": 2,
+          "speed_multiplier": 1.15,
+          "start_distance": 4,
+          "stop_distance": 2
+        }
+      }
+    },
+    "components": {
+      "minecraft:type_family": {
+        "family": [
+          "mushroom_yorkie",
+          "mob"
+        ]
+      },
+      "minecraft:health": {
+        "value": 20,
+        "max": 20
+      },
+      "minecraft:collision_box": {
+        "width": 0.42,
+        "height": 0.46
+      },
+      "minecraft:persistent": {},
+      "minecraft:nameable": {},
+      "minecraft:physics": {},
+      "minecraft:movement": {
+        "value": 0.25
+      },
+      "minecraft:movement.basic": {},
+      "minecraft:navigation.walk": {
+        "avoid_water": true,
+        "can_path_over_water": true
+      },
+      "minecraft:jump.static": {},
+      "minecraft:behavior.float": {
+        "priority": 0
+      },
+      "minecraft:behavior.random_stroll": {
+        "priority": 5,
+        "speed_multiplier": 0.75
+      },
+      "minecraft:behavior.look_at_player": {
+        "priority": 6,
+        "look_distance": 6
+      },
+      "minecraft:behavior.random_look_around": {
+        "priority": 7
+      }
+    },
+    "events": {
+      "minecraft:entity_spawned": {
+        "add": {
+          "component_groups": [
+            "mushroom_yorkie:untamed"
+          ]
+        }
+      },
+      "mushroom_yorkie:on_tame": {
+        "remove": {
+          "component_groups": [
+            "mushroom_yorkie:untamed"
+          ]
+        },
+        "add": {
+          "component_groups": [
+            "mushroom_yorkie:tamed"
+          ]
+        }
+      }
+    }
+  }
+}

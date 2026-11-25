@@ -1,0 +1,4 @@
+entity.mushroom_yorkie:mushroom_yorkie.name=Mushroom
+item.spawn_egg.entity.mushroom_yorkie:mushroom_yorkie.name=Mushroom Spawn Egg
+item.mushroom_yorkie:yorkie_treat.name=Yorkie Treat
+item.mushroom_yorkie:adoption_tag.name=Mushroom Adoption Egg

@@ -1,0 +1,44 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "mushroom_yorkie:mushroom_yorkie",
+      "materials": {
+        "default": "entity_alphatest"
+      },
+      "textures": {
+        "default": "textures/entity/mushroom_yorkie"
+      },
+      "geometry": {
+        "default": "geometry.mushroom_yorkie.yorkie"
+      },
+      "spawn_egg": {
+        "base_color": "#614738",
+        "overlay_color": "#DAB181"
+      },
+      "animations": {
+        "look": "animation.mushroom_yorkie.look",
+        "idle": "animation.mushroom_yorkie.idle",
+        "walk": "animation.mushroom_yorkie.walk",
+        "sit": "animation.mushroom_yorkie.sit"
+      },
+      "scripts": {
+        "animate": [
+          "look",
+          {
+            "idle": "!query.is_sitting"
+          },
+          {
+            "walk": "!query.is_sitting && query.modified_move_speed > 0.01"
+          },
+          {
+            "sit": "query.is_sitting"
+          }
+        ]
+      },
+      "render_controllers": [
+        "controller.render.default"
+      ]
+    }
+  }
+}

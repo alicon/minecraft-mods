@@ -1,0 +1,39 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "Mushroom the Yorkie (Behavior)",
+    "description": "Meet Mushroom, a tiny Yorkie companion.",
+    "uuid": "39cd5d27-46ff-4535-8858-c031b7eee2f7",
+    "version": [
+      0,
+      1,
+      0
+    ],
+    "min_engine_version": [
+      1,
+      26,
+      60
+    ]
+  },
+  "modules": [
+    {
+      "type": "data",
+      "uuid": "1cd4e75c-9de8-4960-8a64-53750fbf59c2",
+      "version": [
+        0,
+        1,
+        0
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "uuid": "eca38482-d83d-4767-8fa9-73f548474fdb",
+      "version": [
+        0,
+        1,
+        0
+      ]
+    }
+  ]
+}

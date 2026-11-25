@@ -1,0 +1,12 @@
+{
+  "resource_pack_name": "mushroom_yorkie",
+  "texture_name": "atlas.items",
+  "texture_data": {
+    "mushroom_yorkie_treat": {
+      "textures": "textures/items/yorkie_treat"
+    },
+    "mushroom_yorkie_adoption": {
+      "textures": "textures/items/mushroom_yorkie_spawn_egg"
+    }
+  }
+}
