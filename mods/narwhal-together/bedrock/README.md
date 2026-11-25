@@ -21,4 +21,4 @@ npm --prefix tools/bedrock run check
 python3 scripts/smoke-narwhal-bedrock.py /path/to/bedrock-server.zip build/bedrock/narwhal-together-bedrock-0.1.0.mcaddon
 ```
 
-The disposable server test exercises native use with simulated Survival players. Controller, touch, crafting menus, and Realm delivery need client playtests. [Device controls](https://github.com/alicon/minecraft-mods/issues/139) · [Multiplayer regroup](https://github.com/alicon/minecraft-mods/issues/140)
+The disposable server test reopens a saved charm and exercises native use with simulated Survival players. Pass `--upgrade-from` with an older archive to test a pack upgrade in the same save. Controller, touch, crafting menus, and Realm delivery need client playtests. [Device controls](https://github.com/alicon/minecraft-mods/issues/139) · [Multiplayer regroup](https://github.com/alicon/minecraft-mods/issues/140)

@@ -18,13 +18,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("server_zip", type=Path)
     parser.add_argument("addon", type=Path)
+    parser.add_argument("--upgrade-from", type=Path)
     args = parser.parse_args()
     with TemporaryDirectory(prefix="narwhal-bedrock-smoke-") as directory:
         server_dir = Path(directory)
         prepare_server(args.server_zip, server_dir, WORLD)
         install_probe(server_dir, WORLD, PROBE)
-        install_addon(args.addon, server_dir, WORLD)
+        install_addon(args.upgrade_from or args.addon, server_dir, WORLD)
         exercise_world(server_dir, "NARWHAL_CHARM_REGISTERED")
+        if args.upgrade_from:
+            install_addon(args.addon, server_dir, WORLD)
+        exercise_world(server_dir, "NARWHAL_CHARM_PERSISTED")
         runtime_probe = enable_beta_test_apis(server_dir, WORLD)
         shutil.copyfile(PROBE.with_name("narwhal-bedrock-regroup-probe.js"), runtime_probe)
         exercise_world(server_dir, "NARWHAL_REGROUP_PLAYABLE")
