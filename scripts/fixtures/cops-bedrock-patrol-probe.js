@@ -133,6 +133,7 @@ async function resumePatrol(dimension, driver, other, teller, saved) {
     "Garage drop-off did not move the captured robber to the jail cell");
   console.warn("COPS_PATROL_JAIL");
 
+  world.gameRules.doDayLightCycle = false;
   const vault = chest(dimension);
   vault.setItem(0, new ItemStack("minecraft:paper", 1));
   await talk(other, teller);

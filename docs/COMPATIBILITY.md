@@ -21,7 +21,7 @@ Current Minecraft target support:
 
 ## Bedrock development
 
-Mushroom and Cops and Robbers development packs target Bedrock 26.60 with stable pack schemas. The Cops and Robbers development build includes the three kits and ground vehicles. NARwhal Together is planned. Release support is based on the exact versions and devices that pass playtesting.
+Mushroom and Cops and Robbers development packs target Bedrock 26.60 with stable pack schemas. The Cops and Robbers development build includes the placeable kits, ground vehicles, bank patrols, jail, and fire response. Its [Bedrock guide](../mods/cops-and-robbers/bedrock/README.md) records the edition differences. NARwhal Together is planned. Release support is based on the exact versions and devices that pass playtesting.
 
 - Keep each Bedrock implementation under `mods/<mod-name>/bedrock/` with independent release versions and stable pack UUIDs. Keep Bedrock-specific behavior, models, and interactions there. Reuse matching art and test data and compare player-visible behavior across editions.
 - Use stable Bedrock Script API modules when scripts are needed. Check the pack's minimum engine version against the modules and content in its manifests. Track important edition differences with each release.

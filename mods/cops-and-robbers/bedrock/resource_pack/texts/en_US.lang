@@ -35,3 +35,6 @@ cops_robbers.patrol.caught=Robber captured! Drive to the police garage.
 cops_robbers.patrol.jailed=Robber in jail. Use Vehicle Controls near a bank teller to return the gold.
 cops_robbers.patrol.vault=Make room in the first slot of the vault chest.
 cops_robbers.patrol.complete=Gold returned to the bank!
+cops_robbers.patrol.escaped=Jail alarm! A robber escaped. Check the street by the station!
+cops_robbers.patrol.released=The officer released a robber after their day in jail.
+cops_robbers.fire.dispatch=Fire call at the bank entrance! Bring the fire truck or let a nearby firefighter respond.

@@ -10,6 +10,10 @@
           "type": "bool",
           "default": false,
           "client_sync": true
+        },
+        "cops_robbers:jailbreaker": {
+          "type": "bool",
+          "default": false
         }
       }
     },
@@ -127,7 +131,13 @@
           ]
         },
         "set_property": {
-          "cops_robbers:concealed": false
+          "cops_robbers:concealed": false,
+          "cops_robbers:jailbreaker": false
+        }
+      },
+      "cops_robbers:night_jailbreaker": {
+        "set_property": {
+          "cops_robbers:jailbreaker": true
         }
       },
       "cops_robbers:on_foot": {

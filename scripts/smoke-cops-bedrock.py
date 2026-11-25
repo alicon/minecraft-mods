@@ -15,6 +15,8 @@ PROBE_SOURCE = Path(__file__).with_name("fixtures") / "cops-bedrock-smoke.js"
 KIT_PROBE_SOURCE = PROBE_SOURCE.with_name("cops-bedrock-kits-probe.js")
 VEHICLE_PROBE_SOURCE = PROBE_SOURCE.with_name("cops-bedrock-vehicles-probe.js")
 PATROL_PROBE_SOURCE = PROBE_SOURCE.with_name("cops-bedrock-patrol-probe.js")
+FIRE_PROBE_SOURCE = PROBE_SOURCE.with_name("cops-bedrock-fire-probe.js")
+JAIL_PROBE_SOURCE = PROBE_SOURCE.with_name("cops-bedrock-jail-probe.js")
 
 
 def main():
@@ -24,6 +26,8 @@ def main():
     parser.add_argument("--upgrade-from", type=Path)
     parser.add_argument("--verify-vehicles", action="store_true")
     parser.add_argument("--verify-patrol", action="store_true")
+    parser.add_argument("--verify-fire", action="store_true")
+    parser.add_argument("--verify-jail", action="store_true")
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="cops-bedrock-smoke-") as directory:
         server_dir = Path(directory)
@@ -49,6 +53,15 @@ def main():
             exercise_world(server_dir, "COPS_PATROL_REPLAYED")
             exercise_world(server_dir, "COPS_PATROL_REPLAY_PERSISTED")
             print("The patrol was completed and replayed across server restarts.")
+        if args.verify_fire:
+            shutil.copyfile(FIRE_PROBE_SOURCE, probe)
+            exercise_world(server_dir, "COPS_FIRE_RESPONSE_PLAYABLE")
+            print("Firefighters and the fire truck extinguished reachable fires.")
+        if args.verify_jail:
+            shutil.copyfile(JAIL_PROBE_SOURCE, probe)
+            exercise_world(server_dir, "COPS_JAIL_SENTENCES_SAVED")
+            exercise_world(server_dir, "COPS_JAIL_RELEASE_AND_ESCAPE")
+            print("Saved sentences led to a normal release and an overnight jailbreak.")
 
 
 if __name__ == "__main__":

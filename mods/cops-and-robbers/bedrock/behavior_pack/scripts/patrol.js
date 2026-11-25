@@ -1,16 +1,21 @@
 import { GameMode, InvalidEntityError, ItemStack, Player, system, world } from "@minecraft/server";
 import { center, distanceSquared, findBank, nearbyStations, spawnPoint, validJail, vaultAt } from "./patrol-sites.js";
 import { isDriver } from "./vehicles.js";
+import { dispatchBankFire } from "./fire-response.js";
+import { releasePrisoner } from "./jail.js";
 
 const CRUISER = "cops_robbers:police_cruiser";
 const ROBBER = "cops_robbers:bank_robber";
 const TELLER = "cops_robbers:teller";
 const CONCEALED = "cops_robbers:concealed";
+const JAILBREAKER = "cops_robbers:jailbreaker";
 const ROUND_PREFIX = "cops_robbers:patrol_v1/";
 const RETIRED_PREFIX = "cops_robbers:retired_robber/";
 const CAPTURE_DISTANCE = 2.7;
 const JAIL_DISTANCE = 3.2;
+const REPLAY_DELAY_TICKS = 40;
 const rounds = new Map();
+const replayAfter = new Map();
 
 function save(round) {
   world.setDynamicProperty(ROUND_PREFIX + round.bank.id, JSON.stringify(round));
@@ -43,11 +48,15 @@ function sameStation(a, b) {
   return distanceSquared(a.jail, b.jail) === 0;
 }
 
+function isJailed(round) {
+  return Boolean(round.robberId && !round.jailReleased && (round.stage === "jailed" || round.stage === "complete"));
+}
+
 function startRound(player, bank, previous) {
   const dimension = player.dimension;
   const station = nearbyStations(dimension, player.location).find((candidate) =>
-    !Array.from(rounds.values()).some((round) => round.stage !== "complete" && round.bank.dimension === bank.dimension
-      && sameStation(candidate, round.station)));
+    !Array.from(rounds.values()).some((round) => round.bank.id !== bank.id && round.bank.dimension === bank.dimension
+      && (round.stage !== "complete" || isJailed(round)) && sameStation(candidate, round.station)));
   if (!station) {
     say(player, "station");
     return;
@@ -75,6 +84,7 @@ function startRound(player, bank, previous) {
     retire(previous.robberId);
   }
   say(player, "chase");
+  dispatchBankFire(dimension, bank);
 }
 
 function returnGold(player, round) {
@@ -85,11 +95,12 @@ function returnGold(player, round) {
   }
   vault.setItem(0, new ItemStack("minecraft:gold_ingot", round.gold));
   try {
-    save({ ...round, stage: "complete", returnedAt: world.getAbsoluteTime() });
+    save({ ...round, stage: "complete" });
   } catch (error) {
     vault.setItem(0, undefined);
     throw error;
   }
+  replayAfter.set(round.bank.id, system.currentTick + REPLAY_DELAY_TICKS);
   say(player, "complete");
 }
 
@@ -104,7 +115,7 @@ function talk(player, teller) {
     return;
   }
   const round = rounds.get(bank.id);
-  if (!round || (round.stage === "complete" && world.getAbsoluteTime() - round.returnedAt >= 40)) {
+  if (!round || (round.stage === "complete" && system.currentTick >= (replayAfter.get(bank.id) ?? 0))) {
     startRound(player, bank, round);
   } else if (round.stage === "jailed") {
     returnGold(player, round);
@@ -187,8 +198,26 @@ function reachJail(round, robber) {
   if (validJail(dimension, round.station)
     && robber.tryTeleport(center(round.station.jail), { checkForBlocks: true })) {
     robber.triggerEvent("cops_robbers:jailed");
-    save({ ...round, cruiserId: undefined, stage: "jailed" });
+    if (Math.random() < 0.1) {
+      robber.triggerEvent("cops_robbers:night_jailbreaker");
+    }
+    save({ ...round, cruiserId: undefined, stage: "jailed", jailReleased: false,
+      jailedAt: world.getAbsoluteTime() });
     noticeRiders(vehicle, "jailed");
+  }
+}
+
+function updateJail(round, robber) {
+  const now = world.getAbsoluteTime();
+  if (round.jailedAt === undefined) {
+    // Earlier builds stored the inmate and cell without the start of the sentence.
+    save({ ...round, jailedAt: now });
+    return;
+  }
+  const released = releasePrisoner(robber, round.station, now - round.jailedAt, robber.getProperty(JAILBREAKER) === true);
+  if (released) {
+    const stage = released === "escaped" && round.stage === "jailed" ? "chase" : round.stage;
+    save({ ...round, stage, jailReleased: true, jailedAt: undefined });
   }
 }
 
@@ -219,6 +248,8 @@ world.afterEvents.entityDie.subscribe(({ deadEntity }) => {
   for (const round of rounds.values()) {
     if (round.robberId === deadEntity.id && (round.stage === "chase" || round.stage === "caught")) {
       save({ ...round, cruiserId: undefined, robberId: undefined, stage: "replace" });
+    } else if (round.robberId === deadEntity.id && isJailed(round)) {
+      save({ ...round, robberId: undefined, jailReleased: true, jailedAt: undefined });
     } else if (round.cruiserId === deadEntity.id && round.stage === "caught") {
       const robber = world.getEntity(round.robberId);
       robber?.triggerEvent("cops_robbers:on_foot");
@@ -245,7 +276,8 @@ system.runInterval(() => {
     }
   }
   for (const round of rounds.values()) {
-    if (round.stage !== "chase" && round.stage !== "caught") {
+    const inmate = isJailed(round);
+    if (round.stage !== "chase" && round.stage !== "caught" && !inmate) {
       continue;
     }
     try {
@@ -255,8 +287,10 @@ system.runInterval(() => {
       }
       if (round.stage === "caught") {
         reachJail(round, robber);
-      } else {
+      } else if (round.stage === "chase") {
         capture(round, robber, occupiedCruisers);
+      } else {
+        updateJail(round, robber);
       }
     } catch (error) {
       if (!(error instanceof InvalidEntityError)) {

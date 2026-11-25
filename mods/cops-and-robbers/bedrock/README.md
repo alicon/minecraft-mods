@@ -41,14 +41,20 @@ Set the bank and police station within 64 blocks of each other, with a clear str
 
 After a restart, get back into the same cruiser to continue a capture in progress. If the robber is defeated before jail, use the controls at the bank to restart the chase. [Patrol round](https://github.com/alicon/minecraft-mods/issues/137)
 
-## Verify the kits, vehicles, and patrol
+## Run a fire call and watch the jail
+
+To add a fire call to a patrol, replace one street-level block with netherrack four blocks straight out from the bank's front door. Leave the space above it empty. Starting a robbery lights that pad and sends a fire call to nearby players. Place it away from flammable builds. Firefighters walk toward reachable flames, and a driven fire truck automatically sprays up to ten blocks forward. Point the truck at the fire with a clear path. This works on ordinary fire and soul fire.
+
+An officer releases most prisoners after one Minecraft day. At night a rare prisoner can escape after serving at least 30 seconds. An escape before gold recovery reopens the chase with the same robber and gold. The Bedrock escape leaves the station intact. The adult assembles a Bedrock neighborhood from kits. Java also has the generated patrol neighborhood and a jailbreak that can damage the station.
+
+## Verify the kits, vehicles, patrol, fire response, and jail
 
 Add the official Bedrock Dedicated Server ZIP for 26.66 or a compatible patch, then run:
 
 ```shell
-python3 scripts/smoke-cops-bedrock.py /path/to/bedrock-server.zip build/bedrock/cops-and-robbers-bedrock-0.1.2.mcaddon --verify-vehicles --verify-patrol
+python3 scripts/smoke-cops-bedrock.py /path/to/bedrock-server.zip build/bedrock/cops-and-robbers-bedrock-0.1.3.mcaddon --verify-vehicles --verify-patrol --verify-fire --verify-jail
 ```
 
 The server checks the registered templates, then exercises native placement with two simulated players. It covers obstructed and uneven ground, another player in the footprint, rotation, survival item use, vault contents, crew counts, and save/reopen. GameTest is enabled in the disposable test world. Device visuals, controller and touch inputs, and Realm placement need separate checks.
 
-Pass `--upgrade-from` with a prior archive to verify the placed kits survive the update. The vehicle test checks two seats, driver-only signals, steering, stopping, a wall collision, safe ejection, and saved vehicle identities and signal settings. The patrol test uses two simulated players at the bank, restarts during capture, checks jail and gold return, and reopens independent patrols after replay. Verify the dismount button and the visible and audible feedback on each client.
+Pass `--upgrade-from` with a prior archive to verify the placed kits survive the update. The vehicle test checks two seats, driver-only signals, steering, stopping, a wall collision, safe ejection, and saved vehicle identities and signal settings. The patrol test uses two simulated players at the bank, restarts during capture, checks jail and gold return, and reopens independent patrols after replay. The fire test checks bank dispatch, a walking firefighter, and a driven truck's range and line of sight. The jail test loads saved sentences, checks normal release and nighttime escape, and verifies the state of the vault and station. Verify the dismount button and the visible and audible feedback on each client.

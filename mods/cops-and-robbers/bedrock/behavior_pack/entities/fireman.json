@@ -25,6 +25,24 @@
         "value": 20,
         "max": 20
       },
+      "minecraft:fire_immune": {},
+      "minecraft:movement": {
+        "value": 0.24
+      },
+      "minecraft:movement.basic": {},
+      "minecraft:navigation.walk": {
+        "avoid_water": true
+      },
+      "minecraft:jump.static": {},
+      "minecraft:behavior.move_to_block": {
+        "priority": 1,
+        "goal_radius": 2.5,
+        "search_range": 24,
+        "search_height": 4,
+        "speed_multiplier": 1.15,
+        "target_blocks": ["minecraft:fire", "minecraft:soul_fire"],
+        "tick_interval": 10
+      },
       "minecraft:behavior.look_at_player": {
         "priority": 4,
         "look_distance": 6
