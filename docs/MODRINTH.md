@@ -4,6 +4,8 @@
 
 NARwhal Together is a family-focused Fabric mod that helps young players spend less time typing commands and more time playing together.
 
+**Yep, 100% vibe-coded with Codex and ChatGPT.** It's a bonding project with my daughter and our neighbors. I'm a software engineer, and they tell me what would make Minecraft more fun to play together. We tested two-player teleports between the Overworld and Nether on both supported Minecraft versions, including the cooldown. We also made both builds share the same teleport code so a fix carries over to both.
+
 ## Current feature: quick teleport
 
 Use one configurable action to teleport to another online player—no chat commands and no operator permissions required.
@@ -32,4 +34,4 @@ The default keyboard binding is `G` and can be changed under **Options → Contr
 
 ## Why “NARwhal”?
 
-NAR stands for Noelle, Aoife, and Rufus—the three young players who inspired the project. Future features will continue to focus on making shared Minecraft adventures welcoming, surprising, and easy for families.
+NARwhal is named for the three kids who inspired it.

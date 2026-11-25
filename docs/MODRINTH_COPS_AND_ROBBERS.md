@@ -4,6 +4,8 @@ Cops and Robbers adds a small playable police-and-bank scenario to Minecraft wor
 
 Build a police station, place a bank, patrol in a police cruiser, and chase down robbers before they make off with stolen gold. The mod is designed for family worlds where kids want a clear, playful objective without needing a large quest system.
 
+**Yep, 100% vibe-coded with Codex and ChatGPT.** It's a bonding project with my daughter and our neighbors. I'm a software engineer, and we come up with ideas by playing together. For 0.1.4, we drove both vehicles through their new bays in Minecraft, checked the robbery-to-jail loop, and verified that solid walls stop the water cannon.
+
 ## Features
 
 - Rideable police cruiser with lights, siren, controller-friendly shortcuts, and creative-mode flight tricks.

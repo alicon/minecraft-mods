@@ -4,6 +4,8 @@
 
 Mushroom the Yorkie adds one small, loyal dog companion to your Minecraft world. He follows his owner, takes treats and normal food, naps indoors at night, asks to go outside, eats from dog bowls, curls up on a dog bed, fetches a toy ball, does loop-de-loops and barrel rolls when flying with you, and occasionally gets very invested in nearby peaceful animals.
 
+**Yep, 100% vibe-coded with Codex and ChatGPT.** My daughter and I wanted our real dog in Minecraft. It's a bonding project we play with our neighbors, too. I'm a software engineer, my daughter calls the shots on what's fun, and we read the comments and fix things together. We test stuff like saving mid-fetch so Mushroom doesn't lose his ball, and getting him safely out of the water. Real meat robots, real dog.
+
 ## Current Features
 
 - One Mushroom per player by default, including creative spawn eggs.
@@ -53,5 +55,3 @@ Mushroom the Yorkie must be installed on every participating client and on the s
 ## Why Mushroom?
 
 Mushroom is built for family Minecraft worlds where a companion should feel small, expressive, and a little bit silly without turning into a full pet-management system.
-
-My daughter and I made this because we wanted our real dog, Mushroom, in Minecraft. We play together and post updates here as we go. I used Codex and ChatGPT to help build it. Mostly it's just a thing we like doing together. We read the comments and take feedback. Real meat robots, real dog.
