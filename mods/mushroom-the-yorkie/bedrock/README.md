@@ -66,6 +66,6 @@ python3 scripts/smoke-mushroom-bedrock.py /path/to/bedrock-server.zip /path/to/m
 
 Use `--upgrade-from /path/to/earlier-mushroom.mcaddon` to spawn the Yorkie in an earlier build and reopen the same disposable world with the newer pack. Add `--verify-care-persistence` to verify that the food limit and the tamed component state survive a further restart. Client import, visuals, ordinary player interactions and Realm delivery require the in-game checks above.
 
-Add `--verify-fetch` to exercise interaction with two simulated players on Bedrock Dedicated Server 26.66. It checks ownership, inventory limits, cargo persistence, shallow-water returns, covered pools and an unsafe ledge. The fixture enables GameTest in its disposable world after the ordinary add-on checks. The add-on uses the stable Script API.
+Add `--verify-fetch` to exercise interaction with two simulated players on Bedrock Dedicated Server 26.66. It checks ownership, interruption during a carry, inventory limits, cargo persistence, shallow-water returns, covered pools and an unsafe ledge. The fixture enables GameTest in its disposable world after the ordinary add-on checks. The add-on uses the stable Script API.
 
 [Importing Add-Ons](https://learn.microsoft.com/en-us/minecraft/creator/documents/gettingstarted?view=minecraft-bedrock-stable) · [Activating Add-Ons on a Realm](https://help.minecraft.net/hc/en-us/articles/24120525083533-How-to-activate-Minecraft-Add-On)

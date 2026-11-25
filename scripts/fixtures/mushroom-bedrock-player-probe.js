@@ -254,6 +254,23 @@ world.afterEvents.worldLoad.subscribe(async () => {
     pocket.clearAll();
     owner.teleport(ownerStart);
     pupil.teleport(pupStart);
+    const stopped = "Real ball interrupted by a sit order";
+    throwToy(owner, TOY, stopped);
+    await waitFor(() => carried(pupil)?.nameTag === stopped, "Mushroom to carry the sit-interruption toy");
+    const holding = pupil.location;
+    owner.teleport({ ...holding, x: holding.x - 2.9 });
+    pocket.setItem(owner.selectedSlotIndex, undefined);
+    owner.interactWithEntity(pupil);
+    await waitFor(() => pupil.getProperty("mushroom_yorkie:ordered_sit") === true, "Mushroom to sit while holding the toy");
+    await waitFor(() => !carried(pupil) && looseToys(dimension, stopped).length === 1,
+      "one Survival toy on the ground after interrupting the carry");
+    await system.waitTicks(5);
+    owner.interactWithEntity(pupil);
+    await waitFor(() => pupil.getProperty("mushroom_yorkie:ordered_sit") === false, "Mushroom to resume following");
+    console.warn("MUSHROOM_SIM_CARRY_INTERRUPTED");
+
+    owner.teleport(ownerStart);
+    pupil.teleport(pupStart);
     const returnAfterModeChange = "Real ball with Creative pockets";
     throwToy(owner, TOY, returnAfterModeChange);
     await waitFor(() => carried(pupil)?.nameTag === returnAfterModeChange, "the real toy to be picked up");
@@ -261,10 +278,13 @@ world.afterEvents.worldLoad.subscribe(async () => {
     for (let slot = 0; slot < pocket.size; ++slot) {
       pocket.setItem(slot, new ItemStack("minecraft:cobblestone", 64));
     }
+    world.setTimeOfDay(14000);
+    await waitFor(() => !pupil.getProperty("mushroom_yorkie:fetch_busy"), "nighttime to interrupt fetch");
     await system.waitTicks(55);
     if (carried(pupil)?.nameTag !== returnAfterModeChange || looseToys(dimension, returnAfterModeChange).length) {
-      throw new Error("A real toy was lost or dropped when the owner's Creative inventory filled");
+      throw new Error("A real toy was lost or dropped at night while the owner's Creative inventory was full");
     }
+    world.setTimeOfDay(1000);
     pocket.setItem(0, undefined);
     await waitFor(() => inventoryCount(owner, TOY, returnAfterModeChange) === 1,
       "the carried Survival toy to be returned after creating a slot in Creative");

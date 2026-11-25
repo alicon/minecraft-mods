@@ -99,6 +99,24 @@ function returnToy(pup, owner, cargo, stack) {
     && (releaseToy(pup, cargo, leftover, owner.location) || releaseToy(pup, cargo, leftover, pup.location));
 }
 
+function keepForCreativeSpace(owner, stack) {
+  if (owner.getGameMode() !== GameMode.Creative) {
+    return false;
+  }
+  const inventory = owner.getComponent("minecraft:inventory")?.container;
+  if (!inventory || inventory.emptySlotsCount > 0) {
+    return !inventory;
+  }
+  let room = 0;
+  for (let slot = 0; slot < inventory.size && room < stack.amount; ++slot) {
+    const item = inventory.getItem(slot);
+    if (item?.isStackableWith(stack)) {
+      room += item.maxAmount - item.amount;
+    }
+  }
+  return room < stack.amount;
+}
+
 function matchingToy(pup, owner, now, ignoredItem) {
   const items = pup.dimension.getEntities({
     type: "minecraft:item",
@@ -170,8 +188,11 @@ function updateFetch(pup, state, tick, now) {
       pup.setDynamicProperty(PRACTICE_CARRY, undefined);
     }
     if (carried && cargo && owner?.isValid && owner.dimension.id === pup.dimension.id
-      && (pup.getProperty(storage("ordered_sit")) || dozing(pup) || pup.getComponent("minecraft:leashable")?.isLeashed)) {
-      releaseToy(pup, cargo, carried, pup.location);
+      && (pup.getProperty(storage("ordered_sit")) || dozing(pup) || pup.getComponent("minecraft:leashable")?.isLeashed)
+      && tick >= (state.retryDropAt ?? 0)) {
+      if (keepForCreativeSpace(owner, carried) || !releaseToy(pup, cargo, carried, pup.location)) {
+        state.retryDropAt = tick + 20;
+      }
     }
     return;
   }
