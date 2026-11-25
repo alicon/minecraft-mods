@@ -1,5 +1,14 @@
 package dev.alicon.playtestbridge;
 
+import static dev.alicon.playtestbridge.BridgeJsonFields.optionalDouble;
+import static dev.alicon.playtestbridge.BridgeJsonFields.optionalInt;
+import static dev.alicon.playtestbridge.BridgeJsonFields.optionalString;
+import static dev.alicon.playtestbridge.BridgeJsonFields.requiredDouble;
+import static dev.alicon.playtestbridge.BridgeJsonFields.requiredString;
+import static dev.alicon.playtestbridge.BridgeJsonFields.resourceId;
+
+import static java.util.Map.entry;
+
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -14,12 +23,13 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
+import java.util.function.Function;
 import net.minecraft.commands.CommandResultCallback;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
@@ -43,15 +53,37 @@ final class PlaytestBridgeServer {
 	private static final int SERVER_TASK_TIMEOUT_SECONDS = 15;
 	private static final double DEFAULT_LOOK_DISTANCE = 8.0D;
 	private static final double MAX_LOOK_DISTANCE = 64.0D;
-	private static final Pattern RESOURCE_ID = Pattern.compile("[a-z0-9_.-]+:[a-z0-9_./-]+");
 	private final MinecraftServer server;
 	private final int port;
+	private final Map<String, PostAction> postActions;
 	private HttpServer httpServer;
 	private ExecutorService executor;
 
 	PlaytestBridgeServer(MinecraftServer server, int port) {
 		this.server = server;
 		this.port = port;
+		this.postActions = Map.ofEntries(
+				entry("/chat", this.onServer(this::chat)),
+				entry("/command", this.onServer(this::command)),
+				entry("/look", this.onServer(this::look)),
+				entry("/give", this.onServer(this::give)),
+				entry("/summon", this.onServer(this::summon)),
+				entry("/teleport", this.onServer(this::teleport)),
+				entry("/player-abilities", this.onServer(body -> BridgePlayerActions.updateAbilities(this.playerFromBody(body), body))),
+				entry("/crafting-check", this.onServer(body -> BridgeCraftingActions.check(this.playerFromBody(body), body))),
+				entry("/use-entity", this.onServer(this::useEntity)),
+				entry("/clear-entities", this.onServer(body -> BridgeEntityActions.clearEntities(this.server, body))),
+				entry("/set-block-near-entity", this.onServer(this::setBlockNearEntity)),
+				entry("/set-block", this.onServer(this::setBlock)),
+				entry("/block", this.onServer(this::block)),
+				entry("/use-block", this.onServer(body -> BridgeWorldActions.useBlock(this.playerFromBody(body), body))),
+				entry("/count-blocks", this.onServer(body -> BridgeWorldActions.countBlocks(this.playerFromBody(body), body))),
+				entry("/terrain-scan", this.onServer(body -> BridgeWorldActions.terrainScan(this.playerFromBody(body), body))),
+				entry("/screenshot", BridgeClientRequests::screenshot),
+				entry("/respawn", body -> BridgeClientRequests.respawn(runOnServerThread(this::state), body)),
+				entry("/quit", body -> BridgeClientRequests.quit(runOnServerThread(this::state), body)),
+				entry("/client-input", this::clientInput)
+		);
 	}
 
 	void start() {
@@ -91,77 +123,15 @@ final class PlaytestBridgeServer {
 				return;
 			}
 
-			String method = exchange.getRequestMethod();
-			String path = exchange.getRequestURI().getPath();
-			if ("GET".equals(method) && "/health".equals(path)) {
-				sendJson(exchange, 200, this.health());
-			} else if ("GET".equals(method) && "/state".equals(path)) {
-				sendJson(exchange, 200, runOnServerThread(this::state));
-			} else if ("POST".equals(method) && "/chat".equals(path)) {
-				JsonObject body = readBody(exchange);
-				sendJson(exchange, 200, runOnServerThread(() -> this.chat(body)));
-			} else if ("POST".equals(method) && "/command".equals(path)) {
-				JsonObject body = readBody(exchange);
-				sendJson(exchange, 200, runOnServerThread(() -> this.command(body)));
-			} else if ("POST".equals(method) && "/look".equals(path)) {
-				JsonObject body = readBody(exchange);
-				sendJson(exchange, 200, runOnServerThread(() -> this.look(body)));
-			} else if ("POST".equals(method) && "/give".equals(path)) {
-				JsonObject body = readBody(exchange);
-				sendJson(exchange, 200, runOnServerThread(() -> this.give(body)));
-			} else if ("POST".equals(method) && "/summon".equals(path)) {
-				JsonObject body = readBody(exchange);
-				sendJson(exchange, 200, runOnServerThread(() -> this.summon(body)));
-			} else if ("POST".equals(method) && "/teleport".equals(path)) {
-				JsonObject body = readBody(exchange);
-				sendJson(exchange, 200, runOnServerThread(() -> this.teleport(body)));
-			} else if ("POST".equals(method) && "/player-abilities".equals(path)) {
-				JsonObject body = readBody(exchange);
-				sendJson(exchange, 200, runOnServerThread(() -> BridgePlayerActions.updateAbilities(this.playerFromBody(body), body)));
-			} else if ("POST".equals(method) && "/crafting-check".equals(path)) {
-				JsonObject body = readBody(exchange);
-				sendJson(exchange, 200, runOnServerThread(() -> BridgeCraftingActions.check(this.playerFromBody(body), body)));
-			} else if ("POST".equals(method) && "/use-entity".equals(path)) {
-				JsonObject body = readBody(exchange);
-				sendJson(exchange, 200, runOnServerThread(() -> this.useEntity(body)));
-			} else if ("POST".equals(method) && "/clear-entities".equals(path)) {
-				JsonObject body = readBody(exchange);
-				sendJson(exchange, 200, runOnServerThread(() -> BridgeEntityActions.clearEntities(this.server, body)));
-			} else if ("POST".equals(method) && "/set-block-near-entity".equals(path)) {
-				JsonObject body = readBody(exchange);
-				sendJson(exchange, 200, runOnServerThread(() -> this.setBlockNearEntity(body)));
-			} else if ("POST".equals(method) && "/set-block".equals(path)) {
-				JsonObject body = readBody(exchange);
-				sendJson(exchange, 200, runOnServerThread(() -> this.setBlock(body)));
-			} else if ("POST".equals(method) && "/block".equals(path)) {
-				JsonObject body = readBody(exchange);
-				sendJson(exchange, 200, runOnServerThread(() -> this.block(body)));
-			} else if ("POST".equals(method) && "/use-block".equals(path)) {
-				JsonObject body = readBody(exchange);
-				sendJson(exchange, 200, runOnServerThread(() -> BridgeWorldActions.useBlock(this.playerFromBody(body), body)));
-			} else if ("POST".equals(method) && "/count-blocks".equals(path)) {
-				JsonObject body = readBody(exchange);
-				sendJson(exchange, 200, runOnServerThread(() -> BridgeWorldActions.countBlocks(this.playerFromBody(body), body)));
-			} else if ("POST".equals(method) && "/terrain-scan".equals(path)) {
-				JsonObject body = readBody(exchange);
-				sendJson(exchange, 200, runOnServerThread(() -> BridgeWorldActions.terrainScan(this.playerFromBody(body), body)));
-			} else if ("POST".equals(method) && "/screenshot".equals(path)) {
-				JsonObject body = readBody(exchange);
-				sendJson(exchange, 200, BridgeClientRequests.screenshot(body));
-			} else if ("POST".equals(method) && "/respawn".equals(path)) {
-				JsonObject body = readBody(exchange);
-				JsonObject snapshot = runOnServerThread(this::state);
-				sendJson(exchange, 200, BridgeClientRequests.respawn(snapshot, body));
-			} else if ("POST".equals(method) && "/quit".equals(path)) {
-				JsonObject body = readBody(exchange);
-				JsonObject snapshot = runOnServerThread(this::state);
-				sendJson(exchange, 200, BridgeClientRequests.quit(snapshot, body));
-			} else if ("POST".equals(method) && "/client-input".equals(path)) {
-				JsonObject body = readBody(exchange);
-				JsonObject snapshot = runOnServerThread(() -> BridgeClientRequests.captureInputState(this::state));
-				sendJson(exchange, 200, BridgeClientRequests.input(this.server, snapshot, body));
-			} else {
+			JsonObject response = switch (exchange.getRequestMethod()) {
+				case "GET" -> this.get(exchange.getRequestURI().getPath());
+				case "POST" -> this.post(exchange);
+				default -> null;
+			};
+			if (response == null) {
 				sendError(exchange, 404, "Unknown bridge endpoint");
+			} else {
+				sendJson(exchange, 200, response);
 			}
 		} catch (Exception exception) {
 			PlaytestBridge.LOGGER.warn("Playtest bridge request failed", exception);
@@ -169,6 +139,28 @@ final class PlaytestBridgeServer {
 		} finally {
 			exchange.close();
 		}
+	}
+
+	private JsonObject get(String path) throws Exception {
+		return switch (path) {
+			case "/health" -> this.health();
+			case "/state" -> runOnServerThread(this::state);
+			default -> null;
+		};
+	}
+
+	private JsonObject post(HttpExchange exchange) throws Exception {
+		PostAction action = this.postActions.get(exchange.getRequestURI().getPath());
+		return action == null ? null : action.run(readBody(exchange));
+	}
+
+	private PostAction onServer(Function<JsonObject, JsonObject> action) {
+		return body -> runOnServerThread(() -> action.apply(body));
+	}
+
+	private JsonObject clientInput(JsonObject body) throws Exception {
+		JsonObject snapshot = runOnServerThread(() -> BridgeClientRequests.captureInputState(this::state));
+		return BridgeClientRequests.input(this.server, snapshot, body);
 	}
 
 	private JsonObject health() {
@@ -350,17 +342,6 @@ final class PlaytestBridgeServer {
 		}
 	}
 
-	private String requiredString(JsonObject object, String name) {
-		if (!object.has(name) || !object.get(name).isJsonPrimitive()) {
-			throw new IllegalArgumentException("missing string field: " + name);
-		}
-		String value = object.get(name).getAsString();
-		if (value.isBlank()) {
-			throw new IllegalArgumentException(name + " cannot be blank");
-		}
-		return value;
-	}
-
 	private ServerPlayer playerFromBody(JsonObject object) {
 		String requested = optionalString(object, "player", "");
 		if (requested.isBlank()) {
@@ -377,53 +358,6 @@ final class PlaytestBridgeServer {
 			}
 		}
 		throw new IllegalArgumentException("player not found: " + requested);
-	}
-
-	private String optionalString(JsonObject object, String name, String fallback) {
-		if (!object.has(name) || object.get(name).isJsonNull()) {
-			return fallback;
-		}
-		return object.get(name).getAsString();
-	}
-
-	private int optionalInt(JsonObject object, String name, int fallback, int min, int max) {
-		if (!object.has(name) || object.get(name).isJsonNull()) {
-			return fallback;
-		}
-		int value = object.get(name).getAsInt();
-		if (value < min || value > max) {
-			throw new IllegalArgumentException(name + " must be between " + min + " and " + max);
-		}
-		return value;
-	}
-
-	private double optionalDouble(JsonObject object, String name, double fallback, double min, double max) {
-		if (!object.has(name) || object.get(name).isJsonNull()) {
-			return fallback;
-		}
-		double value = object.get(name).getAsDouble();
-		if (!Double.isFinite(value) || value < min || value > max) {
-			throw new IllegalArgumentException(name + " must be between " + min + " and " + max);
-		}
-		return value;
-	}
-
-	private double requiredDouble(JsonObject object, String name) {
-		if (!object.has(name) || object.get(name).isJsonNull()) {
-			throw new IllegalArgumentException("missing number field: " + name);
-		}
-		double value = object.get(name).getAsDouble();
-		if (!Double.isFinite(value)) {
-			throw new IllegalArgumentException(name + " must be finite");
-		}
-		return value;
-	}
-
-	private String resourceId(String value, String name) {
-		if (!RESOURCE_ID.matcher(value).matches()) {
-			throw new IllegalArgumentException(name + " must be a namespaced id like minecraft:pig");
-		}
-		return value;
 	}
 
 	private JsonObject commandResponse(String command) {
@@ -484,6 +418,11 @@ final class PlaytestBridgeServer {
 		error.addProperty("ok", false);
 		error.addProperty("error", message);
 		sendJson(exchange, status, error);
+	}
+
+	@FunctionalInterface
+	private interface PostAction {
+		JsonObject run(JsonObject body) throws Exception;
 	}
 
 	@FunctionalInterface

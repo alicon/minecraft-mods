@@ -18,7 +18,7 @@ final class MushroomScoldingHandler {
 		MushroomBehaviorDebugger.debug(yorkie, "scolded", "scolded: trusted player hit Mushroom, backing away", true);
 		yorkie.setMushroomOrderedToSit(false);
 		yorkie.setSleeping(false);
-		yorkie.setOwnerUUID(null);
+		yorkie.clearVanillaOwner();
 		yorkie.setTame(false, true);
 		MushroomYorkieSounds.playScoldedWhine(yorkie);
 	}

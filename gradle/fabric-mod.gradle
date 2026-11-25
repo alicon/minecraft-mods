@@ -10,27 +10,26 @@ def modrinthProjectEnv = project.ext.modrinth_project_env
 def modrinthProjectFallback = project.ext.modrinth_project_fallback
 def optionalModrinthProjects = project.ext.modrinth_optional_projects
 def changelogFile = rootProject.file("docs/release-notes/${project.name}/${modVersion}.md")
-def versionMatrix = project.ext.has('supported_minecraft_versions') ? project.ext.supported_minecraft_versions : [:]
+def supportedVersions = project.ext.has('supported_minecraft_versions') ? project.ext.supported_minecraft_versions : []
 def requestedMinecraftVersion = project.findProperty('target_minecraft_version')
-if (requestedMinecraftVersion && !versionMatrix.isEmpty() && !versionMatrix.containsKey(requestedMinecraftVersion)) {
-	throw new GradleException("${project.path} does not support Minecraft ${requestedMinecraftVersion}; supported versions: ${versionMatrix.keySet().join(', ')}")
+if (requestedMinecraftVersion && !supportedVersions.isEmpty() && !supportedVersions.contains(requestedMinecraftVersion)) {
+	throw new GradleException("${project.path} does not support Minecraft ${requestedMinecraftVersion}; supported versions: ${supportedVersions.join(', ')}")
 }
-def activeMinecraftVersion = requestedMinecraftVersion && !versionMatrix.isEmpty()
+def activeMinecraftVersion = requestedMinecraftVersion && !supportedVersions.isEmpty()
 		? requestedMinecraftVersion
 		: project.minecraft_version
-def activeVersionConfig = versionMatrix.get(activeMinecraftVersion) ?: [:]
-def activeFabricApiVersion = activeVersionConfig.fabric_api_version ?: project.fabric_api_version
-def activeLoaderVersion = activeVersionConfig.loader_version ?: project.loader_version
+def legacyTarget = activeMinecraftVersion == project.legacy_minecraft_version
+def activeFabricApiVersion = legacyTarget ? project.legacy_fabric_api_version : project.fabric_api_version
+def activeLoaderVersion = legacyTarget ? project.legacy_loader_version : project.loader_version
 def versionedSourceRoot = "src/versions/${activeMinecraftVersion}"
-def publishedVersionNumber = versionMatrix.isEmpty()
+def publishedVersionNumber = supportedVersions.isEmpty()
 		? modVersion
 		: "${modVersion}+mc${activeMinecraftVersion}"
-def versionedCommonExcludes = project.ext.has('versioned_common_excludes')
-		? project.ext.versioned_common_excludes.get(activeMinecraftVersion, [])
-		: []
-def versionedClientExcludes = project.ext.has('versioned_client_excludes')
-		? project.ext.versioned_client_excludes.get(activeMinecraftVersion, [])
-		: []
+def excludedSources = ['common': 'main', 'client': 'client'].collectMany { environment, sourceSet ->
+	def propertyName = "versioned_${environment}_excludes"
+	def excludes = project.ext.has(propertyName) ? project.ext.get(propertyName).get(activeMinecraftVersion, []) : []
+	excludes.collect { path -> project.file("src/${sourceSet}/java/${path}") }
+} as Set
 
 project.ext.active_minecraft_version = activeMinecraftVersion
 project.ext.active_fabric_api_version = activeFabricApiVersion
@@ -137,15 +136,8 @@ processResources {
 }
 
 tasks.withType(JavaCompile).configureEach {
-	if (!versionedCommonExcludes.isEmpty() || !versionedClientExcludes.isEmpty()) {
-		source = source.filter { file ->
-			def path = file.path
-			!versionedCommonExcludes.any { excluded ->
-				path.endsWith("${File.separator}src${File.separator}main${File.separator}java${File.separator}${excluded.replace('/', File.separator)}")
-			} && !versionedClientExcludes.any { excluded ->
-				path.endsWith("${File.separator}src${File.separator}client${File.separator}java${File.separator}${excluded.replace('/', File.separator)}")
-			}
-		}
+	if (!excludedSources.empty) {
+		source = source.filter { file -> !excludedSources.contains(file) }
 	}
 	options.release = 21
 }
@@ -155,15 +147,8 @@ tasks.withType(Test).configureEach {
 }
 
 tasks.withType(Javadoc).configureEach {
-	if (!versionedCommonExcludes.isEmpty() || !versionedClientExcludes.isEmpty()) {
-		source = source.filter { file ->
-			def path = file.path
-			!versionedCommonExcludes.any { excluded ->
-				path.endsWith("${File.separator}src${File.separator}main${File.separator}java${File.separator}${excluded.replace('/', File.separator)}")
-			} && !versionedClientExcludes.any { excluded ->
-				path.endsWith("${File.separator}src${File.separator}client${File.separator}java${File.separator}${excluded.replace('/', File.separator)}")
-			}
-		}
+	if (!excludedSources.empty) {
+		source = source.filter { file -> !excludedSources.contains(file) }
 	}
 	failOnError = true
 	options.encoding = 'UTF-8'
@@ -181,15 +166,8 @@ java {
 }
 
 tasks.named('sourcesJar') {
-	if (!versionedCommonExcludes.isEmpty() || !versionedClientExcludes.isEmpty()) {
-		exclude { details ->
-			def path = details.file.path
-			versionedCommonExcludes.any { excluded ->
-				path.endsWith("${File.separator}src${File.separator}main${File.separator}java${File.separator}${excluded.replace('/', File.separator)}")
-			} || versionedClientExcludes.any { excluded ->
-				path.endsWith("${File.separator}src${File.separator}client${File.separator}java${File.separator}${excluded.replace('/', File.separator)}")
-			}
-		}
+	if (!excludedSources.empty) {
+		exclude { details -> excludedSources.contains(details.file) }
 	}
 }
 

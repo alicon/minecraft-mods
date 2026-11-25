@@ -1,10 +1,16 @@
 package dev.alicon.playtestbridge;
 
+import static dev.alicon.playtestbridge.BridgeJsonFields.optionalBoolean;
+import static dev.alicon.playtestbridge.BridgeJsonFields.optionalDouble;
+import static dev.alicon.playtestbridge.BridgeJsonFields.optionalInt;
+import static dev.alicon.playtestbridge.BridgeJsonFields.optionalString;
+import static dev.alicon.playtestbridge.BridgeJsonFields.requiredString;
+import static dev.alicon.playtestbridge.BridgeJsonFields.resourceId;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Pattern;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
@@ -20,7 +26,6 @@ import net.minecraft.world.phys.AABB;
 final class BridgeEntityActions {
 	private static final double DEFAULT_USE_ENTITY_RADIUS = 6.0D;
 	private static final double MAX_USE_ENTITY_RADIUS = 64.0D;
-	private static final Pattern RESOURCE_ID = Pattern.compile("[a-z0-9_.-]+:[a-z0-9_./-]+");
 
 	private BridgeEntityActions() {
 	}
@@ -108,64 +113,5 @@ final class BridgeEntityActions {
 		String checked = resourceId(itemId, "item");
 		return BuiltInRegistries.ITEM.getOptional(Identifier.parse(checked))
 				.orElseThrow(() -> new IllegalArgumentException("unknown item: " + checked));
-	}
-
-	private static String requiredString(JsonObject object, String name) {
-		if (!object.has(name) || !object.get(name).isJsonPrimitive()) {
-			throw new IllegalArgumentException("missing string field: " + name);
-		}
-		String value = object.get(name).getAsString();
-		if (value.isBlank()) {
-			throw new IllegalArgumentException(name + " cannot be blank");
-		}
-		return value;
-	}
-
-	private static String optionalString(JsonObject object, String name, String fallback) {
-		if (!object.has(name) || object.get(name).isJsonNull()) {
-			return fallback;
-		}
-		return object.get(name).getAsString();
-	}
-
-	private static int optionalInt(JsonObject object, String name, int fallback, int min, int max) {
-		if (!object.has(name) || object.get(name).isJsonNull()) {
-			return fallback;
-		}
-		int value = object.get(name).getAsInt();
-		if (value < min || value > max) {
-			throw new IllegalArgumentException(name + " must be between " + min + " and " + max);
-		}
-		return value;
-	}
-
-	private static double optionalDouble(JsonObject object, String name, double fallback, double min, double max) {
-		if (!object.has(name) || object.get(name).isJsonNull()) {
-			return fallback;
-		}
-		double value = object.get(name).getAsDouble();
-		if (!Double.isFinite(value) || value < min || value > max) {
-			throw new IllegalArgumentException(name + " must be between " + min + " and " + max);
-		}
-		return value;
-	}
-
-	private static boolean optionalBoolean(JsonObject object, String name, boolean fallback) {
-		if (!object.has(name) || object.get(name).isJsonNull()) {
-			return fallback;
-		}
-		String value = object.get(name).getAsString().toLowerCase(java.util.Locale.ROOT);
-		return switch (value) {
-			case "1", "true", "yes", "on" -> true;
-			case "0", "false", "no", "off" -> false;
-			default -> throw new IllegalArgumentException(name + " must be true or false");
-		};
-	}
-
-	private static String resourceId(String value, String name) {
-		if (!RESOURCE_ID.matcher(value).matches()) {
-			throw new IllegalArgumentException(name + " must be a namespaced id like minecraft:pig");
-		}
-		return value;
 	}
 }

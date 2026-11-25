@@ -1,10 +1,13 @@
 package dev.alicon.mushroomyorkie.entity;
 
 import dev.alicon.mushroomyorkie.pet.PetNeeds;
+import java.util.UUID;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 
 final class MushroomYorkiePersistence {
+	private static final String TRUSTED_PLAYER_KEY = "TrustedPlayer", SCOLDED_DAY_KEY = "ScoldedDay";
 	private static final String HUNGER_KEY = "Hunger", POTTY_KEY = "Potty", MOOD_KEY = "Mood", ENERGY_KEY = "Energy";
 	private static final String NIGHT_WAKE_TICKS_KEY = "NightWakeTicks", HARNESS_KEY = "Harness";
 	private static final String PEACEFUL_MOB_BARK_MUTED_UNTIL_KEY = "PeacefulMobBarkMutedUntil";
@@ -28,7 +31,11 @@ final class MushroomYorkiePersistence {
 		output.putLong(LAST_OWNER_CONTACT_GAME_TIME_KEY, yorkie.ownerPresence.lastOwnerContactGameTime());
 		output.putLong(LAST_RELIEF_DAY_KEY, yorkie.relief.lastReliefDay());
 		output.putString(CALMED_PEACEFUL_MOBS_KEY, yorkie.peacefulMobMemory.save());
-		yorkie.trust.save(output);
+		UUID trustedPlayer = yorkie.trust.trustedPlayerUuid();
+		if (trustedPlayer != null) {
+			output.store(TRUSTED_PLAYER_KEY, UUIDUtil.CODEC, trustedPlayer);
+		}
+		output.putLong(SCOLDED_DAY_KEY, yorkie.trust.scoldedDay());
 	}
 
 	static void read(MushroomYorkieEntity yorkie, ValueInput input) {
@@ -46,6 +53,6 @@ final class MushroomYorkiePersistence {
 		yorkie.ownerPresence.setLastOwnerContactGameTime(input.getLongOr(LAST_OWNER_CONTACT_GAME_TIME_KEY, 0L));
 		yorkie.relief.setLastReliefDay(input.getLongOr(LAST_RELIEF_DAY_KEY, MushroomReliefState.neverRelievedDay()));
 		yorkie.peacefulMobMemory.read(input.getStringOr(CALMED_PEACEFUL_MOBS_KEY, ""));
-		yorkie.trust.read(input);
+		yorkie.trust.restore(input.read(TRUSTED_PLAYER_KEY, UUIDUtil.CODEC).orElse(null), input.getLongOr(SCOLDED_DAY_KEY, -1L));
 	}
 }

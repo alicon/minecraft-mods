@@ -18,11 +18,9 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.entity.EntityTypeTest;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
 
 /** Tameable Yorkie companion entity that adapts Minecraft events to Mushroom's pet state. */
-public final class MushroomYorkieEntity extends net.minecraft.world.entity.TamableAnimal {
+public final class MushroomYorkieEntity extends MushroomVersionedAnimal {
 	private static final float TINY_DOG_PITCH = 1.35F;
 	static final int NEEDS_INTERVAL_TICKS = 200;
 	static final int BARK_INTERVAL_TICKS = 100;
@@ -113,20 +111,13 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	public void claimFor(Player player) {
 		this.trust.claim(player);
 		this.scaredRunTicks = 0;
-		this.tame(player);
-		this.setOwner(player);
+		this.tameForOwner(player);
 		this.setMushroomOrderedToSit(false);
 		this.setSleeping(false);
 	}
 
 	boolean handleSleepingInteract(Player player) {
 		return this.sleepInteractions.handle(this, player);
-	}
-
-	@Override
-	protected void customServerAiStep(ServerLevel level) {
-		super.customServerAiStep(level);
-		MushroomYorkieServerAi.tick(this, level);
 	}
 
 	@Override
@@ -185,10 +176,6 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		return this.ownerPresence.peacefulMobBarkingMuted(level);
 	}
 
-	void hurtFromNeglect(ServerLevel level, float amount) {
-		this.hurtServer(level, level.damageSources().starve(), amount);
-	}
-
 	void recordOwnerContact(ServerLevel level) {
 		this.ownerPresence.recordOwnerContact(level);
 	}
@@ -239,26 +226,10 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		return this.entityData.get(DATA_FLIGHT_TRICK_TICKS);
 	}
 
-	@Override
-	protected void addAdditionalSaveData(ValueOutput output) {
-		super.addAdditionalSaveData(output);
-		MushroomYorkiePersistence.save(this, output);
-	}
-
-	@Override
-	protected void readAdditionalSaveData(ValueInput input) {
-		super.readAdditionalSaveData(input);
-		MushroomYorkiePersistence.read(this, input);
-	}
-
-	@Override
-	public boolean hurtServer(ServerLevel level, DamageSource damageSource, float amount) {
-		boolean hurt = super.hurtServer(level, damageSource, amount);
-		if (hurt && damageSource.getEntity() instanceof Player player && this.belongsTo(player)) {
+	void onDamage(ServerLevel level, DamageSource source) {
+		if (source.getEntity() instanceof Player player && this.belongsTo(player)) {
 			MushroomScoldingHandler.recordTrustedPlayerHit(this, level, player);
 		}
-
-		return hurt;
 	}
 
 	@Override

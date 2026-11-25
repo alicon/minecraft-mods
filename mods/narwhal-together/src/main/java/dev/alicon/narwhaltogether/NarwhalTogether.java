@@ -3,7 +3,6 @@ package dev.alicon.narwhaltogether;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.resources.ResourceLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,15 +25,5 @@ public final class NarwhalTogether implements ModInitializer {
 		);
 
 		LOGGER.info("NARwhal Together initialized");
-	}
-
-	/**
-	 * Creates a resource location in this mod's namespace.
-	 *
-	 * @param path resource path inside the `narwhal_together` namespace
-	 * @return namespaced Minecraft resource location
-	 */
-	public static ResourceLocation id(String path) {
-		return ResourceLocation.fromNamespaceAndPath(MOD_ID, path);
 	}
 }

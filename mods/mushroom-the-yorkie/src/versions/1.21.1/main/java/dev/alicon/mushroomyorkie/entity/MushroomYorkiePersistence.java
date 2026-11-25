@@ -1,9 +1,11 @@
 package dev.alicon.mushroomyorkie.entity;
 
 import dev.alicon.mushroomyorkie.pet.PetNeeds;
+import java.util.UUID;
 import net.minecraft.nbt.CompoundTag;
 
 final class MushroomYorkiePersistence {
+	private static final String TRUSTED_PLAYER_KEY = "TrustedPlayer", SCOLDED_DAY_KEY = "ScoldedDay";
 	private static final String HUNGER_KEY = "Hunger", POTTY_KEY = "Potty", MOOD_KEY = "Mood", ENERGY_KEY = "Energy";
 	private static final String NIGHT_WAKE_TICKS_KEY = "NightWakeTicks", HARNESS_KEY = "Harness";
 	private static final String PEACEFUL_MOB_BARK_MUTED_UNTIL_KEY = "PeacefulMobBarkMutedUntil";
@@ -27,7 +29,11 @@ final class MushroomYorkiePersistence {
 		tag.putLong(LAST_OWNER_CONTACT_GAME_TIME_KEY, yorkie.ownerPresence.lastOwnerContactGameTime());
 		tag.putLong(LAST_RELIEF_DAY_KEY, yorkie.relief.lastReliefDay());
 		tag.putString(CALMED_PEACEFUL_MOBS_KEY, yorkie.peacefulMobMemory.save());
-		yorkie.trust.save(tag);
+		UUID trustedPlayer = yorkie.trust.trustedPlayerUuid();
+		if (trustedPlayer != null) {
+			tag.putUUID(TRUSTED_PLAYER_KEY, trustedPlayer);
+		}
+		tag.putLong(SCOLDED_DAY_KEY, yorkie.trust.scoldedDay());
 	}
 
 	static void read(MushroomYorkieEntity yorkie, CompoundTag tag) {
@@ -45,6 +51,7 @@ final class MushroomYorkiePersistence {
 		yorkie.ownerPresence.setLastOwnerContactGameTime(tag.contains(LAST_OWNER_CONTACT_GAME_TIME_KEY) ? tag.getLong(LAST_OWNER_CONTACT_GAME_TIME_KEY) : 0L);
 		yorkie.relief.setLastReliefDay(tag.contains(LAST_RELIEF_DAY_KEY) ? tag.getLong(LAST_RELIEF_DAY_KEY) : MushroomReliefState.neverRelievedDay());
 		yorkie.peacefulMobMemory.read(tag.contains(CALMED_PEACEFUL_MOBS_KEY) ? tag.getString(CALMED_PEACEFUL_MOBS_KEY) : "");
-		yorkie.trust.read(tag);
+		yorkie.trust.restore(tag.hasUUID(TRUSTED_PLAYER_KEY) ? tag.getUUID(TRUSTED_PLAYER_KEY) : null,
+				tag.contains(SCOLDED_DAY_KEY) ? tag.getLong(SCOLDED_DAY_KEY) : -1L);
 	}
 }

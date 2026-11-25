@@ -43,7 +43,7 @@ Good examples:
 - Document gameplay tuning values with their unit and gameplay effect, especially when changing speed, radius, damage, cooldown, capacity, spawn, or probability.
 - Keep non-gameplay constants such as save-data keys, translation keys, asset paths, and logger names close to the adapter that uses them.
 - Do not hide gameplay-affecting values inside entity plumbing, renderers, Gradle properties, or scripts.
-- For mods with multiple Minecraft targets, declare the version matrix in the mod's `build.gradle`
+- For mods with multiple Minecraft targets, declare supported targets in the mod's `build.gradle`
   and keep version-specific Minecraft/Fabric integration under `src/versions/<minecraft-version>/`.
   Keep shared pure Java behavior in the normal source roots so tests run across every target.
 
@@ -197,7 +197,7 @@ Logs and in-game diagnostics should make development clearer without spamming no
 - no client-only imports from common/server source
 - Javadocs for public declarations that are not overrides
 - release notes for every declared mod version
-- consistent versioned source roots and override exclude maps
+- consistent versioned source roots and override exclude maps, with identical versioned Java files rejected
 - successful per-mod Javadoc generation
 - per-mod JVM unit tests
 
@@ -225,6 +225,17 @@ Logs and in-game diagnostics should make development clearer without spamming no
 - Magic numbers without names when they affect gameplay tuning.
 - Silent behavior changes without docs or tests.
 - Large refactors mixed into unrelated feature work.
+
+## Measuring maintenance changes
+
+Run the same scan on the base and the refactor. [PMD 7.15.0](https://docs.pmd-code.org/pmd-doc-7.15.0/pmd_userdocs_installation.html) can scan Java without resolving Minecraft dependencies:
+
+```shell
+pmd cpd --dir mods --language java --minimum-tokens 75 --format xml --no-fail-on-violation
+pmd check --dir mods --rulesets category/java/design.xml/CyclomaticComplexity --format csv --no-cache --no-fail-on-violation
+```
+
+Compare clone groups and their sizes, methods and constructors scoring 10 or more, and source lines. Read the matches before extracting anything. A version-specific API adapter or a shared test fixture with deliberate differences can look like a clone. For branches that remain complex, check whether they encode distinct gameplay or repeat the same decision.
 
 ## Review Checklist
 
