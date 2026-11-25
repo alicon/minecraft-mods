@@ -3,7 +3,9 @@ import {
   StructureRotation, system, world,
 } from "@minecraft/server";
 import { FOOTPRINT, HEIGHT, SITES } from "./sites.js";
-import "./vehicles.js";
+import { rotate, translated } from "./patrol-sites.js";
+import { useVehicleControls } from "./vehicles.js";
+import { tryBankPatrol } from "./patrol.js";
 
 const ROTATIONS = [StructureRotation.None, StructureRotation.Rotate90, StructureRotation.Rotate180, StructureRotation.Rotate270];
 const PREVIEW_TICKS = 240;
@@ -15,16 +17,6 @@ function facing(view) {
     return view.x < 0 ? 1 : 3;
   }
   return view.z < 0 ? 2 : 0;
-}
-
-function rotate(x, z, turn) {
-  const end = FOOTPRINT - 1;
-  return [[x, z], [end - z, x], [end - x, end - z], [z, end - x]][turn];
-}
-
-function translated(origin, turn, x, y, z) {
-  const [dx, dz] = rotate(x, z, turn);
-  return { x: origin.x + dx, y: origin.y + y, z: origin.z + dz };
 }
 
 function message(player, key) {
@@ -153,3 +145,16 @@ world.beforeEvents.playerInteractWithBlock.subscribe((event) => {
   system.run(() => useKit(player, target, blockFace, itemStack.typeId, slot, turn));
 });
 world.afterEvents.playerLeave.subscribe(({ playerId }) => previews.delete(playerId));
+
+world.beforeEvents.itemUse.subscribe((event) => {
+  const { source: player, itemStack } = event;
+  if (event.cancel || itemStack.typeId !== "cops_robbers:vehicle_controls") {
+    return;
+  }
+  event.cancel = true;
+  system.run(() => {
+    if (player.isValid && (player.getComponent("minecraft:riding") || !tryBankPatrol(player))) {
+      useVehicleControls(player);
+    }
+  });
+});

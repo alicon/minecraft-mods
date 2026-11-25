@@ -14,6 +14,7 @@ WORLD = SmokeWorld(
 PROBE_SOURCE = Path(__file__).with_name("fixtures") / "cops-bedrock-smoke.js"
 KIT_PROBE_SOURCE = PROBE_SOURCE.with_name("cops-bedrock-kits-probe.js")
 VEHICLE_PROBE_SOURCE = PROBE_SOURCE.with_name("cops-bedrock-vehicles-probe.js")
+PATROL_PROBE_SOURCE = PROBE_SOURCE.with_name("cops-bedrock-patrol-probe.js")
 
 
 def main():
@@ -22,6 +23,7 @@ def main():
     parser.add_argument("addon", type=Path)
     parser.add_argument("--upgrade-from", type=Path)
     parser.add_argument("--verify-vehicles", action="store_true")
+    parser.add_argument("--verify-patrol", action="store_true")
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="cops-bedrock-smoke-") as directory:
         server_dir = Path(directory)
@@ -41,6 +43,12 @@ def main():
             exercise_world(server_dir, "COPS_VEHICLES_PLAYABLE")
             exercise_world(server_dir, "COPS_VEHICLES_PERSISTED")
             print("Both vehicles drove and persisted across a server restart.")
+        if args.verify_patrol:
+            shutil.copyfile(PATROL_PROBE_SOURCE, probe)
+            exercise_world(server_dir, "COPS_PATROL_CONTESTED_CAPTURE")
+            exercise_world(server_dir, "COPS_PATROL_REPLAYED")
+            exercise_world(server_dir, "COPS_PATROL_REPLAY_PERSISTED")
+            print("The patrol was completed and replayed across server restarts.")
 
 
 if __name__ == "__main__":

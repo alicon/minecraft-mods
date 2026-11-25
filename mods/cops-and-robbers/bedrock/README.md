@@ -1,6 +1,6 @@
 # Cops and Robbers for Bedrock
 
-## Build the kit playtest
+## Build the patrol playtest
 
 From the repository root:
 
@@ -30,14 +30,25 @@ Craft **Vehicle Controls** from a comparator and a copper ingot, or get it from 
 
 The Bedrock vehicles use ground driving. Creative flight, loops, and barrel rolls remain Java features at this point. [Vehicle controls and parity](https://github.com/alicon/minecraft-mods/issues/136)
 
-## Verify the layouts
+## Play a bank patrol
+
+Set the bank and police station within 64 blocks of each other, with a clear street between the bank doors and the station's yellow garage entrance. Place a cruiser outside and give the players **Vehicle Controls**. Several teams can play independently when each bank has a nearby station with a free jail.
+
+1. Use **Vehicle Controls** on foot beside a bank teller to start a robbery. The robber takes the gold from the first slot of the bank vault chest and appears outside the bank.
+2. Follow the robber in the police cruiser. Drive close enough with a clear path to capture them. A passenger can help spot the robber.
+3. Drive into the assigned station's yellow garage entrance. The game moves the captive to jail.
+4. Either player can use **Vehicle Controls** on foot beside a teller at the original bank to put the gold back in the vault. Keep its first slot empty. Use the controls again after the completion message to start the next round.
+
+After a restart, get back into the same cruiser to continue a capture in progress. If the robber is defeated before jail, use the controls at the bank to restart the chase. [Patrol round](https://github.com/alicon/minecraft-mods/issues/137)
+
+## Verify the kits, vehicles, and patrol
 
 Add the official Bedrock Dedicated Server ZIP for 26.66 or a compatible patch, then run:
 
 ```shell
-python3 scripts/smoke-cops-bedrock.py /path/to/bedrock-server.zip build/bedrock/cops-and-robbers-bedrock-0.1.1.mcaddon --verify-vehicles
+python3 scripts/smoke-cops-bedrock.py /path/to/bedrock-server.zip build/bedrock/cops-and-robbers-bedrock-0.1.2.mcaddon --verify-vehicles --verify-patrol
 ```
 
 The server checks the registered templates, then exercises native placement with two simulated players. It covers obstructed and uneven ground, another player in the footprint, rotation, survival item use, vault contents, crew counts, and save/reopen. GameTest is enabled in the disposable test world. Device visuals, controller and touch inputs, and Realm placement need separate checks.
 
-Pass `--upgrade-from` with a 0.1.0 archive to verify the placed kits survive the update. The vehicle test checks two seats, driver-only signals, steering, stopping, a wall collision, safe ejection, and saved vehicle identities and signal settings. Verify the dismount button and the visible and audible vehicle feedback on each client.
+Pass `--upgrade-from` with a prior archive to verify the placed kits survive the update. The vehicle test checks two seats, driver-only signals, steering, stopping, a wall collision, safe ejection, and saved vehicle identities and signal settings. The patrol test uses two simulated players at the bank, restarts during capture, checks jail and gold return, and reopens independent patrols after replay. Verify the dismount button and the visible and audible feedback on each client.

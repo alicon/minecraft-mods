@@ -1,0 +1,151 @@
+{
+  "format_version": "1.26.60",
+  "minecraft:entity": {
+    "description": {
+      "identifier": "cops_robbers:bank_robber",
+      "is_spawnable": true,
+      "is_summonable": true,
+      "properties": {
+        "cops_robbers:concealed": {
+          "type": "bool",
+          "default": false,
+          "client_sync": true
+        }
+      }
+    },
+    "components": {
+      "minecraft:type_family": {
+        "family": [
+          "cops_robbers_robber",
+          "bank_robber",
+          "mob"
+        ]
+      },
+      "minecraft:persistent": {},
+      "minecraft:health": {
+        "value": 20,
+        "max": 20
+      },
+      "minecraft:movement": {
+        "value": 0.22
+      },
+      "minecraft:movement.basic": {},
+      "minecraft:navigation.walk": {
+        "avoid_water": true
+      },
+      "minecraft:jump.static": {}
+    },
+    "component_groups": {
+      "cops_robbers:chasing": {
+        "minecraft:collision_box": {
+          "width": 0.6,
+          "height": 1.8
+        },
+        "minecraft:physics": {},
+        "minecraft:behavior.avoid_mob_type": {
+          "priority": 1,
+          "max_dist": 10,
+          "max_flee": 13,
+          "sprint_distance": 5,
+          "entity_types": [
+            {
+              "filters": {
+                "test": "is_family",
+                "subject": "other",
+                "value": "police_cruiser"
+              },
+              "max_dist": 10,
+              "walk_speed_multiplier": 1.0,
+              "sprint_speed_multiplier": 1.22
+            }
+          ]
+        },
+        "minecraft:behavior.random_stroll": {
+          "priority": 5,
+          "speed_multiplier": 0.85
+        }
+      },
+      "cops_robbers:secured": {
+        "minecraft:collision_box": {
+          "width": 0.08,
+          "height": 0.08
+        },
+        "minecraft:physics": {
+          "has_gravity": false,
+          "has_collision": false
+        },
+        "minecraft:knockback_resistance": {
+          "value": 1
+        }
+      },
+      "cops_robbers:cell": {
+        "minecraft:collision_box": {
+          "width": 0.6,
+          "height": 1.8
+        },
+        "minecraft:physics": {},
+        "minecraft:behavior.look_at_player": {
+          "priority": 4,
+          "look_distance": 6
+        }
+      }
+    },
+    "events": {
+      "minecraft:entity_spawned": {
+        "add": {
+          "component_groups": [
+            "cops_robbers:chasing"
+          ]
+        }
+      },
+      "cops_robbers:in_custody": {
+        "remove": {
+          "component_groups": [
+            "cops_robbers:chasing",
+            "cops_robbers:cell"
+          ]
+        },
+        "add": {
+          "component_groups": [
+            "cops_robbers:secured"
+          ]
+        },
+        "set_property": {
+          "cops_robbers:concealed": true
+        }
+      },
+      "cops_robbers:jailed": {
+        "remove": {
+          "component_groups": [
+            "cops_robbers:secured",
+            "cops_robbers:chasing"
+          ]
+        },
+        "add": {
+          "component_groups": [
+            "cops_robbers:cell"
+          ]
+        },
+        "set_property": {
+          "cops_robbers:concealed": false
+        }
+      },
+      "cops_robbers:on_foot": {
+        "remove": {
+          "component_groups": [
+            "cops_robbers:secured",
+            "cops_robbers:cell"
+          ]
+        },
+        "add": {
+          "component_groups": [
+            "cops_robbers:chasing"
+          ]
+        },
+        "set_property": {
+          "cops_robbers:concealed": false
+        }
+      }
+    }
+  }
+}

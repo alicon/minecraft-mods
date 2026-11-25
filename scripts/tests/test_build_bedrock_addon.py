@@ -67,7 +67,7 @@ class BedrockPackageTests(unittest.TestCase):
                         self.assertIn(f"items/{name}_kit.json", behavior.namelist())
                         art = cops / "src/main/resources/assets/cops_robbers" / f"textures/item/{name}_kit.png"
                         self.assertEqual(resource.read(f"textures/items/{name}_kit.png"), art.read_bytes())
-                    for name in ("police_cruiser", "fire_truck"):
+                    for name in ("police_cruiser", "fire_truck", "bank_robber"):
                         self.assertIn(f"entities/{name}.json", behavior.namelist())
                         art = cops / "src/main/resources/assets/cops_robbers" / f"textures/entity/{name}.png"
                         self.assertEqual(resource.read(f"textures/entity/{name}.png"), art.read_bytes())
