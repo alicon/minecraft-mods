@@ -3136,7 +3136,8 @@ async function runCopsStructuresSmoke(baseUrl, args) {
       (entity) => entity.custom && entity.custom.stolenGold === true,
       12000
     );
-    await checkedCommand(`tp @e[type=${robberType},limit=1,sort=nearest] ${bankOrigin.x + 8.5} ${bankOrigin.y + 1} ${bankOrigin.z - 4.5}`);
+    // The robber must leave the vault's eight-block chest search to trigger the fire.
+    await checkedCommand(`tp @e[type=${robberType},limit=1,sort=nearest] ${bankOrigin.x + 8.5} ${bankOrigin.y + 1} ${bankOrigin.z + 2.5}`);
     const arsonist = await waitForEntityState(
       baseUrl,
       robberType,
