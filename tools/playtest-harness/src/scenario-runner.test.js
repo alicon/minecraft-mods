@@ -49,6 +49,28 @@ test('records evidence and cleanup errors without hiding original failure', asyn
   assert.equal(result.ok, false);
 });
 
+test('a client pause preserves the interrupted case and stops before another setup in either mode', async () => {
+  const { CLIENT_PAUSED } = require('./yorkie-clock');
+  for (const stopOnFailure of [false, true]) {
+    const tickInterruption = { dispatch: 'accepted', expectedTicks: 1 };
+    const error = Object.assign(new Error('paused'), { code: CLIENT_PAUSED, tickInterruption });
+    const report = await runCases([
+      { name: 'paused', stopOnFailure, setup: async () => {}, run: async () => { throw error; },
+        cleanup: async () => assert.fail('paused cleanup') },
+      { name: 'successor', setup: async () => assert.fail('successor setup') }
+    ], { capture: async (_, cause) => { assert.equal(cause, error);return { screenshot: 'Game Menu' }; },
+      afterSuccess: async () => assert.fail('paused care') });
+    assert.deepEqual(report.summary, { interrupted: 1 });
+    assert.equal(report.cases.length, 1);
+    assert.equal(report.cases[0].cleanupError, undefined);
+    assert.equal(report.cases[0].interruption, 'client_paused');
+    assert.deepEqual(report.cases[0].tickInterruption, tickInterruption);
+    assert.equal(report.cases[0].evidence.screenshot, 'Game Menu');
+    assert.equal(report.postRun.reason, 'interrupted');
+    assert.equal(report.gameplayOk, false);
+  }
+});
+
 test('an investigative failure retains its fixture and reports unexecuted cases', async () => {
   for (const fault of ['behavior', 'cleanup']) {
     let replaced = false, cared = false;

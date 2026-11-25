@@ -1,10 +1,8 @@
 package dev.alicon.narwhaltogether.client;
 
-import dev.alicon.narwhaltogether.NarwhalTogether;
 import dev.alicon.narwhaltogether.TeleportToNextPlayerPayload;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -13,13 +11,8 @@ import org.lwjgl.glfw.GLFW;
 
 /** Client entrypoint for NARwhal keybindings and client-to-server requests. */
 public final class NarwhalTogetherClient implements ClientModInitializer {
-	private static final KeyMapping.Category CONTROLS_CATEGORY =
-			KeyMapping.Category.register(NarwhalTogether.id("controls"));
-	private static final KeyMapping TELEPORT_TO_PLAYER = KeyBindingHelper.registerKeyBinding(new KeyMapping(
-			"key.narwhal_together.teleport_to_player",
-			GLFW.GLFW_KEY_G,
-			CONTROLS_CATEGORY
-	));
+	private static final KeyMapping TELEPORT_TO_PLAYER = NarwhalTeleportKey.register(
+			"key.narwhal_together.teleport_to_player", GLFW.GLFW_KEY_G);
 
 	@Override
 	public void onInitializeClient() {

@@ -1,18 +1,12 @@
 package dev.alicon.mushroomyorkie.entity;
 
 import java.util.UUID;
-import net.minecraft.core.UUIDUtil;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
 
 final class MushroomTrustState {
-	private static final String TRUSTED_PLAYER_KEY = "TrustedPlayer";
-	private static final String SCOLDED_DAY_KEY = "ScoldedDay";
-
 	private UUID trustedPlayerUuid;
 	private long scoldedDay = -1L;
 	private long hitCountDay = -1L;
@@ -55,21 +49,22 @@ final class MushroomTrustState {
 		return true;
 	}
 
-	void save(ValueOutput output) {
-		if (this.trustedPlayerUuid != null) {
-			output.store(TRUSTED_PLAYER_KEY, UUIDUtil.CODEC, this.trustedPlayerUuid);
-		}
-		output.putLong(SCOLDED_DAY_KEY, this.scoldedDay);
+	UUID trustedPlayerUuid() {
+		return this.trustedPlayerUuid;
 	}
 
-	void read(ValueInput input) {
-		this.trustedPlayerUuid = input.read(TRUSTED_PLAYER_KEY, UUIDUtil.CODEC).orElse(null);
-		this.scoldedDay = input.getLongOr(SCOLDED_DAY_KEY, -1L);
+	long scoldedDay() {
+		return this.scoldedDay;
+	}
+
+	void restore(UUID trustedPlayerUuid, long scoldedDay) {
+		this.trustedPlayerUuid = trustedPlayerUuid;
+		this.scoldedDay = scoldedDay;
 	}
 
 	private Player trustedPlayer(MushroomYorkieEntity yorkie, ServerLevel level) {
 		if (this.trustedPlayerUuid != null) {
-			Player player = level.getPlayerInAnyDimension(this.trustedPlayerUuid);
+			Player player = MushroomVersionedAnimal.findPlayer(level, this.trustedPlayerUuid);
 			if (player != null && player.level() == yorkie.level()) {
 				return player;
 			}

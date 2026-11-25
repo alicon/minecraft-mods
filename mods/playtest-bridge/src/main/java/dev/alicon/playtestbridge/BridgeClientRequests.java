@@ -1,7 +1,9 @@
 package dev.alicon.playtestbridge;
 
+import static dev.alicon.playtestbridge.BridgeJsonFields.optionalBoolean;
+import static dev.alicon.playtestbridge.BridgeJsonFields.optionalString;
+
 import com.google.gson.JsonObject;
-import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
@@ -13,9 +15,9 @@ final class BridgeClientRequests {
 	}
 
 	static JsonObject screenshot(JsonObject body) throws Exception {
-		String name = string(body, "name");
-		return BridgeClientHooks.captureScreenshot(name, bool(body, "resume", true),
-				bool(body, "hideGui", false), bool(body, "clearChat", false)).get(10, TimeUnit.SECONDS);
+		String name = optionalString(body, "name", "");
+		return BridgeClientHooks.captureScreenshot(name, optionalBoolean(body, "resume", true),
+				optionalBoolean(body, "hideGui", false), optionalBoolean(body, "clearChat", false)).get(10, TimeUnit.SECONDS);
 	}
 
 	static JsonObject respawn(JsonObject state, JsonObject body) throws Exception {
@@ -79,32 +81,17 @@ final class BridgeClientRequests {
 	}
 
 	static String validateTestWorld(JsonObject state, JsonObject body, String action) {
-		String expectedSave = string(body, "expectedSave");
-		if (expectedSave.isEmpty() || !expectedSave.equals(string(state, "saveName"))) {
+		String expectedSave = optionalString(body, "expectedSave", "");
+		if (expectedSave.isEmpty() || !expectedSave.equals(optionalString(state, "saveName", ""))) {
 			throw new IllegalArgumentException(action + " requires the exact expectedSave name");
 		}
 		if (!(expectedSave.startsWith("Codex ") || expectedSave.startsWith("Mushroom Matrix ")
 				|| expectedSave.startsWith("Mushroom Abel Noelle "))) {
 			throw new IllegalArgumentException(action + " requires a disposable test save");
 		}
-		if (!bool(state, "singleplayer", false) || !state.has("playerCount") || state.get("playerCount").getAsInt() != 1) {
+		if (!optionalBoolean(state, "singleplayer", false) || !state.has("playerCount") || state.get("playerCount").getAsInt() != 1) {
 			throw new IllegalArgumentException(action + " requires exactly one player in a single-player world");
 		}
 		return expectedSave;
-	}
-
-	private static String string(JsonObject body, String key) {
-		return !body.has(key) || body.get(key).isJsonNull() ? "" : body.get(key).getAsString();
-	}
-
-	private static boolean bool(JsonObject body, String key, boolean fallback) {
-		if (!body.has(key) || body.get(key).isJsonNull()) {
-			return fallback;
-		}
-		return switch (body.get(key).getAsString().toLowerCase(Locale.ROOT)) {
-			case "1", "true", "yes", "on" -> true;
-			case "0", "false", "no", "off" -> false;
-			default -> throw new IllegalArgumentException(key + " must be true or false");
-		};
 	}
 }

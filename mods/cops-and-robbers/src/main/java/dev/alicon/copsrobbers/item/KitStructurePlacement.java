@@ -16,46 +16,55 @@ import net.minecraft.world.level.block.state.properties.AttachFace;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 
 final class KitStructurePlacement {
-	private KitStructurePlacement() {
+	private final Level level;
+	private final BlockPos origin;
+	private final Direction front;
+	private final Direction right;
+
+	KitStructurePlacement(Level level, BlockPos origin, Direction front) {
+		this.level = level;
+		this.origin = origin;
+		this.front = front;
+		this.right = front.getClockWise();
 	}
 
-	static void fill(Level level, BlockPos origin, Direction front, Direction right, int minX, int minY, int minZ, int maxX, int maxY, int maxZ, Block block) {
+	void fill(int minX, int minY, int minZ, int maxX, int maxY, int maxZ, Block block) {
 		BlockState state = block.defaultBlockState();
 		for (int x = minX; x <= maxX; x++) {
 			for (int y = minY; y <= maxY; y++) {
 				for (int z = minZ; z <= maxZ; z++) {
-					set(level, origin, front, right, x, y, z, state);
+					set(x, y, z, state);
 				}
 			}
 		}
 	}
 
-	static void set(Level level, BlockPos origin, Direction front, Direction right, int x, int y, int z, BlockState state) {
-		level.setBlock(position(origin, front, right, x, y, z), state, 3);
+	void set(int x, int y, int z, BlockState state) {
+		this.level.setBlock(position(x, y, z), state, 3);
 	}
 
-	static void placeOakDoor(Level level, BlockPos origin, Direction front, Direction right, int x, int y, int z, Direction facing) {
-		placeDoor(level, origin, front, right, x, y, z, Blocks.OAK_DOOR, facing);
+	void placeOakDoor(int x, int y, int z, Direction facing) {
+		placeDoor(x, y, z, Blocks.OAK_DOOR, facing);
 	}
 
-	static void placeIronDoor(Level level, BlockPos origin, Direction front, Direction right, int x, int y, int z, Direction facing) {
-		placeDoor(level, origin, front, right, x, y, z, Blocks.IRON_DOOR, facing);
+	void placeIronDoor(int x, int y, int z, Direction facing) {
+		placeDoor(x, y, z, Blocks.IRON_DOOR, facing);
 	}
 
-	static void placeFloorButton(Level level, BlockPos origin, Direction front, Direction right, int x, int y, int z, Direction facing) {
-		set(level, origin, front, right, x, y, z, Blocks.STONE_BUTTON.defaultBlockState()
+	void placeFloorButton(int x, int y, int z, Direction facing) {
+		set(x, y, z, Blocks.STONE_BUTTON.defaultBlockState()
 				.setValue(ButtonBlock.FACE, AttachFace.FLOOR)
 				.setValue(ButtonBlock.FACING, facing));
 	}
 
-	static void placePressurePlate(Level level, BlockPos origin, Direction front, Direction right, int x, int y, int z) {
-		set(level, origin, front, right, x, y, z, Blocks.STONE_PRESSURE_PLATE.defaultBlockState());
+	void placePressurePlate(int x, int y, int z) {
+		set(x, y, z, Blocks.STONE_PRESSURE_PLATE.defaultBlockState());
 	}
 
-	static void placeWallSign(Level level, BlockPos origin, Direction front, Direction right, int x, int y, int z, Direction facing, String line0, String line1) {
-		BlockPos pos = position(origin, front, right, x, y, z);
-		level.setBlock(pos, Blocks.OAK_WALL_SIGN.defaultBlockState().setValue(WallSignBlock.FACING, facing), 3);
-		if (level.getBlockEntity(pos) instanceof SignBlockEntity sign) {
+	void placeWallSign(int x, int y, int z, Direction facing, String line0, String line1) {
+		BlockPos pos = position(x, y, z);
+		this.level.setBlock(pos, Blocks.OAK_WALL_SIGN.defaultBlockState().setValue(WallSignBlock.FACING, facing), 3);
+		if (this.level.getBlockEntity(pos) instanceof SignBlockEntity sign) {
 			SignText text = sign.getFrontText()
 					.setMessage(0, Component.literal(line0))
 					.setMessage(1, Component.literal(line1));
@@ -63,17 +72,17 @@ final class KitStructurePlacement {
 		}
 	}
 
-	private static void placeDoor(Level level, BlockPos origin, Direction front, Direction right, int x, int y, int z, Block door, Direction facing) {
+	private void placeDoor(int x, int y, int z, Block door, Direction facing) {
 		BlockState lower = door.defaultBlockState()
 				.setValue(DoorBlock.FACING, facing)
 				.setValue(DoorBlock.HALF, DoubleBlockHalf.LOWER)
 				.setValue(DoorBlock.OPEN, false);
 		BlockState upper = lower.setValue(DoorBlock.HALF, DoubleBlockHalf.UPPER);
-		set(level, origin, front, right, x, y, z, lower);
-		set(level, origin, front, right, x, y + 1, z, upper);
+		set(x, y, z, lower);
+		set(x, y + 1, z, upper);
 	}
 
-	private static BlockPos position(BlockPos origin, Direction front, Direction right, int x, int y, int z) {
-		return origin.relative(right, x).relative(front, z).above(y);
+	BlockPos position(int x, int y, int z) {
+		return this.origin.relative(this.right, x).relative(this.front, z).above(y);
 	}
 }

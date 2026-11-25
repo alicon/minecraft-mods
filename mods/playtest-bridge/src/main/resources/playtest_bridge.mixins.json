@@ -6,6 +6,9 @@
 		"ServerInputTraceMixin",
 		"ServerRideTraceMixin"
 	],
+	"client": [
+		"FreeCursorMixin"
+	],
 	"injectors": {
 		"defaultRequire": 1
 	}

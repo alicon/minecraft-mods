@@ -84,63 +84,28 @@ run_gradle() {
 	run env "GRADLE_USER_HOME=$gradle_user_home" ./gradlew "$@"
 }
 
-gradle_string_property() {
+release_field() {
 	local mod="$1"
-	local property="$2"
-	awk -F"'" -v property="$property" '$0 ~ property "[[:space:]]*=" { print $2; exit }' "mods/$mod/build.gradle"
+	local target="$2"
+	local column="$3"
+	awk -F '\t' -v mod="$mod" -v target="$target" -v column="$column" '
+		$1 == "release-target" && $2 == mod && (target == "" || $3 == target) {
+			print $column
+			if (column != 3) exit
+		}
+	' <<< "$release_catalog"
 }
 
 mod_version() {
-	gradle_string_property "$1" "mod_version"
+	release_field "$1" "" 4
 }
 
 archive_name() {
-	gradle_string_property "$1" "mod_archive_name"
-}
-
-default_minecraft_version() {
-	awk -F= '/^minecraft_version=/{print $2; exit}' gradle.properties
-}
-
-mod_uses_version_matrix() {
-	grep -q "supported_minecraft_versions[[:space:]]*=" "mods/$1/build.gradle"
+	release_field "$1" "" 5
 }
 
 supported_minecraft_versions() {
-	local mod="$1"
-	local build_file="mods/$mod/build.gradle"
-	local versions
-
-	versions="$(awk '
-		/supported_minecraft_versions[[:space:]]*=/ {
-			in_matrix = 1
-			depth = 0
-		}
-		in_matrix {
-			line = $0
-			opens = gsub(/\[/, "[", line)
-			line = $0
-			closes = gsub(/\]/, "]", line)
-
-			if ($0 ~ /^[[:space:]]*'\''[^'\'']+'\''[[:space:]]*:/) {
-				version = $0
-				sub(/^[[:space:]]*'\''/, "", version)
-				sub(/'\''[[:space:]]*:.*/, "", version)
-				print version
-			}
-
-			depth += opens - closes
-			if (depth <= 0) {
-				in_matrix = 0
-			}
-		}
-	' "$build_file")"
-
-	if [[ -n "$versions" ]]; then
-		printf '%s\n' "$versions"
-	else
-		default_minecraft_version
-	fi
+	release_field "$1" "" 3
 }
 
 append_unique_minecraft_version() {
@@ -196,16 +161,7 @@ artifact_path() {
 }
 
 published_version_number() {
-	local mod="$1"
-	local minecraft_version="$2"
-	local version
-
-	version="$(mod_version "$mod")"
-	if mod_uses_version_matrix "$mod"; then
-		printf '%s+mc%s\n' "$version" "$minecraft_version"
-	else
-		printf '%s\n' "$version"
-	fi
+	release_field "$1" "$2" 6
 }
 
 checksum_files() {
@@ -556,8 +512,10 @@ main() {
 	require_command git
 	require_command grep
 
-	prepare_matrix
 	verify_git_state
+	release_catalog="$(GRADLE_USER_HOME="$gradle_user_home" ./gradlew --quiet printModReleaseTargets)" ||
+		die "Could not read the release catalog from Gradle"
+	prepare_matrix
 
 	if ! dry_run && { ! skip_metadata || ! skip_publish; }; then
 		load_modrinth_token

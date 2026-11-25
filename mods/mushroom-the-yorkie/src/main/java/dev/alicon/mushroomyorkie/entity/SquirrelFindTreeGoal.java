@@ -20,12 +20,16 @@ final class SquirrelFindTreeGoal extends Goal {
 	private static final double CLIMB_SPEED = 0.45D;
 	// A nearby tree gets at most ten seconds of approach, even if terrain changes.
 	private static final int MAX_APPROACH_TICKS = 200;
+	// Keep established perches stable for nine seconds before exploring the crown.
+	private static final int PERCH_BEFORE_EXPLORING_TICKS = 20 * 9;
+	private static final int AVOID_LAST_TREE_TICKS = 20 * 20;
 	private static final Direction[] APPROACH_DIRECTIONS = {
 		Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
 	};
 
 	private final SquirrelEntity squirrel;
 	private final GroundPathNavigation reachabilityProbe;
+	private final SquirrelTreeTravel treeTravel;
 	private BlockPos treePos;
 	private BlockPos approachPos;
 	private BlockPos climbPos;
@@ -35,12 +39,16 @@ final class SquirrelFindTreeGoal extends Goal {
 	private int approachTicks;
 	private boolean approachFailed;
 	private boolean recoveredCling;
+	private int perchTicks;
+	private BlockPos previousTree;
+	private long previousTreeUntil;
 
 	SquirrelFindTreeGoal(SquirrelEntity squirrel) {
 		this.squirrel = squirrel;
 		// Selection queries must not overwrite another goal's navigation target
 		// or stuck timer. This ordinary ground navigator is queried, never ticked.
 		this.reachabilityProbe = new GroundPathNavigation(squirrel, squirrel.level());
+		this.treeTravel = new SquirrelTreeTravel(squirrel);
 		this.setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
 	}
 
@@ -86,6 +94,7 @@ final class SquirrelFindTreeGoal extends Goal {
 			this.nextSearchTick = 0;
 			return false;
 		}
+		if (this.treeTravel.active() || this.treeTravel.finished()) return this.treeTravel.active();
 		if (this.climbing && this.squirrel.hasFoundTree()) {
 			// Holding and recovering a perch use the same physical support rule;
 			// an obsolete run-up anchor cannot change the outcome after a reload.
@@ -138,10 +147,17 @@ final class SquirrelFindTreeGoal extends Goal {
 		this.nextMoveTick = 0;
 		this.approachTicks = 0;
 		this.approachFailed = false;
+		this.perchTicks = 0;
 	}
 
 	@Override
 	public void stop() {
+		if (this.treeTravel.vacatedTree() != null) {
+			this.previousTree = this.treeTravel.vacatedTree();
+			this.previousTreeUntil = this.squirrel.level().getGameTime() + AVOID_LAST_TREE_TICKS;
+			this.nextSearchTick = 0;
+		}
+		this.treeTravel.reset();
 		this.recoveredCling = false;
 		this.treePos = null;
 		this.approachPos = null;
@@ -168,6 +184,11 @@ final class SquirrelFindTreeGoal extends Goal {
 			this.squirrel.getNavigation().stop();
 			return;
 		}
+		if (this.treeTravel.active()) {
+			this.treeTravel.tick();
+			return;
+		}
+		if (this.treeTravel.finished()) return;
 		this.squirrel.getLookControl().setLookAt(
 				this.climbPos.getX() + 0.5D,
 				this.climbPos.getY() + 0.5D,
@@ -194,6 +215,10 @@ final class SquirrelFindTreeGoal extends Goal {
 					this.squirrel.position(),
 					this.climbPos
 			));
+			if (++this.perchTicks >= PERCH_BEFORE_EXPLORING_TICKS) {
+				this.perchTicks = 0;
+				this.treeTravel.start(this.treePos);
+			}
 			return;
 		}
 
@@ -256,6 +281,8 @@ final class SquirrelFindTreeGoal extends Goal {
 			if (!this.squirrel.level().getBlockState(candidate).is(BlockTags.LOGS)) {
 				continue;
 			}
+			if (this.previousTree != null && this.squirrel.level().getGameTime() < this.previousTreeUntil
+					&& candidate.getX() == this.previousTree.getX() && candidate.getZ() == this.previousTree.getZ()) continue;
 			double distance = candidate.distSqr(origin);
 			if (distance >= nearestDistance) {
 				continue;

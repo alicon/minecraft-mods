@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 // Native /time query gametime returns the long game clock modulo Integer.MAX_VALUE.
 const GAME_TIME_MODULUS = 2147483647;
+const CLIENT_PAUSED = 'MINECRAFT_CLIENT_PAUSED';
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 function elapsedWorldTicks(before, after) {
@@ -21,20 +22,57 @@ async function advanceWorldTicks(command, state, ticks, mode, { timeoutMs = 2000
   assert(['step', 'sprint'].includes(mode), 'Invalid native tick mode');
   assert(Number.isInteger(ticks) && ticks > 0 && ticks < GAME_TIME_MODULUS, 'Invalid native tick count');
   const before = await readWorldTime(command);
-  const requested = await command(`tick ${mode} ${ticks}t`);
+  const tickCommand = `tick ${mode} ${ticks}t`;
+  const evidence = { command: tickCommand, mode, expectedTicks: ticks, before, dispatch: 'unknown' };
+  let requested;
+  try {
+    requested = await command(tickCommand);
+  } catch (error) {
+    error.tickInterruption = evidence;
+    throw error;
+  }
   assert(requested.success === true, 'Native tick request failed');
+  evidence.dispatch = 'accepted';
+  evidence.receipt = requested;
   const started = Date.now(), deadline = started + timeoutMs;
+  let lastWorldClock = before;
   do {
-    const after = await readWorldTime(command);
-    const elapsed = elapsedWorldTicks(before, after);
+    try {
+      lastWorldClock = await readWorldTime(command);
+    } catch (error) {
+      error.tickInterruption = { ...evidence, lastWorldClock };
+      throw error;
+    }
+    const elapsed = elapsedWorldTicks(before, lastWorldClock);
     if (elapsed >= ticks) {
       const snapshot = await state();
-      snapshot.tickAudit = { clock: 'native-gametime', before, after, expectedTicks: ticks, elapsedTicks: elapsed, mode };
+      snapshot.tickAudit = { clock: 'native-gametime', before, after: lastWorldClock, expectedTicks: ticks, elapsedTicks: elapsed, mode };
       return snapshot;
     }
     await delay(pollIntervalMs);
   } while (Date.now() < deadline);
-  throw new Error(`World did not complete ${ticks} native ${mode} ticks`);
+  const error = new Error(`World did not complete ${ticks} native ${mode} ticks`);
+  error.tickInterruption = { ...evidence, lastWorldClock };
+  try {
+    const snapshot = await state();
+    const { integratedServerPaused, overworldGameTime, tickCount, worldFrozen, frozenTicksRemaining, worldSprinting } = snapshot;
+    error.tickInterruption.observation = { integratedServerPaused, overworldGameTime, tickCount, worldFrozen, frozenTicksRemaining, worldSprinting };
+    if (typeof overworldGameTime === 'string' && /^\d+$/.test(overworldGameTime)) {
+      const after = Number(BigInt(overworldGameTime) % BigInt(GAME_TIME_MODULUS));
+      const elapsed = elapsedWorldTicks(before, after);
+      if (elapsed >= ticks) {
+        snapshot.tickAudit = { clock: 'native-gametime', before, after, expectedTicks: ticks, elapsedTicks: elapsed, mode };
+        return snapshot;
+      }
+      if (integratedServerPaused === true) {
+        error.code = CLIENT_PAUSED;
+        error.message = `Minecraft client paused with ${elapsed}/${ticks} native ${mode} ticks observed`;
+      }
+    }
+  } catch (observationError) {
+    error.tickInterruption.observationError = observationError.message;
+  }
+  throw error;
 }
 
-module.exports = { GAME_TIME_MODULUS, elapsedWorldTicks, readWorldTime, advanceWorldTicks };
+module.exports = { CLIENT_PAUSED, GAME_TIME_MODULUS, elapsedWorldTicks, readWorldTime, advanceWorldTicks };

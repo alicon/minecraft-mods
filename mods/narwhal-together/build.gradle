@@ -2,20 +2,11 @@ ext {
 	mod_id = 'narwhal_together'
 	mod_archive_name = 'narwhal-together'
 	mod_display_name = 'NARwhal Together'
-	mod_version = '0.1.2'
+	mod_version = '0.1.3'
 	modrinth_project_env = 'MODRINTH_PROJECT_ID'
 	modrinth_project_fallback = 'narwhal-together'
 	modrinth_optional_projects = ['controlify']
-	supported_minecraft_versions = [
-			'1.21.11': [
-					fabric_api_version: '0.141.4+1.21.11',
-					loader_version    : '0.19.3'
-			],
-			'1.21.1' : [
-					fabric_api_version: '0.116.12+1.21.1',
-					loader_version    : '0.16.14'
-			]
-	]
+	supported_minecraft_versions = [project.minecraft_version, project.legacy_minecraft_version]
 }
 
 apply from: rootProject.file('gradle/fabric-mod.gradle')

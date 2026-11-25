@@ -2,26 +2,15 @@ ext {
 	mod_id = 'mushroom_yorkie'
 	mod_archive_name = 'mushroom-the-yorkie'
 	mod_display_name = 'Mushroom the Yorkie'
-	mod_version = '0.1.3'
+	mod_version = '0.1.5'
 	modrinth_project_env = 'MUSHROOM_MODRINTH_PROJECT_ID'
 	modrinth_project_fallback = 'mushroom-the-yorkie'
 	modrinth_optional_projects = []
 	enable_game_tests = true
-	supported_minecraft_versions = [
-			'1.21.11': [
-					fabric_api_version: '0.141.4+1.21.11',
-					loader_version    : '0.19.3'
-			],
-			'1.21.1' : [
-					fabric_api_version: '0.116.12+1.21.1',
-					loader_version    : '0.16.14'
-			]
-	]
+	supported_minecraft_versions = [project.minecraft_version, project.legacy_minecraft_version]
 	versioned_common_excludes = [
 			'1.21.1': [
 					'dev/alicon/mushroomyorkie/MushroomTheYorkie.java',
-					'dev/alicon/mushroomyorkie/entity/MushroomTrustState.java',
-					'dev/alicon/mushroomyorkie/entity/MushroomYorkieEntity.java',
 					'dev/alicon/mushroomyorkie/item/MushroomYorkieSpawnEggItem.java',
 					'dev/alicon/mushroomyorkie/item/SquirrelSpawnEggItem.java',
 					'dev/alicon/mushroomyorkie/item/YorkieBallItem.java',

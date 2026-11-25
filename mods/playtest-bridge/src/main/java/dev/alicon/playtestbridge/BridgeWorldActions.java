@@ -1,10 +1,16 @@
 package dev.alicon.playtestbridge;
 
+import static dev.alicon.playtestbridge.BridgeJsonFields.optionalDouble;
+import static dev.alicon.playtestbridge.BridgeJsonFields.optionalInt;
+import static dev.alicon.playtestbridge.BridgeJsonFields.optionalString;
+import static dev.alicon.playtestbridge.BridgeJsonFields.requiredInt;
+import static dev.alicon.playtestbridge.BridgeJsonFields.requiredString;
+import static dev.alicon.playtestbridge.BridgeJsonFields.resourceId;
+
 import com.google.gson.JsonObject;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.regex.Pattern;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
@@ -29,7 +35,6 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 
 final class BridgeWorldActions {
-	private static final Pattern RESOURCE_ID = Pattern.compile("[a-z0-9_.-]+:[a-z0-9_./-]+");
 	private static final int MAX_OFFSET = 16;
 	private static final int MAX_COUNT_BLOCK_VOLUME = 65536;
 	private static final int MAX_TERRAIN_SCAN_RADIUS = 256;
@@ -86,7 +91,7 @@ final class BridgeWorldActions {
 			throw new IllegalArgumentException("player is not in a server level");
 		}
 
-		String itemId = resourceId(requiredString(body, "item"), "item");
+		String itemId = resourceId(requiredString(body, "item"), "item", "minecraft:stone");
 		Item item = BuiltInRegistries.ITEM.getOptional(Identifier.parse(itemId))
 				.orElseThrow(() -> new IllegalArgumentException("unknown item: " + itemId));
 		int count = optionalInt(body, "count", 1, 1, 64);
@@ -171,8 +176,8 @@ final class BridgeWorldActions {
 			throw new IllegalArgumentException("player is not in a server level");
 		}
 
-		int centerX = optionalRawInt(body, "x", player.blockPosition().getX());
-		int centerZ = optionalRawInt(body, "z", player.blockPosition().getZ());
+		int centerX = optionalInt(body, "x", player.blockPosition().getX());
+		int centerZ = optionalInt(body, "z", player.blockPosition().getZ());
 		int radius = optionalInt(body, "radius", 48, 4, MAX_TERRAIN_SCAN_RADIUS);
 		int step = optionalInt(body, "step", 8, 1, 32);
 		int minY = Integer.MAX_VALUE;
@@ -301,7 +306,7 @@ final class BridgeWorldActions {
 
 	private static boolean matchesReplace(BlockState previous, String replace) {
 		if (!replace.contains("[")) {
-			return blockId(previous).equals(resourceId(replace, "replace"));
+			return blockId(previous).equals(resourceId(replace, "replace", "minecraft:stone"));
 		}
 		return previous.equals(blockStateFromString(replace, "replace"));
 	}
@@ -318,7 +323,7 @@ final class BridgeWorldActions {
 			properties = value.substring(propertiesStart + 1, value.length() - 1);
 		}
 
-		String checked = resourceId(blockId, name);
+		String checked = resourceId(blockId, name, "minecraft:stone");
 		Block block = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(checked))
 				.orElseThrow(() -> new IllegalArgumentException("unknown block: " + checked));
 		return applyProperties(block.defaultBlockState(), properties, name);
@@ -376,72 +381,11 @@ final class BridgeWorldActions {
 		return property.getName(state.getValue(property));
 	}
 
-	private static String requiredString(JsonObject object, String name) {
-		if (!object.has(name) || !object.get(name).isJsonPrimitive()) {
-			throw new IllegalArgumentException("missing string field: " + name);
-		}
-		String value = object.get(name).getAsString();
-		if (value.isBlank()) {
-			throw new IllegalArgumentException(name + " cannot be blank");
-		}
-		return value;
-	}
-
-	private static String optionalString(JsonObject object, String name, String fallback) {
-		if (!object.has(name) || object.get(name).isJsonNull()) {
-			return fallback;
-		}
-		return object.get(name).getAsString();
-	}
-
-	private static int optionalInt(JsonObject object, String name, int fallback, int min, int max) {
-		if (!object.has(name) || object.get(name).isJsonNull()) {
-			return fallback;
-		}
-		int value = object.get(name).getAsInt();
-		if (value < min || value > max) {
-			throw new IllegalArgumentException(name + " must be between " + min + " and " + max);
-		}
-		return value;
-	}
-
-	private static int requiredInt(JsonObject object, String name) {
-		if (!object.has(name) || object.get(name).isJsonNull()) {
-			throw new IllegalArgumentException("missing integer field: " + name);
-		}
-		return object.get(name).getAsInt();
-	}
-
-	private static int optionalRawInt(JsonObject object, String name, int fallback) {
-		if (!object.has(name) || object.get(name).isJsonNull()) {
-			return fallback;
-		}
-		return object.get(name).getAsInt();
-	}
-
-	private static double optionalDouble(JsonObject object, String name, double fallback, double min, double max) {
-		if (!object.has(name) || object.get(name).isJsonNull()) {
-			return fallback;
-		}
-		double value = object.get(name).getAsDouble();
-		if (!Double.isFinite(value) || value < min || value > max) {
-			throw new IllegalArgumentException(name + " must be between " + min + " and " + max);
-		}
-		return value;
-	}
-
 	private static Direction direction(String value) {
 		Direction direction = Direction.byName(value);
 		if (direction == null) {
 			throw new IllegalArgumentException("face must be one of down, up, north, south, west, east");
 		}
 		return direction;
-	}
-
-	private static String resourceId(String value, String name) {
-		if (!RESOURCE_ID.matcher(value).matches()) {
-			throw new IllegalArgumentException(name + " must be a namespaced id like minecraft:stone");
-		}
-		return value;
 	}
 }

@@ -4,7 +4,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 import net.minecraft.network.chat.Component;
@@ -40,16 +39,7 @@ final class PlayerTeleporter {
 
 		ServerPlayer target = nextTarget(player, targets);
 		player.stopRiding();
-		player.teleportTo(
-				target.level(),
-				target.getX(),
-				target.getY(),
-				target.getZ(),
-				Set.of(),
-				target.getYRot(),
-				target.getXRot(),
-				false
-		);
+		NarwhalTogether.teleport(player, target);
 		player.resetFallDistance();
 
 		LAST_TELEPORT_TICK.put(player.getUUID(), currentTick);

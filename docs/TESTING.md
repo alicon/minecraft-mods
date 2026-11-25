@@ -54,6 +54,16 @@ differ from the eventual fresh neutral-input sample. These observations suppleme
 the existing movement/release proof and do not change native key durations or
 gameplay. Their scheduling overhead can affect a timing-sensitive reproduction.
 
+An unfinished native matrix tick wait records the command, acceptance, last
+observed world clock and any terminal bridge observations. For an integrated
+server, `integratedServerPaused` reports the native Game Menu pause independently
+of `worldFrozen`. `frozenTicksRemaining` and `worldSprinting` report native
+tick-manager state. A confirmed pause interrupts the matrix before another
+fixture, preserves the current screen, and leaves the tick request intact.
+After preserving evidence, verify the same owner, actors and save, then observe
+the world clock before and after resuming the client. A pending step can finish
+on resume. The interrupted report retains its verdict.
+
 Run all verification:
 
 ```shell
@@ -144,6 +154,16 @@ bound. First recovery and later water re-entry are recorded separately. Native
 dismount controls also seed old movement/steering and require owner help to clear
 it for boats, chest boats and carts. Live dock sequences separately check the
 complete landing and settling behavior.
+
+Paired shallow-shore GameTests start a breathing swimmer overlapping the dry
+half-slab edge. They vary only the survival owner's distance along the bank
+and record the first dry tick and longest stable stretch. Both need 40 consecutive
+dry supported ticks within 120 native ticks, with the original healthy actors
+and normal collision. The official live shore cases still require stability
+through the end of their settling window after the full native walk.
+An additional control installs the one-node partial route beneath the dry slab
+observed in the live far-owner trace. The native follow goal must discard it and
+reach the owner with normal movement.
 
 The deck's initial wet-body/breathing-eyes assertion runs inside the recovery
 observer's first sample. An independent delayed callback could run several
@@ -266,6 +286,11 @@ type in reproduction reports rather than converting to JavaScript numbers.
 
 Screenshots close the active client screen before capture by default; set `BRIDGE_SCREENSHOT_RESUME=0` to keep the current screen visible. Set `BRIDGE_SCREENSHOT_HIDE_GUI=1` and `BRIDGE_SCREENSHOT_CLEAR_CHAT=1` for clean visual inspection captures.
 
+For keyboard-driven dev audits, launch the client with the rebuilt bridge and the
+client JVM argument `-Dplaytest.bridge.keepCursorFree=true`. This keeps the OS
+pointer free at world load and when resuming from a screen. The screenshot receipt
+reports `cursorFree` from GLFW. Use this mode for automated keyboard tests.
+
 Launch Modrinth directly into an existing save:
 
 ```shell
@@ -320,6 +345,15 @@ Set `PLAYTEST_SCREENSHOT_DELAY_SECONDS=0` to skip the default post-smoke screens
 Set `BRIDGE_REPORT_FILE=build/playtest-reports/<name>.json` to save the full bridge scenario result for later debugging instead of relying only on terminal output.
 
 ## State-combination testing
+
+For first-anomaly diagnosis, add `--investigate` to the matrix CLI. It stops before
+another fixture replaces a setup/assertion/cleanup failure. Setup/assertion failure
+skips scenario-level fixture cleanup; action-owned key/resource release still runs
+in its own `finally`. Failure capture and guarded reset retain the frozen original
+scene, owner mode and time. Reports record the policy and all requested names/inputs,
+so terminal reports with unexecuted cases cannot be mistaken for full coverage.
+Successful cleanup/care and ordinary run policy remain unchanged. See the harness
+README for the command and capture/reset failure behavior.
 
 The [Mushroom state matrix](../tools/playtest-harness/README.md#mushroom-state-matrix)
 defines 490 cases: 144 combinations, 40 interruption/owner-mode/flight/feeding/tree-approach sequences, 36 terrain cases, 20 outdoor-care sequences, 22 water/rest sequences, eight sleep-spot controls, 100 dry vehicle cases (96 full-entity sequences plus four controlled boarding-refusal challenges), 112 controlled water/rail journeys (including 16 actual offshore immersion controls), and eight native exit-to-shore sequences in a disposable live world. It preserves partial failure

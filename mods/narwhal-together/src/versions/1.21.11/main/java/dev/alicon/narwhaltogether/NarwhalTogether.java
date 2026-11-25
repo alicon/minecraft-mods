@@ -1,40 +1,26 @@
 package dev.alicon.narwhaltogether;
 
-import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import java.util.Set;
 import net.minecraft.resources.Identifier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import net.minecraft.server.level.ServerPlayer;
 
-/** Entrypoint and shared identifiers for the NARwhal Together mod. */
-public final class NarwhalTogether implements ModInitializer {
-	/** Fabric mod id used for registries, packets, assets, and translations. */
-	public static final String MOD_ID = "narwhal_together";
-	/** Logger scoped to the NARwhal Together mod id. */
-	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-
-	@Override
-	public void onInitialize() {
-		PayloadTypeRegistry.playC2S().register(
-				TeleportToNextPlayerPayload.TYPE,
-				TeleportToNextPlayerPayload.CODEC
-		);
-		ServerPlayNetworking.registerGlobalReceiver(
-				TeleportToNextPlayerPayload.TYPE,
-				(payload, context) -> PlayerTeleporter.teleportToNextPlayer(context.player())
-		);
-
-		LOGGER.info("NARwhal Together initialized");
-	}
-
-	/**
-	 * Creates an identifier in this mod's namespace.
-	 *
-	 * @param path resource path inside the `narwhal_together` namespace
-	 * @return namespaced Minecraft identifier
-	 */
+/** Fabric entrypoint with this Minecraft target’s native identifier and teleport types. */
+public final class NarwhalTogether extends NarwhalEntrypoint {
+	/** Creates an identifier in NARwhal's namespace. */
 	public static Identifier id(String path) {
 		return Identifier.fromNamespaceAndPath(MOD_ID, path);
+	}
+
+	static void teleport(ServerPlayer player, ServerPlayer target) {
+		player.teleportTo(
+				target.level(),
+				target.getX(),
+				target.getY(),
+				target.getZ(),
+				Set.of(),
+				target.getYRot(),
+				target.getXRot(),
+				false
+		);
 	}
 }

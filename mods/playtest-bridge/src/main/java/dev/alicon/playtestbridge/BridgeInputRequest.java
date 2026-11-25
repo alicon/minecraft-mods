@@ -11,16 +11,19 @@ record BridgeInputRequest(String action, String expectedSave, String playerUuid,
 	static final int MAX_TICKS = 100;
 	static final int MAX_DISMOUNT_TICKS = 5;
 	static final int MAX_JUMP_TICKS = 5;
+	private static final Set<String> ACTIONS = Set.of("start", "status", "cancel");
+	private static final Set<String> MODES = Set.of("walk", "boat", "dismount", "jump");
 	private static final Set<String> COMMON = Set.of("action", "expectedSave", "playerUuid", "operationId");
 	private static final Set<String> START = Set.of("mode", "ticks", "forward", "backward", "left", "right", "vehicleUuid");
 
 	static BridgeInputRequest parse(JsonObject state, JsonObject body) {
 		String action = text(body, "action");
-		if (!Set.of("start", "status", "cancel").contains(action)) {
+		if (!ACTIONS.contains(action)) {
 			throw new IllegalArgumentException("client input action must be start, status or cancel");
 		}
+		boolean start = action.equals("start");
 		for (String key : body.keySet()) {
-			if (!COMMON.contains(key) && !(action.equals("start") && START.contains(key))) {
+			if (!COMMON.contains(key) && !(start && START.contains(key))) {
 				throw new IllegalArgumentException("unsupported client input field: " + key);
 			}
 		}
@@ -34,19 +37,52 @@ record BridgeInputRequest(String action, String expectedSave, String playerUuid,
 		}
 		String id = text(body, "operationId");
 		UUID.fromString(id);
-		if (!action.equals("start")) {
+		if (!start) {
 			return new BridgeInputRequest(action, save, playerUuid, id, "", 0, false, false, false, false, null, 0, 0, false);
 		}
+		return parseStart(state, body, players.get(0).getAsJsonObject(), save, playerUuid, id);
+	}
+
+	private static BridgeInputRequest parseStart(JsonObject state, JsonObject body, JsonObject player,
+			String save, String playerUuid, String id) {
 		String mode = text(body, "mode");
-		if (!Set.of("walk", "boat", "dismount", "jump").contains(mode)) throw new IllegalArgumentException("input mode must be walk, boat, dismount or jump");
-		String vehicleUuid = null;
-		if (mode.equals("boat") || mode.equals("dismount")) {
-			vehicleUuid = text(body, "vehicleUuid");
-			UUID.fromString(vehicleUuid);
-		} else if (body.has("vehicleUuid")) throw new IllegalArgumentException("on-foot input cannot target a vehicle");
+		if (!MODES.contains(mode)) {
+			throw new IllegalArgumentException("input mode must be walk, boat, dismount or jump");
+		}
+		boolean dismount = mode.equals("dismount");
+		String vehicleUuid = readVehicle(body, dismount || mode.equals("boat"));
 		if (!state.has("worldFrozen") || state.get("worldFrozen").getAsBoolean()) {
 			throw new IllegalArgumentException("client input requires running world ticks");
 		}
+		int ticks = readTicks(body);
+		boolean forward = flag(body, "forward");
+		boolean backward = flag(body, "backward");
+		boolean left = flag(body, "left");
+		boolean right = flag(body, "right");
+		if (forward && backward || left && right) {
+			throw new IllegalArgumentException("opposing input directions are unsupported");
+		}
+		if (dismount && (ticks < 2 || ticks > MAX_DISMOUNT_TICKS || forward || backward || left || right)) {
+			throw new IllegalArgumentException("dismount input requires 2 to " + MAX_DISMOUNT_TICKS + " ticks without directional controls");
+		}
+		JumpSample jump = mode.equals("jump") ? readJumpSample(state, player, ticks) : JumpSample.NOT_READY;
+		return new BridgeInputRequest("start", save, playerUuid, id, mode, ticks, forward, backward, left, right,
+				vehicleUuid, jump.originY(), jump.millis(), jump.ready());
+	}
+
+	private static String readVehicle(JsonObject body, boolean riding) {
+		if (riding) {
+			String vehicleUuid = text(body, "vehicleUuid");
+			UUID.fromString(vehicleUuid);
+			return vehicleUuid;
+		}
+		if (body.has("vehicleUuid")) {
+			throw new IllegalArgumentException("on-foot input cannot target a vehicle");
+		}
+		return null;
+	}
+
+	private static int readTicks(JsonObject body) {
 		var duration = body.get("ticks");
 		int ticks;
 		try {
@@ -57,29 +93,30 @@ record BridgeInputRequest(String action, String expectedSave, String playerUuid,
 		} catch (RuntimeException failure) {
 			throw new IllegalArgumentException("input ticks must be an integer between 1 and " + MAX_TICKS);
 		}
-		if (ticks < 1 || ticks > MAX_TICKS) throw new IllegalArgumentException("input duration is out of bounds");
-		boolean forward = flag(body, "forward"), backward = flag(body, "backward");
-		boolean left = flag(body, "left"), right = flag(body, "right");
-		if (forward && backward || left && right) throw new IllegalArgumentException("opposing input directions are unsupported");
-		if (mode.equals("dismount") && (ticks < 2 || ticks > MAX_DISMOUNT_TICKS || forward || backward || left || right)) {
-			throw new IllegalArgumentException("dismount input requires 2 to " + MAX_DISMOUNT_TICKS + " ticks without directional controls");
+		if (ticks < 1 || ticks > MAX_TICKS) {
+			throw new IllegalArgumentException("input duration is out of bounds");
 		}
-		if (mode.equals("jump")) {
-			if (ticks < 2 || ticks > MAX_JUMP_TICKS) throw new IllegalArgumentException("jump input requires 2 to " + MAX_JUMP_TICKS + " ticks");
+		return ticks;
+	}
+
+	private static JumpSample readJumpSample(JsonObject state, JsonObject player, int ticks) {
+		if (ticks < 2 || ticks > MAX_JUMP_TICKS) {
+			throw new IllegalArgumentException("jump input requires 2 to " + MAX_JUMP_TICKS + " ticks");
 		}
-		double jumpOrigin = 0;long sampleMillis = 0;boolean ready = false;
-		if (mode.equals("jump")) {
-			try {
-				validateJumpStart(players.get(0).getAsJsonObject());
-				jumpOrigin = players.get(0).getAsJsonObject().getAsJsonObject("positionPrecise").get("y").getAsDouble();
-				sampleMillis = Long.parseLong(text(state, "inputObservationEndMillis"));ready = true;
-			} catch (RuntimeException invalidPhysics) {
-				// An identical retry must still return its original receipt while airborne.
-				// A new operation validates these facts before binding or writing any keys.
-				ready = false;
-			}
+		double originY = 0;
+		try {
+			validateJumpStart(player);
+			originY = player.getAsJsonObject("positionPrecise").get("y").getAsDouble();
+			long millis = Long.parseLong(text(state, "inputObservationEndMillis"));
+			return new JumpSample(originY, millis, true);
+		} catch (RuntimeException invalidPhysics) {
+			// Retries can return their existing receipt while airborne. New starts require a valid sample.
+			return new JumpSample(originY, 0, false);
 		}
-		return new BridgeInputRequest(action, save, playerUuid, id, mode, ticks, forward, backward, left, right, vehicleUuid, jumpOrigin, sampleMillis, ready);
+	}
+
+	private record JumpSample(double originY, long millis, boolean ready) {
+		private static final JumpSample NOT_READY = new JumpSample(0, 0, false);
 	}
 
 	void validateNewStart() {

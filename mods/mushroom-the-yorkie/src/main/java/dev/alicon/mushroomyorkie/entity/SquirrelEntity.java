@@ -44,13 +44,14 @@ public final class SquirrelEntity extends net.minecraft.world.entity.animal.Anim
 	@Override
 	protected void registerGoals() {
 		this.goalSelector.addGoal(0, new FloatGoal(this));
-		this.goalSelector.addGoal(1, new SquirrelFindTreeGoal(this));
-		this.goalSelector.addGoal(2, new AvoidEntityGoal<>(this, MushroomYorkieEntity.class, 10.0F, 1.2D, 1.45D));
-		this.goalSelector.addGoal(3, new BreedGoal(this, 1.0D));
-		this.goalSelector.addGoal(4, new TemptGoal(this, 1.1D, Ingredient.of(Items.SWEET_BERRIES, Items.WHEAT_SEEDS), false));
-		this.goalSelector.addGoal(5, new RandomStrollGoal(this, 1.0D, 80));
-		this.goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 6.0F));
-		this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
+		this.goalSelector.addGoal(1, new SquirrelSaplingGoal(this));
+		this.goalSelector.addGoal(2, new SquirrelFindTreeGoal(this));
+		this.goalSelector.addGoal(3, new AvoidEntityGoal<>(this, MushroomYorkieEntity.class, 10.0F, 1.2D, 1.45D));
+		this.goalSelector.addGoal(4, new BreedGoal(this, 1.0D));
+		this.goalSelector.addGoal(5, new TemptGoal(this, 1.1D, Ingredient.of(Items.SWEET_BERRIES, Items.WHEAT_SEEDS), false));
+		this.goalSelector.addGoal(6, new RandomStrollGoal(this, 1.0D, 80));
+		this.goalSelector.addGoal(7, new LookAtPlayerGoal(this, Player.class, 6.0F));
+		this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
 	}
 
 	/** True once this squirrel has climbed to the safe height on its selected tree. */

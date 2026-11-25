@@ -3136,7 +3136,8 @@ async function runCopsStructuresSmoke(baseUrl, args) {
       (entity) => entity.custom && entity.custom.stolenGold === true,
       12000
     );
-    await checkedCommand(`tp @e[type=${robberType},limit=1,sort=nearest] ${bankOrigin.x + 8.5} ${bankOrigin.y + 1} ${bankOrigin.z - 4.5}`);
+    // The robber must leave the vault's eight-block chest search to trigger the fire.
+    await checkedCommand(`tp @e[type=${robberType},limit=1,sort=nearest] ${bankOrigin.x + 8.5} ${bankOrigin.y + 1} ${bankOrigin.z + 2.5}`);
     const arsonist = await waitForEntityState(
       baseUrl,
       robberType,
@@ -3423,6 +3424,7 @@ Common options:
   --item <id>          Namespaced item id for give/use-block/use-entity
   --block <id>         Namespaced block id or block state for set-block actions
   --report-file <path> Write the full JSON result to a file
+  --investigate       Matrix only: stop at first failure and retain its frozen fixture
 `);
 }
 
@@ -3432,6 +3434,9 @@ async function main() {
   if (args.help || action === 'help') {
     printBridgeUsage();
     return;
+  }
+  if (args.investigate !== undefined && action !== 'yorkie-matrix') {
+    throw new Error('--investigate is only supported by yorkie-matrix');
   }
   const host = option(args, 'host', 'BRIDGE_HOST', '127.0.0.1');
   const port = option(args, 'port', 'BRIDGE_PORT', '57321');
@@ -3646,10 +3651,13 @@ async function main() {
 
 function describeError(error) {
   const code = error && error.cause && error.cause.code;
-  if (code === 'ECONNREFUSED' || (error && error.message === 'fetch failed')) {
-    return 'Could not reach the playtest bridge. Start or restart Minecraft with playtest-bridge installed, then load a world.';
-  }
-  return error.stack || error.message;
+  const message = code === 'ECONNREFUSED' || (error && error.message === 'fetch failed')
+    ? 'Could not reach the playtest bridge. Start or restart Minecraft with playtest-bridge installed, then load a world.'
+    : error.stack || error.message;
+  return [message,
+    ...(error.investigativeWorldReset?.worldFrozen ? ['Investigative fixture retained frozen after runner interruption.'] : []),
+    ...(error.worldResetError ? [`World reset also failed: ${error.worldResetError}`] : [])
+  ].join('\n');
 }
 
 main().catch((error) => {

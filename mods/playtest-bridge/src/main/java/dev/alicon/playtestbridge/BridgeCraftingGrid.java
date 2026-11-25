@@ -4,11 +4,9 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Pattern;
 
 /** A bounded synthetic grid for read-only native recipe resolution, never an inventory mutation. */
 record BridgeCraftingGrid(int width, int height, List<String> slots) {
-	private static final Pattern RESOURCE_ID = Pattern.compile("[a-z0-9_.-]+:[a-z0-9_./-]+");
 
 	static BridgeCraftingGrid parse(JsonObject body) {
 		int width = dimension(body, "width");
@@ -20,7 +18,7 @@ record BridgeCraftingGrid(int width, int height, List<String> slots) {
 		for (JsonElement entry : body.getAsJsonArray("slots")) {
 			if (entry.isJsonNull()) {
 				slots.add("minecraft:air");
-			} else if (entry.isJsonPrimitive() && entry.getAsJsonPrimitive().isString() && RESOURCE_ID.matcher(entry.getAsString()).matches()) {
+			} else if (entry.isJsonPrimitive() && entry.getAsJsonPrimitive().isString() && BridgeJsonFields.isResourceId(entry.getAsString())) {
 				slots.add(entry.getAsString());
 			} else {
 				throw new IllegalArgumentException("Each slot must be a namespaced item id or null");

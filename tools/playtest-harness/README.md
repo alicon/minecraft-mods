@@ -190,6 +190,29 @@ unexpectedly missing from another fixture remains a failure. World-reset errors
 preserve the original failed report or interruption. Direct CLI calls also honor
 `BRIDGE_REPORT_FILE`; an explicit `--report-file` takes precedence.
 
+Use `--investigate` to preserve the first anomaly before another case can replace
+its fixture:
+
+```shell
+npm --prefix tools/playtest-harness run bridge -- yorkie-matrix --expected-save "Codex Test Copy" --investigate --report-file build/playtest-reports/investigation.json
+```
+
+It works with `--group` and `--case`. Reports include `investigativeAudit`, the
+execution policy and `requestedCases` (names/inputs), including unexecuted cases.
+Original bodies, inputs, assertions and successful cleanup/care stay unchanged.
+After a setup or assertion failure, capture freezes the original scene and the
+mode skips scenario-level fixture cleanup. The guarded world reset retains that
+freeze instead of changing owner mode/time. Capture errors remain visible; reset
+still attempts the guarded freeze. Unexpected runner errors (such as report-write
+failure) also attempt guarded retention, even after success care reset the world;
+the original error stays primary and stderr states whether retention succeeded or
+failed. A cleanup error after a passing body also stops the run and fails it.
+Key/resource release belongs in the action's own `finally`,
+never in skippable fixture cleanup. Ordinary runs keep their existing policy.
+`complete` means the report finished; check `gameplayComplete`, `requestedCaseCount`
+and executed cases before claiming the selected coverage passed. Other commands
+reject this matrix-only flag instead of silently ignoring it.
+
 The 144 base cases combine four times (day, dusk, night, dawn), three shelter types
 (open sky, roof only, enclosed room), fed/hungry needs, sit/follow orders,
 and three owner states (survival walking, creative walking, creative flying). Each fresh-pet fixture checks sleep, orders,
@@ -205,7 +228,7 @@ branch blocks the nearest face (`--case squirrel-clear-tree-face`).
 Replay them by name with `--case fetch-sit-yorkie_ball` or
 `--case sleep-flight-sleep-90`, or `--case starving-night-food-bowl`, or `--case fetch-owner-mode-yorkie_ball`.
 
-Before each fresh pet, the fixture advances an empty arena past the owner’s 1800-tick builder-focus window. Replacing the pet alone does not clear that owner activity. The audit records this reset so case ordering cannot silently trigger a leftover creative nap.
+Before each fresh pet, the fixture clears the arena, verifies the staging floor, and waits for the owner to hold a stable position on the verified block across three server ticks before advancing past the 1800-tick builder-focus window. The bridge reports the owner's last native movement input when available. The fixture requires neutral input and dry, grounded support at the settled position before and after the reset. A staging failure retains the owner samples and stops as a setup failure. The audit records the owner's supported position and health after a successful reset. A dead owner during vehicle observation is a setup failure.
 
 The terrain group adds 36 cases: dry ground, open water, covered water, and a
 six-block drop for each toy and owner locomotion state. It requires ordinary

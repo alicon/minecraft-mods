@@ -123,23 +123,18 @@ tasks.register('validateFormatting') {
 	description = 'Validates low-level text formatting for source-controlled files.'
 
 	doLast {
-		def checkedExtensions = ['.gradle', '.java', '.json', '.md', '.properties', '.sh', '.yml', '.yaml']
-		def checkedFiles = ['.editorconfig', '.gitattributes', '.gitignore']
-		def ignoredDirs = ['.git', '.gradle', '.gradle-user-home', 'build', 'node_modules']
+		def checkedExtensions = ['gradle', 'java', 'json', 'md', 'properties', 'sh', 'yml', 'yaml']
+		def checkedDotfiles = ['.editorconfig', '.gitattributes', '.gitignore']
+		def generatedDirs = ['.git', '.gradle', '.gradle-user-home', 'build', 'node_modules', 'run', 'logs']
+		def sources = rootProject.fileTree(rootProject.projectDir) {
+			include checkedExtensions.collect { "**/*.${it}" }
+			exclude generatedDirs.collect { "**/${it}/**" }
+		}.files
+		def dotfiles = checkedDotfiles.collect { rootProject.file(it) }.findAll { it.file }
 		def violations = []
 
-		rootProject.projectDir.eachFileRecurse { file ->
-			if (!file.file) {
-				return
-			}
+		(sources + dotfiles).each { file ->
 			def relative = rootProject.projectDir.toPath().relativize(file.toPath()).toString()
-			def pathParts = relative.split(/[\/\\]/)
-			if (pathParts.any { ignoredDirs.contains(it) } || relative.contains("${File.separator}build${File.separator}")) {
-				return
-			}
-			if (!checkedExtensions.any { relative.endsWith(it) } && !checkedFiles.contains(relative)) {
-				return
-			}
 
 			def bytes = file.bytes
 			def text = new String(bytes, java.nio.charset.StandardCharsets.UTF_8)
@@ -303,7 +298,7 @@ tasks.register('validateReleaseNotes') {
 
 tasks.register('validateVersionedSourceLayout') {
 	group = 'verification'
-	description = 'Validates supported Minecraft version source roots and override excludes.'
+	description = 'Validates declared Minecraft source roots, override excludes, and duplicate version files.'
 
 	doLast {
 		def violations = []
@@ -311,20 +306,36 @@ tasks.register('validateVersionedSourceLayout') {
 		subprojects.each { modProject ->
 			def modDir = modProject.projectDir
 			def versionsDir = modDir.toPath().resolve('src/versions').toFile()
-			def versionMatrix = modProject.ext.has('supported_minecraft_versions') ? modProject.ext.supported_minecraft_versions : [:]
-			def declaredVersions = versionMatrix.keySet().collect { it.toString() } as Set
+			def declaredVersions = modProject.ext.has('supported_minecraft_versions')
+					? modProject.ext.supported_minecraft_versions as Set
+					: [] as Set
 
-			if (versionMatrix.isEmpty()) {
+			if (declaredVersions.isEmpty()) {
 				if (versionsDir.directory) {
-					violations << "${modProject.path} has src/versions but no supported_minecraft_versions map"
+					violations << "${modProject.path} has src/versions but no supported_minecraft_versions list"
 				}
 				return
 			}
 
+			def versionSources = [:].withDefault { [] }
 			declaredVersions.each { minecraftVersion ->
-				def versionDir = versionsDir.toPath().resolve(minecraftVersion).toFile()
+				def versionDir = new File(versionsDir, minecraftVersion)
 				if (!versionDir.directory) {
 					violations << "${modProject.path} declares Minecraft ${minecraftVersion} but is missing src/versions/${minecraftVersion}"
+					return
+				}
+				modProject.fileTree(versionDir).matching { include '**/*.java' }.each { versionFile ->
+					def relativePath = versionDir.toPath().relativize(versionFile.toPath()).toString()
+					def sharedFile = new File(modDir, "src/${relativePath}")
+					def candidates = versionSources[relativePath]
+					def duplicate = ([sharedFile] + candidates).find {
+						it.file && java.nio.file.Files.mismatch(it.toPath(), versionFile.toPath()) == -1L
+					}
+					if (duplicate != null) {
+						def duplicatePath = modDir.toPath().relativize(duplicate.toPath())
+						violations << "${modProject.path} src/versions/${minecraftVersion}/${relativePath} duplicates ${duplicatePath}; move the common code to src/${relativePath}"
+					}
+					candidates << versionFile
 				}
 			}
 

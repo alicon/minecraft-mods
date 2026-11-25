@@ -47,11 +47,7 @@ final class MushroomWaterEscape {
 			this.stalledTicks++;
 		}
 		boolean clearAbove = this.clearAbove();
-		if (!this.escaping && clearAbove) {
-			this.attempts.clearRoute();
-			return;
-		}
-		if (!this.escaping && this.stalledTicks < STALLED_TICKS) {
+		if (!this.escaping && (clearAbove || this.stalledTicks < STALLED_TICKS)) {
 			this.attempts.clearRoute();
 			return;
 		}
@@ -72,22 +68,13 @@ final class MushroomWaterEscape {
 			}
 			clearAbove = this.clearAbove();
 		}
-		if (this.approach != null) {
-			this.approach = new Vec3(this.approach.x, this.yorkie.getY(), this.approach.z);
-		}
-		if (!clearAbove && (this.approach == null || !this.canReach(this.approach))) {
-			this.approach = null;
-			if (this.yorkie.tickCount < this.nextPlanTick) {
-				return;
-			}
-			this.nextPlanTick = this.yorkie.tickCount + REPLAN_TICKS;
-			this.approach = this.findApproach();
-		}
-		if (!clearAbove && this.approach == null) {
+		if (!this.prepareRoute(clearAbove)) {
 			return;
 		}
 		if (!this.escaping) {
-			if (!this.attempts.continueEpisode(this.yorkie.tickCount)) return;
+			if (!this.attempts.continueEpisode(this.yorkie.tickCount)) {
+				return;
+			}
 			this.progressAnchor = this.yorkie.position();
 			this.stalledTicks = 0;
 			this.escaping = true;
@@ -104,6 +91,25 @@ final class MushroomWaterEscape {
 			this.yorkie.setDeltaMovement(direction.x * SWIM_SPEED_BLOCKS_PER_TICK, velocity.y,
 					direction.z * SWIM_SPEED_BLOCKS_PER_TICK);
 		}
+	}
+
+	private boolean prepareRoute(boolean clearAbove) {
+		if (this.approach != null) {
+			this.approach = new Vec3(this.approach.x, this.yorkie.getY(), this.approach.z);
+		}
+		if (clearAbove) {
+			return true;
+		}
+		if (this.approach != null && this.canReach(this.approach)) {
+			return true;
+		}
+
+		this.approach = null;
+		if (this.yorkie.tickCount >= this.nextPlanTick) {
+			this.nextPlanTick = this.yorkie.tickCount + REPLAN_TICKS;
+			this.approach = this.findApproach();
+		}
+		return this.approach != null;
 	}
 
 	private Vec3 findApproach() {

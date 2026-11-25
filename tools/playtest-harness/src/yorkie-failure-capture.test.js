@@ -67,3 +67,15 @@ test('an unconfirmed investigative freeze fails without touching the view', asyn
   await assert.rejects(captureMatrixFailure(f.context, { name: 'boat', stopOnFailure: true }, { delay: f.delay }), /frozen world/);
   assert.equal(f.requests.length, 0);assert.equal(f.ui.screen, 'pause-menu');assert.equal(f.world.players[0].vehicle.id, 7);
 });
+
+test('an investigative client pause preserves the screen and pending tick without sending a freeze command', async () => {
+  const f = fixture();
+  f.world.integratedServerPaused = true;
+  f.world.frozenTicksRemaining = 1;
+  const result = await captureMatrixFailure(f.context, { name: 'boat', stopOnFailure: true },
+    { delay: f.delay, clientPaused: true });
+  assert.deepEqual(f.commands, []);
+  assert.equal(f.ui.screen, 'pause-menu');
+  assert.equal(result.cameraState.frozenTicksRemaining, 1);
+  assert.equal(result.screenshot, 'failure.png');
+});

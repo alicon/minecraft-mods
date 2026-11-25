@@ -2,6 +2,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { CLIENT_PAUSED } = require('./yorkie-clock');
 
 // Shared atomic writer also preserves a completed failed report if world reset fails afterward.
 function saveReport(reportFile, report) {
@@ -29,12 +30,18 @@ async function runCases(cases, { reportFile, metadata = {}, capture = async () =
       result.status = 'passed';
     } catch (error) {
       if (result.observed === undefined && error.observed !== undefined) result.observed = error.observed;
-      result.status = phase === 'setup' || error.phase === 'setup' ? 'setup_failed' : 'failed';
+      if (error.code === CLIENT_PAUSED) {
+        result.status = 'interrupted';
+        result.interruption = 'client_paused';
+      } else {
+        result.status = phase === 'setup' || error.phase === 'setup' ? 'setup_failed' : 'failed';
+      }
+      if (error.tickInterruption) result.tickInterruption = error.tickInterruption;
       result.error = error.message;
       try { result.evidence = await capture(scenario, error); }
       catch (captureError) { result.captureError = captureError.message; }
     } finally {
-      if (scenario.cleanup) {
+      if (scenario.cleanup && result.status !== 'interrupted') {
         try { await scenario.cleanup(result); }
         catch (error) { result.cleanupError = error.message; result.status = 'cleanup_failed'; }
       }
@@ -42,7 +49,7 @@ async function runCases(cases, { reportFile, metadata = {}, capture = async () =
     }
     onResult(result);
     // Keep failed investigative actors available instead of replacing their fixture.
-    if (scenario.stopOnFailure && result.status !== 'passed' && report.cases.length < cases.length) {
+    if ((result.status === 'interrupted' || scenario.stopOnFailure && result.status !== 'passed') && report.cases.length < cases.length) {
       report.stoppedAfterFailure = true;
       break;
     }
@@ -65,7 +72,7 @@ async function runCases(cases, { reportFile, metadata = {}, capture = async () =
         report.postRun.status = 'failed'; report.postRun.error = error.message;
         if (error.observed) report.postRun.observed = error.observed;
       }
-    } else report.postRun.reason = 'gameplay_failed';
+    } else report.postRun.reason = report.summary.interrupted ? 'interrupted' : 'gameplay_failed';
     report.postRun.finishedAt = new Date().toISOString();
   }
   report.ok = report.gameplayOk && report.postRun?.status !== 'failed';

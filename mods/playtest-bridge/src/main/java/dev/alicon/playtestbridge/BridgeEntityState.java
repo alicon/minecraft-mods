@@ -34,6 +34,7 @@ final class BridgeEntityState {
 		state.addProperty("health", player.getHealth());
 		state.addProperty("food", player.getFoodData().getFoodLevel());
 		state.addProperty("shiftKeyDown", player.isShiftKeyDown());
+		state.add("lastClientInput", BridgeNativeInputTrace.flags(player.getLastClientInput()));
 		state.addProperty("onGround", player.onGround());
 		state.addProperty("inWater", player.isInWater());
 		state.addProperty("inWaterOrBubble", inWaterOrBubble(player));

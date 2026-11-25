@@ -10,11 +10,18 @@ import net.minecraft.world.phys.AABB;
 
 final class BarkAtPeacefulMobsGoal extends Goal {
 	private static final double OWNER_RECALL_DISTANCE_SQR = 24.0D * 24.0D;
+	// A 12-second ground return at normal walking speed, with native following as a fallback.
+	private static final int SQUIRREL_RETURN_MAX_TICKS = 20 * 12;
+	private static final int SQUIRREL_RETURN_REPATH_TICKS = 10;
+	private static final double SQUIRREL_RETURN_SPEED = 1.0D;
+	private static final double SQUIRREL_RETURN_REACHED_SQR = 2.5D * 2.5D;
 
 	private final MushroomYorkieEntity yorkie;
 	private Animal target;
 	private int nextSearchTick;
 	private int squirrelChaseTicks;
+	private int squirrelReturnTicks;
+	private boolean returningFromSquirrel;
 
 	BarkAtPeacefulMobsGoal(MushroomYorkieEntity yorkie) {
 		this.yorkie = yorkie;
@@ -41,19 +48,13 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 
 	@Override
 	public boolean canContinueToUse() {
-		if (!(this.yorkie.level() instanceof ServerLevel level)
-				|| !this.canStayInGoal(level)
-				|| !(this.target instanceof SquirrelEntity) && this.yorkie.peacefulMobBarkingMuted(level)) {
+		if (!(this.yorkie.level() instanceof ServerLevel level) || !this.canStayInGoal(level)) {
 			return false;
 		}
-
-		if (this.target instanceof SquirrelEntity squirrel && this.shouldGiveUpSquirrel(squirrel)) {
-			this.yorkie.peacefulMobMemory.remember(squirrel);
-			MushroomOwnerNotice.send(this.yorkie, "message.mushroom_yorkie.notice_squirrel_done", MushroomOwnerNotice.MEDIUM_COOLDOWN_TICKS);
-			return false;
+		if (this.returningFromSquirrel) {
+			return this.canReturnToOwner(this.yorkie.getOwner());
 		}
-
-		return this.target != null && this.target.isAlive() && this.yorkie.distanceToSqr(this.target) < 196.0D;
+		return this.target instanceof SquirrelEntity || !this.yorkie.peacefulMobBarkingMuted(level) && this.targetIsNearby();
 	}
 
 	@Override
@@ -64,6 +65,8 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 	@Override
 	public void start() {
 		this.squirrelChaseTicks = 0;
+		this.squirrelReturnTicks = 0;
+		this.returningFromSquirrel = false;
 		String message = this.target instanceof SquirrelEntity
 				? "message.mushroom_yorkie.notice_squirrel"
 				: "message.mushroom_yorkie.notice_peaceful_mob";
@@ -75,24 +78,34 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 	public void stop() {
 		MushroomBehaviorDebugger.debug(this.yorkie, "peaceful_mob_stop", "peaceful mob: stopped barking", true);
 		this.target = null;
+		this.returningFromSquirrel = false;
 		this.yorkie.getNavigation().stop();
 	}
 
 	@Override
 	public void tick() {
-		if (this.target == null) {
-			return;
-		}
-		if (this.target instanceof SquirrelEntity) {
-			this.squirrelChaseTicks++;
-		}
-
 		LivingEntity owner = this.yorkie.getOwner();
 		if (owner == null) {
 			return;
 		}
+		if (this.returningFromSquirrel) {
+			this.tickSquirrelReturn(owner);
+			return;
+		}
+		if (this.target == null) {
+			return;
+		}
 
-		if (this.yorkie.distanceToSqr(owner) > OWNER_RECALL_DISTANCE_SQR) {
+		boolean ownerFar = this.yorkie.distanceToSqr(owner) > OWNER_RECALL_DISTANCE_SQR;
+		if (this.target instanceof SquirrelEntity squirrel) {
+			if (this.shouldGiveUpSquirrel(squirrel, owner) || ownerFar || !this.targetIsNearby()) {
+				this.beginSquirrelReturn(squirrel);
+				this.tickSquirrelReturn(owner);
+				return;
+			}
+			this.squirrelChaseTicks++;
+		}
+		if (ownerFar) {
 			this.yorkie.getLookControl().setLookAt(owner, 10.0F, this.yorkie.getMaxHeadXRot());
 			this.yorkie.getNavigation().moveTo(owner, 1.35D);
 			MushroomOwnerNotice.send(this.yorkie, "message.mushroom_yorkie.notice_peaceful_return", MushroomOwnerNotice.MEDIUM_COOLDOWN_TICKS);
@@ -168,10 +181,36 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 		return closestSquirrel == null ? closest : closestSquirrel;
 	}
 
-	private boolean shouldGiveUpSquirrel(SquirrelEntity squirrel) {
-		LivingEntity owner = this.yorkie.getOwner();
-		double ownerDistance = owner == null ? 0.0D : squirrel.distanceToSqr(owner);
-		if (!SquirrelChasePolicy.shouldGiveUp(this.squirrelChaseTicks, squirrel.hasFoundTree(), ownerDistance)) {
+	private boolean targetIsNearby() {
+		return this.target != null && this.target.isAlive() && this.yorkie.distanceToSqr(this.target) < 196.0D;
+	}
+
+	private boolean canReturnToOwner(LivingEntity owner) {
+		return owner != null && owner.level() == this.yorkie.level() && !this.yorkie.isPassenger()
+				&& this.squirrelReturnTicks < SQUIRREL_RETURN_MAX_TICKS
+				&& this.yorkie.distanceToSqr(owner) > SQUIRREL_RETURN_REACHED_SQR;
+	}
+
+	private void beginSquirrelReturn(SquirrelEntity squirrel) {
+		this.yorkie.peacefulMobMemory.remember(squirrel);
+		this.returningFromSquirrel = true;
+		this.yorkie.getNavigation().stop();
+		MushroomOwnerNotice.send(this.yorkie, "message.mushroom_yorkie.notice_squirrel_done", MushroomOwnerNotice.MEDIUM_COOLDOWN_TICKS);
+		MushroomBehaviorDebugger.debug(this.yorkie, "squirrel_return", "squirrel: walking back to owner", true);
+	}
+
+	private void tickSquirrelReturn(LivingEntity owner) {
+		if (!this.canReturnToOwner(owner)) {
+			return;
+		}
+		this.yorkie.getLookControl().setLookAt(owner, 10.0F, this.yorkie.getMaxHeadXRot());
+		if (this.squirrelReturnTicks++ % SQUIRREL_RETURN_REPATH_TICKS == 0) {
+			this.yorkie.getNavigation().moveTo(owner, SQUIRREL_RETURN_SPEED);
+		}
+	}
+
+	private boolean shouldGiveUpSquirrel(SquirrelEntity squirrel, LivingEntity owner) {
+		if (!SquirrelChasePolicy.shouldGiveUp(this.squirrelChaseTicks, squirrel.hasFoundTree(), squirrel.distanceToSqr(owner))) {
 			return false;
 		}
 

@@ -1,40 +1,27 @@
 package dev.alicon.narwhaltogether;
 
-import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import java.util.Set;
 import net.minecraft.resources.ResourceLocation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.RelativeMovement;
 
-/** Entrypoint and shared identifiers for the NARwhal Together mod. */
-public final class NarwhalTogether implements ModInitializer {
-	/** Fabric mod id used for registries, packets, assets, and translations. */
-	public static final String MOD_ID = "narwhal_together";
-	/** Logger scoped to the NARwhal Together mod id. */
-	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-
-	@Override
-	public void onInitialize() {
-		PayloadTypeRegistry.playC2S().register(
-				TeleportToNextPlayerPayload.TYPE,
-				TeleportToNextPlayerPayload.CODEC
-		);
-		ServerPlayNetworking.registerGlobalReceiver(
-				TeleportToNextPlayerPayload.TYPE,
-				(payload, context) -> PlayerTeleporter.teleportToNextPlayer(context.player())
-		);
-
-		LOGGER.info("NARwhal Together initialized");
-	}
-
-	/**
-	 * Creates a resource location in this mod's namespace.
-	 *
-	 * @param path resource path inside the `narwhal_together` namespace
-	 * @return namespaced Minecraft resource location
-	 */
+/** Fabric entrypoint with this Minecraft target’s native identifier and teleport types. */
+public final class NarwhalTogether extends NarwhalEntrypoint {
+	/** Creates an identifier in NARwhal's namespace. */
 	public static ResourceLocation id(String path) {
 		return ResourceLocation.fromNamespaceAndPath(MOD_ID, path);
+	}
+
+	static void teleport(ServerPlayer player, ServerPlayer target) {
+		player.teleportTo(
+				(ServerLevel) target.level(),
+				target.getX(),
+				target.getY(),
+				target.getZ(),
+				Set.<RelativeMovement>of(),
+				target.getYRot(),
+				target.getXRot()
+		);
 	}
 }

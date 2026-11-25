@@ -64,7 +64,7 @@ public final class BridgeNativeInputTrace {
 		}
 	}
 
-	private static JsonObject flags(Input input) {
+	static JsonObject flags(Input input) {
 		JsonObject flags = new JsonObject();flags.addProperty("shift", input.shift());flags.addProperty("jump", input.jump());
 		flags.addProperty("forward", input.forward());flags.addProperty("backward", input.backward());
 		flags.addProperty("left", input.left());flags.addProperty("right", input.right());flags.addProperty("sprint", input.sprint());
