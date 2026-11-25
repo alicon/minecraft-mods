@@ -52,3 +52,5 @@ Mushroom the Yorkie must be installed on every participating client and on the s
 ## Why Mushroom?
 
 Mushroom is built for family Minecraft worlds where a companion should feel small, expressive, and a little bit silly without turning into a full pet-management system.
+
+My daughter and I made this because we wanted our real dog, Mushroom, in Minecraft. We play together and post updates here as we go. I used Codex and ChatGPT to help build it. Mostly it's just a thing we like doing together. We read the comments and take feedback. Real meat robots, real dog.
