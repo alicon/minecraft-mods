@@ -1,0 +1,55 @@
+{
+  "format_version": "1.26.60",
+  "minecraft:entity": {
+    "description": {
+      "identifier": "cops_robbers:fireman",
+      "is_spawnable": true,
+      "is_summonable": true
+    },
+    "components": {
+      "minecraft:type_family": {
+        "family": [
+          "cops_robbers_crew",
+          "fireman",
+          "mob"
+        ]
+      },
+      "minecraft:collision_box": {
+        "width": 0.6,
+        "height": 1.8
+      },
+      "minecraft:physics": {},
+      "minecraft:persistent": {},
+      "minecraft:nameable": {},
+      "minecraft:health": {
+        "value": 20,
+        "max": 20
+      },
+      "minecraft:fire_immune": {},
+      "minecraft:movement": {
+        "value": 0.24
+      },
+      "minecraft:movement.basic": {},
+      "minecraft:navigation.walk": {
+        "avoid_water": true
+      },
+      "minecraft:jump.static": {},
+      "minecraft:behavior.move_to_block": {
+        "priority": 1,
+        "goal_radius": 2.5,
+        "search_range": 24,
+        "search_height": 4,
+        "speed_multiplier": 1.15,
+        "target_blocks": ["minecraft:fire", "minecraft:soul_fire"],
+        "tick_interval": 10
+      },
+      "minecraft:behavior.look_at_player": {
+        "priority": 4,
+        "look_distance": 6
+      },
+      "minecraft:behavior.random_look_around": {
+        "priority": 6
+      }
+    }
+  }
+}

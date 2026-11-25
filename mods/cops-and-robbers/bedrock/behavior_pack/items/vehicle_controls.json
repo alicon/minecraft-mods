@@ -1,0 +1,30 @@
+{
+  "format_version": "1.26.60",
+  "minecraft:item": {
+    "description": {
+      "identifier": "cops_robbers:vehicle_controls",
+      "menu_category": {
+        "category": "items"
+      }
+    },
+    "components": {
+      "minecraft:display_name": {
+        "value": "item.cops_robbers:vehicle_controls.name"
+      },
+      "minecraft:icon": {
+        "textures": {
+          "default": "comparator"
+        }
+      },
+      "minecraft:max_stack_size": 1,
+      "minecraft:interact_button": "action.interact.cops_robbers_signals",
+      "minecraft:throwable": {
+        "do_swing_animation": false,
+        "max_launch_power": 0.75
+      },
+      "minecraft:projectile": {
+        "projectile_entity": "minecraft:snowball"
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "resource_pack_name": "cops_robbers",
+  "texture_name": "atlas.items",
+  "texture_data": {
+    "cops_robbers_bank_kit": {
+      "textures": "textures/items/bank_kit"
+    },
+    "cops_robbers_police_station_kit": {
+      "textures": "textures/items/police_station_kit"
+    },
+    "cops_robbers_fire_station_kit": {
+      "textures": "textures/items/fire_station_kit"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "format_version": "1.8.0",
+  "animations": {
+    "animation.cops_robbers.vehicle.wheels": {
+      "loop": true,
+      "bones": {
+        "front_left_wheel": {
+          "rotation": [
+            "q.modified_distance_moved * -135",
+            0,
+            0
+          ]
+        },
+        "front_right_wheel": {
+          "rotation": [
+            "q.modified_distance_moved * -135",
+            0,
+            0
+          ]
+        },
+        "rear_left_wheel": {
+          "rotation": [
+            "q.modified_distance_moved * -135",
+            0,
+            0
+          ]
+        },
+        "rear_right_wheel": {
+          "rotation": [
+            "q.modified_distance_moved * -135",
+            0,
+            0
+          ]
+        }
+      }
+    }
+  }
+}

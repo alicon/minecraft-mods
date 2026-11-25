@@ -1,0 +1,29 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "Cops and Robbers (Resources)",
+    "description": "Set up a town for the Cops and Robbers patrol.",
+    "uuid": "e7ed5890-d98c-4beb-91bd-73235b289075",
+    "version": [
+      0,
+      1,
+      3
+    ],
+    "min_engine_version": [
+      1,
+      26,
+      60
+    ]
+  },
+  "modules": [
+    {
+      "type": "resources",
+      "uuid": "f1c8e219-a57a-4907-b461-b8ba07e10189",
+      "version": [
+        0,
+        1,
+        3
+      ]
+    }
+  ]
+}
