@@ -6,14 +6,11 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.RelativeMovement;
 
-/** Resource identifiers and the teleport signature for this Minecraft target. */
-public final class NarwhalMinecraft {
-	private NarwhalMinecraft() {
-	}
-
+/** Fabric entrypoint with this Minecraft target’s native identifier and teleport types. */
+public final class NarwhalTogether extends NarwhalEntrypoint {
 	/** Creates an identifier in NARwhal's namespace. */
 	public static ResourceLocation id(String path) {
-		return ResourceLocation.fromNamespaceAndPath(NarwhalTogether.MOD_ID, path);
+		return ResourceLocation.fromNamespaceAndPath(MOD_ID, path);
 	}
 
 	static void teleport(ServerPlayer player, ServerPlayer target) {

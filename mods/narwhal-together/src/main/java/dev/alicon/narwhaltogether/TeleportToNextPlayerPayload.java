@@ -10,7 +10,7 @@ public record TeleportToNextPlayerPayload() implements CustomPacketPayload {
 	public static final TeleportToNextPlayerPayload INSTANCE = new TeleportToNextPlayerPayload();
 	/** Packet type identifier used by Fabric networking. */
 	public static final Type<TeleportToNextPlayerPayload> TYPE =
-			new Type<>(NarwhalMinecraft.id("teleport_to_next_player"));
+			new Type<>(NarwhalTogether.id("teleport_to_next_player"));
 	/** Codec for the stateless teleport request payload. */
 	public static final StreamCodec<RegistryFriendlyByteBuf, TeleportToNextPlayerPayload> CODEC =
 			StreamCodec.unit(INSTANCE);

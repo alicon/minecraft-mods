@@ -7,10 +7,12 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
+import org.lwjgl.glfw.GLFW;
 
 /** Client entrypoint for NARwhal keybindings and client-to-server requests. */
 public final class NarwhalTogetherClient implements ClientModInitializer {
-	private static final KeyMapping TELEPORT_TO_PLAYER = NarwhalTeleportKey.register();
+	private static final KeyMapping TELEPORT_TO_PLAYER = NarwhalTeleportKey.register(
+			"key.narwhal_together.teleport_to_player", GLFW.GLFW_KEY_G);
 
 	@Override
 	public void onInitializeClient() {

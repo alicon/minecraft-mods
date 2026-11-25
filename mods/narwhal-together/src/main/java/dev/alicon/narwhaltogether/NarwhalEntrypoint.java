@@ -6,8 +6,7 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Entrypoint and shared identifiers for the NARwhal Together mod. */
-public final class NarwhalTogether implements ModInitializer {
+abstract class NarwhalEntrypoint implements ModInitializer {
 	/** Fabric mod id used for registries, packets, assets, and translations. */
 	public static final String MOD_ID = "narwhal_together";
 	/** Logger scoped to the NARwhal Together mod id. */

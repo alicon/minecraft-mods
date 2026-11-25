@@ -39,7 +39,7 @@ final class PlayerTeleporter {
 
 		ServerPlayer target = nextTarget(player, targets);
 		player.stopRiding();
-		NarwhalMinecraft.teleport(player, target);
+		NarwhalTogether.teleport(player, target);
 		player.resetFallDistance();
 
 		LAST_TELEPORT_TICK.put(player.getUUID(), currentTick);

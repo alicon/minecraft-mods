@@ -228,7 +228,7 @@ Logs and in-game diagnostics should make development clearer without spamming no
 
 ## Measuring maintenance changes
 
-Run the same scan on the base and the refactor. [PMD 7.15.0](https://docs.pmd-code.org/pmd-doc-7.15.0/pmd_userdocs_installation.html) can scan Java without resolving Minecraft dependencies:
+Run the same scan on the base and the refactor. PMD can scan Java without resolving Minecraft dependencies. [PMD 7.15.0](https://docs.pmd-code.org/pmd-doc-7.15.0/pmd_userdocs_installation.html)
 
 ```shell
 pmd cpd --dir mods --language java --minimum-tokens 75 --format xml --no-fail-on-violation
