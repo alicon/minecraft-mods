@@ -206,6 +206,25 @@ urlencode() {
 	jq -nr --arg value "$1" '$value|@uri'
 }
 
+if ((${#stale_gallery_titles[@]})); then
+	for stale_title in ${stale_gallery_titles[@]+"${stale_gallery_titles[@]}"}; do
+		while IFS= read -r stale_url; do
+			if [[ -z "$stale_url" ]]; then
+				continue
+			fi
+			curl --fail-with-body --silent --show-error \
+				--request DELETE \
+				--header "$auth_header" \
+				--header "User-Agent: $user_agent" \
+				"$api/gallery?url=$(urlencode "$stale_url")"
+		done < <(jq -r --arg title "$stale_title" '.gallery[]? | select(.title == $title) | .url' <<<"$project_json")
+	done
+	project_json="$(curl --fail-with-body --silent --show-error \
+		--header "$auth_header" \
+		--header "User-Agent: $user_agent" \
+		"$api")"
+fi
+
 if ((${#gallery_specs[@]})); then
 	for spec in ${gallery_specs[@]+"${gallery_specs[@]}"}; do
 		IFS='|' read -r gallery_title gallery_file gallery_description featured ordering <<<"$spec"
@@ -220,21 +239,6 @@ if ((${#gallery_specs[@]})); then
 			--header "Content-Type: image/png" \
 			--data-binary @"$gallery_file" \
 			"$api/gallery?ext=png&featured=${featured}&title=$(urlencode "$gallery_title")&description=$(urlencode "$gallery_description")&ordering=${ordering}"
-	done
-fi
-
-if ((${#stale_gallery_titles[@]})); then
-	for stale_title in ${stale_gallery_titles[@]+"${stale_gallery_titles[@]}"}; do
-		while IFS= read -r stale_url; do
-			if [[ -z "$stale_url" ]]; then
-				continue
-			fi
-			curl --fail-with-body --silent --show-error \
-				--request DELETE \
-				--header "$auth_header" \
-				--header "User-Agent: $user_agent" \
-				"$api/gallery?url=$(urlencode "$stale_url")"
-		done < <(jq -r --arg title "$stale_title" '.gallery[]? | select(.title == $title) | .url' <<<"$project_json")
 	done
 fi
 
