@@ -1,0 +1,91 @@
+{
+  "format_version": "1.26.50",
+  "minecraft:block": {
+    "description": {
+      "identifier": "mushroom_yorkie:doghouse",
+      "menu_category": {
+        "category": "items"
+      },
+      "traits": {
+        "minecraft:placement_direction": {
+          "enabled_states": [
+            "minecraft:cardinal_direction"
+          ],
+          "y_rotation_offset": 180
+        }
+      }
+    },
+    "components": {
+      "minecraft:selection_box": {
+        "origin": [-8, 0, -8],
+        "size": [16, 16, 16]
+      },
+      "minecraft:collision_box": {
+        "origin": [-8, 0, -8],
+        "size": [16, 2, 16]
+      },
+      "minecraft:geometry": "geometry.mushroom_yorkie.doghouse",
+      "minecraft:material_instances": {
+        "*": {
+          "texture": "cherry_planks",
+          "render_method": "opaque"
+        },
+        "wall": {
+          "texture": "cherry_planks",
+          "render_method": "opaque"
+        },
+        "trim": {
+          "texture": "stripped_cherry_log_side",
+          "render_method": "opaque"
+        },
+        "roof": {
+          "texture": "dark_oak_planks",
+          "render_method": "opaque"
+        },
+        "bed": {
+          "texture": "wool_colored_red",
+          "render_method": "opaque"
+        },
+        "pillow": {
+          "texture": "wool_colored_white",
+          "render_method": "opaque"
+        },
+        "light": {
+          "texture": "ochre_froglight_side",
+          "render_method": "opaque"
+        }
+      },
+      "minecraft:destructible_by_mining": {
+        "seconds_to_destroy": 0.4
+      },
+      "minecraft:light_dampening": 0,
+      "minecraft:light_emission": 6
+    },
+    "permutations": [
+      {
+        "condition": "query.block_state('minecraft:cardinal_direction') == 'east'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [0, -90, 0]
+          }
+        }
+      },
+      {
+        "condition": "query.block_state('minecraft:cardinal_direction') == 'south'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [0, 180, 0]
+          }
+        }
+      },
+      {
+        "condition": "query.block_state('minecraft:cardinal_direction') == 'west'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [0, 90, 0]
+          }
+        }
+      }
+    ]
+  }
+}

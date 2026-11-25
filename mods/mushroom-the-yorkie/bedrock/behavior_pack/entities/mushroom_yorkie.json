@@ -4,7 +4,14 @@
     "description": {
       "identifier": "mushroom_yorkie:mushroom_yorkie",
       "is_spawnable": true,
-      "is_summonable": true
+      "is_summonable": true,
+      "properties": {
+        "mushroom_yorkie:wearing_harness": {
+          "type": "bool",
+          "default": false,
+          "client_sync": true
+        }
+      }
     },
     "component_groups": {
       "mushroom_yorkie:untamed": {
@@ -22,9 +29,6 @@
       "mushroom_yorkie:tamed": {
         "minecraft:is_tamed": {},
         "minecraft:sittable": {},
-        "minecraft:leashable": {
-          "can_be_stolen": false
-        },
         "minecraft:behavior.stay_while_sitting": {
           "priority": 1
         },
@@ -33,6 +37,76 @@
           "speed_multiplier": 1.15,
           "start_distance": 4,
           "stop_distance": 2
+        },
+        "minecraft:interact": {
+          "interactions": [
+            {
+              "cooldown": 0.5,
+              "use_item": true,
+              "interact_text": "action.interact.mushroom_equip_harness",
+              "on_interact": {
+                "filters": {
+                  "all_of": [
+                    {
+                      "test": "is_owner",
+                      "subject": "other"
+                    },
+                    {
+                      "test": "has_equipment",
+                      "subject": "other",
+                      "domain": "main_hand",
+                      "value": "mushroom_yorkie:yorkie_harness"
+                    },
+                    {
+                      "test": "bool_property",
+                      "domain": "mushroom_yorkie:wearing_harness",
+                      "value": false
+                    }
+                  ]
+                },
+                "event": "mushroom_yorkie:equip_harness",
+                "target": "self"
+              }
+            },
+            {
+              "cooldown": 0.5,
+              "interact_text": "action.interact.mushroom_remove_harness",
+              "spawn_items": {
+                "table": "loot_tables/harness.json",
+                "y_offset": 0.25
+              },
+              "on_interact": {
+                "filters": {
+                  "all_of": [
+                    {
+                      "test": "is_owner",
+                      "subject": "other"
+                    },
+                    {
+                      "test": "has_equipment",
+                      "subject": "other",
+                      "domain": "main_hand",
+                      "value": "minecraft:shears"
+                    },
+                    {
+                      "test": "bool_property",
+                      "domain": "mushroom_yorkie:wearing_harness",
+                      "value": true
+                    }
+                  ]
+                },
+                "event": "mushroom_yorkie:remove_harness",
+                "target": "self"
+              }
+            }
+          ]
+        }
+      },
+      "mushroom_yorkie:harnessed": {
+        "minecraft:leashable": {
+          "can_be_cut": false,
+          "can_be_stolen": false,
+          "unleash_on_removal": true
         }
       }
     },
@@ -96,6 +170,26 @@
           "component_groups": [
             "mushroom_yorkie:tamed"
           ]
+        }
+      },
+      "mushroom_yorkie:equip_harness": {
+        "add": {
+          "component_groups": [
+            "mushroom_yorkie:harnessed"
+          ]
+        },
+        "set_property": {
+          "mushroom_yorkie:wearing_harness": true
+        }
+      },
+      "mushroom_yorkie:remove_harness": {
+        "remove": {
+          "component_groups": [
+            "mushroom_yorkie:harnessed"
+          ]
+        },
+        "set_property": {
+          "mushroom_yorkie:wearing_harness": false
         }
       }
     }

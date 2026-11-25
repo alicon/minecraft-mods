@@ -51,14 +51,27 @@ class BedrockPackageTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "matching resource pack UUID and version"):
             builder.validate_manifests(manifests)
 
-    def test_treat_recipe_matches_java(self):
-        java = builder.read_json(MOD / "src/main/resources/data/mushroom_yorkie/recipe/yorkie_treat.json")
-        bedrock = builder.read_json(ADDON / "behavior_pack/recipes/yorkie_treat.json")[
-            "minecraft:recipe_shapeless"
-        ]
-        self.assertEqual(Counter(java["ingredients"]), Counter(entry["item"] for entry in bedrock["ingredients"]))
-        self.assertEqual(java["result"]["id"], bedrock["result"]["item"])
-        self.assertEqual(java["result"]["count"], bedrock["result"]["count"])
+    def test_shared_recipes_match_java(self):
+        java_recipes = MOD / "src/main/resources/data/mushroom_yorkie/recipe"
+        bedrock_recipes = ADDON / "behavior_pack/recipes"
+        for name in (
+            "yorkie_treat", "yorkie_harness", "dog_bowl", "dog_food_bowl", "dog_water_bowl", "dog_bed", "doghouse"
+        ):
+            with self.subTest(recipe=name):
+                java = builder.read_json(java_recipes / f"{name}.json")
+                bedrock = builder.read_json(bedrock_recipes / f"{name}.json")
+                if "pattern" in java:
+                    actual = bedrock["minecraft:recipe_shaped"]
+                    self.assertEqual(java["pattern"], actual["pattern"])
+                    self.assertEqual(java["key"], {symbol: entry["item"] for symbol, entry in actual["key"].items()})
+                else:
+                    actual = bedrock["minecraft:recipe_shapeless"]
+                    self.assertEqual(
+                        Counter(java["ingredients"]),
+                        Counter(entry["item"] for entry in actual["ingredients"]),
+                    )
+                self.assertEqual(java["result"]["id"], actual["result"]["item"])
+                self.assertEqual(java["result"]["count"], actual["result"]["count"])
 
 
 if __name__ == "__main__":

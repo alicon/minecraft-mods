@@ -1,0 +1,39 @@
+{
+  "format_version": "1.21.30",
+  "minecraft:recipe_shaped": {
+    "description": {
+      "identifier": "mushroom_yorkie:doghouse"
+    },
+    "tags": [
+      "crafting_table"
+    ],
+    "result": {
+      "item": "mushroom_yorkie:doghouse",
+      "count": 1
+    },
+    "unlock": [
+      {
+        "item": "minecraft:cherry_planks"
+      }
+    ],
+    "pattern": [
+      "DDD",
+      "PLP",
+      "PWP"
+    ],
+    "key": {
+      "D": {
+        "item": "minecraft:dark_oak_planks"
+      },
+      "L": {
+        "item": "minecraft:lantern"
+      },
+      "P": {
+        "item": "minecraft:cherry_planks"
+      },
+      "W": {
+        "item": "minecraft:red_wool"
+      }
+    }
+  }
+}

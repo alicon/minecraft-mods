@@ -5,6 +5,7 @@ import io
 import json
 import os
 import queue
+import shutil
 import subprocess
 import tempfile
 import threading
@@ -13,15 +14,14 @@ from pathlib import Path
 from zipfile import ZipFile
 
 WORLD = "Mushroom Bedrock Smoke"
-ENTITY = "mushroom_yorkie:mushroom_yorkie"
-TAG = "mushroom_smoke"
+PROBE_ID = "836a477e-ab53-4084-8ff3-600c098fb836"
+PROBE_SOURCE = Path(__file__).with_name("fixtures") / "mushroom-bedrock-smoke.js"
 SERVER_PROPERTIES = {
     "level-name": WORLD,
     "gamemode": "survival",
-    "allow-cheats": "true",
     "allow-list": "true",
     "enable-lan-visibility": "false",
-    "transport": "raknet",
+    "transport": "nethernet",
     "content-log-console-output-enabled": "true",
     "content-log-level": "warning",
 }
@@ -29,16 +29,46 @@ SERVER_PROPERTIES = {
 
 def install_addon(addon_path, server_dir):
     world_dir = server_dir / "worlds" / WORLD
-    world_dir.mkdir(parents=True)
+    world_dir.mkdir(parents=True, exist_ok=True)
     with ZipFile(addon_path) as addon:
         for role, kind in (("data", "behavior"), ("resources", "resource")):
             [bundle] = [name for name in addon.namelist() if name.endswith(f"-{role}.mcpack")]
             pack_dir = server_dir / f"{kind}_packs" / "mushroom_the_yorkie"
+            if pack_dir.is_dir():
+                shutil.rmtree(pack_dir)
             with ZipFile(io.BytesIO(addon.read(bundle))) as pack:
                 pack.extractall(pack_dir)
                 header = json.loads(pack.read("manifest.json"))["header"]
             link = [{"pack_id": header["uuid"], "version": header["version"]}]
+            if kind == "behavior":
+                link.append({"pack_id": PROBE_ID, "version": [1, 0, 0]})
             (world_dir / f"world_{kind}_packs.json").write_text(json.dumps(link), encoding="utf-8")
+
+
+def install_probe(server_dir):
+    pack_dir = server_dir / "behavior_packs" / "mushroom_smoke_test"
+    scripts = pack_dir / "scripts"
+    scripts.mkdir(parents=True)
+    shutil.copyfile(PROBE_SOURCE, scripts / "probe.js")
+    manifest = {
+        "format_version": 2,
+        "header": {
+            "name": "Mushroom Smoke Test",
+            "description": "Test fixture for a disposable world",
+            "uuid": PROBE_ID,
+            "version": [1, 0, 0],
+            "min_engine_version": [1, 26, 60],
+        },
+        "modules": [{
+            "type": "script",
+            "language": "javascript",
+            "entry": "scripts/probe.js",
+            "uuid": "74c5afd1-2ba5-49cc-af25-b9f47a6e314e",
+            "version": [1, 0, 0],
+        }],
+        "dependencies": [{"module_name": "@minecraft/server", "version": "2.11.0"}],
+    }
+    (pack_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
 
 
 def collect_output(stream, lines):
@@ -48,7 +78,7 @@ def collect_output(stream, lines):
     lines.put(None)
 
 
-def expect_line(lines, marker, timeout=45):
+def expect_line(lines, marker, timeout=90):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
@@ -57,16 +87,18 @@ def expect_line(lines, marker, timeout=45):
             break
         if line is None:
             raise RuntimeError(f"Server exited while waiting for {marker!r}")
-        if "ERROR" in line and any(
-            part in line.lower() for part in ("[entity]", "[json]", "[recipes]", "[item]", "mushroom")
-        ):
+        if "MUSHROOM_TEST_FAIL" in line or ("ERROR" in line and any(
+            part in line.lower() for part in (
+                "[blocks]", "[components]", "[entity]", "[json]", "[recipes]", "[item]", "[scripting]", "mushroom"
+            )
+        )):
             raise RuntimeError(f"Bedrock rejected content: {line.strip()}")
         if marker in line:
             return
     raise RuntimeError(f"Server did not report {marker!r} in {timeout}s")
 
 
-def exercise_world(server_dir, first_boot):
+def exercise_world(server_dir, marker):
     with subprocess.Popen(
         [str(server_dir / "bedrock_server")],
         cwd=server_dir,
@@ -82,27 +114,12 @@ def exercise_world(server_dir, first_boot):
         reader = threading.Thread(target=collect_output, args=(server.stdout, lines), daemon=True)
         reader.start()
 
-        def command(value):
-            print(f"> {value}", flush=True)
-            server.stdin.write(value + "\n")
-            server.stdin.flush()
-
         try:
-            expect_line(lines, "Server started.")
-            if first_boot:
-                command("tickingarea add circle 0 300 0 1 mushroom_smoke true")
-                expect_line(lines, "ticking area", timeout=15)
-                command("fill -4 300 -4 4 300 4 stone")
-                expect_line(lines, "blocks filled", timeout=15)
-                command(f"summon {ENTITY} 0 301 0 0 0 minecraft:entity_spawned")
-                expect_line(lines, "summoned", timeout=15)
-                command(f"tag @e[type={ENTITY},c=1] add {TAG}")
-                expect_line(lines, TAG, timeout=15)
-            command(f"testfor @e[type={ENTITY},tag={TAG}]")
-            expect_line(lines, "Found ", timeout=15)
+            expect_line(lines, marker)
         finally:
             if server.poll() is None:
-                command("stop")
+                server.stdin.write("stop\n")
+                server.stdin.flush()
                 try:
                     server.wait(timeout=20)
                 except subprocess.TimeoutExpired:
@@ -117,6 +134,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("server_zip", type=Path)
     parser.add_argument("addon", type=Path)
+    parser.add_argument("--upgrade-from", type=Path)
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="mushroom-bedrock-smoke-") as directory:
         server_dir = Path(directory)
@@ -126,9 +144,12 @@ def main():
         (server_dir / "server.properties").write_text(
             "".join(f"{key}={value}\n" for key, value in SERVER_PROPERTIES.items()), encoding="utf-8"
         )
-        install_addon(args.addon, server_dir)
-        exercise_world(server_dir, first_boot=True)
-        exercise_world(server_dir, first_boot=False)
+        install_probe(server_dir)
+        install_addon(args.upgrade_from or args.addon, server_dir)
+        exercise_world(server_dir, "MUSHROOM_TEST_SPAWNED")
+        if args.upgrade_from:
+            install_addon(args.addon, server_dir)
+        exercise_world(server_dir, "MUSHROOM_TEST_REOPENED")
         print("Mushroom spawned and remained in the world after a server restart.")
 
 

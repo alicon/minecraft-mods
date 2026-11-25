@@ -1,0 +1,87 @@
+{
+  "format_version": "1.21.0",
+  "minecraft:geometry": [
+    {
+      "description": {
+        "identifier": "geometry.mushroom_yorkie.dog_food_bowl",
+        "texture_width": 16,
+        "texture_height": 16
+      },
+      "bones": [
+        {
+          "name": "block",
+          "pivot": [0, 0, 0],
+          "cubes": [
+            {
+              "origin": [-5, 0, -5],
+              "size": [10, 2, 10],
+              "uv": {
+                "down": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "copper"
+                },
+                "up": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "inside"
+                },
+                "north": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "copper"
+                },
+                "south": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "copper"
+                },
+                "west": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "copper"
+                },
+                "east": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "copper"
+                }
+              }
+            },
+            {
+              "origin": [-4, 2, -4],
+              "size": [8, 1, 8],
+              "uv": {
+                "up": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "food"
+                },
+                "north": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "food"
+                },
+                "south": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "food"
+                },
+                "west": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "food"
+                },
+                "east": {
+                  "uv": [0, 0],
+                  "uv_size": [16, 16],
+                  "material_instance": "food"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
