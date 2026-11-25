@@ -48,10 +48,11 @@ class BedrockPackageTests(unittest.TestCase):
                     expected = (ADDON / "behavior_pack" / script["entry"]).read_bytes()
                     self.assertEqual(behavior.read(script["entry"]), expected)
 
-    def test_cops_kit_archive_uses_current_templates_and_separate_ids(self):
+    def test_cops_archive_uses_current_java_assets_and_separate_ids(self):
         cops = builder.ROOT / "mods" / "cops-and-robbers"
         bedrock = cops / "bedrock"
         subprocess.run([sys.executable, str(bedrock / "tools/build-structures.py"), "--check"], check=True)
+        subprocess.run([sys.executable, str(bedrock / "tools/build-vehicles.py"), "--check"], check=True)
         with tempfile.TemporaryDirectory() as directory:
             archive = builder.build(cops, Path(directory))
             self.assertEqual(archive.read_bytes(), builder.build(cops, Path(directory) / "again").read_bytes())
@@ -66,6 +67,10 @@ class BedrockPackageTests(unittest.TestCase):
                         self.assertIn(f"items/{name}_kit.json", behavior.namelist())
                         art = cops / "src/main/resources/assets/cops_robbers" / f"textures/item/{name}_kit.png"
                         self.assertEqual(resource.read(f"textures/items/{name}_kit.png"), art.read_bytes())
+                    for name in ("police_cruiser", "fire_truck"):
+                        self.assertIn(f"entities/{name}.json", behavior.namelist())
+                        art = cops / "src/main/resources/assets/cops_robbers" / f"textures/entity/{name}.png"
+                        self.assertEqual(resource.read(f"textures/entity/{name}.png"), art.read_bytes())
 
         identifiers = []
         for addon in (ADDON, bedrock):

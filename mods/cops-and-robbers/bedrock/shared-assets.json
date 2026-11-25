@@ -9,6 +9,8 @@
     "textures/items/fire_station_kit.png": "src/main/resources/assets/cops_robbers/textures/item/fire_station_kit.png",
     "textures/entity/cop.png": "src/main/resources/assets/cops_robbers/textures/entity/cop.png",
     "textures/entity/teller.png": "src/main/resources/assets/cops_robbers/textures/entity/teller.png",
-    "textures/entity/fireman.png": "src/main/resources/assets/cops_robbers/textures/entity/fireman.png"
+    "textures/entity/fireman.png": "src/main/resources/assets/cops_robbers/textures/entity/fireman.png",
+    "textures/entity/police_cruiser.png": "src/main/resources/assets/cops_robbers/textures/entity/police_cruiser.png",
+    "textures/entity/fire_truck.png": "src/main/resources/assets/cops_robbers/textures/entity/fire_truck.png"
   }
 }

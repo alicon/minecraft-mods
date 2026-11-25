@@ -1,0 +1,79 @@
+{
+  "format_version": "1.26.60",
+  "minecraft:entity": {
+    "description": {
+      "identifier": "cops_robbers:police_cruiser",
+      "is_spawnable": true,
+      "is_summonable": true,
+      "properties": {
+        "cops_robbers:signal_mode": {
+          "type": "int",
+          "range": [
+            0,
+            2
+          ],
+          "default": 0,
+          "client_sync": true
+        }
+      }
+    },
+    "components": {
+      "minecraft:type_family": {
+        "family": [
+          "cops_robbers_vehicle",
+          "police_cruiser"
+        ]
+      },
+      "minecraft:collision_box": {
+        "width": 2.05,
+        "height": 1.65
+      },
+      "minecraft:health": {
+        "value": 30,
+        "max": 30
+      },
+      "minecraft:persistent": {},
+      "minecraft:physics": {},
+      "minecraft:scale": {
+        "value": 1.22
+      },
+      "minecraft:knockback_resistance": {
+        "value": 1
+      },
+      "minecraft:movement": {
+        "value": 0.16
+      },
+      "minecraft:movement.basic": {},
+      "minecraft:input_ground_controlled": {},
+      "minecraft:rideable": {
+        "seat_count": 2,
+        "controlling_seat": 0,
+        "family_types": [
+          "player"
+        ],
+        "interact_text": "action.interact.cops_robbers_drive",
+        "pull_in_entities": false,
+        "seats": [
+          {
+            "position": [
+              0,
+              0.75,
+              0.45
+            ],
+            "lock_rider_rotation": 0
+          },
+          {
+            "position": [
+              0,
+              0.75,
+              -0.65
+            ],
+            "lock_rider_rotation": 0,
+            "min_rider_count": 2,
+            "max_rider_count": 2
+          }
+        ]
+      }
+    }
+  }
+}

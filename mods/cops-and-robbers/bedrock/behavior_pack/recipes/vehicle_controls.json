@@ -1,0 +1,28 @@
+{
+  "format_version": "1.26.60",
+  "minecraft:recipe_shapeless": {
+    "description": {
+      "identifier": "cops_robbers:vehicle_controls"
+    },
+    "tags": [
+      "crafting_table"
+    ],
+    "ingredients": [
+      {
+        "item": "minecraft:comparator"
+      },
+      {
+        "item": "minecraft:copper_ingot"
+      }
+    ],
+    "result": {
+      "item": "cops_robbers:vehicle_controls",
+      "count": 1
+    },
+    "unlock": [
+      {
+        "item": "minecraft:comparator"
+      }
+    ]
+  }
+}

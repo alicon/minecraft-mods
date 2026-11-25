@@ -1,0 +1,32 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "cops_robbers:fire_truck",
+      "materials": {
+        "default": "entity_alphatest"
+      },
+      "textures": {
+        "default": "textures/entity/fire_truck"
+      },
+      "geometry": {
+        "default": "geometry.cops_robbers.vehicle"
+      },
+      "animations": {
+        "wheels": "animation.cops_robbers.vehicle.wheels"
+      },
+      "scripts": {
+        "animate": [
+          "wheels"
+        ]
+      },
+      "render_controllers": [
+        "controller.render.cops_robbers.fire_truck"
+      ],
+      "spawn_egg": {
+        "base_color": "#BB2929",
+        "overlay_color": "#FFE673"
+      }
+    }
+  }
+}

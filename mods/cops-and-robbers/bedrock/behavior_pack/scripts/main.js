@@ -3,6 +3,7 @@ import {
   StructureRotation, system, world,
 } from "@minecraft/server";
 import { FOOTPRINT, HEIGHT, SITES } from "./sites.js";
+import "./vehicles.js";
 
 const ROTATIONS = [StructureRotation.None, StructureRotation.Rotate90, StructureRotation.Rotate180, StructureRotation.Rotate270];
 const PREVIEW_TICKS = 240;

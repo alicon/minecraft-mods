@@ -1,0 +1,731 @@
+{
+  "format_version": "1.12.0",
+  "minecraft:geometry": [
+    {
+      "description": {
+        "identifier": "geometry.cops_robbers.vehicle",
+        "texture_width": 160,
+        "texture_height": 96,
+        "visible_bounds_width": 5,
+        "visible_bounds_height": 4,
+        "visible_bounds_offset": [
+          0,
+          1,
+          0
+        ]
+      },
+      "bones": [
+        {
+          "name": "root",
+          "pivot": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "name": "lower_body",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -11.0,
+                3.5,
+                -21.0
+              ],
+              "size": [
+                22.0,
+                7.0,
+                42.0
+              ],
+              "uv": [
+                0,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "hood",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -9.5,
+                8.5,
+                -24.0
+              ],
+              "size": [
+                19.0,
+                5.0,
+                17.0
+              ],
+              "uv": [
+                0,
+                50
+              ]
+            }
+          ]
+        },
+        {
+          "name": "cabin_left_wall",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                7.0,
+                10.5,
+                -8.0
+              ],
+              "size": [
+                1.0,
+                9.0,
+                20.0
+              ],
+              "uv": [
+                76,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "cabin_right_wall",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -8.0,
+                10.5,
+                -8.0
+              ],
+              "size": [
+                1.0,
+                9.0,
+                20.0
+              ],
+              "uv": [
+                76,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "cabin_back_wall",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -8.0,
+                10.5,
+                11.0
+              ],
+              "size": [
+                16.0,
+                9.0,
+                1.0
+              ],
+              "uv": [
+                76,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "dashboard",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -7.0,
+                10.5,
+                -9.0
+              ],
+              "size": [
+                14.0,
+                2.0,
+                2.0
+              ],
+              "uv": [
+                76,
+                30
+              ]
+            }
+          ]
+        },
+        {
+          "name": "roof_peak",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -6.0,
+                18.5,
+                -3.0
+              ],
+              "size": [
+                12.0,
+                4.0,
+                12.0
+              ],
+              "uv": [
+                72,
+                36
+              ]
+            }
+          ]
+        },
+        {
+          "name": "front_bumper",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -10.5,
+                4.5,
+                -25.5
+              ],
+              "size": [
+                21.0,
+                4.0,
+                3.0
+              ],
+              "uv": [
+                0,
+                76
+              ]
+            }
+          ]
+        },
+        {
+          "name": "rear_bumper",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -10.5,
+                4.5,
+                22.5
+              ],
+              "size": [
+                21.0,
+                4.0,
+                3.0
+              ],
+              "uv": [
+                48,
+                76
+              ]
+            }
+          ]
+        },
+        {
+          "name": "windshield_top_frame",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -7.0,
+                17.5,
+                -9.0
+              ],
+              "size": [
+                14.0,
+                1.0,
+                1.0
+              ],
+              "uv": [
+                120,
+                36
+              ]
+            }
+          ]
+        },
+        {
+          "name": "windshield_left_frame",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                6.0,
+                12.5,
+                -9.0
+              ],
+              "size": [
+                1.0,
+                6.0,
+                1.0
+              ],
+              "uv": [
+                120,
+                42
+              ]
+            }
+          ]
+        },
+        {
+          "name": "windshield_right_frame",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -7.0,
+                12.5,
+                -9.0
+              ],
+              "size": [
+                1.0,
+                6.0,
+                1.0
+              ],
+              "uv": [
+                124,
+                42
+              ]
+            }
+          ]
+        },
+        {
+          "name": "windshield_bottom_frame",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -7.0,
+                12.5,
+                -9.0
+              ],
+              "size": [
+                14.0,
+                1.0,
+                1.0
+              ],
+              "uv": [
+                128,
+                42
+              ]
+            }
+          ]
+        },
+        {
+          "name": "push_bar",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -8.5,
+                6.5,
+                -27.0
+              ],
+              "size": [
+                17.0,
+                6.0,
+                1.0
+              ],
+              "uv": [
+                96,
+                72
+              ]
+            }
+          ]
+        },
+        {
+          "name": "side_mirror_left",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                10.8,
+                12.5,
+                -9.0
+              ],
+              "size": [
+                2.0,
+                3.0,
+                1.0
+              ],
+              "uv": [
+                136,
+                52
+              ]
+            }
+          ]
+        },
+        {
+          "name": "side_mirror_right",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -12.8,
+                12.5,
+                -9.0
+              ],
+              "size": [
+                2.0,
+                3.0,
+                1.0
+              ],
+              "uv": [
+                144,
+                52
+              ]
+            }
+          ]
+        },
+        {
+          "name": "door_badge_left",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                11.1,
+                8.0,
+                -4.0
+              ],
+              "size": [
+                0.7,
+                6.0,
+                8.0
+              ],
+              "uv": [
+                132,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "door_badge_right",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -11.8,
+                8.0,
+                -4.0
+              ],
+              "size": [
+                0.7,
+                6.0,
+                8.0
+              ],
+              "uv": [
+                132,
+                14
+              ]
+            }
+          ]
+        },
+        {
+          "name": "lightbar_red",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -6.0,
+                22.5,
+                0.0
+              ],
+              "size": [
+                6.0,
+                2.0,
+                4.0
+              ],
+              "uv": [
+                0,
+                84
+              ]
+            }
+          ]
+        },
+        {
+          "name": "lightbar_blue",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                0.0,
+                22.5,
+                0.0
+              ],
+              "size": [
+                6.0,
+                2.0,
+                4.0
+              ],
+              "uv": [
+                24,
+                84
+              ]
+            }
+          ]
+        },
+        {
+          "name": "fire_ladder",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -3.0,
+                24.5,
+                -18.0
+              ],
+              "size": [
+                6.0,
+                2.0,
+                32.0
+              ],
+              "uv": [
+                48,
+                84
+              ]
+            }
+          ]
+        },
+        {
+          "name": "water_cannon",
+          "parent": "root",
+          "pivot": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -2.0,
+                25.0,
+                -24.0
+              ],
+              "size": [
+                4.0,
+                3.0,
+                10.0
+              ],
+              "uv": [
+                124,
+                84
+              ]
+            }
+          ]
+        },
+        {
+          "name": "front_left_wheel",
+          "parent": "root",
+          "pivot": [
+            10.5,
+            4.5,
+            -13.5
+          ],
+          "cubes": [
+            {
+              "origin": [
+                8.0,
+                0.0,
+                -18.0
+              ],
+              "size": [
+                5,
+                9,
+                9
+              ],
+              "uv": [
+                104,
+                56
+              ]
+            }
+          ]
+        },
+        {
+          "name": "front_right_wheel",
+          "parent": "root",
+          "pivot": [
+            -10.5,
+            4.5,
+            -13.5
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -13.0,
+                0.0,
+                -18.0
+              ],
+              "size": [
+                5,
+                9,
+                9
+              ],
+              "uv": [
+                104,
+                56
+              ]
+            }
+          ]
+        },
+        {
+          "name": "rear_left_wheel",
+          "parent": "root",
+          "pivot": [
+            10.5,
+            4.5,
+            14.5
+          ],
+          "cubes": [
+            {
+              "origin": [
+                8.0,
+                0.0,
+                10.0
+              ],
+              "size": [
+                5,
+                9,
+                9
+              ],
+              "uv": [
+                104,
+                56
+              ]
+            }
+          ]
+        },
+        {
+          "name": "rear_right_wheel",
+          "parent": "root",
+          "pivot": [
+            -10.5,
+            4.5,
+            14.5
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -13.0,
+                0.0,
+                10.0
+              ],
+              "size": [
+                5,
+                9,
+                9
+              ],
+              "uv": [
+                104,
+                56
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "cops_robbers:police_cruiser",
+      "materials": {
+        "default": "entity_alphatest"
+      },
+      "textures": {
+        "default": "textures/entity/police_cruiser"
+      },
+      "geometry": {
+        "default": "geometry.cops_robbers.vehicle"
+      },
+      "animations": {
+        "wheels": "animation.cops_robbers.vehicle.wheels"
+      },
+      "scripts": {
+        "animate": [
+          "wheels"
+        ]
+      },
+      "render_controllers": [
+        "controller.render.cops_robbers.police_cruiser"
+      ],
+      "spawn_egg": {
+        "base_color": "#1C4294",
+        "overlay_color": "#D4D6DC"
+      }
+    }
+  }
+}

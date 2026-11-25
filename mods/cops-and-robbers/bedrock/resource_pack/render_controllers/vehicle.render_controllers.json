@@ -1,0 +1,61 @@
+{
+  "format_version": "1.8.0",
+  "render_controllers": {
+    "controller.render.cops_robbers.police_cruiser": {
+      "geometry": "Geometry.default",
+      "materials": [
+        {
+          "*": "Material.default"
+        }
+      ],
+      "textures": [
+        "Texture.default"
+      ],
+      "part_visibility": [
+        {
+          "push_bar": true
+        },
+        {
+          "fire_ladder": false
+        },
+        {
+          "water_cannon": false
+        },
+        {
+          "lightbar_red": "q.property('cops_robbers:signal_mode') > 0 && math.mod(math.floor(q.life_time * 4), 2) == 0"
+        },
+        {
+          "lightbar_blue": "q.property('cops_robbers:signal_mode') > 0 && math.mod(math.floor(q.life_time * 4), 2) == 1"
+        }
+      ]
+    },
+    "controller.render.cops_robbers.fire_truck": {
+      "geometry": "Geometry.default",
+      "materials": [
+        {
+          "*": "Material.default"
+        }
+      ],
+      "textures": [
+        "Texture.default"
+      ],
+      "part_visibility": [
+        {
+          "push_bar": false
+        },
+        {
+          "fire_ladder": true
+        },
+        {
+          "water_cannon": true
+        },
+        {
+          "lightbar_red": "q.property('cops_robbers:signal_mode') > 0 && math.mod(math.floor(q.life_time * 4), 2) == 0"
+        },
+        {
+          "lightbar_blue": "q.property('cops_robbers:signal_mode') > 0 && math.mod(math.floor(q.life_time * 4), 2) == 1"
+        }
+      ]
+    }
+  }
+}
