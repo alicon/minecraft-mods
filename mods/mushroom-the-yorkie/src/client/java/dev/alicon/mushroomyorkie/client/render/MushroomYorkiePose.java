@@ -163,13 +163,13 @@ final class MushroomYorkiePose {
 			this.rightEar.zRot = -0.28F;
 			this.leftEye.visible = false;
 			this.rightEye.visible = false;
-			this.body.y = 21.4F;
+			this.body.y = 21.8F;
 			this.body.xRot = 0.0F;
 			this.body.zRot = 0.82F;
-			this.head.y = 20.0F;
-			this.head.xRot = 0.34F;
+			this.head.y = 22.5F;
+			this.head.xRot = 0.30F;
 			this.head.yRot = 0.0F;
-			this.head.zRot = -0.45F;
+			this.head.zRot = -0.27F;
 			this.tail.xRot = 0.95F;
 			this.tail.yRot = -0.7F;
 			this.frontLeftLeg.xRot = -1.35F;
