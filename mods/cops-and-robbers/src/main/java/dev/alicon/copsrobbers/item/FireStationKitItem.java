@@ -35,14 +35,18 @@ public final class FireStationKitItem extends StructureKitItem {
 		structure.fill(8, 2, -5, 8, 4, 10, Blocks.RED_CONCRETE);
 		structure.fill(-8, 5, -5, 8, 5, 10, Blocks.SMOOTH_QUARTZ);
 		structure.fill(-7, 2, -4, 7, 4, 9, Blocks.AIR);
-		structure.fill(-4, 2, -5, 4, 4, -5, Blocks.GLASS_PANE);
-		structure.fill(-1, 2, -5, 1, 4, -5, Blocks.WHITE_CONCRETE);
-		structure.set(0, 1, -6, Blocks.SMOOTH_STONE.defaultBlockState());
-		structure.placeIronDoor(0, 2, -5, front);
-		structure.placePressurePlate(0, 2, -6);
-		structure.placePressurePlate(0, 2, -4);
+		// Two one-block steps bring the truck from the terrain up to the raised bay floor.
+		structure.fill(-3, 0, -12, 3, 0, -10, Blocks.POLISHED_ANDESITE);
+		structure.fill(-3, 1, -9, 3, 1, -6, Blocks.SMOOTH_STONE);
+		structure.fill(-3, 2, -5, 3, 4, -5, Blocks.AIR);
+		structure.fill(-4, 2, -5, -4, 4, -5, Blocks.WHITE_CONCRETE);
+		structure.fill(4, 2, -5, 4, 4, -5, Blocks.WHITE_CONCRETE);
 		structure.fill(-7, 3, -5, -5, 3, -5, Blocks.GLASS_PANE);
-		structure.fill(5, 3, -5, 7, 3, -5, Blocks.GLASS_PANE);
+		structure.set(6, 1, -6, Blocks.SMOOTH_STONE.defaultBlockState());
+		structure.placeIronDoor(6, 2, -5, front);
+		structure.placePressurePlate(6, 2, -6);
+		structure.placePressurePlate(6, 2, -4);
+		structure.set(7, 3, -5, Blocks.GLASS_PANE.defaultBlockState());
 		structure.fill(-8, 3, 0, -8, 3, 3, Blocks.GLASS_PANE);
 		structure.fill(8, 3, 0, 8, 3, 3, Blocks.GLASS_PANE);
 		structure.fill(-7, 2, 3, -5, 4, 8, Blocks.WHITE_WOOL);
@@ -50,10 +54,12 @@ public final class FireStationKitItem extends StructureKitItem {
 		structure.fill(1, 4, 0, 5, 4, 0, Blocks.SEA_LANTERN);
 		structure.fill(-5, 4, 6, -1, 4, 6, Blocks.SEA_LANTERN);
 		structure.fill(1, 4, 6, 5, 4, 6, Blocks.SEA_LANTERN);
-		structure.placeWallSign(0, 6, -6, front.getOpposite(), "Fire", "Station");
-		structure.set(0, 6, -5, Blocks.WHITE_CONCRETE.defaultBlockState());
-		structure.set(-1, 6, -5, Blocks.RED_CONCRETE.defaultBlockState());
-		structure.set(1, 6, -5, Blocks.RED_CONCRETE.defaultBlockState());
+		structure.fill(-8, 5, -6, 8, 5, -6, Blocks.RED_CONCRETE);
+		structure.fill(-4, 6, -5, 4, 6, -5, Blocks.RED_CONCRETE);
+		structure.fill(-4, 7, -5, 4, 7, -5, Blocks.SMOOTH_QUARTZ);
+		structure.set(-3, 6, -5, Blocks.SEA_LANTERN.defaultBlockState());
+		structure.set(3, 6, -5, Blocks.SEA_LANTERN.defaultBlockState());
+		structure.placeWallSign(0, 6, -6, front.getOpposite(), "FIRE & RESCUE", "ENGINE BAY");
 	}
 
 	private static void spawnFireCrew(ServerLevel level, BlockPos origin, Direction front) {

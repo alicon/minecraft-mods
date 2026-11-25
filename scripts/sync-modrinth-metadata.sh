@@ -86,14 +86,21 @@ case "$mod" in
 		title="Cops and Robbers"
 		description="Police cruisers, fire trucks, robbers, banks, and patrol play for family Minecraft worlds."
 		categories='["adventure", "mobs", "game-mechanics"]'
-		stale_gallery_titles=()
+		stale_gallery_titles=(
+			"Patrol Scene Lineup"
+			"Mob Cast Closeup"
+			"Emergency Vehicles"
+			"Police Station Kit"
+			"Bank Kit"
+			"Fire Station Kit"
+		)
 		gallery_specs=(
-			"Patrol Scene Lineup|docs/media/cops-and-robbers-lineup.png|Cops, robbers, bank staff, emergency crews, and vehicles staged together.|true|0"
-			"Mob Cast Closeup|docs/media/cops-and-robbers-mobs.png|Bank robbers, a cop, a teller, and a fireman ready for patrol scenes.|false|1"
-			"Emergency Vehicles|docs/media/cops-and-robbers-vehicles.png|A police cruiser and fire truck for chases, captures, and fire response.|false|2"
-			"Police Station Kit|docs/media/cops-and-robbers-police-station.png|The placeable police station kit gives patrol worlds a jail and station front.|false|3"
-			"Bank Kit|docs/media/cops-and-robbers-bank.png|The placeable bank kit creates a target for robber heists and teller spawns.|false|4"
-			"Fire Station Kit|docs/media/cops-and-robbers-fire-station.png|The placeable fire station kit adds a red responder base with a truck bay and crew.|false|5"
+			"Meet the Neighborhood|docs/media/cops-and-robbers-lineup.png|The 0.1.4 crew and their rides on the same block as all three new building kits.|true|0"
+			"The Crew Up Close|docs/media/cops-and-robbers-mobs.png|A robber with stolen gold, a patrol officer, a bank teller, and a firefighter.|false|1"
+			"Cruiser and Ladder Truck|docs/media/cops-and-robbers-vehicles.png|The patrol cruiser and fire truck have their own bodies, equipment, and light bars.|false|2"
+			"Patrol Headquarters|docs/media/cops-and-robbers-police-station.png|The police station has a drive-in cruiser bay, a jail, and a prisoner drop-off around back.|false|3"
+			"Village Bank|docs/media/cops-and-robbers-bank.png|Tellers work the lobby while robbers make for the barred vault.|false|4"
+			"Fire and Rescue|docs/media/cops-and-robbers-fire-station.png|The rescue crew and their ladder truck outside the new engine bay.|false|5"
 		)
 		;;
 	*)

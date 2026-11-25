@@ -17,15 +17,16 @@ final class CopsAndRobbersRenderers {
 
 	static void register() {
 		EntityModelLayerRegistry.registerModelLayer(PoliceCruiserModel.LAYER_LOCATION, PoliceCruiserModel::createBodyLayer);
+		EntityModelLayerRegistry.registerModelLayer(PoliceCruiserModel.FIRE_TRUCK_LAYER, PoliceCruiserModel::createFireTruckLayer);
 		EntityModelLayerRegistry.registerModelLayer(BankRobberModel.LAYER_LOCATION, BankRobberModel::createBodyLayer);
 		EntityRenderers.register(ModEntities.POLICE_CRUISER, PoliceCruiserRenderer::new);
 		EntityRenderers.register(ModEntities.FIRE_TRUCK, FireTruckRenderer::new);
 		EntityRenderers.register(ModEntities.BANK_ROBBER, BankRobberRenderer::new);
 		EntityRenderers.register(ModEntities.TELLER, context ->
-				new PoliceNpcRenderer<>(context, CopsAndRobbers.id("textures/entity/teller.png")));
+				new PoliceNpcRenderer<>(context, CopsAndRobbers.id("textures/entity/teller.png"), BankRobberModel.Role.TELLER));
 		EntityRenderers.register(ModEntities.COP, context ->
-				new PoliceNpcRenderer<>(context, CopsAndRobbers.id("textures/entity/cop.png")));
+				new PoliceNpcRenderer<>(context, CopsAndRobbers.id("textures/entity/cop.png"), BankRobberModel.Role.COP));
 		EntityRenderers.register(ModEntities.FIREMAN, context ->
-				new PoliceNpcRenderer<>(context, CopsAndRobbers.id("textures/entity/fireman.png")));
+				new PoliceNpcRenderer<>(context, CopsAndRobbers.id("textures/entity/fireman.png"), BankRobberModel.Role.FIREFIGHTER));
 	}
 }

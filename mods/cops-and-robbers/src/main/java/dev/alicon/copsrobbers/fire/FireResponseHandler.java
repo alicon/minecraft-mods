@@ -5,7 +5,11 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.CollisionContext;
 
 /** Shared fire-response behavior for cops, firemen, and fire trucks. */
 public final class FireResponseHandler {
@@ -29,6 +33,7 @@ public final class FireResponseHandler {
 	/** Extinguishes fires in a small cone ahead of a vehicle. */
 	public static boolean sprayWater(ServerLevel level, BlockPos origin, double dirX, double dirZ, int length, int width) {
 		boolean extinguished = false;
+		Vec3 nozzle = Vec3.atCenterOf(origin);
 		double len = Math.max(0.001D, Math.sqrt(dirX * dirX + dirZ * dirZ));
 		double forwardX = dirX / len;
 		double forwardZ = dirZ / len;
@@ -38,7 +43,9 @@ public final class FireResponseHandler {
 			for (int side = -width; side <= width; side++) {
 				BlockPos center = origin.offset((int) Math.round(forwardX * step + sideX * side), 0, (int) Math.round(forwardZ * step + sideZ * side));
 				for (BlockPos pos : BlockPos.betweenClosed(center.below(), center.above(3))) {
-					if (level.getBlockState(pos).is(Blocks.FIRE)) {
+					if (level.getBlockState(pos).is(Blocks.FIRE) && level.clip(new ClipContext(
+							nozzle, Vec3.atCenterOf(pos), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE,
+							CollisionContext.empty())).getType() == HitResult.Type.MISS) {
 						extinguish(level, pos);
 						extinguished = true;
 					}

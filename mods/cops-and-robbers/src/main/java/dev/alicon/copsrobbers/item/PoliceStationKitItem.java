@@ -39,17 +39,12 @@ public final class PoliceStationKitItem extends StructureKitItem {
 		structure.placeIronDoor(0, 1, -4, front);
 		structure.placePressurePlate(0, 1, -5);
 		structure.placePressurePlate(0, 1, -3);
-		structure.placeWallSign(0, 4, -5, front.getOpposite(), "Police", "Station");
 
-		// Garage and prisoner drop-off lane on the right.
-		structure.fill(3, 0, -3, 7, 0, 12, Blocks.LIGHT_GRAY_CONCRETE);
-		structure.fill(3, 1, -4, 7, 3, -4, Blocks.QUARTZ_BLOCK);
-		structure.fill(3, 2, -4, 4, 2, -4, Blocks.GLASS);
-		structure.fill(6, 2, -4, 7, 2, -4, Blocks.GLASS);
-		structure.set(5, 0, -5, Blocks.SMOOTH_STONE.defaultBlockState());
-		structure.placeIronDoor(5, 1, -4, front);
-		structure.placePressurePlate(5, 1, -5);
-		structure.placePressurePlate(5, 1, -3);
+		// Flush drive-through bay on the right, clear for the cruiser collision box.
+		structure.fill(3, 0, -9, 7, 0, 12, Blocks.LIGHT_GRAY_CONCRETE);
+		structure.fill(3, 1, -4, 7, 3, -4, Blocks.AIR);
+		structure.set(3, 0, -7, Blocks.YELLOW_CONCRETE.defaultBlockState());
+		structure.set(7, 0, -7, Blocks.YELLOW_CONCRETE.defaultBlockState());
 		structure.fill(-4, -1, 14, 4, -1, 20, Blocks.LIGHT_GRAY_CONCRETE);
 		structure.fill(-1, -1, 15, 1, -1, 19, Blocks.YELLOW_CONCRETE);
 
@@ -78,9 +73,15 @@ public final class PoliceStationKitItem extends StructureKitItem {
 		structure.placePressurePlate(0, 1, 12);
 		structure.placeWallSign(0, 3, 14, front, "Prisoner", "Drop Off");
 
-		// Police colors.
+		// Blue awning, roof lights and columns frame the lobby and the open bay.
+		structure.fill(-8, 4, -5, 8, 4, -5, Blocks.BLUE_CONCRETE);
+		structure.fill(-8, 5, -4, 8, 5, -4, Blocks.POLISHED_ANDESITE);
+		structure.fill(-8, 1, -4, -8, 3, -4, Blocks.BLUE_CONCRETE);
+		structure.fill(8, 1, -4, 8, 3, -4, Blocks.BLUE_CONCRETE);
+		structure.placeWallSign(0, 4, -6, front.getOpposite(), "PATROL", "HEADQUARTERS");
+		structure.placeWallSign(5, 4, -6, front.getOpposite(), "CRUISER", "BAY");
 		structure.set(-1, 5, -4, Blocks.BLUE_CONCRETE.defaultBlockState());
 		structure.set(0, 5, -4, Blocks.WHITE_CONCRETE.defaultBlockState());
-		structure.set(1, 5, -4, Blocks.RED_CONCRETE.defaultBlockState());
+		structure.set(1, 5, -4, Blocks.BLUE_CONCRETE.defaultBlockState());
 	}
 }

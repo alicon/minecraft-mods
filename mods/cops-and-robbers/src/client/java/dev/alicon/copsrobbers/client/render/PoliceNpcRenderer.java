@@ -8,16 +8,20 @@ import net.minecraft.world.entity.Mob;
 /** Shared humanoid renderer for simple police-bank NPCs. */
 public final class PoliceNpcRenderer<T extends Mob> extends MobRenderer<T, BankRobberRenderState, BankRobberModel> {
 	private final Identifier texture;
+	private final BankRobberModel.Role role;
 
-	/** Shared renderer for NPCs using the robber geometry; texture is the only intended variation point. */
-	public PoliceNpcRenderer(EntityRendererProvider.Context context, Identifier texture) {
+	/** Binds the uniform texture and role-specific model parts for the NPC. */
+	public PoliceNpcRenderer(EntityRendererProvider.Context context, Identifier texture, BankRobberModel.Role role) {
 		super(context, new BankRobberModel(context.bakeLayer(BankRobberModel.LAYER_LOCATION)), 0.5F);
 		this.texture = texture;
+		this.role = role;
 	}
 
 	@Override
 	public BankRobberRenderState createRenderState() {
-		return new BankRobberRenderState();
+		BankRobberRenderState state = new BankRobberRenderState();
+		state.role = this.role;
+		return state;
 	}
 
 	@Override
