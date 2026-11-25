@@ -1,0 +1,28 @@
+{
+  "format_version": "1.26.60",
+  "minecraft:recipe_shapeless": {
+    "description": {
+      "identifier": "narwhal_together:regroup_charm"
+    },
+    "tags": [
+      "crafting_table"
+    ],
+    "ingredients": [
+      {
+        "item": "minecraft:paper"
+      },
+      {
+        "item": "minecraft:copper_ingot"
+      }
+    ],
+    "result": {
+      "item": "narwhal_together:regroup_charm",
+      "count": 1
+    },
+    "unlock": [
+      {
+        "item": "minecraft:paper"
+      }
+    ]
+  }
+}

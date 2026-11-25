@@ -72,10 +72,27 @@ class BedrockPackageTests(unittest.TestCase):
                         art = cops / "src/main/resources/assets/cops_robbers" / f"textures/entity/{name}.png"
                         self.assertEqual(resource.read(f"textures/entity/{name}.png"), art.read_bytes())
 
+    def test_regroup_recipe_and_art_are_in_the_narwhal_archive(self):
+        narwhal = builder.ROOT / "mods" / "narwhal-together"
+        art = narwhal / "src/main/resources/assets/narwhal_together/icon.png"
+        with tempfile.TemporaryDirectory() as directory:
+            archive = builder.build(narwhal, Path(directory))
+            self.assertEqual(archive.read_bytes(), builder.build(narwhal, Path(directory) / "again").read_bytes())
+            with ZipFile(archive) as addon:
+                with (
+                    ZipFile(io.BytesIO(addon.read(f"{narwhal.name}-data.mcpack"))) as behavior,
+                    ZipFile(io.BytesIO(addon.read(f"{narwhal.name}-resources.mcpack"))) as resource,
+                ):
+                    recipe = json.loads(behavior.read("recipes/regroup_charm.json"))["minecraft:recipe_shapeless"]
+                    self.assertEqual(recipe["result"]["item"], "narwhal_together:regroup_charm")
+                    self.assertEqual({entry["item"] for entry in recipe["ingredients"]}, {"minecraft:paper", "minecraft:copper_ingot"})
+                    self.assertEqual(resource.read("textures/items/regroup_charm.png"), art.read_bytes())
+
+    def test_bedrock_addons_have_separate_pack_ids(self):
         identifiers = []
-        for addon in (ADDON, bedrock):
+        for folder in sorted((builder.ROOT / "mods").glob("*/bedrock")):
             for kind in builder.PACK_TYPES:
-                manifest = builder.read_json(addon / kind / "manifest.json")
+                manifest = builder.read_json(folder / kind / "manifest.json")
                 identifiers.extend(entry["uuid"] for entry in (manifest["header"], *manifest["modules"]))
         self.assertEqual(len(identifiers), len(set(identifiers)))
 
