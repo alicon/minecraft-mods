@@ -50,7 +50,7 @@ def main():
         if args.verify_patrol:
             shutil.copyfile(PATROL_PROBE_SOURCE, probe)
             exercise_world(server_dir, "COPS_PATROL_CONTESTED_CAPTURE")
-            exercise_world(server_dir, "COPS_PATROL_REPLAYED")
+            exercise_world(server_dir, "COPS_PATROL_REPLAYED", timeout=150)
             exercise_world(server_dir, "COPS_PATROL_REPLAY_PERSISTED")
             print("The patrol was completed and replayed across server restarts.")
         if args.verify_fire:

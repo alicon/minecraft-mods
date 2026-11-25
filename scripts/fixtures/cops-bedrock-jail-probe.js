@@ -82,7 +82,7 @@ async function sendToJail(dimension, bankX, name, escape) {
   }
 
   // Choose the native sentence branch explicitly so the tests do not depend on the 10% roll.
-  robber.triggerEvent(escape ? "cops_robbers:night_jailbreaker" : "cops_robbers:jailed");
+  robber.triggerEvent(escape ? "cops_robbers:night_jailbreaker" : "cops_robbers:ordinary_sentence");
   if (!escape) {
     spectator.stopUsingItem();
     await system.waitTicks(18);

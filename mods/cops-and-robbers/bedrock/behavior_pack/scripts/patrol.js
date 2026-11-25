@@ -198,9 +198,7 @@ function reachJail(round, robber) {
   if (validJail(dimension, round.station)
     && robber.tryTeleport(center(round.station.jail), { checkForBlocks: true })) {
     robber.triggerEvent("cops_robbers:jailed");
-    if (Math.random() < 0.1) {
-      robber.triggerEvent("cops_robbers:night_jailbreaker");
-    }
+    robber.triggerEvent(Math.random() < 0.1 ? "cops_robbers:night_jailbreaker" : "cops_robbers:ordinary_sentence");
     save({ ...round, cruiserId: undefined, stage: "jailed", jailReleased: false,
       jailedAt: world.getAbsoluteTime() });
     noticeRiders(vehicle, "jailed");
@@ -218,6 +216,12 @@ function updateJail(round, robber) {
   if (released) {
     const stage = released === "escaped" && round.stage === "jailed" ? "chase" : round.stage;
     save({ ...round, stage, jailReleased: true, jailedAt: undefined });
+  } else {
+    const cell = center(round.station.jail);
+    if (distanceSquared(robber.location, cell) > 2.25 && validJail(robber.dimension, round.station)
+      && robber.tryTeleport(cell, { checkForBlocks: true })) {
+      robber.triggerEvent("cops_robbers:jailed");
+    }
   }
 }
 
