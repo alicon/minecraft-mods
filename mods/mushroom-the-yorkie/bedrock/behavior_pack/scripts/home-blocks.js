@@ -47,18 +47,20 @@ export function distanceSquared(from, to) {
   return (from.x - to.x) ** 2 + (from.y - to.y) ** 2 + (from.z - to.z) ** 2;
 }
 
+export function hasDrySupport(dimension, location) {
+  const support = blockAt(dimension, { ...location, y: Math.floor(location.y) - 1 });
+  return Boolean(support && !support.isAir && !support.isLiquid && !support.isWaterlogged
+    && dimension.getBlockBelow(support.location, { maxDistance: 1 })?.y === support.y);
+}
+
 export function restSpot(block) {
   if (!block || (block.typeId !== BED && block.typeId !== HOUSE) || block.isWaterlogged) {
     return undefined;
   }
   const { dimension } = block;
   const center = centerOf(block);
-  const support = blockAt(dimension, { ...center, y: center.y - 1 });
   const above = blockAt(dimension, { ...center, y: center.y + 1 });
-  if (!support || support.isAir || support.isLiquid || support.isWaterlogged || !above?.isAir) {
-    return undefined;
-  }
-  if (dimension.getBlockBelow(support.location, { maxDistance: 1 })?.y !== support.y) {
+  if (!hasDrySupport(dimension, center) || !above?.isAir) {
     return undefined;
   }
   const door = DOORS[block.permutation.getState("minecraft:cardinal_direction")] ?? DOORS.north;

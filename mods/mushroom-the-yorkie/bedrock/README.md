@@ -33,7 +33,7 @@ Open the generated `build/bedrock/mushroom-the-yorkie-bedrock-*.mcaddon` on a Be
 - Verify furniture placement, facing, lighting and the visible models. Check that an obstructed or wet doghouse does not leave Mushroom stuck, that he wakes at dawn, and that a nearby nighttime threat interrupts sleep.
 - Refill both bowls on the same Minecraft day, reopen the world and check the daily limits. Keep both tamed pets in the world during a multiplayer test and verify that the care messages go to their own players.
 
-The development build uses the craftable adoption egg. Bed-triggered adoption, lost-pet recovery and the outdoor request routine are tracked in [the home routine issue](https://github.com/alicon/minecraft-mods/issues/129).
+The development build also attempts adoption after a full night in an Overworld bed. It can bring a loaded, following Yorkie back after a full day apart. Test both routes with two players and check that a second adoption does not replace an existing pet. The outdoor request routine is tracked in [the home routine issue](https://github.com/alicon/minecraft-mods/issues/129).
 
 Check the scripts against the same stable API version used by the behavior pack:
 
