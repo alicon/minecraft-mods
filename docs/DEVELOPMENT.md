@@ -31,7 +31,7 @@ From the repository root:
 ./gradlew check -Ptarget_minecraft_version=1.21.1
 ```
 
-The default target is Minecraft `1.21.11`. NARwhal Together and Mushroom the Yorkie also support Minecraft `1.21.1`; Cops and Robbers currently supports `1.21.11`.
+The default target is Minecraft `1.21.11`. See the [compatibility table](COMPATIBILITY.md) for mod support and minimum Fabric Loader versions.
 
 ## Common Commands
 
@@ -56,24 +56,24 @@ make build MOD=mushroom-the-yorkie MC_VERSION=1.21.1
 
 ## Manual Playtesting
 
-To copy a built mod jar into a local Minecraft or Modrinth profile, point `LIVE_TEST_MODS_DIR` at that profile's `mods` directory:
+Close Minecraft, then point `LIVE_TEST_MODS_DIR` at a disposable profile's `mods` directory:
 
 ```shell
-make live-test MOD=cops-and-robbers LIVE_TEST_MODS_DIR=/path/to/profile/mods
+make live-test MOD=cops-and-robbers LIVE_TEST_MODS_DIR=/path/to/test-profile/mods
+make live-test-bridge LIVE_TEST_MODS_DIR=/path/to/test-profile/mods
 ```
 
-The Makefile backs up older matching jars before copying the newly built jar. On this workstation, the default profile path is Dad's Minecraft Modrinth profile.
+The Makefile backs up older matching versioned jars and replaces the same-version jar when rebuilding. If no path is provided, it targets the configured Modrinth profile, which defaults to Dad's Minecraft on macOS. Use a copied save and check its identity before running any scenarios. See [Testing](TESTING.md#local-playtest-harness) for the cursor-free JVM setting and bridge checks.
 
 ## Release Helpers
 
-Preview and run the full local release flow:
+Preview a release for the selected mod:
 
 ```shell
-make release-dry-run
-make release MODRINTH_VERSION_TYPE=alpha
+make release-dry-run RELEASE_MODS=cops-and-robbers RELEASE_SKIP_PROFILE=1
 ```
 
-The full release flow validates all selected Minecraft targets, builds release jars, syncs Modrinth metadata, publishes Modrinth versions, installs the default Minecraft `1.21.11` jars into the local Dad's Minecraft profile, and prints checksums and publish URLs. It refuses to publish from a dirty worktree unless `ALLOW_DIRTY_RELEASE=1` is set.
+The dry run prints the target versions and planned commands. See the [release guide](RELEASING.md#publish) to test the packaged jar and choose a publishing path. For metadata synchronization, install `curl` and `jq`.
 
 Sync Modrinth project metadata:
 

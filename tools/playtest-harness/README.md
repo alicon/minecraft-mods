@@ -8,9 +8,11 @@ ordinary native respawn. The command holds the bridge lock, refuses living or
 changed players, preserves its own report and requires a living server owner
 after acknowledgement. This explicit recovery does not change earlier verdicts.
 
-Mineflayer-based harness for local playtesting this mods workspace. The first pass focuses on a bot that can join your local/LAN world, follow a player, open a browser viewer, and run command-backed smoke scenarios for mod entities.
+Use the Fabric bridge for live scenarios with the real Minecraft client and custom mod registries. Use the Mineflayer bot for a companion, a browser viewer, and command-backed smoke checks in protocol-compatible test worlds.
 
 ## Install
+
+Use Node.js 22 or newer for the Mineflayer dependencies and npm for the Make targets. Run Make examples from the repository root.
 
 ```shell
 make harness-install
@@ -24,7 +26,7 @@ For command-backed smoke scenarios, the bot needs operator permissions and cheat
 
 If you open a single-player world to LAN, Minecraft prints the temporary port in chat. Pass that as `HARNESS_PORT`.
 
-Fabric modded LAN worlds can reject Mineflayer with a message that the server requires Fabric Loader and Fabric API on the client. That is expected when the server needs Fabric registry sync for custom mod content: Mineflayer is a protocol bot, not a Fabric client. Use this harness against protocol-compatible local worlds, or use it as the command/scenario layer behind a future Fabric client bridge.
+Fabric modded LAN worlds can reject Mineflayer with a message that the server requires Fabric Loader and Fabric API on the client. That is expected when the server needs Fabric registry sync for custom mod content: Mineflayer is a protocol bot, not a Fabric client. Use this harness against protocol-compatible local worlds, or use the Fabric bridge below in an actual modded client.
 
 ## Fabric Bridge
 
@@ -41,7 +43,7 @@ is distinct from rejected syntax.
 For real modded worlds, install the `playtest-bridge` jar in the same profile as the other local test mods:
 
 ```shell
-make live-test-bridge
+make live-test-bridge LIVE_TEST_MODS_DIR=/path/to/test-profile/mods
 ```
 
 Restart Minecraft after installing it. When a single-player or LAN server starts, the bridge listens on loopback port `57321`.
@@ -63,7 +65,7 @@ make bridge-set-block BRIDGE_X=0 BRIDGE_Y=100 BRIDGE_Z=0 BRIDGE_BLOCK=minecraft:
 make bridge-use-block BRIDGE_X=0 BRIDGE_Y=99 BRIDGE_Z=0 BRIDGE_ITEM=cops_robbers:bank_kit
 make bridge-count-blocks BRIDGE_X1=-8 BRIDGE_Y1=100 BRIDGE_Z1=-8 BRIDGE_X2=8 BRIDGE_Y2=106 BRIDGE_Z2=8
 make bridge-screenshot BRIDGE_SCREENSHOT_NAME=playtest.png
-make bridge-yorkie-smoke PLAYTEST_WORLD="Mushroom Abel Noelle 20261115-075437" BRIDGE_SCREENSHOT_NAME=yorkie-smoke.png
+make bridge-yorkie-smoke PLAYTEST_WORLD="Codex Test Copy" BRIDGE_SCREENSHOT_NAME=yorkie-smoke.png
 make bridge-yorkie-home-squirrel BRIDGE_SCREENSHOT_NAME=yorkie-home-squirrel
 make bridge-cops-smoke BRIDGE_SCREENSHOT_NAME=cops-smoke.png
 make bridge-cops-structures-smoke BRIDGE_SCREENSHOT_NAME=cops-structures.png
@@ -73,7 +75,7 @@ make bridge-cops-visual-sweep BRIDGE_SCREENSHOT_NAME=cops-visual
 For a normal saved client shutdown before installing rebuilt jars:
 
 ```shell
-make bridge-quit PLAYTEST_WORLD="Mushroom Abel Noelle 20261115-075437"
+make bridge-quit PLAYTEST_WORLD="Codex Test Copy"
 ```
 
 The quit endpoint requires the exact loaded disposable save name, a single-player
@@ -84,9 +86,9 @@ verify the game process has exited and that new log lines after the request cont
 `All dimensions are saved`. If that confirmation is missing, inspect the shutdown
 rather than treating a vanished bridge as proof of a successful save.
 
-The bridge is intentionally bound to `127.0.0.1` and should only be installed in local development profiles.
+Use a dedicated test profile and a disposable copied save. Verify the loopback address, exact save path, and single connected owner with `make bridge-state` before running mutating commands. Some individual bridge commands can edit the loaded world without a save-name guard. Add `-Dplaytest.bridge.keepCursorFree=true` to the Minecraft client JVM arguments to keep the pointer free and verify `cursorFree` in a screenshot receipt.
 Screenshots close the active client screen before capture by default. Set `BRIDGE_SCREENSHOT_RESUME=0` to keep the current screen visible. Set `BRIDGE_SCREENSHOT_HIDE_GUI=1` and `BRIDGE_SCREENSHOT_CLEAR_CHAT=1` for clean visual inspection captures.
-Set `BRIDGE_REPORT_FILE=build/playtest-reports/<name>.json` on any bridge scenario target to persist the full JSON result, including every step payload and screenshot path, outside the terminal output.
+Set `BRIDGE_REPORT_FILE="$PWD/build/playtest-reports/<name>.json"` on scenario targets that support it. Matrix and Yorkie runtime smoke reports checkpoint partial runs. Other scenario commands write JSON when they complete, so retain terminal output and the original scene when they fail.
 The `set-block` and `set-block-near-entity` bridge actions accept namespaced block IDs or full block-state strings such as `minecraft:cherry_leaves[persistent=true]`.
 
 `/block` also reports native `blockLight`, `skyLight` and `waterFreezeEligible`.
@@ -97,7 +99,7 @@ which differs from daylight, when auditing controlled pools against ice formatio
 You can launch Modrinth directly into a save without using the launcher UI:
 
 ```shell
-make modrinth-launch-world PLAYTEST_WORLD="New World (21)"
+make modrinth-launch-world PLAYTEST_WORLD="Codex Test Copy"
 ```
 
 For repeatable disposable worlds, keep a closed template save and copy it before launch:
@@ -118,8 +120,8 @@ Run Mushroom's richer bridge scenario:
 make modrinth-autoplay-yorkie PLAYTEST_TEMPLATE_WORLD="Clean Template" BRIDGE_SCREENSHOT_NAME=yorkie-smoke.png
 make modrinth-autoplay-yorkie-home-squirrel PLAYTEST_TEMPLATE_WORLD="Clean Template" BRIDGE_SCREENSHOT_NAME=yorkie-home-squirrel
 make modrinth-autoplay-yorkie-visual PLAYTEST_TEMPLATE_WORLD="Clean Template" BRIDGE_SCREENSHOT_NAME=yorkie-gallery
-make modrinth-autoplay-yorkie-biome-scout PLAYTEST_WORLD="New World (21)" BRIDGE_SCREENSHOT_NAME=yorkie-biome-scout
-make modrinth-autoplay-yorkie-natural-gallery PLAYTEST_TEMPLATE_WORLD="New World (21)" PLAYTEST_WORLD_PREFIX="Codex Yorkie Natural" BRIDGE_SCREENSHOT_NAME=yorkie-natural-gallery
+make modrinth-autoplay-yorkie-biome-scout PLAYTEST_WORLD="Codex Test Copy" BRIDGE_SCREENSHOT_NAME=yorkie-biome-scout
+make modrinth-autoplay-yorkie-natural-gallery PLAYTEST_TEMPLATE_WORLD="Gallery Template" PLAYTEST_WORLD_PREFIX="Codex Yorkie Natural" BRIDGE_SCREENSHOT_NAME=yorkie-natural-gallery
 ```
 
 It covers duplicate-claim blocking, treat taming, owner commands, harness/lead behavior, exact food and toy effects, sheltered nighttime sleep/wake, dog food and water bowl use, same-day bowl refill rejection, outdoor potty relief, exact shelter cleanup, screenshot capture, and positive leash attach.
@@ -144,7 +146,7 @@ Care is a one-time inspection step, not immunity from later hunger decay.
 The focused home-and-squirrel scenario proves visible doghouse sleep, squirrel tree seeking, Mushroom's chase and 30-second return, and the early return when a tree-less squirrel crosses the 24-block player limit. It also saves clean doghouse and squirrel-chase screenshots.
 The visual sweep captures clean gallery scenes for sitting, a fence-tied leash walk, sleep, water, fetch, flying, food and water bowls, wants-outside messaging, sheep chasing, and hostile spider defense.
 The biome scout samples real worldgen coordinates in an existing save, records seed/coordinates/biomes, and captures candidate staging screenshots for natural outdoor gallery refreshes.
-The natural gallery scenario copies a scouted save, then stages Mushroom at saved real-biome coordinates for outdoor sitting, leashed, water, fetch, flying, bowl, chase, and hostile-defense screenshots.
+The natural gallery launcher copies the template and captures outdoor scenes at fixed coordinates from the original gallery seed. See the [staging guide](../../docs/YORKIE_GALLERY_STAGING.md) for the seed and terrain requirements.
 
 Run Cops and Robbers' richer bridge scenario:
 
@@ -158,7 +160,7 @@ The fast Cops scenario covers item registration, the cruiser/fire truck/cop/fire
 The structures scenario uses real item-on-block placement for the police station, fire station, and bank kits, counts signature generated blocks, verifies teller/fire crew spawning, verifies robber vault theft, verifies firefighter extinguishing, verifies mounted fire truck water-cannon extinguishing, and captures a screenshot.
 The visual sweep builds a clean high-altitude stage and captures HUD-free lineup, mob skin closeup, vehicle closeup, police station front, fire station front, bank front, and overview screenshots with the real kits.
 
-The launcher uses `open -g` by default to avoid intentionally activating Modrinth, but Minecraft can still grab mouse/keyboard focus when the client window starts. Press Escape to release it, or set `MODRINTH_OPEN_BACKGROUND=0` when you want the game to come forward.
+Set `MODRINTH_PROFILE` and `MODRINTH_INSTANCE_ID` for the same test instance. The launcher uses `open -g` to open Modrinth in the background. Set `MODRINTH_OPEN_BACKGROUND=0` to bring Modrinth forward. The client JVM setting above controls pointer capture separately.
 It also sets `pauseOnLostFocus:false` by default so singleplayer test worlds keep ticking in the background. Set `PLAYTEST_DISABLE_PAUSE_ON_LOST_FOCUS=0` to leave that profile option unchanged.
 If Modrinth was not already running, the launcher re-opens the deep link after a short cold-start delay. Set `MODRINTH_STARTUP_RETRY_SECONDS=0` to disable that retry.
 Set `PLAYTEST_SCREENSHOT_DELAY_SECONDS=0` to skip the default post-smoke screenshot delay.
@@ -168,7 +170,7 @@ Set `PLAYTEST_SCREENSHOT_DELAY_SECONDS=0` to skip the default post-smoke screens
 Run the matrix only in a disposable copy, with exactly one player connected:
 
 ```shell
-make bridge-yorkie-matrix PLAYTEST_WORLD="Mushroom Abel Noelle 20261115-075437" BRIDGE_REPORT_FILE=build/playtest-reports/yorkie-matrix.json
+make bridge-yorkie-matrix PLAYTEST_WORLD="Codex Test Copy" BRIDGE_REPORT_FILE="$PWD/build/playtest-reports/yorkie-matrix.json"
 ```
 
 It requires an exact save-name match and a disposable prefix (`Codex `,
@@ -194,7 +196,7 @@ Use `--investigate` to preserve the first anomaly before another case can replac
 its fixture:
 
 ```shell
-npm --prefix tools/playtest-harness run bridge -- yorkie-matrix --expected-save "Codex Test Copy" --investigate --report-file build/playtest-reports/investigation.json
+npm --prefix tools/playtest-harness run bridge -- yorkie-matrix --expected-save "Codex Test Copy" --investigate --report-file "$PWD/build/playtest-reports/investigation.json"
 ```
 
 It works with `--group` and `--case`. Reports include `investigativeAudit`, the
@@ -290,7 +292,7 @@ whether every requested case ran.
 Matrix failure screenshots preserve the current screen, HUD, chat and camera
 orientation. They do not teleport or rotate the owner for framing, which could
 otherwise dismount a rider and change the failed physics state.
-The matrix's 490 defined cases are not a claim that a full sweep has passed.
+The 490-case grouped audit of Mushroom 0.1.3 passed. Check the selected build’s report for coverage and verdicts. [Audit checkpoint](https://github.com/alicon/minecraft-mods/issues/87)
 
 ```shell
 node tools/playtest-harness/src/bridge-cli.js yorkie-matrix --expected-save "<copied save>" --group native-shore --report-file build/playtest-reports/native-shore.json
@@ -439,7 +441,7 @@ Treat setup failures as harness problems until investigated.
 Replay one numbered case directly:
 
 ```shell
-node tools/playtest-harness/src/bridge-cli.js yorkie-matrix --expected-save "Mushroom Abel Noelle 20261115-075437" --case 19 --report-file build/playtest-reports/replay-19.json
+node tools/playtest-harness/src/bridge-cli.js yorkie-matrix --expected-save "Codex Test Copy" --case 19 --report-file build/playtest-reports/replay-19.json
 npm --prefix tools/playtest-harness test
 ```
 
@@ -483,7 +485,7 @@ wrong vehicle or changed save/player prevents input or releases an active burst.
 
 ```shell
 node tools/playtest-harness/src/bridge-cli.js client-input \
-  --expected-save "Mushroom Abel Noelle 20261115-075437" \
+  --expected-save "Codex Test Copy" \
   --mode walk --ticks 20 --forward true \
   --report-file build/playtest-reports/native-walk.json
 ```
@@ -608,7 +610,7 @@ of an observer that has already failed.
 ## Fetch across a saved restart
 
 ```shell
-make bridge-yorkie-fetch-restart PLAYTEST_WORLD="Mushroom Abel Noelle 20261115-075437"
+make bridge-yorkie-fetch-restart PLAYTEST_WORLD="Codex Test Copy"
 ```
 
 This destructive test requires Python 3, the updated bridge and Mushroom jars,
@@ -711,7 +713,7 @@ Mineflayer caches Microsoft auth tokens locally after the first login.
 
 ```shell
 node tools/playtest-harness/src/bridge-cli.js yorkie-crafting \
-  --expected-save 'Mushroom Abel Noelle 20261115-075437' \
+  --expected-save 'Codex Test Copy' \
   --report-file build/playtest-reports/yorkie-crafting.json
 ```
 
@@ -740,7 +742,7 @@ cleanup; neither case receives success-only pet care.
 
 ```shell
 node tools/playtest-harness/src/bridge-cli.js yorkie-squirrel-restart \
-  --expected-save "Mushroom Abel Noelle 20261115-075437" --lower-face-block
+  --expected-save "Codex Test Copy" --lower-face-block
 ```
 
 Omit `--lower-face-block` for the unchanged-perch control. This destructive check keeps one mutation lock across its matrix fixture and

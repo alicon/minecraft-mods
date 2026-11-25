@@ -1,12 +1,16 @@
 # Minecraft Mods
 
-Fabric mod workspace for small Minecraft projects.
+Small Fabric mods for playing Minecraft together.
 
 ## Mods
 
-- **NARwhal Together**: family-focused multiplayer helpers. Current feature: press `G` to teleport to the next online player.
-- **Mushroom the Yorkie**: a tiny pointy-eared Yorkie companion with pet needs, treats, bowls, toys, a softly lit doghouse for sleeping, squirrel chases, lost-dog recovery, and tame/follow/sit behavior.
-- **Cops and Robbers**: police cruisers, fire trucks, cops, robbers, bank tellers, and placeable bank/police station kits.
+| Mod | What you can do | Minecraft Java |
+| --- | --- | --- |
+| [NARwhal Together](https://modrinth.com/mod/narwhal-together) | Press `G` or use Controlify to visit the next online player. | 1.21.11, 1.21.1 |
+| [Mushroom the Yorkie](https://modrinth.com/mod/mushroom-the-yorkie) | Take a tiny Yorkie for walks, play fetch, and watch him chase squirrels. | 1.21.11, 1.21.1 |
+| [Cops and Robbers](https://modrinth.com/mod/cops-and-robbers) | Build a bank, police station, and fire station. Patrol, catch robbers, and put out fires. | 1.21.11 |
+
+Install the matching mod build and Fabric API on every participating client and on the server or LAN host.
 
 ## Layout
 
@@ -18,19 +22,20 @@ mods/
     src/
   cops-and-robbers/
     src/
+  playtest-bridge/
+    src/
 gradle/
   fabric-mod.gradle
 ```
 
-Each mod has its own `fabric.mod.json`, Java package, assets, and jar. Shared Fabric/Loom/Modrinth build setup lives in `gradle/fabric-mod.gradle`.
+Each mod has its own Fabric metadata, sources, and jar. Shared Fabric, Loom, and Modrinth configuration lives in `gradle/fabric-mod.gradle`. The Playtest Bridge is a local development tool for 1.21.11.
 
 ## Requirements
 
-- Minecraft Java Edition 1.21.11 by default
-- NARwhal Together and Mushroom the Yorkie also support Minecraft Java Edition 1.21.1
-- Fabric Loader 0.19.3 or newer
-- Fabric API
 - Java 21 or newer
+- Fabric Loader 0.19.3 or newer for Minecraft 1.21.11
+- Fabric Loader 0.16.14 or newer for Minecraft 1.21.1
+- Fabric API for the selected Minecraft version
 
 ## Build
 
@@ -44,7 +49,10 @@ Distributable jars are written under the active Minecraft target:
 build/mods/narwhal-together/<minecraft-version>/libs/narwhal-together-<version>.jar
 build/mods/mushroom-the-yorkie/<minecraft-version>/libs/mushroom-the-yorkie-<version>.jar
 build/mods/cops-and-robbers/<minecraft-version>/libs/cops-and-robbers-<version>.jar
+build/mods/playtest-bridge/1.21.11/libs/playtest-bridge-<version>.jar
 ```
+
+Pass `-Ptarget_minecraft_version=1.21.1` to build NARwhal Together or Mushroom the Yorkie for that target. Use the matching Minecraft directory when selecting a jar.
 
 ## Verification
 
@@ -85,6 +93,8 @@ Helpful process docs:
 - [Development Environment](docs/DEVELOPMENT.md)
 - [Testing](docs/TESTING.md)
 - [Compatibility Policy](docs/COMPATIBILITY.md)
+- [Mushroom gameplay and configuration](docs/MUSHROOM_THE_YORKIE.md)
+- [Cops and Robbers gameplay and controls](docs/MODRINTH_COPS_AND_ROBBERS.md)
 - [Reference Codebases](docs/REFERENCE_CODEBASES.md)
 - [Release Guide](docs/RELEASING.md)
 

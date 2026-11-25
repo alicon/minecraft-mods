@@ -27,7 +27,7 @@ Preserve the original failure first. For an already-dead owner in the disposable
 Overworld test save, explicitly run:
 
 ```shell
-npm --prefix tools/playtest-harness run bridge -- respawn --expected-save "Codex Test Copy" --player-uuid "<original owner UUID>" --report-file build/playtest-reports/owner-respawn.json
+npm --prefix tools/playtest-harness run bridge -- respawn --expected-save "Codex Test Copy" --player-uuid "<original owner UUID>" --report-file "$PWD/build/playtest-reports/owner-respawn.json"
 ```
 
 This sends Minecraft's native respawn request after exact save/player checks,
@@ -118,6 +118,14 @@ Run Mushroom's headless Minecraft GameTests:
 ```shell
 ./gradlew :mushroom-the-yorkie:runGameTestServer
 ```
+
+Run Cops and Robbers' headless GameTests on Minecraft 1.21.11:
+
+```shell
+./gradlew :cops-and-robbers:runGameTestServer
+```
+
+Keep each Gradle invocation serialized within a worktree, including while a development client runs. Use a separate worktree for parallel client and server checks.
 
 Fetch GameTests cover active flight steering, interruption returning to normal following, toy returns from below a platform, fractional owner heights, landing during chase/return, airborne return across native save/load, and shoreline path endpoints within pickup reach. Flight fixtures run the real fetch goal, flight controller, and native collision movement in server order. Live terrain cases additionally exercise full entity ticks, all three toys, and independent survival/creative walking/creative flying owner states.
 
@@ -221,7 +229,7 @@ adapters stay under `src/versions/<version>/gametest/java`. They remain test-onl
 
 ## Local Playtest Harness
 
-The Mineflayer harness in `tools/playtest-harness/` can join a local dev server, dedicated test server, or single-player LAN world. Use it for player-like smoke checks, live bot companionship, and artifact capture that is faster than repeating manual setup by hand.
+Use the Fabric bridge for mod gameplay checks in the actual client. The Mineflayer bot in `tools/playtest-harness/` can join protocol-compatible local or LAN test worlds for companion mode and command-backed smoke checks. Install Node.js 22 or newer for the bot and npm for the Make targets.
 
 Install once:
 
@@ -232,14 +240,14 @@ make harness-install
 Join a world and follow the human player:
 
 ```shell
-make harness-companion HARNESS_PORT=<lan-or-server-port> HARNESS_TARGET=<your-player-name>
+make harness-companion HARNESS_PORT=25565 HARNESS_TARGET=YourMinecraftName
 ```
 
 Run op-only smoke scenarios in a local test world:
 
 ```shell
-make harness-mushroom-smoke HARNESS_PORT=<lan-or-server-port>
-make harness-cops-smoke HARNESS_PORT=<lan-or-server-port>
+make harness-mushroom-smoke HARNESS_PORT=25565
+make harness-cops-smoke HARNESS_PORT=25565
 ```
 
 The Make targets start a Prismarine viewer by default at `http://localhost:3007` and write JSON event logs/snapshots to `tools/playtest-harness/artifacts/`. Set `HARNESS_VIEWER=0` to disable the viewer.
@@ -247,13 +255,13 @@ The Make targets start a Prismarine viewer by default at `http://localhost:3007`
 For real Fabric modded worlds, install the local Playtest Bridge mod and use its loopback HTTP endpoints instead of Mineflayer:
 
 ```shell
-make live-test-bridge
+make live-test-bridge LIVE_TEST_MODS_DIR=/path/to/test-profile/mods
 make bridge-health
 make bridge-state
 make bridge-smoke BRIDGE_MESSAGE="Codex bridge smoke passed."
 make bridge-chat BRIDGE_MESSAGE="Codex can see the world."
 make bridge-command BRIDGE_COMMAND="time set day"
-make bridge-look BRIDGE_PLAYER=<your-player-name>
+make bridge-look BRIDGE_PLAYER=YourMinecraftName
 make bridge-give BRIDGE_ITEM=minecraft:apple BRIDGE_COUNT=1
 make bridge-summon BRIDGE_ENTITY=cops_robbers:police_cruiser
 make bridge-teleport BRIDGE_X=0 BRIDGE_Y=100 BRIDGE_Z=0
@@ -264,7 +272,7 @@ make bridge-set-block BRIDGE_X=0 BRIDGE_Y=100 BRIDGE_Z=0 BRIDGE_BLOCK=minecraft:
 make bridge-use-block BRIDGE_X=0 BRIDGE_Y=99 BRIDGE_Z=0 BRIDGE_ITEM=cops_robbers:bank_kit
 make bridge-count-blocks BRIDGE_X1=-8 BRIDGE_Y1=100 BRIDGE_Z1=-8 BRIDGE_X2=8 BRIDGE_Y2=106 BRIDGE_Z2=8
 make bridge-screenshot BRIDGE_SCREENSHOT_NAME=playtest.png
-make bridge-yorkie-smoke BRIDGE_SCREENSHOT_NAME=yorkie-smoke.png
+make bridge-yorkie-smoke PLAYTEST_WORLD="Codex Test Copy" BRIDGE_SCREENSHOT_NAME=yorkie-smoke.png
 make bridge-yorkie-home-squirrel BRIDGE_SCREENSHOT_NAME=yorkie-home-squirrel
 make bridge-cops-smoke BRIDGE_SCREENSHOT_NAME=cops-smoke.png
 make bridge-cops-structures-smoke BRIDGE_SCREENSHOT_NAME=cops-structures.png
@@ -283,6 +291,9 @@ frame waits and unrelated file writes are not evidence of console blockage.
 Restart Minecraft after installing `playtest-bridge`. The bridge binds to `127.0.0.1:57321` by default and is intended only for local development profiles.
 Bridge state and terrain-scan seeds are exact signed decimal strings; keep that
 type in reproduction reports rather than converting to JavaScript numbers.
+Before mutating the world, use `make bridge-state` to confirm the exact path of
+the disposable copied save and the expected single owner. Individual commands
+such as `bridge-command` can mutate the loaded world without a save-name check.
 
 Screenshots close the active client screen before capture by default; set `BRIDGE_SCREENSHOT_RESUME=0` to keep the current screen visible. Set `BRIDGE_SCREENSHOT_HIDE_GUI=1` and `BRIDGE_SCREENSHOT_CLEAR_CHAT=1` for clean visual inspection captures.
 
@@ -291,10 +302,15 @@ client JVM argument `-Dplaytest.bridge.keepCursorFree=true`. This keeps the OS
 pointer free at world load and when resuming from a screen. The screenshot receipt
 reports `cursorFree` from GLFW. Use this mode for automated keyboard tests.
 
-Launch Modrinth directly into an existing save:
+The Modrinth launcher examples assume a dedicated test instance. Set both
+`MODRINTH_PROFILE` and `MODRINTH_INSTANCE_ID` for that instance before running
+these commands. The profile path selects the files to copy, and the instance ID
+selects which profile opens in Modrinth.
+
+Launch Modrinth directly into an existing copied save:
 
 ```shell
-make modrinth-launch-world PLAYTEST_WORLD="New World (21)"
+make modrinth-launch-world PLAYTEST_WORLD="Codex Test Copy"
 ```
 
 Create a disposable save by copying a closed template world, then launch Modrinth directly into the copy:
@@ -315,15 +331,15 @@ Run Mushroom's richer live bridge scenario against a disposable world:
 make modrinth-autoplay-yorkie PLAYTEST_TEMPLATE_WORLD="Clean Template" BRIDGE_SCREENSHOT_NAME=yorkie-smoke.png
 make modrinth-autoplay-yorkie-home-squirrel PLAYTEST_TEMPLATE_WORLD="Clean Template" BRIDGE_SCREENSHOT_NAME=yorkie-home-squirrel
 make modrinth-autoplay-yorkie-visual PLAYTEST_TEMPLATE_WORLD="Clean Template" BRIDGE_SCREENSHOT_NAME=yorkie-gallery
-make modrinth-autoplay-yorkie-biome-scout PLAYTEST_WORLD="New World (21)" BRIDGE_SCREENSHOT_NAME=yorkie-biome-scout
-make modrinth-autoplay-yorkie-natural-gallery PLAYTEST_TEMPLATE_WORLD="New World (21)" PLAYTEST_WORLD_PREFIX="Codex Yorkie Natural" BRIDGE_SCREENSHOT_NAME=yorkie-natural-gallery
+make modrinth-autoplay-yorkie-biome-scout PLAYTEST_WORLD="Codex Test Copy" BRIDGE_SCREENSHOT_NAME=yorkie-biome-scout
+make modrinth-autoplay-yorkie-natural-gallery PLAYTEST_TEMPLATE_WORLD="Gallery Template" PLAYTEST_WORLD_PREFIX="Codex Yorkie Natural" BRIDGE_SCREENSHOT_NAME=yorkie-natural-gallery
 ```
 
 The Yorkie scenario checks duplicate-claim blocking, treat taming, owner sit/follow commands, harness equip/removal, lead rejection without a harness, exact treat/toy/player-food need changes, sheltered nighttime sleep, double-click wake-up, exact shelter cleanup, dog food and water bowl use, same-day bowl refill rejection, outdoor potty relief, screenshot capture, and positive lead attach with the harness equipped.
 The Yorkie home-and-squirrel scenario verifies that Mushroom walks fully into the softly lit doghouse and curls up visibly, a squirrel reaches a tree, Mushroom starts the chase and returns after 30 seconds, and he returns early when a tree-less squirrel gets more than 24 blocks from the player. It captures focused doghouse and chase screenshots and records the squirrel's tree state in the JSON report.
 The Yorkie visual sweep captures gallery-ready scenes for sitting, a fence-tied leash walk, nighttime sleep, water, fetch, flying, food and water bowls, wants-outside messaging, sheep chasing, and hostile spider defense.
 The Yorkie biome scout samples real worldgen in an existing save, records seed/coordinates/biomes, and captures review screenshots for natural outdoor staging candidates.
-The Yorkie natural gallery scenario copies the scouted save and stages Mushroom at saved real-biome coordinates for outdoor sitting, leashed, water, fetch, flying, bowl, chase, and hostile-defense screenshots.
+The natural gallery scenario stages its screenshots at fixed coordinates. Use a disposable copy of a compatible template as described in the [gallery staging guide](YORKIE_GALLERY_STAGING.md).
 
 Run Cops and Robbers' richer live bridge scenario against a disposable world:
 
@@ -338,11 +354,11 @@ The Cops structures scenario checks real item-on-block police station, fire stat
 The Cops visual sweep builds a clean high-altitude stage, captures HUD-free lineup, mob skin closeup, vehicle closeup, police station front, fire station front, bank front, and overview screenshots, and uses real kit placement for the buildings.
 
 This uses Modrinth's `modrinth://launch/instance/<instance-id>?singleplayer_world=<save-folder>` deep link and avoids clicking through the launcher UI. The template save must not be the currently open world.
-The launcher script uses `open -g` by default so Modrinth is not deliberately activated during launch. Minecraft can still grab mouse/keyboard focus when the game window starts or enters relative-mouse mode; press Escape to release it, or set `MODRINTH_OPEN_BACKGROUND=0` if you want the client to come forward intentionally.
+The launcher uses `open -g` by default to open Modrinth in the background. Set `MODRINTH_OPEN_BACKGROUND=0` to bring Modrinth forward. The client JVM setting above controls pointer capture separately.
 The launcher also sets `pauseOnLostFocus:false` by default so singleplayer test worlds keep ticking when Minecraft is not frontmost. Set `PLAYTEST_DISABLE_PAUSE_ON_LOST_FOCUS=0` to leave that profile option unchanged.
 If Modrinth was not already running, the launcher re-opens the deep link after a short cold-start delay because the app can otherwise receive the URL before its state is initialized. Set `MODRINTH_STARTUP_RETRY_SECONDS=0` to disable that retry.
 Set `PLAYTEST_SCREENSHOT_DELAY_SECONDS=0` to skip the default post-smoke screenshot delay.
-Set `BRIDGE_REPORT_FILE=build/playtest-reports/<name>.json` to save the full bridge scenario result for later debugging instead of relying only on terminal output.
+Set `BRIDGE_REPORT_FILE="$PWD/build/playtest-reports/<name>.json"` to save a report in the root workspace regardless of which launcher invokes the CLI. For scenarios that only write a report on success, preserve terminal output and capture the existing failure view before retrying.
 
 ## State-combination testing
 
@@ -544,6 +560,7 @@ Mushroom the Yorkie:
 
 Cops and Robbers:
 
+- native GameTests cover the ordinary gold chest, one-ingot theft from an existing barred vault, and water cannon occlusion behind a solid wall
 - live Modrinth bridge smoke covers item registration, all core Cops entity registrations, cruiser mounting, mounted cruiser robber capture, jail dropoff, jailed robber state, and screenshot capture
 - live Modrinth bridge structures smoke covers real kit item use, generated station/fire station/bank block signatures, teller and fire crew spawning, robber vault theft, firefighter extinguishing, mounted fire truck water-cannon extinguishing, and screenshot capture
 - live Modrinth bridge visual sweep captures clean mob skin, vehicle, police station, fire station, bank, and overview screenshots for visual regression review
@@ -632,7 +649,9 @@ Mushroom the Yorkie:
 - [ ] With debug messages enabled, the baseline state wraps into readable chat lines and outdoor relief emits `potty_relieved`.
 - [ ] Calming peaceful-mob barking with a treat makes nearby passive mobs stop triggering repeat barking.
 - [ ] A squirrel continually seeks a nearby reachable tree; Mushroom barks and chases it for no more than 30 seconds, then gives up without immediately restarting.
-- [ ] The Squirrel Spawn Egg has its own russet, cream-speckled, bushy-tail artwork rather than reusing Mushroom's egg.
+- [ ] The Squirrel Spawn Egg is easy to distinguish from Mushroom's egg in inventory.
+- [ ] A squirrel climbs onto a canopy, crosses a nearby gap or comes down for a distant tree, and can plant a dropped vanilla sapling with mob griefing enabled.
+- [ ] On a slack lead, Mushroom sometimes pauses outdoors or heads briefly toward a scent. A nearby monster wakes a sleeping, following Mushroom.
 - [ ] Squirrels naturally spawn in small groups on valid peaceful-animal ground in biomes that already spawn rabbits, foxes, wolves, ocelots, pandas, or parrots.
 - [ ] If a squirrel has not found a tree and gets more than 24 blocks from the player, Mushroom gives up early and returns instead of following it farther away.
 - [ ] Right-clicking with a Yorkie Ball, Yorkie Chew Toy, or vanilla Bone throws it like a soft snowball; Mushroom fetches it and returns it near the owner.
@@ -653,6 +672,8 @@ Cops and Robbers:
 - [ ] Police cruiser can be driven and responds to lights and siren controls.
 - [ ] Creative-only cruiser flight and tricks are unavailable to non-creative players.
 - [ ] Bank, fire station, and police station kits place their expected structures.
+- [ ] A driver can enter the actual cruiser garage and fire truck bay under normal movement.
+- [ ] Robbers leave an ordinary gold chest alone, and the cannon stops at a solid wall.
 - [ ] Robber capture, jail release, and gold recovery messages are understandable.
 - [ ] Fire truck and fire response behavior do not spam logs or chat.
 - [ ] No errors attributed to `cops_robbers` appear in the latest log.
