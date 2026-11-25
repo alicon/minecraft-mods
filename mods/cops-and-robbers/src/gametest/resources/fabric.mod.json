@@ -1,0 +1,16 @@
+{
+	"schemaVersion": 1,
+	"id": "cops_robbers_gametest",
+	"version": "1.0.0",
+	"name": "Cops and Robbers GameTests",
+	"entrypoints": {
+		"fabric-gametest": [
+			"dev.alicon.copsrobbers.bank.BankVaultGameTests",
+			"dev.alicon.copsrobbers.fire.FireResponseGameTests"
+		]
+	},
+	"depends": {
+		"cops_robbers": "*",
+		"fabric-gametest-api-v1": "*"
+	}
+}

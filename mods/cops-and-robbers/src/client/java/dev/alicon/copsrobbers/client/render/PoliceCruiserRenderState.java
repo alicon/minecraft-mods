@@ -12,6 +12,4 @@ public final class PoliceCruiserRenderState extends LivingEntityRenderState {
 	public int trickType;
 	/** Normalized stunt animation progress. */
 	public float trickProgress;
-	/** Whether this render state is for the larger fire truck variant. */
-	public boolean fireTruck;
 }

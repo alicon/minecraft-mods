@@ -46,7 +46,7 @@ public final class BankKitItem extends StructureKitItem {
 		structure.fill(0, 1, -4, 0, 2, -4, Blocks.AIR);
 		structure.fill(-1, 1, -4, -1, 2, -4, Blocks.GLASS);
 		structure.fill(1, 1, -4, 1, 2, -4, Blocks.GLASS);
-		structure.set(0, 0, -5, Blocks.OAK_PLANKS.defaultBlockState());
+		structure.fill(-2, 0, -6, 2, 0, -5, Blocks.POLISHED_ANDESITE);
 		structure.placeOakDoor(0, 1, -4, front);
 		structure.set(0, 1, -5, Blocks.OAK_PRESSURE_PLATE.defaultBlockState());
 		structure.fill(-5, 2, -4, -3, 2, -4, Blocks.GLASS_PANE);
@@ -68,12 +68,16 @@ public final class BankKitItem extends StructureKitItem {
 		structure.fill(0, 1, 5, 1, 2, 5, Blocks.AIR);
 
 		// Bank colors and burnable trim.
-		structure.fill(-7, 1, -3, 7, 1, -3, Blocks.OAK_LOG);
+		structure.fill(-7, 1, -4, -7, 3, -4, Blocks.STRIPPED_OAK_LOG);
+		structure.fill(7, 1, -4, 7, 3, -4, Blocks.STRIPPED_OAK_LOG);
+		structure.fill(-7, 4, -5, 7, 4, -5, Blocks.DARK_OAK_PLANKS);
+		structure.fill(-5, 5, -4, 5, 5, -4, Blocks.CUT_COPPER);
+		structure.fill(-3, 6, -4, 3, 6, -4, Blocks.OAK_SLAB);
 		structure.set(0, 1, -3, Blocks.OAK_PRESSURE_PLATE.defaultBlockState());
 		structure.set(-1, 5, -4, Blocks.GOLD_BLOCK.defaultBlockState());
 		structure.set(0, 5, -4, Blocks.WHITE_WOOL.defaultBlockState());
 		structure.set(1, 5, -4, Blocks.GOLD_BLOCK.defaultBlockState());
-		structure.placeWallSign(0, 4, -5, front.getOpposite(), "Village", "Bank");
+		structure.placeWallSign(0, 4, -6, front.getOpposite(), "VILLAGE BANK", "VAULT & TELLERS");
 
 		// Warm old-school lantern lighting.
 		BlockState lantern = Blocks.LANTERN.defaultBlockState().setValue(LanternBlock.HANGING, true);

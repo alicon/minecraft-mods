@@ -2,18 +2,17 @@ package dev.alicon.copsrobbers.client.render;
 
 import dev.alicon.copsrobbers.CopsAndRobbers;
 import dev.alicon.copsrobbers.entity.FireTruckEntity;
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.resources.Identifier;
 
-/** Renderer that reuses the truck model with fire truck colors. */
+/** Renderer that binds the fire engine model and its distinct texture. */
 public final class FireTruckRenderer extends MobRenderer<FireTruckEntity, PoliceCruiserRenderState, PoliceCruiserModel> {
 	private static final Identifier TEXTURE = CopsAndRobbers.id("textures/entity/fire_truck.png");
 
-	/** Reuses PoliceCruiserModel with fire-truck texture/state; avoid a second truck model unless geometry diverges. */
+	/** Uses the fire truck layer with common vehicle animation. */
 	public FireTruckRenderer(EntityRendererProvider.Context context) {
-		super(context, new PoliceCruiserModel(context.bakeLayer(PoliceCruiserModel.LAYER_LOCATION)), 0.75F);
+		super(context, new PoliceCruiserModel(context.bakeLayer(PoliceCruiserModel.FIRE_TRUCK_LAYER)), 0.75F);
 	}
 
 	@Override
@@ -24,16 +23,10 @@ public final class FireTruckRenderer extends MobRenderer<FireTruckEntity, Police
 	@Override
 	public void extractRenderState(FireTruckEntity entity, PoliceCruiserRenderState state, float partialTick) {
 		super.extractRenderState(entity, state, partialTick);
-		state.lightsEnabled = true;
-		state.sirenEnabled = false;
+		state.lightsEnabled = entity.lightsEnabled();
+		state.sirenEnabled = entity.sirenEnabled();
 		state.trickType = entity.trickType();
-		state.trickProgress = 0.0F;
-		state.fireTruck = true;
-	}
-
-	@Override
-	protected void scale(PoliceCruiserRenderState state, PoseStack poseStack) {
-		poseStack.scale(1.55F, 1.48F, 1.55F);
+		state.trickProgress = PoliceCruiserRenderer.trickProgress(entity, partialTick);
 	}
 
 	@Override
