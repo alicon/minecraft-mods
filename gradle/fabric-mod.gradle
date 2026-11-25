@@ -22,9 +22,8 @@ def legacyTarget = activeMinecraftVersion == project.legacy_minecraft_version
 def activeFabricApiVersion = legacyTarget ? project.legacy_fabric_api_version : project.fabric_api_version
 def activeLoaderVersion = legacyTarget ? project.legacy_loader_version : project.loader_version
 def versionedSourceRoot = "src/versions/${activeMinecraftVersion}"
-def publishedVersionNumber = supportedVersions.isEmpty()
-		? modVersion
-		: "${modVersion}+mc${activeMinecraftVersion}"
+def releaseVersion = { target -> supportedVersions.isEmpty() ? modVersion : "${modVersion}+mc${target}" }
+def publishedVersionNumber = releaseVersion(activeMinecraftVersion)
 def excludedSources = ['common': 'main', 'client': 'client'].collectMany { environment, sourceSet ->
 	def propertyName = "versioned_${environment}_excludes"
 	def excludes = project.ext.has(propertyName) ? project.ext.get(propertyName).get(activeMinecraftVersion, []) : []
@@ -34,6 +33,9 @@ def excludedSources = ['common': 'main', 'client': 'client'].collectMany { envir
 project.ext.active_minecraft_version = activeMinecraftVersion
 project.ext.active_fabric_api_version = activeFabricApiVersion
 project.ext.active_loader_version = activeLoaderVersion
+project.ext.releaseTargets = (supportedVersions ?: [project.minecraft_version]).collect { target ->
+	[project.name, target, modVersion, archiveName, releaseVersion(target)]
+}
 
 version = modVersion
 group = project.maven_group

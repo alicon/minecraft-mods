@@ -6,6 +6,16 @@ plugins {
 
 apply from: rootProject.file('gradle/repo-validation.gradle')
 
+tasks.register('printModReleaseTargets') {
+	group = 'publishing'
+	description = 'Prints the artifact and Modrinth version for every mod target.'
+	doLast {
+		subprojects.each { mod ->
+			mod.ext.releaseTargets.each { target -> println "release-target\t" + target.join('\t') }
+		}
+	}
+}
+
 tasks.register('buildAllMods') {
 	group = 'build'
 	description = 'Builds every mod subproject.'
