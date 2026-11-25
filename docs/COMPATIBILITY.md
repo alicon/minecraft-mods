@@ -45,8 +45,15 @@ python3 scripts/smoke-narwhal-bedrock.py /path/to/bedrock-server.zip /path/to/na
 
 Use the [Bedrock release checklist](RELEASING.md#publish-a-bedrock-add-on) to record client and Realm evidence alongside server results.
 
-NARwhal's Fabric selector test and Bedrock Survival-player smoke use the same
-[regroup cycle fixture](../scripts/fixtures/narwhal-regroup-cycle.json) for alphabetical selection and wraparound.
+### Gameplay checks by edition
+
+| Shared behavior | Java Fabric checks | Bedrock checks |
+| --- | --- | --- |
+| Mushroom ownership, care, and fetch | Live companion smoke, wake-up and care policy tests, and native fetch save/load GameTests | [Companion smoke](../mods/mushroom-the-yorkie/bedrock/README.md#verify-the-add-on) with adoption, care persistence, and fetch enabled |
+| Cops and Robbers kits, patrol, and fire response | Live patrol and structures smoke exercises kit placement, mounted capture, jail drop-off, and extinguishing fires | [Patrol smoke](../mods/cops-and-robbers/bedrock/README.md#verify-the-kits-vehicles-patrol-fire-response-and-jail) with the vehicle, patrol, fire, and jail scenarios enabled |
+| NARwhal alphabetical regroup and wraparound | Fabric target selector tests use the [shared regroup cycle](../scripts/fixtures/narwhal-regroup-cycle.json) | [Regroup smoke](../mods/narwhal-together/bedrock/README.md#build-and-test) exercises the same cycle through native item use |
+
+See [Java automated coverage](TESTING.md#current-automated-coverage) for the complete test descriptions.
 
 See [Add-On development](https://learn.microsoft.com/en-us/minecraft/creator/documents/addondevelopmentworkflow?view=minecraft-bedrock-stable) and [Script API versioning](https://learn.microsoft.com/en-us/minecraft/creator/documents/scripting/versioning?view=minecraft-bedrock-stable).
 
