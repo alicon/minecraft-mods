@@ -1,4 +1,4 @@
-import { BlockPermutation, BlockTypes, BlockVolume, ItemStack, ItemTypes, system, world } from "@minecraft/server";
+import { BlockPermutation, BlockTypes, BlockVolume, ItemStack, ItemTypes, system, WeatherType, world } from "@minecraft/server";
 
 const YORKIE = "mushroom_yorkie:mushroom_yorkie";
 const ENTITY_ID = "mushroom_smoke:original_entity";
@@ -161,6 +161,9 @@ async function assertBowlStillFull(puppy, dimension) {
 world.afterEvents.worldLoad.subscribe(async () => {
   try {
     const dimension = world.getDimension("overworld");
+    world.gameRules.doWeatherCycle = false;
+    world.gameRules.doMobSpawning = false;
+    dimension.setWeather(WeatherType.Clear);
     await world.tickingAreaManager.createTickingArea(AREA, {
       dimension,
       from: MIN,

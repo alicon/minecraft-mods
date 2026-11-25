@@ -130,3 +130,10 @@ make release RELEASE_INSTALL_MC_VERSION=1.21.11
 The command refuses to publish from a dirty working tree unless `ALLOW_DIRTY_RELEASE=1` is set. Keep the default guard for normal releases so Modrinth artifacts map cleanly back to a commit.
 
 The GitHub **Publish to Modrinth** workflow remains available as a single-mod fallback. It rebuilds from the selected commit and uploads the remapped production JAR for the selected Minecraft target. The publishing task declares Fabric API as required. NARwhal also declares Controlify as optional.
+
+## Release a Bedrock add-on
+
+1. Keep the existing pack UUIDs and content identifiers. Increment both pack versions and the behavior pack's resource dependency together. Run the Bedrock type check, package checks, and the mod's native server checks. Run the Fabric checks for the mod's supported targets.
+2. Build from the release commit and record the `.mcaddon` checksum. Use that archive for a clean import, an existing test-world upgrade, and save/reopen. On the devices you plan to support, verify typical controls, ownership in multiplayer, and Realm pack delivery if you will advertise it.
+3. Use a separate GitHub Release for each Bedrock add-on version. Attach the exact archive tested in step 2 and list the tested Minecraft versions and devices, setup steps, and edition differences. Link the download from the mod's documentation.
+4. After publishing, download the `.mcaddon` while signed out and verify its checksum matches the tested archive.
