@@ -42,6 +42,8 @@ final class SquirrelTreeRemovalProbe {
 						"Squirrel kept clinging after its trunk disappeared");
 				this.helper.assertTrue(!this.squirrel.onClimbable(),
 						"Squirrel retained climbing physics after its trunk disappeared");
+				this.helper.assertTrue(this.squirrel.treePoseDirection() == 0,
+						"Squirrel retained its trunk pose after falling away");
 				this.normalFallObserved |= this.squirrel.getDeltaMovement().y < -0.2D;
 				boolean landed = this.squirrel.onGround() && this.squirrel.getY() < this.clingingY - 2.0D;
 				this.landedTicks = landed ? this.landedTicks + 1 : 0;

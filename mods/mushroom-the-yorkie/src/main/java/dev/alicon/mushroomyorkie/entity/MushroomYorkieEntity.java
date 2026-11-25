@@ -125,6 +125,12 @@ public final class MushroomYorkieEntity extends MushroomVersionedAnimal {
 		return MushroomYorkieStateQueries.ownerIsCreative(this);
 	}
 
+	@Override
+	protected double getDefaultGravity() {
+		// The visual doghouse mattress is above its collisionless floor.
+		return MushroomYorkieStateQueries.restingInDoghouse(this) ? 0.0D : super.getDefaultGravity();
+	}
+
 	boolean isMushroomSleeping() {
 		return this.entityData.get(DATA_SLEEPING);
 	}

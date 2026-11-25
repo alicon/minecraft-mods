@@ -84,6 +84,12 @@ final class SquirrelTreeTravel {
 		}
 		this.squirrel.resetFallDistance();
 		this.squirrel.getLookControl().setLookAt(this.waypoints.peek());
+		if ((this.phase == Phase.CLIMB || this.phase == Phase.DESCEND)
+				&& Math.abs(delta.y) > delta.horizontalDistance()) {
+			this.squirrel.poseAgainstTrunk(this.tree, this.phase == Phase.DESCEND);
+		} else {
+			this.squirrel.clearTreePose();
+		}
 		this.squirrel.setDeltaMovement(delta);
 	}
 
@@ -102,6 +108,7 @@ final class SquirrelTreeTravel {
 
 	private void beginRest() {
 		this.phase = Phase.REST;
+		this.squirrel.clearTreePose();
 		this.nextAction = CROWN_REST_TICKS;
 		this.squirrel.setNoGravity(false);
 		this.squirrel.setDeltaMovement(Vec3.ZERO);
@@ -137,6 +144,7 @@ final class SquirrelTreeTravel {
 	private void finish(boolean descended) {
 		this.vacatedTree = descended ? this.tree : null;
 		this.phase = Phase.FINISHED;
+		this.squirrel.clearTreePose();
 		this.squirrel.setFoundTree(false);
 		this.squirrel.setNoGravity(false);
 		if (descended) this.squirrel.setDeltaMovement(Vec3.ZERO);

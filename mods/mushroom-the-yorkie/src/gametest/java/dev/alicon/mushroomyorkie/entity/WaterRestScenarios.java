@@ -1,7 +1,10 @@
 package dev.alicon.mushroomyorkie.entity;
 
+import dev.alicon.mushroomyorkie.block.DoghouseBlock;
 import dev.alicon.mushroomyorkie.block.ModBlocks;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.util.Mth;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -52,6 +55,15 @@ final class WaterRestScenarios {
 				yorkie.setOnGround(false);
 				yorkie.setSleeping(true);
 				helper.assertTrue(yorkie.isMushroomSleeping(), "Doghouse visual bed anchor was not accepted over its solid floor");
+				for (Direction facing : Direction.Plane.HORIZONTAL) {
+					helper.getLevel().setBlockAndUpdate(below, ModBlocks.DOGHOUSE.defaultBlockState().setValue(DoghouseBlock.FACING, facing));
+					yorkie.setYRot(facing.getOpposite().toYRot());
+					yorkie.setDeltaMovement(0.0D, -0.08D, 0.0D);
+					yorkie.setSleeping(true);
+					helper.assertTrue(Mth.wrapDegrees(yorkie.getYRot() - facing.toYRot()) == 0.0F, "Sleeper faced away from the doghouse doorway");
+					helper.assertTrue(yorkie.getDefaultGravity() == 0.0D && yorkie.getDeltaMovement().y == 0.0D,
+							"Doghouse gravity or a pending downward movement could make the sleeper bob");
+				}
 				yorkie.fallDistance = 12.0F;
 				yorkie.setSleeping(true);
 				helper.assertTrue(yorkie.fallDistance == 0.0F, "Supported doghouse sleep accumulated a lethal synthetic fall");
@@ -63,6 +75,7 @@ final class WaterRestScenarios {
 				yorkie.setSleeping(true);
 				yorkie.setOnGround(false);
 				helper.getLevel().setBlockAndUpdate(below.below(), Blocks.WATER.defaultBlockState());
+				helper.assertTrue(yorkie.getDefaultGravity() > 0.0D, "Removing doghouse support failed to restore gravity");
 				yorkie.setSleeping(true);
 				helper.assertTrue(!yorkie.isMushroomSleeping(), "Unsupported doghouse over water allowed sleep");
 				helper.getLevel().setBlockAndUpdate(below.below(), Blocks.STONE.defaultBlockState());

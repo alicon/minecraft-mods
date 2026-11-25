@@ -1,6 +1,11 @@
 package dev.alicon.mushroomyorkie.entity;
 
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.AgeableMob;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
@@ -21,12 +26,55 @@ import net.minecraft.world.level.Level;
 
 /** Small woodland squirrel whose first instinct is always to find a nearby tree. */
 public final class SquirrelEntity extends net.minecraft.world.entity.animal.Animal {
+	private static final EntityDataAccessor<Byte> TREE_POSE = SynchedEntityData.defineId(SquirrelEntity.class, EntityDataSerializers.BYTE);
+	// Degrees above horizontal; the client approaches a new pose over successive ticks.
+	private static final float TREE_PITCH_DEGREES = 78.0F;
 	private boolean foundTree;
 	private boolean treeClimbing;
+	private float previousTreePitch;
+	private float treePitch;
 
 	/** Creates a squirrel in the supplied world. */
 	public SquirrelEntity(EntityType<? extends SquirrelEntity> entityType, Level level) {
 		super(entityType, level);
+	}
+
+	@Override
+	protected void defineSynchedData(SynchedEntityData.Builder builder) {
+		super.defineSynchedData(builder);
+		builder.define(TREE_POSE, (byte) 0);
+	}
+
+	@Override
+	public void tick() {
+		super.tick();
+		if (!(this.level() instanceof ServerLevel)) {
+			this.previousTreePitch = this.treePitch;
+			float target = this.treePoseDirection() * TREE_PITCH_DEGREES;
+			this.treePitch = Mth.approach(this.treePitch, target, 19.5F);
+		}
+	}
+
+	/** Interpolated upward or downward trunk-cling pitch for the model, in degrees. */
+	public float treePosePitch(float partialTick) {
+		return Mth.lerp(Mth.clamp(partialTick, 0.0F, 1.0F), this.previousTreePitch, this.treePitch);
+	}
+
+	int treePoseDirection() {
+		return this.entityData.get(TREE_POSE);
+	}
+
+	void clearTreePose() {
+		this.entityData.set(TREE_POSE, (byte) 0);
+	}
+
+	void poseAgainstTrunk(BlockPos trunk, boolean descending) {
+		this.entityData.set(TREE_POSE, (byte) (descending ? -1 : 1));
+		double x = trunk.getX() + 0.5D - this.getX();
+		double z = trunk.getZ() + 0.5D - this.getZ();
+		float yaw = (float) Math.toDegrees(Mth.atan2(-x, z));
+		this.setYRot(yaw);
+		this.setYBodyRot(yaw);
 	}
 
 	/** Attributes tuned so a squirrel can stay just ahead of Mushroom during a playful chase. */
@@ -65,6 +113,9 @@ public final class SquirrelEntity extends net.minecraft.world.entity.animal.Anim
 
 	void setTreeClimbing(boolean treeClimbing) {
 		this.treeClimbing = treeClimbing;
+		if (!treeClimbing) {
+			this.clearTreePose();
+		}
 	}
 
 	@Override

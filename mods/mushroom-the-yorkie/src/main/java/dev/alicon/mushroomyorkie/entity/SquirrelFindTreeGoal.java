@@ -206,6 +206,7 @@ final class SquirrelFindTreeGoal extends Goal {
 		}
 
 		this.squirrel.setTreeClimbing(true);
+		this.squirrel.poseAgainstTrunk(this.climbPos, false);
 		if (SquirrelTreeClimbPolicy.reachedHeight(this.squirrel.getY(), this.climbPos.getY())) {
 			this.squirrel.getNavigation().stop();
 			this.squirrel.setFoundTree(true);

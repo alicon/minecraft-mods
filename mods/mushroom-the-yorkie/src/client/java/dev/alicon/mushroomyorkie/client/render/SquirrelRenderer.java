@@ -22,11 +22,18 @@ public final class SquirrelRenderer extends MobRenderer<SquirrelEntity, Squirrel
 	}
 
 	@Override
+	public void extractRenderState(SquirrelEntity entity, SquirrelRenderState state, float partialTick) {
+		super.extractRenderState(entity, state, partialTick);
+		state.treePitch = entity.treePosePitch(partialTick);
+	}
+
+	@Override
 	public Identifier getTextureLocation(SquirrelRenderState state) {
 		return TEXTURE;
 	}
 
-	/** Vanilla living render state is sufficient for squirrel locomotion animation. */
+	/** Client pose state for ground and trunk locomotion. */
 	public static final class SquirrelRenderState extends LivingEntityRenderState {
+		float treePitch;
 	}
 }

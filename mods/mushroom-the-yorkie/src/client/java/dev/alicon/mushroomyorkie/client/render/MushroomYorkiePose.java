@@ -159,6 +159,8 @@ final class MushroomYorkiePose {
 		}
 
 		if (sleeping) {
+			this.leftEar.zRot = 0.28F;
+			this.rightEar.zRot = -0.28F;
 			this.leftEye.visible = false;
 			this.rightEye.visible = false;
 			this.body.y = 21.4F;
