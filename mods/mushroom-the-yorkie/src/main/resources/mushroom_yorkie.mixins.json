@@ -1,0 +1,11 @@
+{
+	"required": true,
+	"package": "dev.alicon.mushroomyorkie.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"mixins": [
+		"CreativeToyPickupMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

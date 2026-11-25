@@ -85,14 +85,16 @@ final class FetchModeChangeScenarios {
 				item -> !item.isRemoved() && item.getItem().is(ModItems.YORKIE_BALL));
 		helper.assertTrue(thrown.size() == 1, "Throw did not produce one copy");
 		ItemEntity toy = thrown.getFirst();
+		toy.playerTouch(owner);
+		helper.assertTrue(!toy.isRemoved(), "Player collected a Creative toy immediately as it was thrown");
 		for (int tick = 0; tick < 40; tick++) {
 			toy.tick();
 		}
 		owner.setGameMode(GameType.SURVIVAL);
 		toy.setPos(owner.getX(), owner.getY(), owner.getZ());
 		toy.playerTouch(owner);
-		helper.assertTrue(!toy.isRemoved() && owner.getInventory().countItem(ModItems.YORKIE_BALL) == 1,
-				"Free creative copy became a second inventory item after its normal pickup delay");
+		helper.assertTrue(toy.isRemoved() && owner.getInventory().countItem(ModItems.YORKIE_BALL) == 1,
+				"Collecting the temporary Creative toy did not leave exactly one inventory original");
 		helper.succeed();
 	}
 

@@ -18,6 +18,29 @@ At a shallow bank, a breathing Mushroom can resume following a nearby owner
 standing on dry block support even after bobbing inside his usual two-block
 follow range. He uses normal pathfinding and collision to finish getting out.
 
+## Walks, nighttime defense, and squirrels
+
+After breaking off a squirrel chase, Mushroom takes up to 12 seconds to walk
+back using a ground path. Ordinary pet recovery is available if the return route
+stays blocked. While he is on a slack lead held by his owner, he can pause to
+relieve himself outdoors or wander a few blocks toward a scent and look back
+with a bark. About one in twelve of his occasional walk decisions is a brief
+stubborn stop. Continuing to walk brings him along.
+
+Nearby monsters wake a following Mushroom within 12 blocks, even through a
+wall. He barks, looks toward the threat, and tries to approach. A bite needs a
+clear line of sight and close range. An explicit sit order takes precedence.
+
+After a short perch, squirrels can climb around the leaf edge onto a crown.
+They hop to nearby crowns across clear gaps of up to four blocks or climb down
+and cross the ground when the next tree is farther away. Squirrels can pick up
+dropped vanilla saplings and plant them one at a time on open dirt when Minecraft's
+mob griefing rule permits it. These saplings grow through normal Minecraft rules.
+
+Walking over a temporary Creative fetch toy collects it once it clears the
+thrower. The original stays in the player's inventory. Physical Survival throws
+use the normal item pickup delay.
+
 ## Gameplay Configuration
 
 `mushroom_yorkie.json` is generated in the Fabric config directory. Values that change gameplay are centralized in `MushroomYorkieConfig` and exposed through small value objects so entity code reads tuning, not raw JSON fields.

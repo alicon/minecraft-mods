@@ -1,7 +1,6 @@
 package dev.alicon.mushroomyorkie.entity;
 
 import java.util.EnumSet;
-import java.util.List;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -11,9 +10,12 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 final class HesitantHostileMobGoal extends Goal {
+	// Poll nearby hostiles at most twice per second while there is no active threat.
+	private static final int THREAT_SEARCH_INTERVAL_TICKS = 10;
+	private static final double THREAT_TRACK_DISTANCE_SQR = 16.0D * 16.0D;
 	private final MushroomYorkieEntity yorkie;
 	private Monster target;
-	private int nextSearchTick;
+	private long nextSearchTick;
 	private int retreatTicks;
 	private int nextMoveTick;
 
@@ -24,10 +26,11 @@ final class HesitantHostileMobGoal extends Goal {
 
 	@Override
 	public boolean canUse() {
-		if (!(this.yorkie.level() instanceof ServerLevel level) || !this.canFight(level)) {
+		if (!(this.yorkie.level() instanceof ServerLevel level) || !this.canFight(level) || level.getGameTime() < this.nextSearchTick) {
 			return false;
 		}
 
+		this.nextSearchTick = level.getGameTime() + THREAT_SEARCH_INTERVAL_TICKS;
 		this.target = this.findTarget(level);
 		return this.target != null;
 	}
@@ -38,7 +41,8 @@ final class HesitantHostileMobGoal extends Goal {
 				&& this.canFight(level)
 				&& this.target != null
 				&& this.target.isAlive()
-				&& this.yorkie.distanceToSqr(this.target) < 256.0D;
+				&& this.yorkie.canAttack(this.target)
+				&& this.yorkie.distanceToSqr(this.target) < THREAT_TRACK_DISTANCE_SQR;
 	}
 
 	@Override
@@ -48,6 +52,9 @@ final class HesitantHostileMobGoal extends Goal {
 
 	@Override
 	public void start() {
+		this.yorkie.setSleeping(false);
+		this.nextMoveTick = 0;
+		MushroomYorkieSounds.bark(this.yorkie);
 		MushroomBehaviorDebugger.debug(this.yorkie, "hostile_start", "hostile: noticed " + this.targetName(), true);
 	}
 
@@ -84,7 +91,7 @@ final class HesitantHostileMobGoal extends Goal {
 			MushroomYorkieSounds.bark(this.yorkie);
 		}
 
-		if (this.yorkie.distanceToSqr(this.target) <= 2.2D) {
+		if (this.yorkie.distanceToSqr(this.target) <= 2.2D && this.yorkie.getSensing().hasLineOfSight(this.target)) {
 			this.yorkie.swing(InteractionHand.MAIN_HAND);
 			MushroomHostileCombat.attack(this.yorkie, level, this.target);
 			MushroomBehaviorDebugger.debug(this.yorkie, "hostile_attack", "hostile: nipped " + this.targetName(), true);
@@ -96,24 +103,17 @@ final class HesitantHostileMobGoal extends Goal {
 	private boolean canFight(ServerLevel level) {
 		return this.yorkie.isTame()
 				&& !this.yorkie.isOrderedToSit()
-				&& !this.yorkie.isMushroomSleeping()
 				&& !this.yorkie.isNoGravity()
 				&& !MushroomNightBehavior.shouldAskToGoOutside(this.yorkie, level);
 	}
 
 	private Monster findTarget(ServerLevel level) {
-		if (this.nextSearchTick-- > 0 && this.target != null && this.target.isAlive()) {
-			return this.target;
-		}
-
-		this.nextSearchTick = 30;
-		Player player = this.yorkie.trust.playerToStayNear(this.yorkie, level);
-		Vec3 center = player == null ? this.yorkie.position() : player.position();
-		AABB area = new AABB(center, center).inflate(MushroomYorkieEntity.HOSTILE_MOB_SEARCH_RADIUS, 5.0D, MushroomYorkieEntity.HOSTILE_MOB_SEARCH_RADIUS);
-		List<Monster> monsters = level.getEntitiesOfClass(Monster.class, area, monster -> monster.isAlive() && this.yorkie.canAttack(monster));
+		double radius = MushroomYorkieEntity.HOSTILE_MOB_SEARCH_RADIUS;
+		AABB area = new AABB(this.yorkie.position(), this.yorkie.position()).inflate(radius, 5.0D, radius);
 		Monster closest = null;
-		double closestDistance = Double.MAX_VALUE;
-		for (Monster monster : monsters) {
+		double closestDistance = radius * radius;
+		// Wake on sound through a wall. Normal pathfinding and line of sight govern the approach and bite.
+		for (Monster monster : level.getEntitiesOfClass(Monster.class, area, mob -> mob.isAlive() && this.yorkie.canAttack(mob))) {
 			double distance = this.yorkie.distanceToSqr(monster);
 			if (distance < closestDistance) {
 				closest = monster;
