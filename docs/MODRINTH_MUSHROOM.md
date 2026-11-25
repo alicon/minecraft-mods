@@ -14,10 +14,11 @@ Mushroom the Yorkie adds one small, loyal dog companion to your Minecraft world.
 - Mushroom has a simple food bar shown during owner interactions; it drains while following and much more slowly while sitting.
 - If a loaded Mushroom is lost from his owner for a full Minecraft day, the next successful sleep can bring him back to the player's bed.
 - Craft a dog bed from wool and dye, or give Mushroom a doghouse for sheltered rest.
-- Woodland squirrels spawn naturally and look for trees to climb. Mushroom can chase them and come back afterward; squirrels also have their own spawn egg.
+- Woodland squirrels climb trees, hop between nearby crowns, and plant dropped vanilla saplings when mob griefing is enabled. They have their own spawn egg.
+- Mushroom can chase squirrels and walk back to you afterward. On a lead he may stop for a bathroom break, sniff in a different direction, or briefly dig his heels in.
 - Craft wool-and-dye toys, including a ball and chew toy you can right-click throw for Mushroom to fetch. Dropped toys and vanilla bones also work, including safe open-water fetches.
 - Mushroom barks when he needs to go outside after being indoors too long, then only resets that potty need once per Minecraft day.
-- At night indoors in a natural day/night dimension, Mushroom curls up to sleep with closed eyes; he stays awake in the Nether.
+- At night indoors in a natural day/night dimension, Mushroom curls up to sleep. A nearby monster can wake him, even through a wall.
 - A following Mushroom travels through dimension-changing portals with his owner; tell him to sit if he should stay behind.
 - Double-click a sleeping Mushroom to wake him briefly before he settles back down.
 - Mushroom can bark at and chase peaceful mobs, but treats call him off and teach him to leave nearby passive animals alone.
@@ -45,9 +46,9 @@ Mushroom the Yorkie must be installed on every participating client and on the s
 
 ### Required
 
-- Fabric Loader
-- Fabric API
 - Minecraft Java Edition 1.21.11 or 1.21.1
+- Fabric Loader 0.19.3 or newer on 1.21.11, or 0.16.14 or newer on 1.21.1
+- Fabric API for your Minecraft version
 
 ## Why Mushroom?
 

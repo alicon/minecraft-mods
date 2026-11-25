@@ -20,9 +20,9 @@ NARwhal Together must be installed on every participating client and on the serv
 
 ### Required
 
-- Fabric Loader
-- Fabric API
 - Minecraft Java Edition 1.21.11 or 1.21.1
+- Fabric Loader 0.19.3 or newer on 1.21.11, or 0.16.14 or newer on 1.21.1
+- Fabric API for your Minecraft version
 
 ### Optional
 

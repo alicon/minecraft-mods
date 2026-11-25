@@ -4,20 +4,13 @@ This repo optimizes for simple, maintainable Fabric mods for family Minecraft pl
 
 ## Supported Platform
 
-- Minecraft Java Edition: target the version in `gradle.properties`
-- Loader: Fabric
-- Java: target the version in `gradle.properties`
-- Required dependency: Fabric API
+| Minecraft Java | Fabric Loader minimum | Supported projects |
+| --- | --- | --- |
+| 1.21.11 (default) | 0.19.3 | NARwhal Together, Mushroom the Yorkie, Cops and Robbers, Playtest Bridge |
+| 1.21.1 | 0.16.14 | NARwhal Together, Mushroom the Yorkie |
 
-By default, the workspace builds the version in `gradle.properties`. Individual mods may opt into a
-small version matrix with version-specific source roots when the compatibility value is worth the
-extra maintenance.
-
-Current Minecraft target support:
-
-- NARwhal Together: Minecraft Java Edition `1.21.11` and `1.21.1`
-- Mushroom the Yorkie: Minecraft Java Edition `1.21.11` and `1.21.1`
-- Cops and Robbers: Minecraft Java Edition `1.21.11`
+All builds target Java 21 and require Fabric API for their Minecraft version.
+Minecraft, Fabric Loader, and Fabric API build versions are pinned in `gradle.properties`.
 
 ## Non-Goals For Now
 
@@ -52,10 +45,13 @@ The active version is selected from `gradle.properties`, or per command with:
 ./gradlew :mushroom-the-yorkie:check -Ptarget_minecraft_version=1.21.1
 ```
 
-A mod that uses versioned sources must declare its supported version matrix in its `build.gradle`.
-The shared Gradle convention wires the matching Minecraft, Fabric Loader, Fabric API, metadata, and
-source roots from that matrix. Versioned mods publish distinct Modrinth version numbers such as
-`0.1.0+mc1.21.1` so separate jars do not collide.
+Mods with multiple targets declare `supported_minecraft_versions` in their `build.gradle`.
+The shared Gradle convention combines common sources with the selected target's sources and
+uses the matching Minecraft, Fabric Loader, Fabric API, and metadata. Mods without a target
+matrix build for the default Minecraft version. Use the release catalog to check the actual
+target of each artifact, including when a legacy build also configures modern-only projects.
+Multi-target Modrinth releases have a suffix such as `0.1.5+mc1.21.1`. The local jar filename has
+the mod version alone, so choose it from the matching Minecraft build directory.
 
 ## Compatibility Rules
 

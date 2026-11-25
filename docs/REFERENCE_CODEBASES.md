@@ -4,7 +4,7 @@ These projects are useful references for habits and patterns, not templates to c
 
 ## Fabric API
 
-Source: https://github.com/FabricMC/fabric
+Source: https://github.com/FabricMC/fabric-api
 
 Borrow:
 
