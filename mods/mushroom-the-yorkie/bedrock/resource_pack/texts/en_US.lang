@@ -10,3 +10,7 @@ tile.mushroom_yorkie:dog_food_bowl.name=Dog Food Bowl
 tile.mushroom_yorkie:dog_water_bowl.name=Dog Water Bowl
 tile.mushroom_yorkie:dog_bed.name=Dog Bed
 tile.mushroom_yorkie:doghouse.name=Mushroom's Doghouse
+mushroom.care.ate=Mushroom finished his food.
+mushroom.care.drank=Mushroom had a drink.
+mushroom.care.alert=Mushroom heard a monster nearby!
+mushroom.owner.already_adopted=You already have a Mushroom.

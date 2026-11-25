@@ -107,10 +107,13 @@ def build(mod, output_dir):
     shared_assets = read_json(asset_index) if asset_index.is_file() else {}
     if shared_assets.keys() - PACK_TYPES.keys():
         raise ValueError("Shared assets must target a behavior or resource pack")
-    packed = {
-        f"{mod.name}-{role}.mcpack": archive(pack_files(mod, kind, shared_assets.get(kind, {})))
-        for kind, role in PACK_TYPES.items()
-    }
+    packed = {}
+    for kind, role in PACK_TYPES.items():
+        files = pack_files(mod, kind, shared_assets.get(kind, {}))
+        for module in manifests[kind]["modules"]:
+            if module["type"] == "script" and pack_path(module["entry"]).as_posix() not in files:
+                raise ValueError(f"{kind} script entry {module['entry']} is missing")
+        packed[f"{mod.name}-{role}.mcpack"] = archive(files)
     destination = output_dir / f"{mod.name}-bedrock-{addon_version}.mcaddon"
     output_dir.mkdir(parents=True, exist_ok=True)
     destination.write_bytes(archive(packed))

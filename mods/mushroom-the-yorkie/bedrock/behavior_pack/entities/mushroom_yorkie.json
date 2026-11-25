@@ -10,6 +10,23 @@
           "type": "bool",
           "default": false,
           "client_sync": true
+        },
+        "mushroom_yorkie:home_goal": {
+          "type": "enum",
+          "values": [
+            "idle",
+            "food",
+            "water",
+            "house",
+            "bed",
+            "sleep"
+          ],
+          "default": "idle",
+          "client_sync": true
+        },
+        "mushroom_yorkie:ordered_sit": {
+          "type": "bool",
+          "default": false
         }
       }
     },
@@ -28,15 +45,18 @@
       },
       "mushroom_yorkie:tamed": {
         "minecraft:is_tamed": {},
-        "minecraft:sittable": {},
+        "minecraft:sittable": {
+          "sit_event": {
+            "event": "mushroom_yorkie:ordered_sit",
+            "target": "self"
+          },
+          "stand_event": {
+            "event": "mushroom_yorkie:ordered_stand",
+            "target": "self"
+          }
+        },
         "minecraft:behavior.stay_while_sitting": {
           "priority": 1
-        },
-        "minecraft:behavior.follow_owner": {
-          "priority": 2,
-          "speed_multiplier": 1.15,
-          "start_distance": 4,
-          "stop_distance": 2
         },
         "minecraft:interact": {
           "interactions": [
@@ -108,6 +128,78 @@
           "can_be_stolen": false,
           "unleash_on_removal": true
         }
+      },
+      "mushroom_yorkie:awake": {
+        "minecraft:behavior.follow_owner": {
+          "priority": 2,
+          "speed_multiplier": 1.15,
+          "start_distance": 4,
+          "stop_distance": 2
+        },
+        "minecraft:behavior.random_stroll": {
+          "priority": 5,
+          "speed_multiplier": 0.75
+        }
+      },
+      "mushroom_yorkie:seek_food": {
+        "minecraft:behavior.move_to_block": {
+          "priority": 1,
+          "tick_interval": 8,
+          "start_chance": 1,
+          "speed_multiplier": 1.05,
+          "search_range": 8,
+          "search_height": 3,
+          "target_blocks": [
+            "mushroom_yorkie:dog_food_bowl"
+          ],
+          "goal_radius": 0.45,
+          "stay_duration": 25
+        }
+      },
+      "mushroom_yorkie:seek_water": {
+        "minecraft:behavior.move_to_block": {
+          "priority": 1,
+          "tick_interval": 8,
+          "start_chance": 1,
+          "speed_multiplier": 1.05,
+          "search_range": 8,
+          "search_height": 3,
+          "target_blocks": [
+            "mushroom_yorkie:dog_water_bowl"
+          ],
+          "goal_radius": 0.45,
+          "stay_duration": 25
+        }
+      },
+      "mushroom_yorkie:seek_house": {
+        "minecraft:behavior.move_to_block": {
+          "priority": 1,
+          "tick_interval": 8,
+          "start_chance": 1,
+          "speed_multiplier": 1.05,
+          "search_range": 8,
+          "search_height": 3,
+          "target_blocks": [
+            "mushroom_yorkie:doghouse"
+          ],
+          "goal_radius": 0.45,
+          "stay_duration": 25
+        }
+      },
+      "mushroom_yorkie:seek_bed": {
+        "minecraft:behavior.move_to_block": {
+          "priority": 1,
+          "tick_interval": 8,
+          "start_chance": 1,
+          "speed_multiplier": 1.05,
+          "search_range": 8,
+          "search_height": 3,
+          "target_blocks": [
+            "mushroom_yorkie:dog_bed"
+          ],
+          "goal_radius": 0.45,
+          "stay_duration": 25
+        }
       }
     },
     "components": {
@@ -140,23 +232,74 @@
       "minecraft:behavior.float": {
         "priority": 0
       },
-      "minecraft:behavior.random_stroll": {
-        "priority": 5,
-        "speed_multiplier": 0.75
-      },
       "minecraft:behavior.look_at_player": {
         "priority": 6,
         "look_distance": 6
       },
       "minecraft:behavior.random_look_around": {
         "priority": 7
+      },
+      "minecraft:environment_sensor": {
+        "triggers": [
+          {
+            "filters": {
+              "all_of": [
+                {
+                  "test": "enum_property",
+                  "value": "sleep",
+                  "domain": "mushroom_yorkie:home_goal",
+                  "operator": "!="
+                },
+                {
+                  "test": "has_component",
+                  "value": "minecraft:behavior.random_stroll",
+                  "operator": "!="
+                }
+              ]
+            },
+            "event": "mushroom_yorkie:restore_awake"
+          },
+          {
+            "filters": {
+              "all_of": [
+                {
+                  "test": "is_sitting",
+                  "value": true
+                },
+                {
+                  "test": "bool_property",
+                  "value": false,
+                  "domain": "mushroom_yorkie:ordered_sit"
+                }
+              ]
+            },
+            "event": "mushroom_yorkie:ordered_sit"
+          },
+          {
+            "filters": {
+              "all_of": [
+                {
+                  "test": "is_sitting",
+                  "value": false
+                },
+                {
+                  "test": "bool_property",
+                  "value": true,
+                  "domain": "mushroom_yorkie:ordered_sit"
+                }
+              ]
+            },
+            "event": "mushroom_yorkie:ordered_stand"
+          }
+        ]
       }
     },
     "events": {
       "minecraft:entity_spawned": {
         "add": {
           "component_groups": [
-            "mushroom_yorkie:untamed"
+            "mushroom_yorkie:untamed",
+            "mushroom_yorkie:awake"
           ]
         }
       },
@@ -190,6 +333,123 @@
         },
         "set_property": {
           "mushroom_yorkie:wearing_harness": false
+        }
+      },
+      "mushroom_yorkie:ordered_sit": {
+        "set_property": {
+          "mushroom_yorkie:ordered_sit": true
+        }
+      },
+      "mushroom_yorkie:ordered_stand": {
+        "set_property": {
+          "mushroom_yorkie:ordered_sit": false
+        }
+      },
+      "mushroom_yorkie:restore_awake": {
+        "add": {
+          "component_groups": [
+            "mushroom_yorkie:awake"
+          ]
+        }
+      },
+      "mushroom_yorkie:home_food": {
+        "remove": {
+          "component_groups": [
+            "mushroom_yorkie:seek_water",
+            "mushroom_yorkie:seek_house",
+            "mushroom_yorkie:seek_bed"
+          ]
+        },
+        "set_property": {
+          "mushroom_yorkie:home_goal": "food"
+        },
+        "add": {
+          "component_groups": [
+            "mushroom_yorkie:seek_food"
+          ]
+        }
+      },
+      "mushroom_yorkie:home_water": {
+        "remove": {
+          "component_groups": [
+            "mushroom_yorkie:seek_food",
+            "mushroom_yorkie:seek_house",
+            "mushroom_yorkie:seek_bed"
+          ]
+        },
+        "set_property": {
+          "mushroom_yorkie:home_goal": "water"
+        },
+        "add": {
+          "component_groups": [
+            "mushroom_yorkie:seek_water"
+          ]
+        }
+      },
+      "mushroom_yorkie:home_house": {
+        "remove": {
+          "component_groups": [
+            "mushroom_yorkie:seek_food",
+            "mushroom_yorkie:seek_water",
+            "mushroom_yorkie:seek_bed"
+          ]
+        },
+        "set_property": {
+          "mushroom_yorkie:home_goal": "house"
+        },
+        "add": {
+          "component_groups": [
+            "mushroom_yorkie:seek_house"
+          ]
+        }
+      },
+      "mushroom_yorkie:home_bed": {
+        "remove": {
+          "component_groups": [
+            "mushroom_yorkie:seek_food",
+            "mushroom_yorkie:seek_water",
+            "mushroom_yorkie:seek_house"
+          ]
+        },
+        "set_property": {
+          "mushroom_yorkie:home_goal": "bed"
+        },
+        "add": {
+          "component_groups": [
+            "mushroom_yorkie:seek_bed"
+          ]
+        }
+      },
+      "mushroom_yorkie:home_idle": {
+        "remove": {
+          "component_groups": [
+            "mushroom_yorkie:seek_food",
+            "mushroom_yorkie:seek_water",
+            "mushroom_yorkie:seek_house",
+            "mushroom_yorkie:seek_bed"
+          ]
+        },
+        "set_property": {
+          "mushroom_yorkie:home_goal": "idle"
+        },
+        "add": {
+          "component_groups": [
+            "mushroom_yorkie:awake"
+          ]
+        }
+      },
+      "mushroom_yorkie:home_sleep": {
+        "remove": {
+          "component_groups": [
+            "mushroom_yorkie:seek_food",
+            "mushroom_yorkie:seek_water",
+            "mushroom_yorkie:seek_house",
+            "mushroom_yorkie:seek_bed",
+            "mushroom_yorkie:awake"
+          ]
+        },
+        "set_property": {
+          "mushroom_yorkie:home_goal": "sleep"
         }
       }
     }

@@ -20,19 +20,25 @@
         "look": "animation.mushroom_yorkie.look",
         "idle": "animation.mushroom_yorkie.idle",
         "walk": "animation.mushroom_yorkie.walk",
-        "sit": "animation.mushroom_yorkie.sit"
+        "sit": "animation.mushroom_yorkie.sit",
+        "sleep": "animation.mushroom_yorkie.sleep"
       },
       "scripts": {
         "animate": [
-          "look",
           {
-            "idle": "!query.is_sitting"
+            "look": "!(query.property('mushroom_yorkie:home_goal') == 'sleep')"
           },
           {
-            "walk": "!query.is_sitting && query.modified_move_speed > 0.01"
+            "idle": "!(query.property('mushroom_yorkie:home_goal') == 'sleep') && !query.is_sitting"
           },
           {
-            "sit": "query.is_sitting"
+            "walk": "!(query.property('mushroom_yorkie:home_goal') == 'sleep') && !query.is_sitting && query.modified_move_speed > 0.01"
+          },
+          {
+            "sit": "!(query.property('mushroom_yorkie:home_goal') == 'sleep') && query.is_sitting"
+          },
+          {
+            "sleep": "query.property('mushroom_yorkie:home_goal') == 'sleep'"
           }
         ]
       },

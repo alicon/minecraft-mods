@@ -1,12 +1,25 @@
-import { BlockTypes, BlockVolume, ItemTypes, system, world } from "@minecraft/server";
+import { BlockPermutation, BlockTypes, BlockVolume, ItemTypes, system, world } from "@minecraft/server";
 
 const YORKIE = "mushroom_yorkie:mushroom_yorkie";
 const ENTITY_ID = "mushroom_smoke:original_entity";
+const CARE_TESTED = "mushroom_smoke:care_tested";
 const AREA = "mushroom_smoke";
 const MIN = { x: 0, y: 195, z: 0 };
 const MAX = { x: 15, y: 205, z: 15 };
 const CENTER = { x: 8.5, y: 201, z: 8.5 };
 const FURNITURE = ["dog_bowl", "dog_food_bowl", "dog_water_bowl", "dog_bed", "doghouse"];
+const NAMESPACE = "mushroom_yorkie:";
+const FOOD = { x: 5, y: 201, z: 8 };
+
+async function waitFor(condition, description, ticks = 180) {
+  for (let elapsed = 0; elapsed < ticks; elapsed += 5) {
+    if (condition()) {
+      return;
+    }
+    await system.waitTicks(5);
+  }
+  throw new Error("Timed out waiting for " + description);
+}
 
 async function testHarness(puppy) {
   if (!ItemTypes.get("mushroom_yorkie:yorkie_harness")) {
@@ -37,8 +50,82 @@ function testFurniture(dimension) {
     if (dimension.getBlock(location)?.typeId !== identifier) {
       throw new Error("Could not place " + identifier);
     }
+    dimension.setBlockType(location, "minecraft:air");
   }
   console.warn("MUSHROOM_TEST_FURNITURE");
+}
+
+async function testDomesticCare(puppy, dimension) {
+  if (puppy.getProperty(NAMESPACE + "home_goal") === undefined) {
+    return;
+  }
+  puppy.teleport(CENTER);
+  world.setTimeOfDay(1000);
+  puppy.triggerEvent(NAMESPACE + "on_tame");
+  const water = { x: 5, y: 201, z: 9 };
+  dimension.setBlockType(FOOD, NAMESPACE + "dog_food_bowl");
+  dimension.setBlockType(water, NAMESPACE + "dog_water_bowl");
+  await waitFor(() => dimension.getBlock(FOOD)?.typeId === NAMESPACE + "dog_bowl", "Mushroom to reach and eat from the food bowl");
+  await waitFor(() => dimension.getBlock(water)?.typeId === NAMESPACE + "dog_bowl", "Mushroom to drink from the water bowl");
+  const day = world.getDay();
+  dimension.setBlockType(FOOD, NAMESPACE + "dog_food_bowl");
+  await assertBowlStillFull(puppy, dimension);
+  console.warn("MUSHROOM_TEST_DAILY_BOWLS");
+
+  const house = { x: 7, y: 201, z: 8 };
+  const bed = { x: 6, y: 201, z: 9 };
+  dimension.setBlockPermutation(house, BlockPermutation.resolve(NAMESPACE + "doghouse", {
+    "minecraft:cardinal_direction": "south",
+  }));
+  dimension.setBlockType(bed, NAMESPACE + "dog_bed");
+  world.setTimeOfDay(14500);
+  await waitFor(() => puppy.getProperty(NAMESPACE + "home_goal") === "sleep", "Mushroom to curl up in his doghouse", 180)
+    .catch((error) => {
+      const floor = dimension.getBlockBelow({ ...house, y: house.y - 1 }, { maxDistance: 1 });
+      throw new Error(String(error) + " " + JSON.stringify({
+        goal: puppy.getProperty(NAMESPACE + "home_goal"),
+        location: puppy.location,
+        ground: puppy.isOnGround,
+        time: world.getTimeOfDay(),
+        dimension: puppy.dimension.id,
+        facing: dimension.getBlock(house)?.permutation.getState("minecraft:cardinal_direction"),
+        floor: floor?.typeId,
+      }));
+    });
+  if (Math.floor(puppy.location.x) !== house.x || Math.floor(puppy.location.z) !== house.z
+    || Math.abs(puppy.location.y - (house.y + 2 / 16)) > 0.04) {
+    throw new Error("Mushroom slept off the doghouse mattress: " + JSON.stringify(puppy.location));
+  }
+  await system.waitTicks(25);
+  if (puppy.getProperty(NAMESPACE + "home_goal") !== "sleep") {
+    throw new Error("Mushroom did not stay asleep after settling");
+  }
+
+  const entrance = { ...house, z: house.z + 1 };
+  dimension.setBlockType(entrance, "minecraft:stone");
+  await waitFor(() => puppy.getProperty(NAMESPACE + "home_goal") === "sleep"
+    && Math.floor(puppy.location.x) === bed.x && Math.floor(puppy.location.z) === bed.z,
+  "Mushroom to switch to his bed when the doghouse entrance is obstructed");
+
+  const monster = dimension.spawnEntity("minecraft:zombie", { x: 10.5, y: 201, z: 8.5 });
+  await waitFor(() => puppy.getProperty(NAMESPACE + "home_goal") !== "sleep", "Mushroom to wake when a monster approaches");
+  monster.remove();
+  await waitFor(() => puppy.getProperty(NAMESPACE + "home_goal") === "sleep", "Mushroom to settle after the threat is gone");
+  console.warn("MUSHROOM_TEST_NIGHT_SAFETY");
+
+  world.setAbsoluteTime(day * 24000 + 1000);
+  await waitFor(() => puppy.getProperty(NAMESPACE + "home_goal") !== "sleep", "Mushroom to wake at dawn");
+  console.warn("MUSHROOM_TEST_NIGHT_REST");
+  await assertBowlStillFull(puppy, dimension);
+  world.setDynamicProperty(CARE_TESTED, day);
+}
+
+async function assertBowlStillFull(puppy, dimension) {
+  puppy.teleport({ x: FOOD.x + 0.5, y: FOOD.y, z: FOOD.z + 0.5 });
+  await system.waitTicks(35);
+  if (dimension.getBlock(FOOD)?.typeId !== NAMESPACE + "dog_food_bowl") {
+    throw new Error("Mushroom took a second meal on the same day");
+  }
 }
 
 world.afterEvents.worldLoad.subscribe(async () => {
@@ -59,11 +146,20 @@ world.afterEvents.worldLoad.subscribe(async () => {
     const originalId = world.getDynamicProperty(ENTITY_ID);
     if (originalId !== undefined) {
       const pups = dimension.getEntities({ type: YORKIE, location: CENTER, maxDistance: 8 });
-      if (pups.length !== 1 || pups[0].id !== originalId || !pups[0].getComponent("minecraft:tameable")) {
-        throw new Error("Expected the same untamed Yorkie after reopening");
+      const careDay = world.getDynamicProperty(CARE_TESTED);
+      const expectedComponent = careDay === undefined ? "minecraft:tameable" : "minecraft:is_tamed";
+      if (pups.length !== 1 || pups[0].id !== originalId || !pups[0].getComponent(expectedComponent)) {
+        throw new Error("Expected the same Yorkie and taming state after reopening");
+      }
+      if (typeof careDay === "number") {
+        world.setAbsoluteTime(careDay * 24000 + 1000);
+        await assertBowlStillFull(pups[0], dimension);
+        console.warn("MUSHROOM_TEST_CARE_PERSISTED");
+        return;
       }
       await testHarness(pups[0]);
       testFurniture(dimension);
+      await testDomesticCare(pups[0], dimension);
       console.warn("MUSHROOM_TEST_REOPENED");
       return;
     }
@@ -78,6 +174,6 @@ world.afterEvents.worldLoad.subscribe(async () => {
     world.setDynamicProperty(ENTITY_ID, puppy.id);
     console.warn("MUSHROOM_TEST_SPAWNED");
   } catch (error) {
-    console.warn("MUSHROOM_TEST_FAIL " + (error.stack ?? String(error)));
+    console.warn("MUSHROOM_TEST_FAIL " + String(error) + "\n" + (error.stack ?? ""));
   }
 });

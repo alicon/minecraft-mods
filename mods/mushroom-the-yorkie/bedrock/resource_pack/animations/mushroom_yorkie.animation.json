@@ -131,6 +131,70 @@
           ]
         }
       }
+    },
+    "animation.mushroom_yorkie.sleep": {
+      "loop": true,
+      "bones": {
+        "body": {
+          "position": [
+            0,
+            -3.4,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            47
+          ]
+        },
+        "head": {
+          "position": [
+            0,
+            -3.0,
+            0
+          ],
+          "rotation": [
+            -19,
+            0,
+            -26
+          ]
+        },
+        "tail": {
+          "rotation": [
+            -69,
+            -40,
+            0
+          ]
+        },
+        "front_left_leg": {
+          "rotation": [
+            74,
+            0,
+            0
+          ]
+        },
+        "front_right_leg": {
+          "rotation": [
+            74,
+            0,
+            0
+          ]
+        },
+        "back_left_leg": {
+          "rotation": [
+            74,
+            0,
+            0
+          ]
+        },
+        "back_right_leg": {
+          "rotation": [
+            74,
+            0,
+            0
+          ]
+        }
+      }
     }
   }
 }

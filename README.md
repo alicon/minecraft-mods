@@ -38,6 +38,8 @@ Each mod has its own `fabric.mod.json`, Java package, assets, and jar. Shared Fa
 ./gradlew build
 ```
 
+For Mushroom's Bedrock development build, see the [Bedrock build and playtest guide](mods/mushroom-the-yorkie/bedrock/README.md).
+
 Distributable jars are written under the active Minecraft target:
 
 ```text

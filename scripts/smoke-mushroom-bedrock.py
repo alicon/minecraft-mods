@@ -135,6 +135,7 @@ def main():
     parser.add_argument("server_zip", type=Path)
     parser.add_argument("addon", type=Path)
     parser.add_argument("--upgrade-from", type=Path)
+    parser.add_argument("--verify-care-persistence", action="store_true")
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="mushroom-bedrock-smoke-") as directory:
         server_dir = Path(directory)
@@ -150,6 +151,8 @@ def main():
         if args.upgrade_from:
             install_addon(args.addon, server_dir)
         exercise_world(server_dir, "MUSHROOM_TEST_REOPENED")
+        if args.verify_care_persistence:
+            exercise_world(server_dir, "MUSHROOM_TEST_CARE_PERSISTED")
         print("Mushroom spawned and remained in the world after a server restart.")
 
 

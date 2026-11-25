@@ -42,6 +42,9 @@ class BedrockPackageTests(unittest.TestCase):
                     status = {"behavior_pack": json.loads(behavior.read("manifest.json")),
                               "resource_pack": json.loads(resource.read("manifest.json"))}
                     builder.validate_manifests(status)
+                    [script] = [module for module in status["behavior_pack"]["modules"] if module["type"] == "script"]
+                    expected = (ADDON / "behavior_pack" / script["entry"]).read_bytes()
+                    self.assertEqual(behavior.read(script["entry"]), expected)
 
     def test_mismatched_dependency_cannot_be_packaged(self):
         manifests = {

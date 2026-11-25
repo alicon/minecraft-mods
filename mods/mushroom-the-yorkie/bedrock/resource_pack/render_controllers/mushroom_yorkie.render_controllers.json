@@ -14,6 +14,12 @@
       "part_visibility": [
         {
           "harness": "query.property('mushroom_yorkie:wearing_harness')"
+        },
+        {
+          "left_eye": "!(query.property('mushroom_yorkie:home_goal') == 'sleep')"
+        },
+        {
+          "right_eye": "!(query.property('mushroom_yorkie:home_goal') == 'sleep')"
         }
       ]
     }
