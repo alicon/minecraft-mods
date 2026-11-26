@@ -85,6 +85,18 @@ if (project.ext.has('enable_game_tests') && project.ext.enable_game_tests) {
 		}
 	}
 
+	def gameTestFilter = findProperty('game_test_filter')
+	def gameTestVerify = findProperty('game_test_verify')
+	if (gameTestFilter != null || gameTestVerify != null) {
+		if (activeMinecraftVersion == '1.21.1') {
+			throw new GradleException('GameTest filtering and rotation verification require the 1.21.11 Fabric runner')
+		}
+		tasks.named('runGameTest') {
+			if (gameTestFilter != null) systemProperty 'fabric-api.gametest.filter', gameTestFilter
+			if (gameTestVerify != null) systemProperty 'fabric-api.gametest.verify', gameTestVerify
+		}
+	}
+
 	tasks.register('runGameTestServer') {
 		group = 'verification'
 		description = 'Runs the server-side Fabric GameTests.'

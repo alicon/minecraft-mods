@@ -109,6 +109,17 @@ Run Mushroom's headless Minecraft GameTests:
 ./gradlew :mushroom-the-yorkie:runGameTestServer
 ```
 
+Use Fabric 1.21.11's verification mode to repeat a native case 100 times in each of four rotations. The regular build still runs the short suite on both supported targets.
+
+```shell
+MUSHROOM_SQUIRREL_TRACE_DIR="$PWD/build/squirrel-approach-verify" \
+  ./gradlew :mushroom-the-yorkie:runGameTestServer -Ptarget_minecraft_version=1.21.11 \
+  -Pgame_test_filter=mushroom_yorkie_gametest:squirrel_approach_game_tests_squirrel_replans_closed_approach \
+  -Pgame_test_verify=true
+```
+
+This fixture confirms the squirrel has started down the original path and its body is clear before placing the wall. The trace records when the route closed and when the same squirrel climbed the alternate tree.
+
 Fetch GameTests cover active flight steering, interruption returning to normal following, toy returns from below a platform, fractional owner heights, landing during chase/return, airborne return across native save/load, and shoreline path endpoints within pickup reach. Flight fixtures run the real fetch goal, flight controller, and native collision movement in server order. Live terrain cases additionally exercise full entity ticks, all three toys, and independent survival/creative walking/creative flying owner states.
 
 Flight and airborne-reload fetch tests declare a 16×16 horizontal arena. Their
