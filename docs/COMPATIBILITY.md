@@ -75,6 +75,8 @@ Upgrade fixtures check saved ownership, daily care, cargo, structures, patrols, 
 
 ### Gameplay checks by edition
 
+Use the [Mushroom gameplay expectations](MUSHROOM_GAMEPLAY.md) to review shared outcomes and track where the editions differ.
+
 | Shared behavior | Java Fabric checks | Bedrock checks |
 | --- | --- | --- |
 | Mushroom ownership and borrowed leads | Native `daycareGuestsShareLeads` on both Fabric targets checks the one-dog limit, harness, guest lead, feeding while leashed, and ownership | Adoption and care persistence probes and the mixed two-player session exercise independent ownership, guest walks, and feeding while leashed |
