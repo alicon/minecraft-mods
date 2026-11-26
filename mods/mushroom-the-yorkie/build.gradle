@@ -7,6 +7,7 @@ ext {
 	modrinth_project_fallback = 'mushroom-the-yorkie'
 	modrinth_optional_projects = []
 	enable_game_tests = true
+	client_game_test_version = '1.21.11'
 	supported_minecraft_versions = [
 			'1.21.11': [
 					fabric_api_version: '0.141.4+1.21.11',
@@ -47,4 +48,12 @@ apply from: rootProject.file('gradle/legacy-crafting-recipes.gradle')
 
 tasks.named('processGametestResources') {
 	from(rootProject.file('scripts/fixtures/mushroom-treat-cases.json'))
+}
+
+if (project.hasProperty('yorkie_daycare_guest')) {
+	def profile = layout.buildDirectory.dir('daycare-client-guest').get().asFile
+	tasks.named('runClient') {
+		args '--gameDir', profile.absolutePath, '--username', 'DaycareGuest',
+				'--quickPlayMultiplayer', '127.0.0.1:57341'
+	}
 }

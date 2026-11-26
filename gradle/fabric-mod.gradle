@@ -70,11 +70,13 @@ sourceSets {
 }
 
 if (project.ext.has('enable_game_tests') && project.ext.enable_game_tests) {
+	def enableClientTests = project.hasProperty('client_game_tests') && project.ext.has('client_game_test_version') &&
+			activeMinecraftVersion == project.ext.client_game_test_version
 	fabricApi {
 		configureTests {
 			createSourceSet = true
 			modId = "${modId}_gametest"
-			enableClientGameTests = false
+			enableClientGameTests = enableClientTests
 			eula = true
 		}
 	}
@@ -82,6 +84,13 @@ if (project.ext.has('enable_game_tests') && project.ext.enable_game_tests) {
 	sourceSets {
 		gametest {
 			java.setSrcDirs(["src/gametest/java", "${versionedSourceRoot}/gametest/java"])
+			if (enableClientTests) java.srcDir "${versionedSourceRoot}/clientGametest/java"
+		}
+	}
+	if (enableClientTests) {
+		tasks.named('runClientGameTest') {
+			// Fabric's in-process packet synchronizer cannot coordinate a second Minecraft process.
+			systemProperty 'fabric.client.gametest.disableNetworkSynchronizer', 'true'
 		}
 	}
 

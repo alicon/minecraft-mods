@@ -212,7 +212,7 @@ adapters stay under `src/versions/<version>/gametest/java`. They remain test-onl
 
 ## Local Playtest Harness
 
-The Mineflayer harness in `tools/playtest-harness/` can join a local dev server, dedicated test server, or single-player LAN world. Use it for player-like smoke checks, live bot companionship, and artifact capture that is faster than repeating manual setup by hand.
+The Mineflayer harness in `tools/playtest-harness/` can join compatible local servers and LAN worlds for player-like smoke checks, live bot companionship, and artifact capture. Mushroom's Fabric registry sync requires a modded client. Use the Playtest Bridge for single-client play or the Fabric client GameTest below for the two-client check.
 
 Install once:
 
@@ -294,6 +294,22 @@ node tools/playtest-harness/src/bridge-cli.js yorkie-daycare \
 ```
 
 The report records each action, native walking distance, the original dog's identity, completed fetches, consumed treats, dawns, wall time, and in-game days. Use `--client-log <path>` when a dev launcher writes its Fabric startup log outside the game profile. The report tracks bridge observations and input failures separately from gameplay assertions. A failed run retains the current view and freezes the disposable fixture for investigation.
+
+#### Two Java clients walking a borrowed Yorkie
+
+On Java 1.21.11, start the opt-in client GameTest from one checkout. It creates a disposable server at `127.0.0.1:57341` and prints when it is ready for the dog owner.
+
+```shell
+./gradlew :mushroom-the-yorkie:runClientGameTest -Ptarget_minecraft_version=1.21.11 -Pclient_game_tests
+```
+
+Within 90 seconds, run the owner client from a separate worktree at the same commit. Prepare the second worktree and its Gradle dependencies before starting the test.
+
+```shell
+./gradlew :mushroom-the-yorkie:runClient -Ptarget_minecraft_version=1.21.11 -Pyorkie_daycare_guest
+```
+
+The first client uses the normal Use and movement bindings as a Survival guest. The test checks that the dog and guest both move, the harness stays on, and the connected owner keeps the dog. Look for `Daycare walk passed` in the first terminal and screenshots under `mods/mushroom-the-yorkie/build/run/clientGameTest/screenshots/`. The test stops the temporary server. Close the owner client after it disconnects.
 
 Screenshots close the active client screen before capture by default; set `BRIDGE_SCREENSHOT_RESUME=0` to keep the current screen visible. Set `BRIDGE_SCREENSHOT_HIDE_GUI=1` and `BRIDGE_SCREENSHOT_CLEAR_CHAT=1` for clean visual inspection captures.
 

@@ -5,6 +5,9 @@
 	"name": "Mushroom the Yorkie GameTests",
 	"environment": "*",
 	"entrypoints": {
+		"fabric-client-gametest": [
+			"dev.alicon.mushroomyorkie.entity.DaycareClientGameTest"
+		],
 		"fabric-gametest": [
 			"dev.alicon.mushroomyorkie.gametest.MushroomYorkieGameTests",
 			"dev.alicon.mushroomyorkie.gametest.RecipeCraftingGameTests",
