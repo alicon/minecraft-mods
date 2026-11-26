@@ -160,8 +160,9 @@ def collect_output(stream, lines):
     lines.put(None)
 
 
-def expect_line(lines, marker, timeout=90):
-    deadline = time.monotonic() + timeout
+def expect_line(lines, marker, *, startup_timeout=180, timeout=150):
+    started = False
+    deadline = time.monotonic() + startup_timeout
     while time.monotonic() < deadline:
         try:
             line = lines.get(timeout=max(0, deadline - time.monotonic()))
@@ -177,7 +178,12 @@ def expect_line(lines, marker, timeout=90):
             raise RuntimeError(f"Bedrock rejected content: {line.strip()}")
         if marker in line:
             return
-    raise RuntimeError(f"Server did not report {marker!r} in {timeout}s")
+        if not started and line.rstrip().endswith(" INFO] Server started."):
+            started = True
+            deadline = time.monotonic() + timeout
+    if started:
+        raise RuntimeError(f"Server did not report {marker!r} within {timeout}s after startup")
+    raise RuntimeError(f"Server did not start or report {marker!r} within {startup_timeout}s")
 
 
 def exercise_world(server_dir, marker, *, timeout=150):

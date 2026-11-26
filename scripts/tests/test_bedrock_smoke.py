@@ -1,13 +1,16 @@
+from collections import deque
 from io import BytesIO
 import json
 from pathlib import Path
+import queue
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from zipfile import ZipFile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from bedrock_smoke import SmokeWorld, install_addon, install_companion_addons
+from bedrock_smoke import SmokeWorld, expect_line, install_addon, install_companion_addons
 
 
 def write_addon(path, behavior_id, resource_id, version):
@@ -66,6 +69,43 @@ class BedrockSmokeInstallerTests(unittest.TestCase):
             install_addon(invalid, self.server, self.world)
         self.assertEqual(self.links("behavior")["main-behavior"], [0, 1, 0])
         self.assertEqual(self.links("resource"), {"main-resources": [0, 1, 0]})
+
+
+class ScriptedServerOutput:
+    def __init__(self, *lines):
+        self.lines = deque(lines)
+        self.now = 0
+
+    def get(self, *, timeout):
+        if self.lines and self.lines[0][0] <= self.now + timeout:
+            self.now, line = self.lines.popleft()
+            return line
+        self.now += timeout
+        raise queue.Empty
+
+    def monotonic(self):
+        return self.now
+
+
+class BedrockSmokeTimingTests(unittest.TestCase):
+    STARTED = "[2026-11-25 17:02:04:049 INFO] Server started.\n"
+
+    def test_gameplay_gets_its_full_timeout_after_a_slow_start(self):
+        output = ScriptedServerOutput((9, self.STARTED), (13, "PLAYABLE"))
+        with patch("bedrock_smoke.time.monotonic", output.monotonic):
+            expect_line(output, "PLAYABLE", startup_timeout=10, timeout=5)
+
+    def test_repeated_startup_line_does_not_extend_the_gameplay_timeout(self):
+        output = ScriptedServerOutput((9, self.STARTED), (12, self.STARTED), (15, "PLAYABLE"))
+        with patch("bedrock_smoke.time.monotonic", output.monotonic):
+            with self.assertRaisesRegex(RuntimeError, "within 5s after startup"):
+                expect_line(output, "PLAYABLE", startup_timeout=10, timeout=5)
+
+    def test_startup_stays_bounded_when_the_server_never_becomes_ready(self):
+        output = ScriptedServerOutput((11, self.STARTED))
+        with patch("bedrock_smoke.time.monotonic", output.monotonic):
+            with self.assertRaisesRegex(RuntimeError, "did not start .* within 10s"):
+                expect_line(output, "PLAYABLE", startup_timeout=10, timeout=5)
 
 
 if __name__ == "__main__":
