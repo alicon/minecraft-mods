@@ -125,7 +125,7 @@ tasks.register('validateFormatting') {
 	doLast {
 		def checkedExtensions = ['.gradle', '.java', '.json', '.md', '.properties', '.sh', '.yml', '.yaml']
 		def checkedFiles = ['.editorconfig', '.gitattributes', '.gitignore']
-		def ignoredDirs = ['.git', '.gradle', '.gradle-user-home', 'build', 'node_modules']
+		def ignoredDirs = ['.git', '.gradle', '.gradle-user-home', 'build', 'node_modules', 'run']
 		def violations = []
 
 		rootProject.projectDir.eachFileRecurse { file ->
