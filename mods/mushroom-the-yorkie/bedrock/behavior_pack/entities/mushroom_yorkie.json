@@ -45,6 +45,11 @@
           ],
           "default": "ground",
           "client_sync": true
+        },
+        "mushroom_yorkie:walking_after_stay": {
+          "type": "bool",
+          "default": false,
+          "client_sync": true
         }
       }
     },
@@ -87,6 +92,148 @@
         },
         "minecraft:interact": {
           "interactions": [
+            {
+              "use_item": true,
+              "interact_text": "action.interact.mushroom_feed",
+              "on_interact": {
+                "filters": {
+                  "all_of": [
+                    { "test": "is_owner", "subject": "other" },
+                    {
+                      "any_of": [
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:beetroot" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:chicken" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:cod" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:cookie" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:dried_kelp" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:glow_berries" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:melon_slice" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:mutton" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:poisonous_potato" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:potato" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:pufferfish" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:salmon" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:spider_eye" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:sweet_berries" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:tropical_fish" }
+                      ]
+                    }
+                  ]
+                },
+                "event": "mushroom_yorkie:feed_1",
+                "target": "self"
+              }
+            },
+            {
+              "use_item": true,
+              "interact_text": "action.interact.mushroom_feed",
+              "on_interact": {
+                "filters": {
+                  "all_of": [
+                    { "test": "is_owner", "subject": "other" },
+                    {
+                      "any_of": [
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:beef" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:carrot" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:porkchop" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:rabbit" }
+                      ]
+                    }
+                  ]
+                },
+                "event": "mushroom_yorkie:feed_1_5",
+                "target": "self"
+              }
+            },
+            {
+              "use_item": true,
+              "interact_text": "action.interact.mushroom_feed",
+              "on_interact": {
+                "filters": {
+                  "all_of": [
+                    { "test": "is_owner", "subject": "other" },
+                    {
+                      "any_of": [
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:apple" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:chorus_fruit" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:enchanted_golden_apple" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:golden_apple" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:rotten_flesh" }
+                      ]
+                    }
+                  ]
+                },
+                "event": "mushroom_yorkie:feed_2",
+                "target": "self"
+              }
+            },
+            {
+              "use_item": true,
+              "interact_text": "action.interact.mushroom_feed",
+              "on_interact": {
+                "filters": {
+                  "all_of": [
+                    { "test": "is_owner", "subject": "other" },
+                    {
+                      "any_of": [
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:baked_potato" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:bread" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:cooked_cod" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:cooked_rabbit" }
+                      ]
+                    }
+                  ]
+                },
+                "event": "mushroom_yorkie:feed_2_5",
+                "target": "self"
+              }
+            },
+            {
+              "use_item": true,
+              "interact_text": "action.interact.mushroom_feed",
+              "on_interact": {
+                "filters": {
+                  "all_of": [
+                    { "test": "is_owner", "subject": "other" },
+                    {
+                      "any_of": [
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:beetroot_soup" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:cooked_chicken" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:cooked_mutton" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:cooked_salmon" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:golden_carrot" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:honey_bottle" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:mushroom_stew" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:suspicious_stew" }
+                      ]
+                    }
+                  ]
+                },
+                "event": "mushroom_yorkie:feed_3",
+                "target": "self"
+              }
+            },
+            {
+              "use_item": true,
+              "interact_text": "action.interact.mushroom_feed",
+              "on_interact": {
+                "filters": {
+                  "all_of": [
+                    { "test": "is_owner", "subject": "other" },
+                    {
+                      "any_of": [
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:cooked_beef" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:cooked_porkchop" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:pumpkin_pie" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:rabbit_stew" }
+                      ]
+                    }
+                  ]
+                },
+                "event": "mushroom_yorkie:feed_4",
+                "target": "self"
+              }
+            },
             {
               "cooldown": 0.5,
               "use_item": true,
@@ -252,6 +399,19 @@
             "deals_damage": "no"
           }
         }
+      },
+      "mushroom_yorkie:clearing_native_sit": {
+        "minecraft:timer": {
+          "looping": false,
+          "time": {
+            "min": 0.1,
+            "max": 0.1
+          },
+          "time_down_event": {
+            "event": "mushroom_yorkie:restore_after_stay",
+            "target": "self"
+          }
+        }
       }
     },
     "components": {
@@ -327,6 +487,11 @@
                   "test": "enum_property",
                   "domain": "mushroom_yorkie:flight_mode",
                   "value": "ground"
+                },
+                {
+                  "test": "bool_property",
+                  "domain": "mushroom_yorkie:walking_after_stay",
+                  "value": false
                 }
               ]
             },
@@ -374,6 +539,12 @@
       }
     },
     "events": {
+      "mushroom_yorkie:feed_1": {},
+      "mushroom_yorkie:feed_1_5": {},
+      "mushroom_yorkie:feed_2": {},
+      "mushroom_yorkie:feed_2_5": {},
+      "mushroom_yorkie:feed_3": {},
+      "mushroom_yorkie:feed_4": {},
       "minecraft:entity_spawned": {
         "add": {
           "component_groups": [
@@ -605,6 +776,63 @@
         },
         "set_property": {
           "mushroom_yorkie:flight_mode": "ground"
+        }
+      },
+      "mushroom_yorkie:leave_stay": {
+        "sequence": [
+          {
+            "remove": {
+              "component_groups": [
+                "mushroom_yorkie:tamed"
+              ]
+            }
+          },
+          {
+            "add": {
+              "component_groups": [
+                "mushroom_yorkie:clearing_native_sit"
+              ]
+            }
+          },
+          {
+            "remove": {
+              "component_groups": [
+                "mushroom_yorkie:awake"
+              ]
+            }
+          },
+          {
+            "set_property": {
+              "mushroom_yorkie:walking_after_stay": true
+            }
+          },
+          {
+            "set_property": {
+              "mushroom_yorkie:ordered_sit": false
+            }
+          }
+        ]
+      },
+      "mushroom_yorkie:finish_stay_walk": {
+        "add": {
+          "component_groups": [
+            "mushroom_yorkie:awake"
+          ]
+        },
+        "set_property": {
+          "mushroom_yorkie:walking_after_stay": false
+        }
+      },
+      "mushroom_yorkie:restore_after_stay": {
+        "remove": {
+          "component_groups": [
+            "mushroom_yorkie:clearing_native_sit"
+          ]
+        },
+        "add": {
+          "component_groups": [
+            "mushroom_yorkie:tamed"
+          ]
         }
       }
     }

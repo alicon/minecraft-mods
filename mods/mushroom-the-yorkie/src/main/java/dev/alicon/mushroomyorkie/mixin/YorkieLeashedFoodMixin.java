@@ -12,12 +12,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(Mob.class)
-abstract class YorkieLeashedTreatMixin {
+abstract class YorkieLeashedFoodMixin {
 	@Inject(method = "interact", at = @At("HEAD"), cancellable = true)
 	private void mushroom$feedBeforeLeashRelease(Player player, InteractionHand hand,
 			CallbackInfoReturnable<InteractionResult> callback) {
 		if ((Object) this instanceof MushroomYorkieEntity yorkie) {
-			var result = MushroomFeedingInteractions.feedLeashHolderTreat(yorkie, player, hand);
+			var result = MushroomFeedingInteractions.feedWhileHoldingLead(yorkie, player, hand);
 			if (result.consumesAction()) {
 				callback.setReturnValue(result);
 			}

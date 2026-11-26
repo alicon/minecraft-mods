@@ -34,6 +34,7 @@ final class FetchToyChase {
 				EntityTypeTest.forClass(ItemEntity.class),
 				area,
 				item -> MushroomFetchToyPolicy.isFetchToy(item.getItem())
+						&& belongsToPlayerOrUnclaimed(item, owner)
 						&& !item.getUUID().equals(lastReturnedToy)
 						&& !item.getUUID().equals(ignoredToy)
 		);
@@ -41,6 +42,10 @@ final class FetchToyChase {
 				.filter(item -> FetchToySafety.safeFetchPlacement(level, owner, yorkie, item))
 				.min(Comparator.comparingDouble(yorkie::distanceToSqr))
 				.orElseGet(() -> toys.stream().min(Comparator.comparingDouble(yorkie::distanceToSqr)).orElse(null));
+	}
+
+	private static boolean belongsToPlayerOrUnclaimed(ItemEntity item, Player owner) {
+		return !(item.getOwner() instanceof Player thrower) || thrower.getUUID().equals(owner.getUUID());
 	}
 
 	static boolean canPickUp(MushroomYorkieEntity yorkie, ItemEntity item) {

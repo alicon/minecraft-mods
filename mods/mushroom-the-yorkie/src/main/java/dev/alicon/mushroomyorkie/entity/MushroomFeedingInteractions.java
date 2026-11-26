@@ -16,15 +16,18 @@ public final class MushroomFeedingInteractions {
 	private MushroomFeedingInteractions() {
 	}
 
-	/** Handles a held treat before vanilla can release the current player's lead. */
-	public static InteractionResult feedLeashHolderTreat(MushroomYorkieEntity yorkie, Player player, InteractionHand hand) {
+	/** Handles permitted food before vanilla can release the current player's lead. */
+	public static InteractionResult feedWhileHoldingLead(MushroomYorkieEntity yorkie, Player player, InteractionHand hand) {
 		ItemStack stack = player.getItemInHand(hand);
 		if (!yorkie.isAlive() || !yorkie.isTame() || player.isSpectator()
-				|| yorkie.getLeashHolder() != player || !MushroomFoodPolicy.isYorkieTreat(stack)) {
+				|| yorkie.getLeashHolder() != player) {
 			return InteractionResult.PASS;
 		}
 
 		var result = handle(yorkie, player, hand, stack);
+		if (result == null) {
+			return InteractionResult.PASS;
+		}
 		if (!yorkie.level().isClientSide()) {
 			yorkie.gameEvent(GameEvent.ENTITY_INTERACT, player);
 		}

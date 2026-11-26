@@ -1,0 +1,7 @@
+[
+  {"id":"bread-survival","item":"bread","mode":"survival","missingHealth":6,"healed":2.5,"spent":1,"owner":true,"leashed":false},
+  {"id":"apple-creative","item":"apple","mode":"creative","missingHealth":6,"healed":2,"spent":0,"owner":true,"leashed":false},
+  {"id":"full-health-steak","item":"cooked_beef","mode":"survival","missingHealth":0,"healed":0,"spent":1,"owner":true,"leashed":false},
+  {"id":"guest-food","item":"bread","mode":"survival","missingHealth":6,"healed":0,"spent":0,"owner":false,"leashed":false},
+  {"id":"leashed-carrot","item":"carrot","mode":"survival","missingHealth":6,"healed":1.5,"spent":1,"owner":true,"leashed":true}
+]
