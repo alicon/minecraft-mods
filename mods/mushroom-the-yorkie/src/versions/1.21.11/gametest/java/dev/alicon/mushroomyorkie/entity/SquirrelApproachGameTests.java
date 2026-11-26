@@ -100,7 +100,7 @@ public final class SquirrelApproachGameTests {
 	}
 
 	/** A wall built ahead during approach must trigger a reachable alternative. */
-	@GameTest(maxTicks = 340)
+	@GameTest(structure = "mushroom_yorkie_gametest:fetch_arena", maxTicks = 340)
 	public void squirrelReplansClosedApproach(GameTestHelper helper) {
 		SquirrelReachabilityScenarios.closeDuringApproach(helper);
 	}

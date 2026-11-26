@@ -3,6 +3,7 @@ package dev.alicon.mushroomyorkie.entity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /** The nearest standable trunk may be unreachable while a farther tree remains usable. */
@@ -68,29 +69,42 @@ final class SquirrelReachabilityScenarios {
 			long seed = GameTestSeeds.apply(squirrel, label);
 			Vec3 expectedTree = helper.absoluteVec(layout == Layout.OPEN_NEAR
 					? new Vec3(4.5D, 1.0D, 4.5D) : new Vec3(1.5D, 1.0D, 0.5D));
-			if (layout == Layout.CLOSE_AFTER_START) closeRoute(helper, squirrel);
-			new SquirrelRouteProbe(helper, squirrel, label, seed, expectedTree).start();
+			SquirrelRouteProbe probe = new SquirrelRouteProbe(helper, squirrel, label, seed, expectedTree);
+			if (layout == Layout.CLOSE_AFTER_START) {
+				closeRoute(helper, squirrel, probe);
+			} else {
+				probe.start();
+			}
 			scheduled = true;
 		} finally {
 			if (!scheduled) squirrel.discard();
 		}
 	}
 
-	private static void closeRoute(GameTestHelper helper, SquirrelEntity squirrel) {
-		helper.runAfterDelay(4, () -> {
-			try {
-				var path = squirrel.getNavigation().getPath();
-				helper.assertTrue(path != null && path.canReach()
-						&& path.getTarget().equals(helper.absolutePos(new BlockPos(3, 1, 4))) && !squirrel.onClimbable(),
-						"Route-closure control did not begin the native near-tree approach");
-				helper.assertTrue(squirrel.getBoundingBox().maxX < helper.absolutePos(new BlockPos(2, 1, 4)).getX(),
-						"Route closure would place a wall through the squirrel");
-				enclose(helper);
-			} catch (RuntimeException | Error failure) {
-				squirrel.discard();
-				throw failure;
-			}
-		});
+	private static void closeRoute(GameTestHelper helper, SquirrelEntity squirrel, SquirrelRouteProbe probe) {
+		Vec3 start = squirrel.position();
+		BlockPos approach = helper.absolutePos(new BlockPos(3, 1, 4));
+		AABB enclosure = AABB.encapsulatingFullBlocks(helper.absolutePos(new BlockPos(2, 1, 2)),
+				helper.absolutePos(new BlockPos(6, 7, 6)));
+		helper.startSequence()
+				.thenWaitUntil(() -> {
+					var path = squirrel.getNavigation().getPath();
+					helper.assertTrue(path != null && path.canReach() && path.getTarget().equals(approach)
+									&& !squirrel.onClimbable() && squirrel.position().distanceToSqr(start) > 0.01D,
+							"Route-closure control did not begin the native near-tree approach");
+				})
+				.thenExecute(() -> {
+					try {
+						helper.assertTrue(!squirrel.getBoundingBox().intersects(enclosure),
+								"Route-closure fixture reached the enclosure before it could be built");
+						enclose(helper);
+						probe.recordRouteClosure();
+						probe.start();
+					} catch (RuntimeException | Error failure) {
+						squirrel.discard();
+						throw failure;
+					}
+				});
 	}
 
 	private static void enclose(GameTestHelper helper) {
