@@ -37,6 +37,21 @@ jobs:
           npm --prefix tools/bedrock ci
           npm --prefix tools/bedrock run check
 
+      - name: Validate the built archives with Minecraft Creator Tools
+        run: |
+          for folder in mods/*/bedrock; do
+            mod=$(basename "$(dirname "$folder")")
+            python3 scripts/build-bedrock-addon.py "$mod" --output build/creator-inputs
+          done
+          python3 scripts/check-bedrock-creator-tools.py build/creator-inputs/*.mcaddon --output build/creator-reports
+      - name: Keep Creator Tools reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bedrock-creator-validation
+          path: build/creator-reports
+          if-no-files-found: warn
+
   bedrock-smoke:
     runs-on: ubuntu-24.04
     timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && 260 || 20 }}
