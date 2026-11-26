@@ -4,6 +4,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
 import net.minecraft.core.BlockPos;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.phys.Vec3;
 
 final class SquirrelTreeTravel {
@@ -75,7 +76,16 @@ final class SquirrelTreeTravel {
 			this.routeEnded();
 			return;
 		}
-		Vec3 delta = this.waypoints.peek().subtract(feet);
+		Vec3 next = this.waypoints.peek();
+		boolean onSurface = this.phase == Phase.CLIMB || this.phase == Phase.DESCEND;
+		BlockPos nextCell = BlockPos.containing(next);
+		if (onSurface && !SquirrelCanopyPaths.touchesTree(this.squirrel.level(), nextCell)
+				&& !(this.phase == Phase.DESCEND && this.waypoints.size() == 1
+				&& SquirrelFindTreeGoal.isStandable(this.squirrel.level(), nextCell))) {
+			this.finish(false);
+			return;
+		}
+		Vec3 delta = next.subtract(feet);
 		double limit = this.phase == Phase.LEAP ? LEAP_SPEED : SURFACE_SPEED;
 		if (delta.lengthSqr() > limit * limit) delta = delta.normalize().scale(limit);
 		if (!SquirrelCanopyPaths.stepIsClear(this.squirrel, feet, feet.add(delta))) {
@@ -84,8 +94,10 @@ final class SquirrelTreeTravel {
 		}
 		this.squirrel.resetFallDistance();
 		this.squirrel.getLookControl().setLookAt(this.waypoints.peek());
-		if ((this.phase == Phase.CLIMB || this.phase == Phase.DESCEND)
-				&& Math.abs(delta.y) > delta.horizontalDistance()) {
+		if (onSurface && delta.horizontalDistance() > Math.abs(delta.y)
+				&& this.squirrel.level().getBlockState(this.squirrel.blockPosition().above()).is(BlockTags.LEAVES)) {
+			this.squirrel.poseUnderLeaves(delta.x, delta.z);
+		} else if (onSurface && Math.abs(delta.y) > delta.horizontalDistance()) {
 			this.squirrel.poseAgainstTrunk(this.tree, this.phase == Phase.DESCEND);
 		} else {
 			this.squirrel.clearTreePose();

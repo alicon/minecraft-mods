@@ -2,6 +2,7 @@ package dev.alicon.mushroomyorkie.entity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
@@ -72,6 +73,79 @@ final class SquirrelTravelScenarios {
 			helper.assertTrue(level.getBlockState(planted).is(Blocks.OAK_LOG), "A buried sapling could not grow into a native tree");
 			squirrel.discard();
 			item.discard();
+		});
+	}
+
+	static void reachesTallCanopy(GameTestHelper helper, boolean removeRoof) {
+		int trunkX = 8;
+		int trunkZ = 8;
+		int roof = 15;
+		for (int x = 1; x <= 15; x++) {
+			for (int z = 1; z <= 15; z++) helper.setBlock(x, 0, z, Blocks.STONE);
+		}
+		for (int y = 1; y <= roof; y++) helper.setBlock(trunkX, y, trunkZ, Blocks.SPRUCE_LOG);
+		for (int x = trunkX - 3; x <= trunkX + 3; x++) {
+			for (int z = trunkZ - 3; z <= trunkZ + 3; z++) {
+				if (x != trunkX || z != trunkZ) helper.setBlock(new BlockPos(x, roof, z),
+						Blocks.SPRUCE_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true));
+			}
+		}
+		var squirrel = helper.spawn(ModEntities.SQUIRREL, 5, 1, trunkZ);
+		boolean[] clungToLeaves = {false};
+		int[] removedAt = {-1};
+		double[] highestY = {squirrel.getY()};
+		helper.onEachTick(() -> {
+			if (squirrel.treePoseDirection() == SquirrelEntity.UNDER_LEAVES
+					&& helper.getLevel().getBlockState(squirrel.blockPosition().above()).is(Blocks.SPRUCE_LEAVES)
+					&& Math.abs(squirrel.getBoundingBox().maxY - squirrel.blockPosition().above().getY()) < 0.1D) {
+				clungToLeaves[0] = true;
+				if (removeRoof && removedAt[0] < 0) {
+					removedAt[0] = squirrel.tickCount;
+					for (int dx = -3; dx <= 3; dx++) {
+						for (int dz = -3; dz <= 3; dz++) helper.setBlock(trunkX + dx, roof, trunkZ + dz, Blocks.AIR);
+					}
+					for (int y = 1; y < roof; y++) helper.setBlock(trunkX, y, trunkZ, Blocks.AIR);
+				}
+			}
+			highestY[0] = Math.max(highestY[0], squirrel.getY());
+		});
+		double canopyTop = helper.absoluteVec(new Vec3(trunkX, roof + 1, trunkZ)).y;
+		helper.succeedWhen(() -> {
+			if (removeRoof) {
+				int elapsed = squirrel.tickCount - removedAt[0];
+				helper.assertTrue(removedAt[0] >= 0 && elapsed >= 2 && elapsed <= 5 && !squirrel.isNoGravity()
+						&& squirrel.treePoseDirection() == 0 && squirrel.getDeltaMovement().y < 0,
+						"Squirrel did not release its underside grip after the canopy disappeared");
+				squirrel.discard();
+				return;
+			}
+			var under = helper.getLevel().getBlockState(squirrel.blockPosition().below());
+			helper.assertTrue(clungToLeaves[0], "Squirrel never clung beneath the canopy; peak Y=" + highestY[0] + ", last position=" + squirrel.position());
+			helper.assertTrue(squirrel.getY() >= canopyTop - 0.1D && under.is(Blocks.SPRUCE_LEAVES),
+					"Squirrel never made it to the tall canopy: " + squirrel.position() + ", beneath=" + under + ", peak Y=" + highestY[0]);
+			squirrel.discard();
+		});
+	}
+
+	static void reachesGrownBirch(GameTestHelper helper) {
+		for (int x = 2; x <= 18; x++) {
+			for (int z = 2; z <= 18; z++) helper.setBlock(x, 0, z, Blocks.DIRT);
+		}
+		var level = helper.getLevel();
+		BlockPos trunk = helper.absolutePos(new BlockPos(10, 1, 10));
+		helper.setBlock(10, 1, 10, Blocks.BIRCH_SAPLING);
+		var sapling = (SaplingBlock) Blocks.BIRCH_SAPLING;
+		var random = RandomSource.create(119L);
+		for (int attempt = 0; attempt < 8 && level.getBlockState(trunk).is(sapling); attempt++) {
+			sapling.performBonemeal(level, random, trunk, level.getBlockState(trunk));
+		}
+		helper.assertTrue(level.getBlockState(trunk).is(Blocks.BIRCH_LOG), "Fixture birch failed to grow");
+		var squirrel = helper.spawn(ModEntities.SQUIRREL, 6, 1, 10);
+		helper.succeedWhen(() -> {
+			BlockPos feet = squirrel.blockPosition();
+			helper.assertTrue(level.getBlockState(feet.below()).is(BlockTags.LEAVES) && level.canSeeSky(feet)
+					&& squirrel.onGround(), "Squirrel never landed on the grown birch crown: " + squirrel.position());
+			squirrel.discard();
 		});
 	}
 

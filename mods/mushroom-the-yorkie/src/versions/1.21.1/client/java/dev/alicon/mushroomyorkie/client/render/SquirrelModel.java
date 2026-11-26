@@ -31,7 +31,9 @@ public final class SquirrelModel extends EntityModel<SquirrelEntity> {
 
 	@Override
 	public void setupAnim(SquirrelEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-		this.pose.animate(limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch, entity.treePosePitch(ageInTicks - entity.tickCount));
+		float partialTick = ageInTicks - entity.tickCount;
+		this.pose.animate(limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch,
+				entity.treePosePitch(partialTick), entity.treePoseRoll(partialTick));
 	}
 
 	@Override

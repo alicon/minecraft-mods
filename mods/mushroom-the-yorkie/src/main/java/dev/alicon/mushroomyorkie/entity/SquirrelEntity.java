@@ -29,6 +29,9 @@ public final class SquirrelEntity extends net.minecraft.world.entity.animal.Anim
 	private static final EntityDataAccessor<Byte> TREE_POSE = SynchedEntityData.defineId(SquirrelEntity.class, EntityDataSerializers.BYTE);
 	// Degrees above horizontal; the client approaches a new pose over successive ticks.
 	private static final float TREE_PITCH_DEGREES = 78.0F;
+	static final byte UNDER_LEAVES = 2;
+	private float previousTreeRoll;
+	private float treeRoll;
 	private boolean foundTree;
 	private boolean treeClimbing;
 	private float previousTreePitch;
@@ -50,7 +53,10 @@ public final class SquirrelEntity extends net.minecraft.world.entity.animal.Anim
 		super.tick();
 		if (!(this.level() instanceof ServerLevel)) {
 			this.previousTreePitch = this.treePitch;
-			float target = this.treePoseDirection() * TREE_PITCH_DEGREES;
+			boolean inverted = this.treePoseDirection() == UNDER_LEAVES;
+			this.previousTreeRoll = this.treeRoll;
+			this.treeRoll = Mth.approach(this.treeRoll, inverted ? 180.0F : 0.0F, 30.0F);
+			float target = inverted ? 0 : this.treePoseDirection() * TREE_PITCH_DEGREES;
 			this.treePitch = Mth.approach(this.treePitch, target, 19.5F);
 		}
 	}
@@ -58,6 +64,16 @@ public final class SquirrelEntity extends net.minecraft.world.entity.animal.Anim
 	/** Interpolated upward or downward trunk-cling pitch for the model, in degrees. */
 	public float treePosePitch(float partialTick) {
 		return Mth.lerp(Mth.clamp(partialTick, 0.0F, 1.0F), this.previousTreePitch, this.treePitch);
+	}
+
+	/** Roll around the direction of travel while crossing the underside of foliage. */
+	public float treePoseRoll(float partialTick) {
+		return Mth.lerp(Mth.clamp(partialTick, 0.0F, 1.0F), this.previousTreeRoll, this.treeRoll);
+	}
+
+	void poseUnderLeaves(double x, double z) {
+		this.entityData.set(TREE_POSE, UNDER_LEAVES);
+		this.faceDirection(x, z);
 	}
 
 	int treePoseDirection() {
@@ -72,6 +88,10 @@ public final class SquirrelEntity extends net.minecraft.world.entity.animal.Anim
 		this.entityData.set(TREE_POSE, (byte) (descending ? -1 : 1));
 		double x = trunk.getX() + 0.5D - this.getX();
 		double z = trunk.getZ() + 0.5D - this.getZ();
+		this.faceDirection(x, z);
+	}
+
+	private void faceDirection(double x, double z) {
 		float yaw = (float) Math.toDegrees(Mth.atan2(-x, z));
 		this.setYRot(yaw);
 		this.setYBodyRot(yaw);
