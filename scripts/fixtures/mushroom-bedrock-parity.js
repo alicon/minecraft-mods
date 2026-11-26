@@ -26,20 +26,12 @@ async function until(predicate, detail, ticks = 80) {
   throw new Error(detail());
 }
 
-async function use(player, dog, type, amount = 1, atCrosshair = false) {
+async function use(player, dog, type, amount = 1) {
   player.stopInteracting();
   player.selectedSlotIndex = 0;
   player.setItem(new ItemStack(type, amount), 0, true);
   await system.waitTicks(3);
-  if (atCrosshair) {
-    await until(() => {
-      player.lookAtLocation({ ...dog.location, y: dog.location.y + 0.23 });
-      return player.getEntitiesFromViewDirection({ maxDistance: 4 })[0]?.entity?.id === dog.id;
-    }, () => "setup could not aim at the Yorkie", 20);
-    player.interact();
-  } else {
-    player.interactWithEntity(dog);
-  }
+  player.interactWithEntity(dog);
   await system.waitTicks(1);
   player.stopInteracting();
 }
@@ -51,12 +43,13 @@ async function feed(owner, guest, dog, example) {
   const health = dog.getComponent("minecraft:health");
   const before = health.effectiveMax - example.missingHealth;
   health.setCurrentValue(before);
-  await use(player, dog, item, 2, true);
+  await use(player, dog, item, 2);
   await system.waitTicks(8);
   const held = bag(player).getItem(0)?.amount ?? 0;
   assert(leashHolder(dog) === (example.leashed ? owner.id : undefined), "changed lead holder");
-  assert(health.currentValue === before + example.healed && held === 2 - example.spent,
-    "expected health " + (before + example.healed) + " and held " + (2 - example.spent)
+  const expectedHealth = before + (example.bedrockHealed ?? example.healed);
+  assert(health.currentValue === expectedHealth && held === 2 - example.spent,
+    "expected health " + expectedHealth + " and held " + (2 - example.spent)
       + ", observed health " + health.currentValue + " and held " + held);
   assert(ownerId(dog) === owner.id && !dog.getProperty(NS + "ordered_sit"), "changed owner or sit order");
 }
