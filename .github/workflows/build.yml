@@ -4,6 +4,17 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      play_seconds:
+        description: Seconds of autonomous Mushroom play
+        type: choice
+        options: ['1800', '7200', '14400']
+        default: '1800'
+      play_seed:
+        description: Integer gameplay seed
+        type: string
+        default: '119'
 
 permissions:
   contents: read
@@ -28,7 +39,10 @@ jobs:
 
   bedrock-smoke:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && 260 || 20 }}
+    env:
+      PLAY_SECONDS: ${{ inputs.play_seconds || '30' }}
+      PLAY_SEED: ${{ inputs.play_seed || '119' }}
     steps:
       - uses: actions/checkout@v7
       - name: Download Bedrock Dedicated Server 26.66.1
@@ -44,14 +58,25 @@ jobs:
           mushroom="$(python3 scripts/build-bedrock-addon.py mushroom-the-yorkie)"
           cops="$(python3 scripts/build-bedrock-addon.py cops-and-robbers)"
           narwhal="$(python3 scripts/build-bedrock-addon.py narwhal-together)"
-          python3 scripts/smoke-mushroom-bedrock.py "$server" "$mushroom" \
+          set -o pipefail
+          python3 -u scripts/smoke-mushroom-bedrock.py "$server" "$mushroom" \
             --with-addon "$cops" --with-addon "$narwhal" \
-            --verify-care-persistence --verify-fetch --verify-adoption
+            --verify-care-persistence --verify-fetch --verify-adoption --verify-flight \
+            --play-seconds "$PLAY_SECONDS" --play-seed "$PLAY_SEED" 2>&1 | tee build/bedrock/mushroom-play.log
           python3 scripts/smoke-cops-bedrock.py "$server" "$cops" \
             --with-addon "$mushroom" --with-addon "$narwhal" \
             --verify-vehicles --verify-patrol --verify-fire --verify-jail
           python3 scripts/smoke-narwhal-bedrock.py "$server" "$narwhal" \
             --with-addon "$mushroom" --with-addon "$cops"
+
+      - name: Keep Mushroom gameplay evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mushroom-gameplay-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/bedrock/mushroom-play.log
+          if-no-files-found: warn
+          retention-days: 30
 
   build:
     runs-on: ubuntu-latest
