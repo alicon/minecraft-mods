@@ -21,6 +21,37 @@ jobs:
           npm --prefix tools/playtest-harness run check
           npm --prefix tools/playtest-harness test
           python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+      - name: Check scripts against the stable Bedrock API
+        run: |
+          npm --prefix tools/bedrock ci
+          npm --prefix tools/bedrock run check
+
+  bedrock-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download Bedrock Dedicated Server 26.66.1
+        run: |
+          curl --fail --silent --show-error --location --retry 2 --max-time 120 \
+            --user-agent 'Mozilla/5.0' \
+            https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-1.26.66.1.zip \
+            --output "$RUNNER_TEMP/bedrock-server.zip"
+          echo "e87bcd95bec5cc34b065ca956825c6abb7a0c356ae79408302845069cecaa6bf  $RUNNER_TEMP/bedrock-server.zip" | sha256sum --check
+      - name: Exercise each add-on with the other two installed
+        run: |
+          server="$RUNNER_TEMP/bedrock-server.zip"
+          mushroom="$(python3 scripts/build-bedrock-addon.py mushroom-the-yorkie)"
+          cops="$(python3 scripts/build-bedrock-addon.py cops-and-robbers)"
+          narwhal="$(python3 scripts/build-bedrock-addon.py narwhal-together)"
+          python3 scripts/smoke-mushroom-bedrock.py "$server" "$mushroom" \
+            --with-addon "$cops" --with-addon "$narwhal" \
+            --verify-care-persistence --verify-fetch --verify-adoption
+          python3 scripts/smoke-cops-bedrock.py "$server" "$cops" \
+            --with-addon "$mushroom" --with-addon "$narwhal" \
+            --verify-vehicles --verify-patrol --verify-fire --verify-jail
+          python3 scripts/smoke-narwhal-bedrock.py "$server" "$narwhal" \
+            --with-addon "$mushroom" --with-addon "$cops"
 
   build:
     runs-on: ubuntu-latest

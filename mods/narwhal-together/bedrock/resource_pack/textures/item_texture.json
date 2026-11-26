@@ -1,0 +1,9 @@
+{
+  "resource_pack_name": "narwhal_together",
+  "texture_name": "atlas.items",
+  "texture_data": {
+    "narwhal_together_regroup_charm": {
+      "textures": "textures/items/regroup_charm"
+    }
+  }
+}

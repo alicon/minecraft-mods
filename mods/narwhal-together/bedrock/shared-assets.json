@@ -1,0 +1,9 @@
+{
+  "behavior_pack": {
+    "pack_icon.png": "src/main/resources/assets/narwhal_together/icon.png"
+  },
+  "resource_pack": {
+    "pack_icon.png": "src/main/resources/assets/narwhal_together/icon.png",
+    "textures/items/regroup_charm.png": "src/main/resources/assets/narwhal_together/icon.png"
+  }
+}

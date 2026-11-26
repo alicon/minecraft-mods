@@ -1,0 +1,54 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "NARwhal Together (Behavior)",
+    "description": "Use the Regroup Charm to join your team.",
+    "uuid": "346db46b-3734-44f5-83e2-11d0d98f339c",
+    "version": [
+      0,
+      1,
+      0
+    ],
+    "min_engine_version": [
+      1,
+      26,
+      60
+    ]
+  },
+  "modules": [
+    {
+      "type": "data",
+      "uuid": "2b50b3af-31c9-464a-b40b-1691c6a0674e",
+      "version": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "type": "script",
+      "language": "javascript",
+      "uuid": "8d9da542-395f-40f9-b338-1a3a527af717",
+      "version": [
+        0,
+        1,
+        0
+      ],
+      "entry": "scripts/main.js"
+    }
+  ],
+  "dependencies": [
+    {
+      "uuid": "6912adcd-312b-4167-8c26-3e80c5a3df71",
+      "version": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "module_name": "@minecraft/server",
+      "version": "2.11.0"
+    }
+  ]
+}

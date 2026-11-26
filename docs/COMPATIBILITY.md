@@ -21,14 +21,41 @@ Current Minecraft target support:
 
 ## Bedrock development
 
-Mushroom and Cops and Robbers development packs target Bedrock 26.60 with stable pack schemas. The Cops and Robbers development build includes the placeable kits, ground vehicles, bank patrols, jail, and fire response. Its [Bedrock guide](../mods/cops-and-robbers/bedrock/README.md) records the edition differences. NARwhal Together is planned. Release support is based on the exact versions and devices that pass playtesting.
+Development packs target Bedrock 26.60 with stable pack schemas. Release support is based on the exact versions and devices that pass playtesting.
+
+- [Mushroom the Yorkie](../mods/mushroom-the-yorkie/bedrock/README.md) uses normal item and pet interactions on Bedrock.
+- [Cops and Robbers](../mods/cops-and-robbers/bedrock/README.md) includes placeable kits, ground vehicles, bank patrols, jail, and fire response.
+- [NARwhal Together](../mods/narwhal-together/bedrock/README.md) uses a craftable Regroup Charm on Bedrock. On Java it uses a keybind or Controlify shortcut.
 
 - Keep each Bedrock implementation under `mods/<mod-name>/bedrock/` with independent release versions and stable pack UUIDs. Keep Bedrock-specific behavior, models, and interactions there. Reuse matching art and test data and compare player-visible behavior across editions.
 - Use stable Bedrock Script API modules when scripts are needed. Check the pack's minimum engine version against the modules and content in its manifests. Track important edition differences with each release.
 - Record the effects on Java and Bedrock in gameplay changes. Run the affected Fabric checks and Bedrock package checks, and test the exact package on a supported client for as many affected scenarios as apply. Include save/reopen, upgrade, controller or touch, and multiplayer or Realm checks for release.
 - Keep released identifiers and save keys stable. Increment both Bedrock pack versions together. Exercise previous saves in disposable copies before releasing changes to saved state or assets.
 
-Run `npm --prefix tools/bedrock ci` and `npm --prefix tools/bedrock run check` to type-check Bedrock scripts against the pinned stable API. Keep the API typings in sync with the behavior pack's dependency when updating a script.
+GitHub Actions checks Bedrock scripts against the pinned stable API and builds the add-ons in the package tests. Run the type check locally with `npm --prefix tools/bedrock ci` and `npm --prefix tools/bedrock run check`. The package tests also verify that scripted behavior packs declare the version used to type-check them.
+
+The `bedrock-smoke` job builds all three packs and runs the scenarios below on a pinned, checksum-verified [Bedrock Dedicated Server](https://www.minecraft.net/en-us/download/server/bedrock). It exercises each add-on in a separate disposable world with both companion add-ons active. Review the pinned server build and checksum when updating the supported Bedrock version.
+
+Each server smoke runner accepts one `--with-addon` argument per additional archive. This command tests NARwhal's upgrade and regrouping while Mushroom and Cops and Robbers stay active.
+
+```shell
+python3 scripts/smoke-narwhal-bedrock.py /path/to/bedrock-server.zip /path/to/narwhal.mcaddon \
+  --upgrade-from /path/to/prior-narwhal.mcaddon \
+  --with-addon /path/to/mushroom.mcaddon \
+  --with-addon /path/to/cops.mcaddon
+```
+
+Use the [Bedrock release checklist](RELEASING.md#publish-a-bedrock-add-on) to record client and Realm evidence alongside server results.
+
+### Gameplay checks by edition
+
+| Shared behavior | Java Fabric checks | Bedrock checks |
+| --- | --- | --- |
+| Mushroom ownership, care, and fetch | Live companion smoke, wake-up and care policy tests, and native fetch save/load GameTests | [Companion smoke](../mods/mushroom-the-yorkie/bedrock/README.md#verify-the-add-on) with adoption, care persistence, and fetch enabled |
+| Cops and Robbers kits, patrol, and fire response | Live patrol and structures smoke exercises kit placement, mounted capture, jail drop-off, and extinguishing fires | [Patrol smoke](../mods/cops-and-robbers/bedrock/README.md#verify-the-kits-vehicles-patrol-fire-response-and-jail) with the vehicle, patrol, fire, and jail scenarios enabled |
+| NARwhal alphabetical regroup and wraparound | Fabric target selector tests use the [shared regroup cycle](../scripts/fixtures/narwhal-regroup-cycle.json) | [Regroup smoke](../mods/narwhal-together/bedrock/README.md#build-and-test) exercises the same cycle through native item use |
+
+See [Java automated coverage](TESTING.md#current-automated-coverage) for the complete test descriptions.
 
 See [Add-On development](https://learn.microsoft.com/en-us/minecraft/creator/documents/addondevelopmentworkflow?view=minecraft-bedrock-stable) and [Script API versioning](https://learn.microsoft.com/en-us/minecraft/creator/documents/scripting/versioning?view=minecraft-bedrock-stable).
 

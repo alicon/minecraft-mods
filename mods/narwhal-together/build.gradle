@@ -19,3 +19,7 @@ ext {
 }
 
 apply from: rootProject.file('gradle/fabric-mod.gradle')
+
+tasks.named('processTestResources') {
+	from(rootProject.file('scripts/fixtures/narwhal-regroup-cycle.json'))
+}

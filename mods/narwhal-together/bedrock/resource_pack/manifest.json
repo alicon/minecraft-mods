@@ -1,0 +1,29 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "NARwhal Together (Resources)",
+    "description": "Use the Regroup Charm to join your team.",
+    "uuid": "6912adcd-312b-4167-8c26-3e80c5a3df71",
+    "version": [
+      0,
+      1,
+      0
+    ],
+    "min_engine_version": [
+      1,
+      26,
+      60
+    ]
+  },
+  "modules": [
+    {
+      "type": "resources",
+      "uuid": "475d5e0b-9029-4e63-9951-a8611a905b88",
+      "version": [
+        0,
+        1,
+        0
+      ]
+    }
+  ]
+}

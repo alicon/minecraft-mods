@@ -1,0 +1,7 @@
+item.narwhal_together:regroup_charm.name=Regroup Charm
+action.interact.narwhal_together_regroup=Regroup
+message.narwhal_together.arrived=%s regrouped with you
+message.narwhal_together.no_players=No other players are available
+message.narwhal_together.teleport_cooldown=Regroup is cooling down
+message.narwhal_together.teleported=Regrouped with %s
+message.narwhal_together.unsafe=There is no safe place to land near %s

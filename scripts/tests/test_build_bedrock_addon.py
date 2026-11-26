@@ -72,12 +72,44 @@ class BedrockPackageTests(unittest.TestCase):
                         art = cops / "src/main/resources/assets/cops_robbers" / f"textures/entity/{name}.png"
                         self.assertEqual(resource.read(f"textures/entity/{name}.png"), art.read_bytes())
 
+    def test_regroup_recipe_and_art_are_in_the_narwhal_archive(self):
+        narwhal = builder.ROOT / "mods" / "narwhal-together"
+        art = narwhal / "src/main/resources/assets/narwhal_together/icon.png"
+        with tempfile.TemporaryDirectory() as directory:
+            archive = builder.build(narwhal, Path(directory))
+            self.assertEqual(archive.read_bytes(), builder.build(narwhal, Path(directory) / "again").read_bytes())
+            with ZipFile(archive) as addon:
+                with (
+                    ZipFile(io.BytesIO(addon.read(f"{narwhal.name}-data.mcpack"))) as behavior,
+                    ZipFile(io.BytesIO(addon.read(f"{narwhal.name}-resources.mcpack"))) as resource,
+                ):
+                    recipe = json.loads(behavior.read("recipes/regroup_charm.json"))["minecraft:recipe_shapeless"]
+                    self.assertEqual(recipe["result"]["item"], "narwhal_together:regroup_charm")
+                    self.assertEqual({entry["item"] for entry in recipe["ingredients"]}, {"minecraft:paper", "minecraft:copper_ingot"})
+                    self.assertEqual(resource.read("textures/items/regroup_charm.png"), art.read_bytes())
+
+    def test_bedrock_addons_have_separate_pack_ids(self):
         identifiers = []
-        for addon in (ADDON, bedrock):
+        for folder in sorted((builder.ROOT / "mods").glob("*/bedrock")):
             for kind in builder.PACK_TYPES:
-                manifest = builder.read_json(addon / kind / "manifest.json")
+                manifest = builder.read_json(folder / kind / "manifest.json")
                 identifiers.extend(entry["uuid"] for entry in (manifest["header"], *manifest["modules"]))
         self.assertEqual(len(identifiers), len(set(identifiers)))
+
+    def test_script_packs_match_the_api_checked_in_ci(self):
+        module_name = "@minecraft/server"
+        tooling = builder.read_json(builder.ROOT / "tools/bedrock/package.json")
+        expected = {"module_name": module_name, "version": tooling["devDependencies"][module_name]}
+        for manifest_path in sorted((builder.ROOT / "mods").glob("*/bedrock/behavior_pack/manifest.json")):
+            manifest = builder.read_json(manifest_path)
+            if not any(module["type"] == "script" for module in manifest["modules"]):
+                continue
+            with self.subTest(pack=manifest_path.parents[2].name):
+                dependencies = [
+                    dependency for dependency in manifest.get("dependencies", [])
+                    if dependency.get("module_name") == module_name
+                ]
+                self.assertEqual(dependencies, [expected])
 
     def test_mismatched_dependency_cannot_be_packaged(self):
         manifests = {
