@@ -30,7 +30,8 @@ async function runCases(cases, { reportFile, metadata = {}, capture = async () =
     } catch (error) {
       if (result.observed === undefined && error.observed !== undefined) result.observed = error.observed;
       const fault = phase === 'setup' ? phase : error.phase;
-      result.status = ['setup', 'input', 'observation'].includes(fault) ? `${fault}_failed` : 'failed';
+      result.status = error.name === 'AbortError' ? 'interrupted'
+        : ['setup', 'input', 'observation'].includes(fault) ? `${fault}_failed` : 'failed';
       result.error = error.message;
       try { result.evidence = await capture(scenario, error); }
       catch (captureError) { result.captureError = captureError.message; }

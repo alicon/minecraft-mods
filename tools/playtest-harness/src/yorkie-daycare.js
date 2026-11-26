@@ -15,6 +15,8 @@ const { assertLivingTestOwner } = require('./yorkie-world');
 
 const DOG = 'mushroom_yorkie:mushroom_yorkie';
 const BALL = 'mushroom_yorkie:yorkie_ball';
+const TREAT = 'mushroom_yorkie:yorkie_treat';
+const FEED_AT_HUNGER = 40;
 
 function phaseAt(time) {
   if (time >= 12000 && time < 23000) return time >= 13500 ? 'sleep' : 'return';
@@ -122,9 +124,38 @@ async function runInWorld(baseUrl, expectedSave, seconds, runId, reportFile, cli
     }
   }
 
+  async function feedIfHungry() {
+    const { dog } = await observe();
+    const before = dog.custom.needs.hunger;
+    if (before < FEED_AT_HUNGER) return undefined;
+    await eventually(async () => (await observe()).dog.distance < 4, 'Dog did not come within treat reach');
+    // The bridge supplies the item through the main hand. Preserve the staged
+    // fetch ball if the owner picked it up into that slot.
+    const ballInHand = await command(`execute if items entity ${player} weapon.mainhand ${item}`, true) === 1;
+    const emptyHand = await command(`execute unless items entity ${player} weapon.mainhand *`, true) === 1;
+    assert(ballInHand || emptyHand, 'Select an empty hand for the daycare fixture');
+    if (ballInHand) await command(`clear ${player} ${item} 1`);
+    try {
+      const fed = await request('/use-entity', { type: DOG, radius: 4, item: TREAT, count: 1 });
+      assert(fed.target.uuid === dogId && fed.consumed, 'Treat interaction did not reach the original dog');
+      const after = fed.target.custom.needs.hunger;
+      assert(after < before, 'Treat did not reduce hunger');
+      assert.equal(await command(`execute if items entity ${player} weapon.mainhand ${TREAT}`, true), 0,
+        'Survival treat remained in the owner’s hand');
+      return { before, after, treatsUsed: 1 };
+    } finally {
+      if (ballInHand && await countBall() === 0) {
+        await command(`give ${player} ${item} 1`);
+        await eventually(async () => await countBall() === 1, 'Owner could not reclaim the staged ball');
+      }
+    }
+  }
+
   async function prepare() {
     assert(/^[0-9a-f-]{36}$/i.test(dogId ?? ''), 'Bring a tamed, harnessed Yorkie into the copied world');
     await observe();
+    assert.equal(await command(`execute unless items entity ${player} weapon.mainhand *`, true), 1,
+      'Select an empty hand in the copied world before starting the daycare fixture');
     await command('tick unfreeze', true);
     await command('gamerule minecraft:spawn_mobs false', true);
     await command('gamerule minecraft:advance_time true', true);
@@ -141,21 +172,25 @@ async function runInWorld(baseUrl, expectedSave, seconds, runId, reportFile, cli
     await command(`tp ${dogId} ${x + 1.5} ${y} ${home}`);
     await command('time set 6500');
     await command(`gamemode survival ${player}`);
-    await command(`give ${player} ${item} 1`);
-    await eventually(async () => await countBall() === 1, 'Owner could not receive the single named ball');
     if ((await observe()).dog.tameable.orderedToSit) {
       const sit = await request('/use-entity', { type: DOG, radius: 3, emptyHand: true });
       assert(sit.target.uuid === dogId && !sit.target.tameable.orderedToSit, 'Test dog did not start following');
     }
+    const initialFeed = await feedIfHungry();
+    await command(`give ${player} ${item} 1`);
+    await eventually(async () => await countBall() === 1, 'Owner could not receive the single named ball');
     await command('time set 22300');
+    return initialFeed;
   }
 
-  async function play(result, save) {
+  async function play(initialFeed, result, save) {
     const start = performance.now();
     const firstTick = (await observe()).tick;
     let lastTick;
     let sleepingNight = false;
-    const observations = result.observed = { actions: [], walksAndFetches: 0, dawns: 0 };
+    const observations = result.observed = {
+      actions: [], walksAndFetches: 0, dawns: 0, treatsUsed: initialFeed?.treatsUsed ?? 0, initialFeed
+    };
     function checkpoint(action) {
       observations.actions.push(action);
       save();
@@ -179,6 +214,7 @@ async function runInWorld(baseUrl, expectedSave, seconds, runId, reportFile, cli
           event.walks.push(await walkToward(home));
         }
         assert(Math.abs((await observe()).owner.positionPrecise.z - home) <= 2, 'Owner did not reach the shelter');
+        if (phase === 'return') event.feed = await feedIfHungry();
         if (phase === 'sleep') {
           const rest = await eventually(async () => {
             const sample = await observe();
@@ -198,6 +234,7 @@ async function runInWorld(baseUrl, expectedSave, seconds, runId, reportFile, cli
           const nearby = await observe();
           return nearby.dog.distance < 4 && nearby;
         }, 'Dog did not follow its walking owner');
+        event.feed = await feedIfHungry();
         assert.equal(await countBall(), 1, 'Expected one named ball before fetch');
         // Stage the original ball six blocks ahead so only the dog can retrieve it.
         await command(`clear ${player} ${item} 1`);
@@ -206,6 +243,7 @@ async function runInWorld(baseUrl, expectedSave, seconds, runId, reportFile, cli
         event.ballCount = 1;
         observations.walksAndFetches++;
       }
+      observations.treatsUsed += event.feed?.treatsUsed ?? 0;
       delete observations.inProgress;
       checkpoint(event);
       await wait(12000, undefined, { signal });
@@ -225,7 +263,7 @@ async function runInWorld(baseUrl, expectedSave, seconds, runId, reportFile, cli
   } catch { /* The bridge may be connected to a profile without a local startup log. */ }
   return runCases([{
     name: 'java-daycare', inputs: { seconds }, stopOnFailure: true,
-    setup: prepare, run: (_, result, save) => play(result, save)
+    setup: prepare, run: play
   }], {
     reportFile, metadata: { scenario: 'java-daycare', runId, gameVersion, clientLog: profileLog, seed: initial.seed, expectedSave, savePath,
       playerUuid: actor.uuid, dogUuid: dogId, origin: { x, y, z }, provenance: provenance(savePath) },

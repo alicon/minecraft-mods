@@ -29,6 +29,15 @@ test('an input or observer failure does not count as failed gameplay', async () 
   assert.equal(report.ok, false);
 });
 
+test('an aborted test reports an interruption and earns no pass', async () => {
+  const report = await runCases([{
+    name: 'aborted', setup: async () => {},
+    run: async () => { throw Object.assign(Error('run stopped'), { name: 'AbortError' }); }
+  }], {});
+  assert.deepEqual(report.summary, { interrupted: 1 });
+  assert.equal(report.ok, false);
+});
+
 test('continues after failures and persists evidence and complete report', async () => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'yorkie-tests-'));
   const reportFile = path.join(folder, 'report.json');
