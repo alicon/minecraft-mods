@@ -1,0 +1,144 @@
+import { BlockPermutation, BlockVolume, GameMode, ItemStack, system, world } from "@minecraft/server";
+import { spawnSimulatedPlayer } from "@minecraft/server-gametest";
+
+const NS = "mushroom_yorkie:";
+const BALL = NS + "yorkie_ball";
+const TREAT = NS + "yorkie_treat";
+const origin = { x: 4.5, y: 231, z: 6.5 };
+const dogStart = { ...origin, x: 6.5 };
+const bag = (player) => player.getComponent("minecraft:inventory").container;
+const ownerId = (dog) => dog.getComponent("minecraft:is_tamed")?.tamedToPlayerId;
+const leashHolder = (dog) => dog.getComponent("minecraft:leashable")?.leashHolder?.id;
+
+function assert(condition, detail) {
+  if (!condition) {
+    throw new Error(detail);
+  }
+}
+
+async function until(predicate, detail, ticks = 80) {
+  for (let elapsed = 0; elapsed < ticks; elapsed += 2) {
+    if (predicate()) {
+      return;
+    }
+    await system.waitTicks(2);
+  }
+  throw new Error(detail());
+}
+
+function use(player, dog, type, amount = 1) {
+  player.stopInteracting();
+  player.setItem(new ItemStack(type, amount), 0, true);
+  player.interactWithEntity(dog);
+  player.stopInteracting();
+}
+
+async function feed(owner, guest, dog, example) {
+  const player = example.owner ? owner : guest;
+  const item = "minecraft:" + example.item;
+  player.setGameMode(example.mode === "creative" ? GameMode.Creative : GameMode.Survival);
+  const health = dog.getComponent("minecraft:health");
+  const before = health.effectiveMax - example.missingHealth;
+  health.setCurrentValue(before);
+  use(player, dog, item, 2);
+  await system.waitTicks(8);
+  const held = bag(player).getItem(0)?.amount ?? 0;
+  assert(leashHolder(dog) === (example.leashed ? owner.id : undefined), "changed lead holder");
+  assert(health.currentValue === before + example.healed && held === 2 - example.spent,
+    "expected health " + (before + example.healed) + " and held " + (2 - example.spent)
+      + ", observed health " + health.currentValue + " and held " + held);
+  assert(ownerId(dog) === owner.id && !dog.getProperty(NS + "ordered_sit"), "changed owner or sit order");
+}
+
+function fillGrass(dimension, type) {
+  for (let x = 7; x <= 12; ++x) {
+    for (let z = 3; z <= 9; ++z) {
+      const position = { x, y: 231, z };
+      dimension.setBlockType(position, type);
+      if (type === "minecraft:tall_grass") {
+        dimension.setBlockPermutation({ ...position, y: 232 }, BlockPermutation.resolve(type, { upper_block_bit: true }));
+      }
+    }
+  }
+}
+
+async function fetchGrass(dimension, owner, dog, type) {
+  const target = { ...origin, x: 11.5, y: origin.y + 0.2 };
+  const name = "Fetch through " + type;
+  const toy = new ItemStack(BALL);
+  toy.nameTag = name;
+  fillGrass(dimension, type);
+  owner.setGameMode(GameMode.Survival);
+  owner.teleport(origin);
+  dog.teleport(dogStart);
+  bag(owner).clearAll();
+  const loose = dimension.spawnItem(toy, target);
+  loose.addTag("mushroom_fetch_toy");
+  loose.setDynamicProperty(NS + "fetch_thrower", owner.id);
+  loose.setDynamicProperty(NS + "fetch_drop_amount", 1);
+  const cargo = bag(dog);
+  try {
+    assert(dimension.getBlock(target)?.typeId === type, "grass fixture did not place the target");
+    await until(() => cargo.getItem(0)?.nameTag === name, () => "did not pick up toy in " + type
+      + " (dog at " + JSON.stringify(dog.location) + ")", 140);
+    await until(() => Array.from({ length: bag(owner).size }, (_, slot) => bag(owner).getItem(slot))
+      .filter((item) => item?.nameTag === name).reduce((total, item) => total + item.amount, 0) === 1,
+    () => "did not bring back exactly one original toy", 140);
+    assert(!loose.isValid && !cargo.getItem(0), "added a duplicate or retained cargo");
+  } finally {
+    if (loose.isValid) {
+      loose.remove();
+    }
+    dimension.fillBlocks(new BlockVolume({ x: 7, y: 231, z: 3 }, { x: 12, y: 232, z: 9 }), "minecraft:air");
+  }
+}
+
+world.afterEvents.worldLoad.subscribe(async () => {
+  const failures = [];
+  async function check(name, action) {
+    try {
+      await action();
+      console.warn("MUSHROOM_PARITY_OK " + name);
+    } catch (error) {
+      failures.push(name + ": " + error);
+      console.warn("MUSHROOM_PARITY_ASSERTION " + failures.at(-1));
+    }
+  }
+
+  try {
+    const dimension = world.getDimension("overworld");
+    await world.tickingAreaManager.createTickingArea("mushroom_parity", {
+      dimension, from: { x: 1, y: 230, z: 1 }, to: { x: 13, y: 233, z: 13 },
+    });
+    dimension.fillBlocks(new BlockVolume({ x: 1, y: 230, z: 1 }, { x: 13, y: 230, z: 13 }), "minecraft:grass_block");
+    world.setTimeOfDay(1000);
+    const owner = spawnSimulatedPlayer({ dimension, ...origin }, "ParityOwner", GameMode.Survival);
+    const guest = spawnSimulatedPlayer({ dimension, ...origin, z: 7.5 }, "ParityGuest", GameMode.Survival);
+    const dog = dimension.spawnEntity(NS + "mushroom_yorkie", dogStart, { spawnEvent: "minecraft:entity_spawned" });
+    await system.waitTicks(8);
+    use(owner, dog, TREAT);
+    await until(() => ownerId(dog) === owner.id, () => "setup could not tame the dog");
+
+    for (const type of ["minecraft:short_grass", "minecraft:tall_grass"]) {
+      await check(type, () => fetchGrass(dimension, owner, dog, type));
+    }
+    for (const example of FOOD_EXAMPLES.filter((test) => !test.leashed)) {
+      await check(example.id, () => feed(owner, guest, dog, example));
+    }
+
+    owner.setGameMode(GameMode.Survival);
+    owner.teleport(origin);
+    dog.teleport(dogStart);
+    use(owner, dog, NS + "yorkie_harness");
+    await until(() => dog.getProperty(NS + "wearing_harness"), () => "setup could not fit the harness");
+    use(owner, dog, "minecraft:lead");
+    await until(() => leashHolder(dog) === owner.id, () => "setup could not attach the owner's lead");
+    for (const example of FOOD_EXAMPLES.filter((test) => test.leashed)) {
+      await check(example.id, () => feed(owner, guest, dog, example));
+    }
+    assert(!failures.length, failures.join(" | "));
+    console.warn("MUSHROOM_PARITY_PASS");
+  } catch (error) {
+    console.error("MUSHROOM_TEST_FAIL parity " + (error.stack ?? error));
+  }
+});

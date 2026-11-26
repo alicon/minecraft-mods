@@ -27,6 +27,8 @@ STAY_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-stay-probe.js")
 FLIGHT_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-flight-probe.js")
 AUTOPLAY_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-autoplay.js")
 DAYCARE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-daycare.js")
+PARITY_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-parity.js")
+FOOD_CASES = PROBE_SOURCE.with_name("mushroom-food-cases.json")
 TREAT_CASES = PROBE_SOURCE.with_name("mushroom-treat-cases.json")
 AUTOPLAY_CASES = ("survival-feed", "creative-feed", "owner-walk", "guest-walk", "fetch", "sleep-flight", "daycare")
 
@@ -69,6 +71,7 @@ def main():
     parser.add_argument("--with-addon", action="append", type=Path, default=[],
                         help="keep another .mcaddon active during this test; repeat to add more")
     parser.add_argument("--verify-care-persistence", action="store_true")
+    parser.add_argument("--verify-parity", action="store_true", help="check grass fetch and ordinary food against Java")
     parser.add_argument("--verify-fetch", action="store_true", help="run an opt-in simulated-player fetch test")
     parser.add_argument("--verify-adoption", action="store_true", help="run an opt-in simulated-player sleep adoption test")
     parser.add_argument("--verify-egg-adoption", action="store_true", help="check repeated Creative and Survival egg use")
@@ -111,8 +114,13 @@ def main():
         if args.verify_care_persistence:
             exercise_world(server_dir, "MUSHROOM_TEST_CARE_PERSISTED")
         if any((args.verify_fetch, args.verify_adoption, args.verify_egg_adoption,
-                args.verify_stay_walk, args.verify_flight, args.play_seconds)):
+                args.verify_stay_walk, args.verify_flight, args.verify_parity, args.play_seconds)):
             probe = enable_beta_test_apis(server_dir, WORLD)
+            if args.verify_parity or args.verify_fetch:
+                examples = json.dumps(json.loads(FOOD_CASES.read_text(encoding="utf-8")))
+                probe.write_text(PARITY_SOURCE.read_text(encoding="utf-8")
+                                 + f"\nconst FOOD_EXAMPLES = {examples};\n", encoding="utf-8")
+                exercise_world(server_dir, "MUSHROOM_PARITY_PASS", timeout=90)
             if args.verify_fetch:
                 examples = json.dumps(json.loads(TREAT_CASES.read_text(encoding="utf-8")))
                 probe.write_text(PLAYER_PROBE_SOURCE.read_text(encoding="utf-8")

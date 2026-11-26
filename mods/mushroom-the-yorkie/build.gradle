@@ -50,6 +50,7 @@ apply from: rootProject.file('gradle/legacy-crafting-recipes.gradle')
 
 tasks.named('processGametestResources') {
 	from(rootProject.file('scripts/fixtures/mushroom-treat-cases.json'))
+	from(rootProject.file('scripts/fixtures/mushroom-food-cases.json'))
 }
 
 if (project.hasProperty('yorkie_daycare_guest')) {

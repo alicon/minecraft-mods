@@ -14,6 +14,18 @@ public final class DomesticCareGameTests {
 		TreatScenarios.feed(helper);
 	}
 
+	/** An owner can feed normal food, and guest food does not change the dog. */
+	@GameTest(template = "fabric-gametest-api-v1:empty")
+	public void feedsNormalFood(GameTestHelper helper) {
+		PlayerFoodScenarios.feed(helper, false);
+	}
+
+	/** A bite from the owner must keep the lead attached. */
+	@GameTest(template = "fabric-gametest-api-v1:empty")
+	public void feedsNormalFoodWhileLeashed(GameTestHelper helper) {
+		PlayerFoodScenarios.feed(helper, true);
+	}
+
 	/** A second player can borrow a harnessed dog's lead while both dogs keep their owners. */
 	@GameTest(template = "fabric-gametest-api-v1:empty")
 	public void daycareGuestsShareLeads(GameTestHelper helper) {
