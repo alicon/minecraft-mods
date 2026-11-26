@@ -71,14 +71,18 @@ final class SquirrelPose {
 		return CubeListBuilder.create().texOffs(36, 0).addBox(-0.6F, 0.0F, -0.6F, 1.2F, 3.5F, 1.2F);
 	}
 
-	void animate(float walkPosition, float walkSpeed, float ageInTicks, float headYaw, float headPitch, float treePitch) {
+	void animate(float walkPosition, float walkSpeed, float ageInTicks, float headYaw, float headPitch, float treePitch, float treeRoll) {
+		this.pivot.zRot = treeRoll * Mth.DEG_TO_RAD;
 		this.pivot.xRot = -treePitch * Mth.DEG_TO_RAD;
-		float freeLook = 1.0F - Math.min(Math.abs(treePitch) / 78.0F, 1.0F);
+		float freeLook = Math.max(0.0F, 1.0F - Math.abs(treePitch) / 78.0F) * (1.0F - treeRoll / 180.0F);
 		this.head.xRot = headPitch * Mth.DEG_TO_RAD * freeLook;
 		this.head.yRot = headYaw * Mth.DEG_TO_RAD * freeLook;
-		this.tail.xRot = -0.08F + Mth.sin(ageInTicks * 0.08F) * 0.05F;
-		this.tail.yRot = Mth.sin(ageInTicks * 0.25F) * 0.16F;
 		float walk = walkPosition * 0.9F;
+		float stride = Mth.clamp(walkSpeed, 0.0F, 1.0F);
+		this.tail.xRot = -0.08F + Mth.sin(ageInTicks * 0.08F) * 0.05F
+				- stride * (0.25F + 0.14F * Mth.cos(2.0F * walk));
+		this.tail.yRot = Mth.sin(ageInTicks * 0.25F) * 0.16F;
+		this.tail.zRot = Mth.sin(ageInTicks * 0.13F) * 0.04F + Mth.sin(walk) * stride * 0.55F;
 		this.frontLeftLeg.xRot = Mth.cos(walk) * 1.3F * walkSpeed;
 		this.backRightLeg.xRot = Mth.cos(walk) * 1.3F * walkSpeed;
 		this.frontRightLeg.xRot = Mth.cos(walk + Mth.PI) * 1.3F * walkSpeed;

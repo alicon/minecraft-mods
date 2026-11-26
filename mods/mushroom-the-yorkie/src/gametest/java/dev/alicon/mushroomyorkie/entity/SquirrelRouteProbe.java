@@ -74,6 +74,14 @@ final class SquirrelRouteProbe {
 		this.helper.runAfterDelay(1, this::tick);
 	}
 
+	void recordRouteClosure() {
+		JsonObject closure = new JsonObject();
+		closure.addProperty("entityTick", this.squirrel.tickCount);
+		closure.add("position", point(this.squirrel.position().subtract(this.origin)));
+		this.report.add("routeClosure", closure);
+		this.save(false);
+	}
+
 	SquirrelRouteProbe requireContinuousApproach() {
 		try {
 			this.approachAge = field("approachTicks");
@@ -103,6 +111,9 @@ final class SquirrelRouteProbe {
 			frame.add("position", point(position.subtract(this.origin)));
 			frame.add("velocity", point(this.squirrel.getDeltaMovement()));
 			frame.addProperty("health", this.squirrel.getHealth());
+			frame.addProperty("alive", this.squirrel.isAlive());
+			var lastDamage = this.squirrel.getLastDamageSource();
+			if (lastDamage != null) frame.addProperty("lastDamage", lastDamage.getMsgId());
 			frame.addProperty("climbing", isClimbing);
 			frame.addProperty("treePose", this.squirrel.treePoseDirection());
 			frame.addProperty("foundTree", this.squirrel.hasFoundTree());
@@ -137,7 +148,8 @@ final class SquirrelRouteProbe {
 					this.approachAirborneTicks++;
 				}
 			}
-			this.helper.assertTrue(this.squirrel.isAlive() && this.squirrel.getHealth() == this.squirrel.getMaxHealth(), "Squirrel route lost health");
+			this.helper.assertTrue(this.squirrel.isAlive(), "Original squirrel was removed during the route");
+			this.helper.assertTrue(this.squirrel.getHealth() == this.squirrel.getMaxHealth(), "Squirrel route lost health");
 			boolean clinging = this.squirrel.hasFoundTree() && this.squirrel.isNoGravity()
 					&& position.y >= this.origin.y + 4.8D;
 			if (clinging && this.firstCling < 0) this.firstCling = this.ticks;
@@ -175,7 +187,8 @@ final class SquirrelRouteProbe {
 			} finally {
 				this.squirrel.discard();
 			}
-			throw new IllegalStateException("Native squirrel route failed: " + this.label, failure);
+			throw new IllegalStateException("Native squirrel route failed: " + this.label
+					+ " at tick " + this.ticks + ": " + failure.getMessage(), failure);
 		}
 		this.start();
 	}

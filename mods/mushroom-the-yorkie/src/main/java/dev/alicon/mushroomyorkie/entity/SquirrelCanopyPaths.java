@@ -14,7 +14,7 @@ import net.minecraft.world.phys.Vec3;
 
 final class SquirrelCanopyPaths {
 	private static final int CROWN_RADIUS = 5;
-	private static final int CROWN_HEIGHT = 12;
+	private static final int CROWN_HEIGHT = 24;
 	private static final int NEXT_TREE_RADIUS = 18;
 	private static final double MAX_LEAP_DISTANCE_SQR = 4.0D * 4.0D;
 	private static final double LEAP_RISE = 1.15D;
@@ -42,6 +42,9 @@ final class SquirrelCanopyPaths {
 			BlockPos current = queue.removeFirst();
 			if (destination.test(current)) {
 				var points = new ArrayList<>(route(start, current, parents));
+				// Bring the inverted paws up to the leaves while leaving room for the hitbox.
+				points.replaceAll(point -> level.getBlockState(BlockPos.containing(point).above()).is(BlockTags.LEAVES)
+						? point.add(0, 1.0D - squirrel.getBbHeight() - 0.01D, 0) : point);
 				Vec3 first = points.getFirst();
 				points.set(0, new Vec3(first.x, squirrel.getY(), first.z));
 				return points;
@@ -165,7 +168,7 @@ final class SquirrelCanopyPaths {
 				squirrel.getBoundingBox().move(Vec3.atBottomCenterOf(pos).subtract(squirrel.position())));
 	}
 
-	private static boolean touchesTree(Level level, BlockPos pos) {
+	static boolean touchesTree(Level level, BlockPos pos) {
 		for (Direction direction : Direction.values()) {
 			if (foliage(level, pos.relative(direction))) return true;
 		}

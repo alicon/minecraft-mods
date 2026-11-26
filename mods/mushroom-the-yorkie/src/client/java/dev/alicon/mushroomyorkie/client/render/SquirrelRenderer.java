@@ -25,6 +25,7 @@ public final class SquirrelRenderer extends MobRenderer<SquirrelEntity, Squirrel
 	public void extractRenderState(SquirrelEntity entity, SquirrelRenderState state, float partialTick) {
 		super.extractRenderState(entity, state, partialTick);
 		state.treePitch = entity.treePosePitch(partialTick);
+		state.treeRoll = entity.treePoseRoll(partialTick);
 	}
 
 	@Override
@@ -35,5 +36,6 @@ public final class SquirrelRenderer extends MobRenderer<SquirrelEntity, Squirrel
 	/** Client pose state for ground and trunk locomotion. */
 	public static final class SquirrelRenderState extends LivingEntityRenderState {
 		float treePitch;
+		float treeRoll;
 	}
 }

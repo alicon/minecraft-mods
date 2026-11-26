@@ -29,6 +29,24 @@ public final class ChaseAndDefenseGameTests {
 		SquirrelTravelScenarios.movesBetweenTrees(helper, true);
 	}
 
+	/** The squirrel can go beyond its trunk perch and get above a tall overhang. */
+	@GameTest(template = "mushroom_yorkie_gametest:canopy_arena", timeoutTicks = 620)
+	public void squirrelReachesTallCanopy(GameTestHelper helper) {
+		SquirrelTravelScenarios.reachesTallCanopy(helper, false);
+	}
+
+	/** Losing the tree during an underside crossing releases normal gravity. */
+	@GameTest(template = "mushroom_yorkie_gametest:canopy_arena", timeoutTicks = 620)
+	public void squirrelReleasesRemovedCanopy(GameTestHelper helper) {
+		SquirrelTravelScenarios.reachesTallCanopy(helper, true);
+	}
+
+	/** A normally generated birch offers a navigable crown. */
+	@GameTest(template = "mushroom_yorkie_gametest:canopy_arena", timeoutTicks = 620)
+	public void squirrelReachesGrownBirch(GameTestHelper helper) {
+		SquirrelTravelScenarios.reachesGrownBirch(helper);
+	}
+
 	/** One collected oak sapling becomes a vanilla tree after growth. */
 	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 180)
 	public void squirrelPlantsDroppedSapling(GameTestHelper helper) {
