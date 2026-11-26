@@ -96,6 +96,21 @@ class BedrockPackageTests(unittest.TestCase):
                 identifiers.extend(entry["uuid"] for entry in (manifest["header"], *manifest["modules"]))
         self.assertEqual(len(identifiers), len(set(identifiers)))
 
+    def test_script_packs_match_the_api_checked_in_ci(self):
+        module_name = "@minecraft/server"
+        tooling = builder.read_json(builder.ROOT / "tools/bedrock/package.json")
+        expected = {"module_name": module_name, "version": tooling["devDependencies"][module_name]}
+        for manifest_path in sorted((builder.ROOT / "mods").glob("*/bedrock/behavior_pack/manifest.json")):
+            manifest = builder.read_json(manifest_path)
+            if not any(module["type"] == "script" for module in manifest["modules"]):
+                continue
+            with self.subTest(pack=manifest_path.parents[2].name):
+                dependencies = [
+                    dependency for dependency in manifest.get("dependencies", [])
+                    if dependency.get("module_name") == module_name
+                ]
+                self.assertEqual(dependencies, [expected])
+
     def test_mismatched_dependency_cannot_be_packaged(self):
         manifests = {
             kind: builder.read_json(ADDON / kind / "manifest.json") for kind in builder.PACK_TYPES
