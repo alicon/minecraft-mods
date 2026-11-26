@@ -4,6 +4,22 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      play_seconds:
+        description: Seconds of autonomous Mushroom play
+        type: choice
+        options: ['1800', '7200', '14400']
+        default: '1800'
+      play_case:
+        description: Mushroom gameplay scenario
+        type: choice
+        options: [mixed, daycare]
+        default: mixed
+      play_seed:
+        description: Integer gameplay seed
+        type: string
+        default: '119'
 
 permissions:
   contents: read
@@ -26,9 +42,28 @@ jobs:
           npm --prefix tools/bedrock ci
           npm --prefix tools/bedrock run check
 
+      - name: Validate the built archives with Minecraft Creator Tools
+        run: |
+          for folder in mods/*/bedrock; do
+            mod=$(basename "$(dirname "$folder")")
+            python3 scripts/build-bedrock-addon.py "$mod" --output build/creator-inputs
+          done
+          python3 scripts/check-bedrock-creator-tools.py build/creator-inputs/*.mcaddon --output build/creator-reports
+      - name: Keep Creator Tools reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bedrock-creator-validation
+          path: build/creator-reports
+          if-no-files-found: warn
+
   bedrock-smoke:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && 260 || 20 }}
+    env:
+      PLAY_SECONDS: ${{ inputs.play_seconds || '30' }}
+      PLAY_SEED: ${{ inputs.play_seed || '119' }}
+      PLAY_CASE: ${{ inputs.play_case || 'mixed' }}
     steps:
       - uses: actions/checkout@v7
       - name: Download Bedrock Dedicated Server 26.66.1
@@ -38,20 +73,50 @@ jobs:
             https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-1.26.66.1.zip \
             --output "$RUNNER_TEMP/bedrock-server.zip"
           echo "e87bcd95bec5cc34b065ca956825c6abb7a0c356ae79408302845069cecaa6bf  $RUNNER_TEMP/bedrock-server.zip" | sha256sum --check
-      - name: Exercise each add-on with the other two installed
+      - name: Build the three Bedrock add-ons
+        id: packs
         run: |
-          server="$RUNNER_TEMP/bedrock-server.zip"
           mushroom="$(python3 scripts/build-bedrock-addon.py mushroom-the-yorkie)"
           cops="$(python3 scripts/build-bedrock-addon.py cops-and-robbers)"
           narwhal="$(python3 scripts/build-bedrock-addon.py narwhal-together)"
-          python3 scripts/smoke-mushroom-bedrock.py "$server" "$mushroom" \
-            --with-addon "$cops" --with-addon "$narwhal" \
-            --verify-care-persistence --verify-fetch --verify-adoption
-          python3 scripts/smoke-cops-bedrock.py "$server" "$cops" \
-            --with-addon "$mushroom" --with-addon "$narwhal" \
-            --verify-vehicles --verify-patrol --verify-fire --verify-jail
-          python3 scripts/smoke-narwhal-bedrock.py "$server" "$narwhal" \
-            --with-addon "$mushroom" --with-addon "$cops"
+          {
+            echo "MUSHROOM=$mushroom"
+            echo "COPS=$cops"
+            echo "NARWHAL=$narwhal"
+          } >> "$GITHUB_ENV"
+      - name: Exercise Mushroom with both companion add-ons
+        run: |
+          set -o pipefail
+          args=()
+          if [[ "$PLAY_CASE" != mixed ]]; then args+=(--play-case "$PLAY_CASE"); fi
+          python3 -u scripts/smoke-mushroom-bedrock.py "$RUNNER_TEMP/bedrock-server.zip" "$MUSHROOM" \
+            --with-addon "$COPS" --with-addon "$NARWHAL" \
+            --verify-care-persistence --verify-fetch --verify-adoption --verify-flight \
+            --play-seconds "$PLAY_SECONDS" --play-seed "$PLAY_SEED" "${args[@]}" \
+            --failure-evidence build/bedrock/mushroom-repro.zip 2>&1 | tee build/bedrock/mushroom-play.log
+      - name: Exercise Cops and Robbers with both companion add-ons
+        if: ${{ !cancelled() && steps.packs.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          python3 -u scripts/smoke-cops-bedrock.py "$RUNNER_TEMP/bedrock-server.zip" "$COPS" \
+            --with-addon "$MUSHROOM" --with-addon "$NARWHAL" \
+            --verify-vehicles --verify-patrol --verify-fire --verify-jail 2>&1 | tee build/bedrock/cops-play.log
+      - name: Exercise NARwhal Together with both companion add-ons
+        if: ${{ !cancelled() && steps.packs.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          python3 -u scripts/smoke-narwhal-bedrock.py "$RUNNER_TEMP/bedrock-server.zip" "$NARWHAL" \
+            --with-addon "$MUSHROOM" --with-addon "$COPS" 2>&1 | tee build/bedrock/narwhal-play.log
+      - name: Keep Bedrock gameplay evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bedrock-gameplay-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/bedrock/*-play.log
+            build/bedrock/mushroom-repro.zip
+          if-no-files-found: warn
+          retention-days: 30
 
   build:
     runs-on: ubuntu-latest
@@ -76,8 +141,19 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Build
-        run: ./gradlew ${{ matrix.gradle-tasks }} -Ptarget_minecraft_version=${{ matrix.minecraft-version }} --no-daemon
+      - name: Build and run Fabric server GameTests
+        run: |
+          set -o pipefail
+          mkdir -p build
+          ./gradlew ${{ matrix.gradle-tasks }} -Ptarget_minecraft_version=${{ matrix.minecraft-version }} --no-daemon \
+            --console=plain 2>&1 | tee build/fabric-gametest.log
+      - name: Keep Fabric gameplay evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fabric-gametest-${{ matrix.minecraft-version }}
+          path: build/fabric-gametest.log
+          if-no-files-found: warn
 
       - name: Upload mod JARs
         uses: actions/upload-artifact@v7

@@ -4,9 +4,9 @@
   },
   "resource_pack": {
     "pack_icon.png": "src/main/resources/assets/mushroom_yorkie/icon.png",
-    "textures/entity/mushroom_yorkie.png": "src/main/resources/assets/mushroom_yorkie/textures/entity/mushroom_yorkie.png",
-    "textures/items/yorkie_treat.png": "src/main/resources/assets/mushroom_yorkie/textures/item/yorkie_treat.png",
-    "textures/items/yorkie_harness.png": "src/main/resources/assets/mushroom_yorkie/textures/item/yorkie_harness.png",
-    "textures/items/mushroom_yorkie_spawn_egg.png": "src/main/resources/assets/mushroom_yorkie/textures/item/mushroom_yorkie_spawn_egg.png"
+    "textures/alicon/mushroom_yorkie/entity/mushroom_yorkie.png": "src/main/resources/assets/mushroom_yorkie/textures/entity/mushroom_yorkie.png",
+    "textures/alicon/mushroom_yorkie/items/yorkie_treat.png": "src/main/resources/assets/mushroom_yorkie/textures/item/yorkie_treat.png",
+    "textures/alicon/mushroom_yorkie/items/yorkie_harness.png": "src/main/resources/assets/mushroom_yorkie/textures/item/yorkie_harness.png",
+    "textures/alicon/mushroom_yorkie/items/mushroom_yorkie_spawn_egg.png": "src/main/resources/assets/mushroom_yorkie/textures/item/mushroom_yorkie_spawn_egg.png"
   }
 }

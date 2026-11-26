@@ -9,9 +9,26 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.entity.EntityTypeTest;
+import net.minecraft.world.level.gameevent.GameEvent;
 
-final class MushroomFeedingInteractions {
+/** Applies Mushroom's taming and food interactions. */
+public final class MushroomFeedingInteractions {
 	private MushroomFeedingInteractions() {
+	}
+
+	/** Handles a held treat before vanilla can release the current player's lead. */
+	public static InteractionResult feedLeashHolderTreat(MushroomYorkieEntity yorkie, Player player, InteractionHand hand) {
+		ItemStack stack = player.getItemInHand(hand);
+		if (!yorkie.isAlive() || !yorkie.isTame() || player.isSpectator()
+				|| yorkie.getLeashHolder() != player || !MushroomFoodPolicy.isYorkieTreat(stack)) {
+			return InteractionResult.PASS;
+		}
+
+		var result = handle(yorkie, player, hand, stack);
+		if (!yorkie.level().isClientSide()) {
+			yorkie.gameEvent(GameEvent.ENTITY_INTERACT, player);
+		}
+		return result;
 	}
 
 	static InteractionResult handle(MushroomYorkieEntity yorkie, Player player, InteractionHand hand, ItemStack stack) {

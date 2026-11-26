@@ -13,11 +13,15 @@ By default, the workspace builds the version in `gradle.properties`. Individual 
 small version matrix with version-specific source roots when the compatibility value is worth the
 extra maintenance.
 
-Current Minecraft target support:
+### Support matrix
 
-- NARwhal Together: Minecraft Java Edition `1.21.11` and `1.21.1`
-- Mushroom the Yorkie: Minecraft Java Edition `1.21.11` and `1.21.1`
-- Cops and Robbers: Minecraft Java Edition `1.21.11`
+| Mod | Fabric targets | Bedrock minimum | Dedicated Server used in CI | Device and Realm results |
+| --- | --- | --- | --- | --- |
+| Mushroom the Yorkie | 1.21.11, 1.21.1 | 26.60 | 26.66.1 | [Mushroom playtests](https://github.com/alicon/minecraft-mods/issues/134) |
+| Cops and Robbers | 1.21.11 | 26.60 | 26.66.1 | [Patrol playtests](https://github.com/alicon/minecraft-mods/issues/138) |
+| NARwhal Together | 1.21.11, 1.21.1 | 26.60 | 26.66.1 | [Regroup playtests](https://github.com/alicon/minecraft-mods/issues/141) |
+
+Each device result applies to the archive version, Minecraft version and join method recorded in its issue.
 
 ## Bedrock development
 
@@ -34,6 +38,10 @@ Development packs target Bedrock 26.60 with stable pack schemas. Release support
 
 GitHub Actions checks Bedrock scripts against the pinned stable API and builds the add-ons in the package tests. Run the type check locally with `npm --prefix tools/bedrock ci` and `npm --prefix tools/bedrock run check`. The package tests also verify that scripted behavior packs declare the version used to type-check them.
 
+CI also runs Mojang’s Creator Tools on the built archives. Its main suite checks JSON, manifests and resources. Its cooperative Add-On suite checks packaging conventions used when multiple add-ons share a world. Download the reports from the workflow artifacts to inspect warnings and file paths. After building the three packs, run `python3 scripts/check-bedrock-creator-tools.py <candidate.mcaddon> [<other-candidate.mcaddon> ...] --output build/creator-reports` against the intended candidates. [Minecraft Creator Tools](https://github.com/Mojang/minecraft-creator-tools)
+
+Creator Tools 0.21.0 reports two warning types against these candidates. Mojang’s own resource pack uses string paths in `item_texture.json` (JSON192), and its bee behavior uses string arrays for `move_to_block.target_blocks` (JSONF110). Keep these findings visible in the reports and verify item textures in a rendered client and the block-seeking behavior in server smoke tests. [Vanilla item atlas](https://github.com/Mojang/bedrock-samples/blob/main/resource_pack/textures/item_texture.json) · [Vanilla bee behavior](https://github.com/Mojang/bedrock-samples/blob/main/behavior_pack/entities/bee.json)
+
 The `bedrock-smoke` job builds all three packs and runs the scenarios below on a pinned, checksum-verified [Bedrock Dedicated Server](https://www.minecraft.net/en-us/download/server/bedrock). It exercises each add-on in a separate disposable world with both companion add-ons active. Review the pinned server build and checksum when updating the supported Bedrock version.
 
 Each server smoke runner accepts one `--with-addon` argument per additional archive. This command tests NARwhal's upgrade and regrouping while Mushroom and Cops and Robbers stay active.
@@ -45,15 +53,37 @@ python3 scripts/smoke-narwhal-bedrock.py /path/to/bedrock-server.zip /path/to/na
   --with-addon /path/to/cops.mcaddon
 ```
 
-Use the [Bedrock release checklist](RELEASING.md#publish-a-bedrock-add-on) to record client and Realm evidence alongside server results.
+Use the [Bedrock release checklist](RELEASING.md#release-a-bedrock-add-on) to record client and Realm evidence alongside server results.
+
+### Testing a game update
+
+1. Keep the previous supported patch and its checksum available. Run the last playtested archive there and on the proposed stable patch. A change seen with the same archive isolates the engine update.
+2. Run the candidate on the proposed patch in a fresh world and on a disposable copy created with the earlier archive. Exercise ownership, inventory across rejoin and the three-pack smoke. Record both archive hashes, exact game versions and the first failing action in the affected mod's issue.
+3. Update the CI pin, this table and release notes after the checks pass. Enter client, controller or touch and Realm results on the same candidate before advertising those platforms.
+
+Package tests compare the built archives to the [playtested identifiers](../scripts/fixtures/bedrock-pack-baselines.json). They check pack and module UUIDs, the entity, block and item names stored in worlds, and paired pack versions. Additive content is allowed in a newer version. Refresh each baseline from its verified download when releasing, retaining every identifier from earlier saves. The patrol stores structured state under a versioned key. Preserve existing scalar save keys and migrate their old values explicitly when their meaning changes.
+
+### Saved state
+
+| Bedrock mod | Current saved schema |
+| --- | --- |
+| Mushroom the Yorkie | V1 uses native entity ownership and cargo plus stable scalar keys for pet identity, owner contact, daily bowls and practice toys. Changes to a scalar's meaning need an explicit migration that accepts the old value. |
+| Cops and Robbers | V1 patrol records live under `cops_robbers:patrol_v1/`. Retired-robber markers retain their original scalar keys. |
+| NARwhal Together | Charm cooldowns and concurrent regroup requests are session state. The item identifier persists in inventories. |
+
+Upgrade fixtures check saved ownership, daily care, cargo, structures, patrols, and the Regroup Charm alongside the other active add-ons.
 
 ### Gameplay checks by edition
 
 | Shared behavior | Java Fabric checks | Bedrock checks |
 | --- | --- | --- |
-| Mushroom ownership, care, and fetch | Live companion smoke, wake-up and care policy tests, and native fetch save/load GameTests | [Companion smoke](../mods/mushroom-the-yorkie/bedrock/README.md#verify-the-add-on) with adoption, care persistence, and fetch enabled |
+| Mushroom ownership and borrowed leads | Native `daycareGuestsShareLeads` on both Fabric targets checks the one-dog limit, harness, guest lead, feeding while leashed, and ownership | Adoption and care persistence probes and the mixed two-player session exercise independent ownership, guest walks, and feeding while leashed |
+| Mushroom treat use | Native `feedsTreatsAcrossEditions` uses the [shared feeding cases](../scripts/fixtures/mushroom-treat-cases.json) | The fetch probe uses the same cases to check health and Survival and Creative inventory |
+| Mushroom fetch and night flight | Native fetch interruption and persistence GameTests plus the bridge transition matrix | The fetch probe verifies interrupted carry and rejoin. The flight probe verifies sleeping through Creative takeoff and resuming flight at dawn |
 | Cops and Robbers kits, patrol, and fire response | Live patrol and structures smoke exercises kit placement, mounted capture, jail drop-off, and extinguishing fires | [Patrol smoke](../mods/cops-and-robbers/bedrock/README.md#verify-the-kits-vehicles-patrol-fire-response-and-jail) with the vehicle, patrol, fire, and jail scenarios enabled |
 | NARwhal alphabetical regroup and wraparound | Fabric target selector tests use the [shared regroup cycle](../scripts/fixtures/narwhal-regroup-cycle.json) | [Regroup smoke](../mods/narwhal-together/bedrock/README.md#build-and-test) exercises the same cycle through native item use |
+
+Creative takeoff wakes a sleeping companion on Java, as exercised by the live bridge transition matrix. The Bedrock companion stays asleep through takeoff and follows flight again at dawn. The Bedrock party tests use the latter expectation. [Mushroom Bedrock gameplay checks](../mods/mushroom-the-yorkie/bedrock/README.md#automated-checks)
 
 See [Java automated coverage](TESTING.md#current-automated-coverage) for the complete test descriptions.
 

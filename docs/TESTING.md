@@ -109,6 +109,17 @@ Run Mushroom's headless Minecraft GameTests:
 ./gradlew :mushroom-the-yorkie:runGameTestServer
 ```
 
+Use Fabric 1.21.11's verification mode to repeat a native case 100 times in each of four rotations. The regular build still runs the short suite on both supported targets.
+
+```shell
+MUSHROOM_SQUIRREL_TRACE_DIR="$PWD/build/squirrel-approach-verify" \
+  ./gradlew :mushroom-the-yorkie:runGameTestServer -Ptarget_minecraft_version=1.21.11 \
+  -Pgame_test_filter=mushroom_yorkie_gametest:squirrel_approach_game_tests_squirrel_replans_closed_approach \
+  -Pgame_test_verify=true
+```
+
+This fixture confirms the squirrel has started down the original path and its body is clear before placing the wall. The trace records when the route closed and when the same squirrel climbed the alternate tree.
+
 Fetch GameTests cover active flight steering, interruption returning to normal following, toy returns from below a platform, fractional owner heights, landing during chase/return, airborne return across native save/load, and shoreline path endpoints within pickup reach. Flight fixtures run the real fetch goal, flight controller, and native collision movement in server order. Live terrain cases additionally exercise full entity ticks, all three toys, and independent survival/creative walking/creative flying owner states.
 
 Flight and airborne-reload fetch tests declare a 16×16 horizontal arena. Their
@@ -201,7 +212,7 @@ adapters stay under `src/versions/<version>/gametest/java`. They remain test-onl
 
 ## Local Playtest Harness
 
-The Mineflayer harness in `tools/playtest-harness/` can join a local dev server, dedicated test server, or single-player LAN world. Use it for player-like smoke checks, live bot companionship, and artifact capture that is faster than repeating manual setup by hand.
+The Mineflayer harness in `tools/playtest-harness/` can join compatible local servers and LAN worlds for player-like smoke checks, live bot companionship, and artifact capture. Mushroom's Fabric registry sync requires a modded client. Use the Playtest Bridge for single-client play or the Fabric client GameTest below for the two-client check.
 
 Install once:
 
@@ -263,6 +274,44 @@ frame waits and unrelated file writes are not evidence of console blockage.
 Restart Minecraft after installing `playtest-bridge`. The bridge binds to `127.0.0.1:57321` by default and is intended only for local development profiles.
 Bridge state and terrain-scan seeds are exact signed decimal strings; keep that
 type in reproduction reports rather than converting to JavaScript numbers.
+
+Test fetch interruptions, owner mode changes, and waking or landing in the live matrix. A case budget and a seed give a replayable subset. The report records the planned order, observed cases and Minecraft profile.
+
+```shell
+node tools/playtest-harness/src/bridge-cli.js yorkie-matrix \
+  --expected-save "Codex Test Copy" --group transitions --seed 119 --limit 8 \
+  --report-file build/playtest-reports/java-transition-seed119.json
+```
+
+Use `--prior-report <previous.json>` to prioritize a prior gameplay finding and nearby variants within the selected group. Replay uses the recorded seed and input report SHA-256. In this mode the harness ranks observed failures and retains the same case assertions. Keep the original report alongside the new one.
+
+Run a real Java 1.21.11 client through natural bedtime, dawn, and daytime fetches with the same dog and owner. Open a disposable copy, select an empty hand, and bring a tamed, harnessed Yorkie within reach. The runner builds a guarded course near the player, stages one named ball, and starts shortly before dawn. During play the clock advances normally. The bridge drives ordinary movement, offers a treat when the dog is hungry, and stages each fetch item six blocks ahead of the owner.
+
+```shell
+node tools/playtest-harness/src/bridge-cli.js yorkie-daycare \
+  --expected-save "Codex Test Copy" --seconds 1800 \
+  --report-file build/playtest-reports/java-daycare.json
+```
+
+The report records each action, native walking distance, the original dog's identity, completed fetches, consumed treats, dawns, wall time, and in-game days. Use `--client-log <path>` when a dev launcher writes its Fabric startup log outside the game profile. The report tracks bridge observations and input failures separately from gameplay assertions. A failed run retains the current view and freezes the disposable fixture for investigation.
+
+#### Two Java clients walking a borrowed Yorkie
+
+On Java 1.21.11, start the opt-in client GameTest from one checkout. It creates a disposable server at `127.0.0.1:57341` and prints when it is ready for the dog owner.
+
+```shell
+./gradlew :mushroom-the-yorkie:runClientGameTest -Ptarget_minecraft_version=1.21.11 -Pclient_game_tests
+```
+
+Within 90 seconds, run the owner client from a separate worktree at the same commit. Prepare the second worktree and its Gradle dependencies before starting the test.
+
+```shell
+./gradlew :mushroom-the-yorkie:runClient -Ptarget_minecraft_version=1.21.11 -Pyorkie_daycare_guest
+```
+
+The first client uses the normal Use and movement bindings as a Survival guest. The test checks that a treat is consumed while the lead stays attached, the dog and guest both move, the harness stays on, and the connected owner keeps the dog. Look for `Daycare walk passed` in the first terminal and screenshots under `mods/mushroom-the-yorkie/build/run/clientGameTest/screenshots/`. The test stops the temporary server. Close the owner client after it disconnects.
+
+For an extended run, prefix the first command with `MUSHROOM_DAYCARE_SOAK_SECONDS=1800`. The guest keeps walking and feeds the dog when hungry while the owner stays connected and the clock advances in the test arena. The log records the elapsed seconds and ticks, moves with the dog, treats, and dawns. Every walk checks the original dog, owner, harness and lead.
 
 Screenshots close the active client screen before capture by default; set `BRIDGE_SCREENSHOT_RESUME=0` to keep the current screen visible. Set `BRIDGE_SCREENSHOT_HIDE_GUI=1` and `BRIDGE_SCREENSHOT_CLEAR_CHAT=1` for clean visual inspection captures.
 

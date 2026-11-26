@@ -3,13 +3,13 @@
   "texture_name": "atlas.items",
   "texture_data": {
     "mushroom_yorkie_treat": {
-      "textures": "textures/items/yorkie_treat"
+      "textures": "textures/alicon/mushroom_yorkie/items/yorkie_treat"
     },
     "mushroom_yorkie_harness": {
-      "textures": "textures/items/yorkie_harness"
+      "textures": "textures/alicon/mushroom_yorkie/items/yorkie_harness"
     },
     "mushroom_yorkie_adoption": {
-      "textures": "textures/items/mushroom_yorkie_spawn_egg"
+      "textures": "textures/alicon/mushroom_yorkie/items/mushroom_yorkie_spawn_egg"
     }
   }
 }

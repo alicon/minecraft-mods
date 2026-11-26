@@ -2,20 +2,21 @@
 
 ## Publish a Bedrock add-on
 
-1. Choose the mod and version from its release issue. Keep both pack UUIDs, module UUIDs, and existing content IDs stable across updates. Bump both manifest versions and the behavior pack's resource dependency together.
-2. Build from the candidate commit. Run the pinned Script API check, package tests, and the mod's server smoke. Keep the other two release candidates active in the coexistence run. Use an older archive and a disposable world for upgrade tests.
+1. Choose the mod and version from its release issue. Keep both pack UUIDs, module UUIDs, and existing content IDs stable across updates. Bump both manifest versions together and update the version in each linked pack dependency.
+2. Build from the candidate commit. Run the pinned Script API check, package tests, Creator Tools validation for the archive, and the mod's server smoke. Keep the other two release candidates active in the coexistence run. Use an older archive and a disposable world for upgrade tests.
 
    ```shell
    npm --prefix tools/bedrock ci
    npm --prefix tools/bedrock run check
    python3 -m unittest discover -s scripts/tests
-   python3 scripts/build-bedrock-addon.py mushroom-the-yorkie
-   shasum -a 256 build/bedrock/mushroom-the-yorkie-bedrock-0.1.8.mcaddon
+   archive="$(python3 scripts/build-bedrock-addon.py mushroom-the-yorkie)"
+   python3 scripts/check-bedrock-creator-tools.py "$archive" --output build/creator-reports
+   shasum -a 256 "$archive"
    ```
 
 3. Attach the exact archive to a draft GitHub Release tagged `<mod>-bedrock-v<version>`. Add the SHA-256, installation and update instructions, and the supported gameplay. Use the release issue as the durable playtest link. When editing a draft, keep its intended tag and verify the download link in the issue afterward. Keep the Fabric JAR release and Bedrock add-on versions independent. [GitHub release management](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository)
 4. In a clean Bedrock client, test the downloaded archive on the advertised hosts. Check world activation, ordinary controller or touch gameplay from a non-operator account, save/reopen, and the upgrade from the earlier pack. For Switch, use the advertised join route. For Realm coverage, have the owner upload or activate the packs on a disposable Realm world and join it from the advertised devices. [Minecraft Realm add-on activation](https://help.minecraft.net/hc/en-us/articles/24120525083533-How-to-activate-Minecraft-Add-On)
-5. Record the pack version, checksum, exact game and device versions, each tested scenario and join route, and any limitations in the release issue. Pass the supported Fabric build checks before publishing. Publish the tested artifact, then open the public asset URL without signing in and compare the downloaded SHA-256 against the tested checksum.
+5. Record the pack version, checksum, exact game and device versions, each tested scenario and join route, and any limitations in the release issue. Pass the supported Fabric build checks before publishing. Publish the tested artifact and link it from the mod’s documentation. Open the public asset URL without signing in and compare the downloaded SHA-256 against the tested checksum.
 
 Release issues hold the device results for [Mushroom the Yorkie](https://github.com/alicon/minecraft-mods/issues/134), [Cops and Robbers](https://github.com/alicon/minecraft-mods/issues/138), and [NARwhal Together](https://github.com/alicon/minecraft-mods/issues/141).
 
@@ -152,7 +153,4 @@ The GitHub **Publish to Modrinth** workflow remains available as a single-mod fa
 
 ## Release a Bedrock add-on
 
-1. Keep the existing pack UUIDs and content identifiers. Increment both pack versions and the behavior pack's resource dependency together. Run the Bedrock type check, package checks, and the mod's native server checks. Run the Fabric checks for the mod's supported targets.
-2. Build from the release commit and record the `.mcaddon` checksum. Use that archive for a clean import, an existing test-world upgrade, and save/reopen. On the devices you plan to support, verify typical controls, ownership in multiplayer, and Realm pack delivery if you will advertise it.
-3. Use a separate GitHub Release for each Bedrock add-on version. Attach the exact archive tested in step 2 and list the tested Minecraft versions and devices, setup steps, and edition differences. Link the download from the mod's documentation.
-4. After publishing, download the `.mcaddon` while signed out and verify its checksum matches the tested archive.
+Follow the [Bedrock publishing checklist](#publish-a-bedrock-add-on) for versioning, verification, and release.

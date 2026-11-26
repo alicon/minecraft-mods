@@ -5,6 +5,7 @@ const YORKIE = "mushroom_yorkie:mushroom_yorkie";
 const TOY = "mushroom_yorkie:yorkie_ball";
 const ITEM_NAME = "Mushroom's Test Ball";
 const CHEW = "mushroom_yorkie:yorkie_chew_toy";
+const TREAT = "mushroom_yorkie:yorkie_treat";
 const OTHER_NAME = "Mushroom's Second Toy";
 const OFFLINE_TOY = "Real ball with an offline owner";
 const SAVED_PET = "mushroom_smoke:offline_pet";
@@ -36,10 +37,33 @@ function spawnYorkie(dimension, location) {
 }
 
 async function tame(owner, pupil) {
-  owner.setItem(new ItemStack("mushroom_yorkie:yorkie_treat"), 0, true);
+  owner.setItem(new ItemStack(TREAT), 0, true);
   const interaction = owner.interactWithEntity(pupil);
   await waitFor(() => pupil.getComponent("minecraft:is_tamed")?.tamedToPlayerId === owner.id,
     "owner to tame Mushroom by interaction (" + interaction + ")", 50);
+}
+
+async function testTreats(owner, pupil) {
+  const health = pupil.getComponent("minecraft:health");
+  for (const example of TREAT_EXAMPLES) {
+    const creative = example.mode === "creative";
+    owner.stopInteracting();
+    owner.setGameMode(creative ? GameMode.Creative : GameMode.Survival);
+    health.setCurrentValue(health.effectiveMax - example.missingHealth);
+    owner.setItem(new ItemStack(TREAT, example.treatsBefore), 0, true);
+    await system.waitTicks(2);
+    owner.interactWithEntity(pupil);
+    await waitFor(() => health.currentValue === health.effectiveMax - example.missingAfter
+      && inventoryCount(owner, TREAT) === example.treatsAfter, "shared treat example " + JSON.stringify(example));
+    if (pupil.getProperty("mushroom_yorkie:ordered_sit")
+      || pupil.getComponent("minecraft:is_tamed")?.tamedToPlayerId !== owner.id) {
+      throw new Error("Feeding changed the sit order or ownership");
+    }
+  }
+  owner.stopInteracting();
+  owner.setGameMode(GameMode.Survival);
+  owner.getComponent("minecraft:inventory").container.setItem(0);
+  console.warn("MUSHROOM_SIM_TREATS");
 }
 
 function throwToy(owner, id, name) {
@@ -162,13 +186,14 @@ world.afterEvents.worldLoad.subscribe(async () => {
     await system.waitTicks(6);
     await tame(owner, pupil);
     console.warn("MUSHROOM_SIM_TAMED");
+    await testTreats(owner, pupil);
 
     const otherStart = { x: 5.5, y: 231, z: 11.5 };
     const other = spawnSimulatedPlayer({ dimension, ...otherStart }, "MushroomGuest", GameMode.Survival);
     const secondPup = spawnYorkie(dimension, { ...pupStart, z: otherStart.z });
     await system.waitTicks(6);
     owner.teleport(otherStart);
-    owner.setItem(new ItemStack("mushroom_yorkie:yorkie_treat"), 0, true);
+    owner.setItem(new ItemStack(TREAT), 0, true);
     owner.interactWithEntity(secondPup);
     await system.waitTicks(6);
     if (secondPup.getComponent("minecraft:is_tamed")?.tamedToPlayerId === owner.id) {

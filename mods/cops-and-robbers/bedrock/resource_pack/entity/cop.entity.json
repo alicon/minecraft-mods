@@ -7,7 +7,7 @@
         "default": "entity_alphatest"
       },
       "textures": {
-        "default": "textures/entity/cop"
+        "default": "textures/alicon/cops_robbers/entity/cop"
       },
       "geometry": {
         "default": "geometry.cops_robbers.crew"

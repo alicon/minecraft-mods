@@ -35,6 +35,16 @@
         "mushroom_yorkie:fetch_busy": {
           "type": "bool",
           "default": false
+        },
+        "mushroom_yorkie:flight_mode": {
+          "type": "enum",
+          "values": [
+            "ground",
+            "flying",
+            "landing"
+          ],
+          "default": "ground",
+          "client_sync": true
         }
       }
     },
@@ -53,6 +63,15 @@
       },
       "mushroom_yorkie:tamed": {
         "minecraft:is_tamed": {},
+        "minecraft:healable": {
+          "force_use": true,
+          "items": [
+            {
+              "item": "mushroom_yorkie:yorkie_treat",
+              "heal_amount": 3
+            }
+          ]
+        },
         "minecraft:sittable": {
           "sit_event": {
             "event": "mushroom_yorkie:ordered_sit",
@@ -100,7 +119,7 @@
               "cooldown": 0.5,
               "interact_text": "action.interact.mushroom_remove_harness",
               "spawn_items": {
-                "table": "loot_tables/harness.json",
+                "table": "loot_tables/alicon/mushroom_yorkie/harness.json",
                 "y_offset": 0.25
               },
               "on_interact": {
@@ -135,6 +154,15 @@
           "can_be_cut": false,
           "can_be_stolen": false,
           "unleash_on_removal": true
+        }
+      },
+      "mushroom_yorkie:look_around": {
+        "minecraft:behavior.look_at_player": {
+          "priority": 6,
+          "look_distance": 6
+        },
+        "minecraft:behavior.random_look_around": {
+          "priority": 7
         }
       },
       "mushroom_yorkie:awake": {
@@ -208,6 +236,22 @@
           "goal_radius": 0.45,
           "stay_duration": 25
         }
+      },
+      "mushroom_yorkie:air_physics": {
+        "minecraft:physics": {
+          "has_gravity": false
+        }
+      },
+      "mushroom_yorkie:ground_physics": {
+        "minecraft:physics": {}
+      },
+      "mushroom_yorkie:flight_fall_protection": {
+        "minecraft:damage_sensor": {
+          "triggers": {
+            "cause": "fall",
+            "deals_damage": "no"
+          }
+        }
       }
     },
     "components": {
@@ -240,15 +284,26 @@
       "minecraft:behavior.float": {
         "priority": 0
       },
-      "minecraft:behavior.look_at_player": {
-        "priority": 6,
-        "look_distance": 6
-      },
-      "minecraft:behavior.random_look_around": {
-        "priority": 7
-      },
       "minecraft:environment_sensor": {
         "triggers": [
+          {
+            "filters": {
+              "all_of": [
+                {
+                  "test": "enum_property",
+                  "domain": "mushroom_yorkie:home_goal",
+                  "operator": "!=",
+                  "value": "sleep"
+                },
+                {
+                  "test": "has_component",
+                  "operator": "!=",
+                  "value": "minecraft:behavior.look_at_player"
+                }
+              ]
+            },
+            "event": "mushroom_yorkie:restore_look"
+          },
           {
             "filters": {
               "all_of": [
@@ -267,6 +322,11 @@
                   "test": "bool_property",
                   "domain": "mushroom_yorkie:fetch_seeking",
                   "value": false
+                },
+                {
+                  "test": "enum_property",
+                  "domain": "mushroom_yorkie:flight_mode",
+                  "value": "ground"
                 }
               ]
             },
@@ -318,7 +378,8 @@
         "add": {
           "component_groups": [
             "mushroom_yorkie:untamed",
-            "mushroom_yorkie:awake"
+            "mushroom_yorkie:awake",
+            "mushroom_yorkie:look_around"
           ]
         }
       },
@@ -368,6 +429,13 @@
         "add": {
           "component_groups": [
             "mushroom_yorkie:awake"
+          ]
+        }
+      },
+      "mushroom_yorkie:restore_look": {
+        "add": {
+          "component_groups": [
+            "mushroom_yorkie:look_around"
           ]
         }
       },
@@ -464,7 +532,8 @@
             "mushroom_yorkie:seek_water",
             "mushroom_yorkie:seek_house",
             "mushroom_yorkie:seek_bed",
-            "mushroom_yorkie:awake"
+            "mushroom_yorkie:awake",
+            "mushroom_yorkie:look_around"
           ]
         },
         "set_property": {
@@ -484,6 +553,58 @@
       "mushroom_yorkie:fetch_seek_off": {
         "set_property": {
           "mushroom_yorkie:fetch_seeking": false
+        }
+      },
+      "mushroom_yorkie:flight_start": {
+        "remove": {
+          "component_groups": [
+            "mushroom_yorkie:ground_physics",
+            "mushroom_yorkie:awake",
+            "mushroom_yorkie:seek_food",
+            "mushroom_yorkie:seek_water",
+            "mushroom_yorkie:seek_house",
+            "mushroom_yorkie:seek_bed"
+          ]
+        },
+        "add": {
+          "component_groups": [
+            "mushroom_yorkie:air_physics",
+            "mushroom_yorkie:flight_fall_protection"
+          ]
+        },
+        "set_property": {
+          "mushroom_yorkie:flight_mode": "flying",
+          "mushroom_yorkie:home_goal": "idle"
+        }
+      },
+      "mushroom_yorkie:flight_descend": {
+        "remove": {
+          "component_groups": [
+            "mushroom_yorkie:air_physics"
+          ]
+        },
+        "add": {
+          "component_groups": [
+            "mushroom_yorkie:ground_physics"
+          ]
+        },
+        "set_property": {
+          "mushroom_yorkie:flight_mode": "landing"
+        }
+      },
+      "mushroom_yorkie:flight_end": {
+        "remove": {
+          "component_groups": [
+            "mushroom_yorkie:flight_fall_protection"
+          ]
+        },
+        "add": {
+          "component_groups": [
+            "mushroom_yorkie:awake"
+          ]
+        },
+        "set_property": {
+          "mushroom_yorkie:flight_mode": "ground"
         }
       }
     }

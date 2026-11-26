@@ -8,6 +8,18 @@ import net.minecraft.world.level.block.Blocks;
 
 /** Emergency bowl care must coexist with sleep, sit orders, and the daily meal limit. */
 public final class DomesticCareGameTests {
+	/** Both editions exercise the same feeding and inventory examples. */
+	@GameTest
+	public void feedsTreatsAcrossEditions(GameTestHelper helper) {
+		TreatScenarios.feed(helper);
+	}
+
+	/** A second player can borrow a harnessed dog's lead while both dogs keep their owners. */
+	@GameTest
+	public void daycareGuestsShareLeads(GameTestHelper helper) {
+		DaycareScenarios.shareLeads(helper);
+	}
+
 	/** A sleeping, starving pet may eat; it cannot ignore sitting or eat a second daily meal. */
 	@GameTest
 	public void urgentMealWakesSleepingPet(GameTestHelper helper) {
