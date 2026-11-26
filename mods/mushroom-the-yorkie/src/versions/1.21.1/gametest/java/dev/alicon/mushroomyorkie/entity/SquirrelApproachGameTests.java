@@ -98,7 +98,7 @@ public final class SquirrelApproachGameTests {
 	}
 
 	/** A wall built ahead during approach must trigger a reachable alternative. */
-	@GameTest(template = "fabric-gametest-api-v1:empty", timeoutTicks = 340)
+	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 340)
 	public void squirrelReplansClosedApproach(GameTestHelper helper) {
 		SquirrelReachabilityScenarios.closeDuringApproach(helper);
 	}
