@@ -15,6 +15,7 @@
 	"license": "MIT",
 	"icon": "assets/mushroom_yorkie/icon.png",
 	"environment": "*",
+	"mixins": ["mushroom_yorkie.mixins.json"],
 	"entrypoints": {
 		"main": [
 			"dev.alicon.mushroomyorkie.MushroomTheYorkie"

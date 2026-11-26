@@ -5,6 +5,8 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
 
+import dev.alicon.mushroomyorkie.item.ModItems;
+import dev.alicon.mushroomyorkie.pet.PetNeeds;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerContext;
@@ -74,6 +76,19 @@ public final class DaycareClientGameTest implements FabricClientGameTest {
 		context.waitFor(client -> client.hitResult instanceof EntityHitResult hit && hit.getEntity().getUUID().equals(dogId));
 		context.getInput().pressKey(options -> options.keyUse);
 		context.waitFor(client -> client.player.getMainHandItem().isEmpty());
+		server.runOnServer(mc -> {
+			dog.needs = new PetNeeds(65, 0, 80, 80);
+			mc.getPlayerList().getPlayer(walkerId).setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.YORKIE_TREAT));
+		});
+		context.waitFor(client -> client.player.getMainHandItem().is(ModItems.YORKIE_TREAT));
+		context.getInput().pressKey(options -> options.keyUse);
+		context.waitFor(client -> client.player.getMainHandItem().isEmpty());
+		server.runOnServer(mc -> {
+			if (dog.needs.hunger() != 30 || dog.getLeashHolder() != mc.getPlayerList().getPlayer(walkerId)) {
+				throw new AssertionError("Feeding the borrowed dog failed to preserve its lead");
+			}
+			System.out.println("Daycare guest fed the borrowed Yorkie without dropping the lead");
+		});
 		context.takeScreenshot("daycare-client-lead");
 		var walkerStart = server.computeOnServer(mc -> mc.getPlayerList().getPlayer(walkerId).position());
 		var dogStart = server.computeOnServer(mc -> {

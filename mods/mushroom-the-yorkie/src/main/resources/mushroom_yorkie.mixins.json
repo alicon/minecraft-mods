@@ -1,0 +1,9 @@
+{
+	"required": true,
+	"package": "dev.alicon.mushroomyorkie.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"mixins": ["YorkieLeashedTreatMixin"],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}
