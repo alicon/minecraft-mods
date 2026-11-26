@@ -92,7 +92,8 @@ jobs:
           python3 -u scripts/smoke-mushroom-bedrock.py "$RUNNER_TEMP/bedrock-server.zip" "$MUSHROOM" \
             --with-addon "$COPS" --with-addon "$NARWHAL" \
             --verify-care-persistence --verify-fetch --verify-adoption --verify-flight \
-            --play-seconds "$PLAY_SECONDS" --play-seed "$PLAY_SEED" "${args[@]}" 2>&1 | tee build/bedrock/mushroom-play.log
+            --play-seconds "$PLAY_SECONDS" --play-seed "$PLAY_SEED" "${args[@]}" \
+            --failure-evidence build/bedrock/mushroom-repro.zip 2>&1 | tee build/bedrock/mushroom-play.log
       - name: Exercise Cops and Robbers with both companion add-ons
         if: ${{ !cancelled() && steps.packs.outcome == 'success' }}
         run: |
@@ -111,7 +112,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: bedrock-gameplay-${{ github.run_id }}-${{ github.run_attempt }}
-          path: build/bedrock/*-play.log
+          path: |
+            build/bedrock/*-play.log
+            build/bedrock/mushroom-repro.zip
           if-no-files-found: warn
           retention-days: 30
 
@@ -138,13 +141,11 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Build
-        run: ./gradlew ${{ matrix.gradle-tasks }} -Ptarget_minecraft_version=${{ matrix.minecraft-version }} --no-daemon
-
-      - name: Test Mushroom in a Fabric server
+      - name: Build and run Fabric server GameTests
         run: |
           set -o pipefail
-          ./gradlew :mushroom-the-yorkie:runGameTest -Ptarget_minecraft_version=${{ matrix.minecraft-version }} --no-daemon \
+          mkdir -p build
+          ./gradlew ${{ matrix.gradle-tasks }} -Ptarget_minecraft_version=${{ matrix.minecraft-version }} --no-daemon \
             --console=plain 2>&1 | tee build/fabric-gametest.log
       - name: Keep Fabric gameplay evidence
         if: always()
