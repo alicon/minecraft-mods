@@ -134,7 +134,10 @@ async function runInWorld(baseUrl, expectedSave, seconds, runId, reportFile, cli
     const ballInHand = await command(`execute if items entity ${player} weapon.mainhand ${item}`, true) === 1;
     const emptyHand = await command(`execute unless items entity ${player} weapon.mainhand *`, true) === 1;
     assert(ballInHand || emptyHand, 'Select an empty hand for the daycare fixture');
-    if (ballInHand) await command(`clear ${player} ${item} 1`);
+    if (ballInHand) {
+      assert.equal(await countBall(), 1, 'The staged ball was duplicated before feeding');
+      await command(`clear ${player} ${item} 1`);
+    }
     try {
       const fed = await request('/use-entity', { type: DOG, radius: 4, item: TREAT, count: 1 });
       assert(fed.target.uuid === dogId && fed.consumed, 'Treat interaction did not reach the original dog');
