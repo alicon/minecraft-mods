@@ -3423,6 +3423,11 @@ Common options:
   --item <id>          Namespaced item id for give/use-block/use-entity
   --block <id>         Namespaced block id or block state for set-block actions
   --report-file <path> Write the full JSON result to a file
+
+Yorkie matrix selection:
+  --seed <0-4294967295> Replay a shuffled case order
+  --limit <count>      Bound the number of selected cases
+  --prior-report <path> Visit gameplay failures and similar cases first
 `);
 }
 

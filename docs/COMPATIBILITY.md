@@ -67,9 +67,13 @@ Package tests compare the built archives to the [playtested identifiers](../scri
 
 | Shared behavior | Java Fabric checks | Bedrock checks |
 | --- | --- | --- |
-| Mushroom ownership, care, and fetch | Live companion smoke, wake-up and care policy tests, and native fetch save/load GameTests | [Companion smoke](../mods/mushroom-the-yorkie/bedrock/README.md#verify-the-add-on) with adoption, care persistence, and fetch enabled |
+| Mushroom ownership and borrowed leads | Native `daycareGuestsShareLeads` on both Fabric targets checks the one-dog limit, harness, guest lead and ownership | Adoption and care persistence probes and the mixed two-player session exercise independent ownership and guest walks |
+| Mushroom treat use | Native `feedsTreatsAcrossEditions` uses the [shared feeding cases](../scripts/fixtures/mushroom-treat-cases.json) | The fetch probe uses the same cases to check health and Survival and Creative inventory |
+| Mushroom fetch and night flight | Native fetch interruption and persistence GameTests plus the bridge transition matrix | The fetch probe verifies interrupted carry and rejoin. The flight probe verifies sleeping through Creative takeoff and resuming flight at dawn |
 | Cops and Robbers kits, patrol, and fire response | Live patrol and structures smoke exercises kit placement, mounted capture, jail drop-off, and extinguishing fires | [Patrol smoke](../mods/cops-and-robbers/bedrock/README.md#verify-the-kits-vehicles-patrol-fire-response-and-jail) with the vehicle, patrol, fire, and jail scenarios enabled |
 | NARwhal alphabetical regroup and wraparound | Fabric target selector tests use the [shared regroup cycle](../scripts/fixtures/narwhal-regroup-cycle.json) | [Regroup smoke](../mods/narwhal-together/bedrock/README.md#build-and-test) exercises the same cycle through native item use |
+
+Creative takeoff wakes a sleeping companion on Java, as exercised by the live bridge transition matrix. The Bedrock companion stays asleep through takeoff and follows flight again at dawn. The Bedrock party tests use the latter expectation. [Mushroom Bedrock gameplay checks](../mods/mushroom-the-yorkie/bedrock/README.md#automated-checks)
 
 See [Java automated coverage](TESTING.md#current-automated-coverage) for the complete test descriptions.
 

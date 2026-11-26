@@ -264,6 +264,16 @@ Restart Minecraft after installing `playtest-bridge`. The bridge binds to `127.0
 Bridge state and terrain-scan seeds are exact signed decimal strings; keep that
 type in reproduction reports rather than converting to JavaScript numbers.
 
+Test fetch interruptions, owner mode changes, and waking or landing in the live matrix. A case budget and a seed give a replayable subset. The report records the planned order, observed cases and Minecraft profile.
+
+```shell
+node tools/playtest-harness/src/bridge-cli.js yorkie-matrix \
+  --expected-save "Codex Test Copy" --group transitions --seed 119 --limit 8 \
+  --report-file build/playtest-reports/java-transition-seed119.json
+```
+
+Use `--prior-report <previous.json>` to prioritize a prior gameplay finding and nearby variants within the selected group. Replay uses the recorded seed and input report SHA-256. In this mode the harness ranks observed failures and retains the same case assertions. Keep the original report alongside the new one.
+
 Screenshots close the active client screen before capture by default; set `BRIDGE_SCREENSHOT_RESUME=0` to keep the current screen visible. Set `BRIDGE_SCREENSHOT_HIDE_GUI=1` and `BRIDGE_SCREENSHOT_CLEAR_CHAT=1` for clean visual inspection captures.
 
 Launch Modrinth directly into an existing save:
