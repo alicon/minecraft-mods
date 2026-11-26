@@ -20,6 +20,15 @@ test('setup diagnostics survive thrown audits without replacing partial run obse
   }
 });
 
+test('an input or observer failure does not count as failed gameplay', async () => {
+  const report = await runCases(['input', 'observation'].map(phase => ({
+    name: phase, setup: async () => {},
+    run: async () => { throw Object.assign(Error('driver failed'), { phase }); }
+  })), {});
+  assert.deepEqual(report.summary, { input_failed: 1, observation_failed: 1 });
+  assert.equal(report.ok, false);
+});
+
 test('continues after failures and persists evidence and complete report', async () => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'yorkie-tests-'));
   const reportFile = path.join(folder, 'report.json');

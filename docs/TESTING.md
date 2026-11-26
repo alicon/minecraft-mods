@@ -274,6 +274,16 @@ node tools/playtest-harness/src/bridge-cli.js yorkie-matrix \
 
 Use `--prior-report <previous.json>` to prioritize a prior gameplay finding and nearby variants within the selected group. Replay uses the recorded seed and input report SHA-256. In this mode the harness ranks observed failures and retains the same case assertions. Keep the original report alongside the new one.
 
+Run a real Java 1.21.11 client through natural bedtime, dawn, and daytime fetches with the same dog and owner. Open a disposable copy and bring a tamed, harnessed Yorkie within reach. The runner builds a guarded course near the player, stages one named ball, and starts shortly before dawn. During play the clock advances normally. The bridge drives ordinary movement and stages each fetch item six blocks ahead of the owner.
+
+```shell
+node tools/playtest-harness/src/bridge-cli.js yorkie-daycare \
+  --expected-save "Codex Test Copy" --seconds 1800 \
+  --report-file build/playtest-reports/java-daycare.json
+```
+
+The report records each action, native walking distance, the original dog's identity, completed fetches, dawns, wall time, and in-game days. Use `--client-log <path>` when a dev launcher writes its Fabric startup log outside the game profile. The report tracks bridge observations and input failures separately from gameplay assertions. A failed run retains the current view and freezes the disposable fixture for investigation.
+
 Screenshots close the active client screen before capture by default; set `BRIDGE_SCREENSHOT_RESUME=0` to keep the current screen visible. Set `BRIDGE_SCREENSHOT_HIDE_GUI=1` and `BRIDGE_SCREENSHOT_CLEAR_CHAT=1` for clean visual inspection captures.
 
 Launch Modrinth directly into an existing save:

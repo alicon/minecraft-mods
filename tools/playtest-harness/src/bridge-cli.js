@@ -3413,6 +3413,7 @@ Actions:
 	  set-block-near-entity, set-block, block, use-block, count-blocks, terrain-scan
 	  client-input (--expected-save <copied save>, --mode walk|boat|dismount|jump, --ticks <1-100; dismount/jump 2-5>, --forward true)
 	  yorkie-matrix (--expected-save <copied save>), yorkie-smoke, yorkie-water-smoke, yorkie-adventure-smoke, yorkie-home-squirrel, yorkie-visual-sweep, yorkie-biome-scout, yorkie-natural-gallery
+	  yorkie-daycare (--expected-save <copied save>, --seconds <90-28800>, --client-log <launch log>)
 	  cops-smoke, cops-structures-smoke, cops-visual-sweep, screenshot
 
 Common options:
@@ -3599,6 +3600,9 @@ async function main() {
   } else if (action === 'yorkie-crafting') {
     result = await require('./yorkie-crafting').runCraftingChecks(baseUrl, args);
     if (!result.ok) process.exitCode = 1;
+  } else if (action === 'yorkie-daycare') {
+    result = await require('./yorkie-daycare').runDaycare(baseUrl, args);
+    if (!result.ok) process.exitCode = 1;
   } else if (action === 'yorkie-matrix') {
     result = await require('./yorkie-matrix').runMatrix(baseUrl, args);
     if (!result.ok) process.exitCode = 1;
@@ -3645,7 +3649,7 @@ async function main() {
   }
 
   // Scenario suites own atomic incremental reports, including any post-run phase.
-  if (!['yorkie-matrix', 'yorkie-crafting', 'yorkie-smoke', 'client-input', 'respawn', 'yorkie-squirrel-restart'].includes(action)) writeReportFile(option(args, 'reportFile', 'BRIDGE_REPORT_FILE', ''), result);
+  if (!['yorkie-daycare', 'yorkie-matrix', 'yorkie-crafting', 'yorkie-smoke', 'client-input', 'respawn', 'yorkie-squirrel-restart'].includes(action)) writeReportFile(option(args, 'reportFile', 'BRIDGE_REPORT_FILE', ''), result);
   console.log(JSON.stringify(result, null, 2));
 }
 
