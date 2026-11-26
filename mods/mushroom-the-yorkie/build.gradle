@@ -44,3 +44,7 @@ ext {
 apply from: rootProject.file('gradle/fabric-mod.gradle')
 
 apply from: rootProject.file('gradle/legacy-crafting-recipes.gradle')
+
+tasks.named('processGametestResources') {
+	from(rootProject.file('scripts/fixtures/mushroom-treat-cases.json'))
+}
