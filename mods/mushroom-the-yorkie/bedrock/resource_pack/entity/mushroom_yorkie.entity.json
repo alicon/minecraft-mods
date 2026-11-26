@@ -21,7 +21,8 @@
         "idle": "animation.mushroom_yorkie.idle",
         "walk": "animation.mushroom_yorkie.walk",
         "sit": "animation.mushroom_yorkie.sit",
-        "sleep": "animation.mushroom_yorkie.sleep"
+        "sleep": "animation.mushroom_yorkie.sleep",
+        "flight": "animation.mushroom_yorkie.flight"
       },
       "scripts": {
         "animate": [
@@ -29,16 +30,19 @@
             "look": "!(query.property('mushroom_yorkie:home_goal') == 'sleep')"
           },
           {
-            "idle": "!(query.property('mushroom_yorkie:home_goal') == 'sleep') && !query.is_sitting"
+            "idle": "!(query.property('mushroom_yorkie:home_goal') == 'sleep') && !query.is_sitting && query.property('mushroom_yorkie:flight_mode') == 'ground'"
           },
           {
-            "walk": "!(query.property('mushroom_yorkie:home_goal') == 'sleep') && !query.is_sitting && query.modified_move_speed > 0.01"
+            "walk": "!(query.property('mushroom_yorkie:home_goal') == 'sleep') && !query.is_sitting && query.modified_move_speed > 0.01 && query.property('mushroom_yorkie:flight_mode') == 'ground'"
           },
           {
-            "sit": "!(query.property('mushroom_yorkie:home_goal') == 'sleep') && query.is_sitting"
+            "sit": "!(query.property('mushroom_yorkie:home_goal') == 'sleep') && query.is_sitting && query.property('mushroom_yorkie:flight_mode') == 'ground'"
           },
           {
             "sleep": "query.property('mushroom_yorkie:home_goal') == 'sleep'"
+          },
+          {
+            "flight": "query.property('mushroom_yorkie:flight_mode') != 'ground'"
           }
         ]
       },

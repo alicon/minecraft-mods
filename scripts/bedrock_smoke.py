@@ -5,6 +5,7 @@ import io
 import json
 import os
 import queue
+import shlex
 import shutil
 import struct
 import subprocess
@@ -160,24 +161,33 @@ def collect_output(stream, lines):
     lines.put(None)
 
 
-def expect_line(lines, marker, *, startup_timeout=180, timeout=150):
-    started = False
-    deadline = time.monotonic() + startup_timeout
+def expect_line(lines, marker, *, startup_timeout=180, timeout=150, heartbeat=None):
+    started = heartbeat is not None
+    deadline = time.monotonic() + (timeout if started else startup_timeout)
+    next_progress = time.monotonic() + 60 if heartbeat else float("inf")
     while time.monotonic() < deadline:
         try:
-            line = lines.get(timeout=max(0, deadline - time.monotonic()))
+            if time.monotonic() >= next_progress:
+                raise RuntimeError(f"Gameplay stopped reporting {heartbeat} while waiting for {marker}")
+            line = lines.get(timeout=max(0, min(deadline, next_progress) - time.monotonic()))
         except queue.Empty:
+            if next_progress < deadline:
+                raise RuntimeError(f"Gameplay stopped reporting {heartbeat} while waiting for {marker}")
             break
         if line is None:
             raise RuntimeError(f"Server exited while waiting for {marker!r}")
-        if "_TEST_FAIL" in line or ("ERROR" in line and any(
+        if "_TEST_FAIL" in line:
+            raise RuntimeError(f"Bedrock scenario failed: {line.strip()}")
+        if "ERROR" in line and any(
             part in line.lower() for part in (
                 "[blocks]", "[components]", "[entity]", "[json]", "[recipes]", "[item]", "[scripting]", "mushroom", "cops_robbers"
             )
-        )):
+        ):
             raise RuntimeError(f"Bedrock rejected content: {line.strip()}")
         if marker in line:
             return
+        if heartbeat and heartbeat in line:
+            next_progress = time.monotonic() + 60
         if not started and line.rstrip().endswith(" INFO] Server started."):
             started = True
             deadline = time.monotonic() + timeout
@@ -186,9 +196,10 @@ def expect_line(lines, marker, *, startup_timeout=180, timeout=150):
     raise RuntimeError(f"Server did not start or report {marker!r} within {startup_timeout}s")
 
 
-def exercise_world(server_dir, marker, *, timeout=150):
+def exercise_world(server_dir, marker, *, timeout=150, play_seconds=None):
+    prefix = shlex.split(os.environ.get("MUSHROOM_BEDROCK_SERVER_PREFIX", ""))
     with subprocess.Popen(
-        [str(server_dir / "bedrock_server")],
+        [*prefix, str(server_dir / "bedrock_server")],
         cwd=server_dir,
         env={**os.environ, "LD_LIBRARY_PATH": str(server_dir)},
         stdin=subprocess.PIPE,
@@ -203,7 +214,16 @@ def exercise_world(server_dir, marker, *, timeout=150):
         reader.start()
 
         try:
-            expect_line(lines, marker, timeout=timeout)
+            if play_seconds is None:
+                expect_line(lines, marker, timeout=timeout)
+            else:
+                expect_line(lines, "MUSHROOM_PLAY_START", timeout=timeout)
+                started = time.monotonic()
+                expect_line(lines, marker, timeout=play_seconds + 180, heartbeat="MUSHROOM_PLAY_RESULT")
+                observed = time.monotonic() - started
+                if observed < play_seconds:
+                    raise RuntimeError(f"Only observed {observed:.1f}s of continuous Bedrock play")
+                print(f"MUSHROOM_PLAY_OBSERVED_SECONDS {observed:.1f}", flush=True)
         finally:
             if server.poll() is None:
                 server.stdin.write("stop\n")

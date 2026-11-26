@@ -25,13 +25,25 @@ Use **right-click** on Windows, the touch layout's **Interact/Use** action on iP
 
 1. Craft eight Yorkie Treats from raw mutton and two bones.
 2. Craft a Mushroom Adoption Egg from a treat, a chicken egg, and paper. Use it on grass or dirt. Creative players can use the Mushroom Spawn Egg.
-3. Hold a Yorkie Treat and interact with Mushroom to tame him. Interact empty-handed to tell him to sit or follow.
+3. Hold a Yorkie Treat and interact with Mushroom to tame him or feed him. A treat restores up to three health, and he accepts one at full health too. Interact empty-handed to tell him to sit or follow.
 4. Craft a Yorkie Harness from string, leather, and black dye. Use the harness on Mushroom before attaching a lead. To remove it in Bedrock, use shears and pick up the harness.
 5. Craft a copper bowl and combine it with a Yorkie Treat or a water bucket. Place the full bowl nearby. Mushroom can finish one food bowl and one water bowl each Minecraft day, and returns each to an empty bowl.
 6. Set a dog bed or doghouse on solid ground. A following Mushroom seeks a clear, dry spot at night and prefers the doghouse. Keep the entrance open so he can reach the mattress.
 7. Craft a Yorkie Ball with white wool, lime dye, and string, or use yellow dye for a Yorkie Chew Toy. Use either toy to throw it. You can also use Minecraft's Drop Item action to toss a bone. Play while Mushroom is following on safe terrain.
 
+In Creative, take off while Mushroom is following and nearby. He trails behind you in the air and comes down when you leave flight. He stays put when sitting or asleep and can follow again after waking. Fetch resumes on the ground.
+
 ## Verify the add-on
+
+### First-time players and daycare
+
+Use the release candidate in a disposable Survival world. Invite a Switch player as a regular member and let them meet, feed, and walk Mushroom, then play fetch using the in-game controls and recipe book. Note the first step where they need help.
+
+Have two players adopt one dog each, take turns walking each other's dogs, then save, leave, and rejoin. Check that each dog still follows the right owner when the lead comes off, and check how the lead sits on the harness. At night, watch Mushroom's head and pose while the owner flies nearby.
+
+Record the add-on version, Minecraft version, device, and join route with any issue. Capture a short Bedrock clip of the daycare, lead handoff, and a fetch return. Use the Java family short in the creator portfolio. Show only actions available in the Bedrock build in the Marketplace footage.
+
+### Full test pass
 
 - Confirm that the packaged add-on imports with both packs and that Mushroom has his expected textures, name, walk and sit poses.
 - In Survival, craft and use the adoption egg. Tame Mushroom, walk far enough to trigger following, and test the sit order.
@@ -42,12 +54,25 @@ Use **right-click** on Windows, the touch layout's **Interact/Use** action on iP
 - Verify furniture placement, facing, lighting and the visible models. Check that an obstructed or wet doghouse does not leave Mushroom stuck, that he wakes at dawn, and that a nearby nighttime threat interrupts sleep.
 - Refill both bowls on the same Minecraft day, reopen the world and check the daily limits. Keep both tamed pets in the world during a multiplayer test and verify that the care messages go to their own players.
 - Throw and recover each toy in Survival and Creative. Verify the original item comes back once, then test a full inventory, multiplayer throws, interrupted fetch and covered water or unsafe terrain.
+- Check for two visible eyes and a visible nose from the front and at an angle. Look for the lead ending on the harness, a still head during sleep, and the sitting pose from the side. In Creative, take off, hover, move horizontally and land with Mushroom following. Repeat takeoff while he is sitting and asleep.
 
 Players can also adopt Mushroom by sleeping through a full night in an Overworld bed. A loaded, following Yorkie can return after a full day apart. The server test covers both paths in the Overworld. Test them with two players on the release devices and verify that a second adoption preserves the existing pet. [Home routine and outdoor requests](https://github.com/alicon/minecraft-mods/issues/129)
 
 ## Edition differences
 
-Java Mushroom can scent nearby generated structures. On Bedrock 26.66.1, the stable scripting surface has no bounded way to locate a nearby generated structure and get its coordinates. The Bedrock release scope covers adoption, care, and fetch. Structure scenting, travel, and squirrels have separate parity tickets. [Structure scenting](https://github.com/alicon/minecraft-mods/issues/133) · [Travel and recovery](https://github.com/alicon/minecraft-mods/issues/131) · [Squirrels](https://github.com/alicon/minecraft-mods/issues/132)
+Java Mushroom can scent nearby generated structures. On Bedrock 26.66.1, the stable scripting surface has no bounded way to locate a nearby generated structure and get its coordinates. The Bedrock build covers adoption, care, ground fetch, and Creative flight follow. Airborne fetch, flight tricks, structure scenting, vehicle and portal behavior, and squirrels still need parity work. [Structure scenting](https://github.com/alicon/minecraft-mods/issues/133) · [Travel and recovery](https://github.com/alicon/minecraft-mods/issues/131) · [Squirrels](https://github.com/alicon/minecraft-mods/issues/132)
+
+## Preview the model on the Mac
+
+With Pillow 10.1 or newer installed, render the geometry, texture atlas and static poses directly from a built package. Add `--reference` with an earlier package for a side-by-side comparison.
+
+```shell
+python3 scripts/render-mushroom-bedrock.py build/bedrock/mushroom-the-yorkie-bedrock-0.1.10.mcaddon \
+  --reference build/bedrock/mushroom-the-yorkie-bedrock-0.1.9.mcaddon \
+  --output build/bedrock/mushroom-model-preview.png
+```
+
+Use a Bedrock client to verify the in-game renderer, lighting and animation transitions.
 
 ## Automated checks
 
@@ -66,8 +91,25 @@ python3 scripts/smoke-mushroom-bedrock.py /path/to/bedrock-server.zip /path/to/m
 
 Use `--upgrade-from /path/to/earlier-mushroom.mcaddon` to spawn the Yorkie in an earlier build and reopen the same disposable world with the newer pack. Add `--verify-care-persistence` to verify that the food limit and the tamed component state survive a further restart. Client import, visuals, ordinary player interactions and Realm delivery require the in-game checks above.
 
-Add `--verify-fetch` to exercise interaction with two simulated players on Bedrock Dedicated Server 26.66. It checks ownership, interruption during a carry, inventory limits, cargo persistence, shallow-water returns, covered pools and an unsafe ledge. The fixture enables GameTest in its disposable world after the ordinary add-on checks. The add-on uses the stable Script API.
+Add `--verify-fetch` to exercise interaction with two simulated players on Bedrock Dedicated Server 26.66. It checks treat feeding, ownership, interruption during a carry, inventory limits, cargo persistence, shallow-water returns, covered pools and an unsafe ledge. The fixture enables GameTest in its disposable world after the ordinary add-on checks. The add-on uses the stable Script API.
 
 Add `--verify-adoption` to check that two Survival players can sleep in ordinary beds and wake up with one independently owned Yorkie each. It also checks that a loaded following Yorkie returns after a day away and a Yorkie told to sit stays put.
 
+Add `--verify-flight` to test that a simulated Creative owner can take off, hover and move with Mushroom following. The test checks the sit order, landing after a switch to Survival, staying asleep as the owner flies away, and flight follow at dawn.
+
 [Importing Add-Ons](https://learn.microsoft.com/en-us/minecraft/creator/documents/gettingstarted?view=minecraft-bedrock-stable) · [Activating Add-Ons on a Realm](https://help.minecraft.net/hc/en-us/articles/24120525083533-How-to-activate-Minecraft-Add-On)
+
+### Autonomous two-player session
+
+Run the exact candidate on a Linux x64 Bedrock Dedicated Server. The script creates its own world and deletes it after the run. Put the console log outside that world. The game-test module is installed only in this temporary save.
+
+```bash
+set -o pipefail
+python3 -u scripts/smoke-mushroom-bedrock.py build/bedrock/server-1.26.66.1.zip \
+  build/bedrock/mushroom-the-yorkie-bedrock-0.1.10.mcaddon --play-seconds 1800 --play-seed 119 \
+  2>&1 | tee build/bedrock/mushroom-seed119.log
+```
+
+Two native simulated players tame and harness their dogs, then take turns feeding, fetching, walking each other's dogs, and flying while a dog sleeps. The test records the archive checksum, action sequence, game ticks and completed rounds. A sustained run needs a successful process exit, all cases in the final count, and at least the requested wall time in `MUSHROOM_PLAY_OBSERVED_SECONDS`. A timeout or stopped run earns no clean time. Repeat with the same seed to replay the action order. Use `--play-case guest-walk` or another case name to isolate one behavior. For overnight play, set `--play-seconds 28800` and use a new log for each seed.
+
+The arena controls fixture locations and time changes. Longer runs exercise more interactions. Device input, rendering, Realm delivery and uninterrupted natural day/night cycles each need their own recorded test.
