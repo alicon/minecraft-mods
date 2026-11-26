@@ -34,6 +34,8 @@ Development packs target Bedrock 26.60 with stable pack schemas. Release support
 
 GitHub Actions checks Bedrock scripts against the pinned stable API and builds the add-ons in the package tests. Run the type check locally with `npm --prefix tools/bedrock ci` and `npm --prefix tools/bedrock run check`. The package tests also verify that scripted behavior packs declare the version used to type-check them.
 
+The `bedrock-smoke` job builds all three packs and runs the scenarios below on a pinned, checksum-verified [Bedrock Dedicated Server](https://www.minecraft.net/en-us/download/server/bedrock). It exercises each add-on in a separate disposable world with both companion add-ons active. Review the pinned server build and checksum when updating the supported Bedrock version.
+
 Each server smoke runner accepts one `--with-addon` argument per additional archive. This command tests NARwhal's upgrade and regrouping while Mushroom and Cops and Robbers stay active.
 
 ```shell
