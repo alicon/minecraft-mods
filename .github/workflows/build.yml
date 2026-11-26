@@ -21,6 +21,10 @@ jobs:
           npm --prefix tools/playtest-harness run check
           npm --prefix tools/playtest-harness test
           python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+      - name: Check scripts against the stable Bedrock API
+        run: |
+          npm --prefix tools/bedrock ci
+          npm --prefix tools/bedrock run check
 
   build:
     runs-on: ubuntu-latest
