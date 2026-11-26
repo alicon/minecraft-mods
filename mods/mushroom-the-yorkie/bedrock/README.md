@@ -101,7 +101,7 @@ Add `--verify-flight` to test that a simulated Creative owner can take off, hove
 
 ### Autonomous two-player session
 
-Run the exact candidate on a Linux x64 Bedrock Dedicated Server. The script creates its own world and deletes it after the run. Put the console log outside that world. The game-test module is installed only in this temporary save.
+Run the exact candidate on a Linux x64 Bedrock Dedicated Server. The script creates its own world. Put the console log outside that world. Add `--failure-evidence build/bedrock/repro-119.zip` to keep the disposable save and active add-on files on a failed run. Keep that ZIP with the console log and the pinned server archive used for the test. The game-test module is installed only in this temporary save.
 
 ```bash
 set -o pipefail

@@ -4,11 +4,15 @@ import argparse
 import hashlib
 import json
 import shutil
+import sys
 import tempfile
+from contextlib import contextmanager
+from zipfile import ZIP_DEFLATED, ZipFile
 from pathlib import Path
 
 from bedrock_smoke import (
-    SmokeWorld, enable_beta_test_apis, exercise_world, install_addon, install_companion_addons, install_probe, prepare_server,
+    FIXTURE_FOLDER, SmokeWorld, enable_beta_test_apis, exercise_world, install_addon, install_companion_addons,
+    install_probe, prepare_server,
 )
 
 WORLD = SmokeWorld(
@@ -25,6 +29,36 @@ TREAT_CASES = PROBE_SOURCE.with_name("mushroom-treat-cases.json")
 AUTOPLAY_CASES = ("survival-feed", "creative-feed", "owner-walk", "guest-walk", "fetch", "sleep-flight", "daycare")
 
 
+@contextmanager
+def disposable_run(failure_evidence):
+    with tempfile.TemporaryDirectory(prefix="mushroom-bedrock-smoke-") as directory:
+        server_dir = Path(directory)
+        try:
+            yield server_dir
+        except (Exception, KeyboardInterrupt):
+            if failure_evidence:
+                try:
+                    failure_evidence.parent.mkdir(parents=True, exist_ok=True)
+                    with ZipFile(failure_evidence, "x", compression=ZIP_DEFLATED) as archive:
+                        # Bundled vanilla content comes from the pinned server ZIP.
+                        paths = [
+                            server_dir / "server.properties",
+                            server_dir / "worlds" / WORLD.name,
+                            server_dir / "behavior_packs" / FIXTURE_FOLDER,
+                            *server_dir.glob(f"behavior_packs/{WORLD.addon_folder}*"),
+                            *server_dir.glob(f"resource_packs/{WORLD.addon_folder}*"),
+                        ]
+                        for source in paths:
+                            files = (source,) if source.is_file() else source.rglob("*")
+                            for file in files:
+                                if file.is_file():
+                                    archive.write(file, file.relative_to(server_dir))
+                    print(f"Bedrock failure world and packs saved to {failure_evidence}", file=sys.stderr, flush=True)
+                except OSError as error:
+                    print(f"Could not retain Bedrock failure evidence: {error}", file=sys.stderr, flush=True)
+            raise
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("server_zip", type=Path)
@@ -39,13 +73,16 @@ def main():
     parser.add_argument("--play-seconds", type=int, help="run seeded simulated-player gameplay for at least this many seconds")
     parser.add_argument("--play-seed", type=int, default=119, help="seed for the gameplay action order and variants")
     parser.add_argument("--play-case", choices=AUTOPLAY_CASES, help="replay one gameplay case")
+    parser.add_argument("--failure-evidence", type=Path,
+                        help="write a ZIP of the temporary world and active packs if the run fails")
     args = parser.parse_args()
+    if args.failure_evidence and args.failure_evidence.exists():
+        parser.error("--failure-evidence must name a new path")
     if args.play_seconds is not None and args.play_seconds <= 0:
         parser.error("--play-seconds must be positive")
     if args.play_case and args.play_seconds is None:
         parser.error("--play-case requires --play-seconds")
-    with tempfile.TemporaryDirectory(prefix="mushroom-bedrock-smoke-") as directory:
-        server_dir = Path(directory)
+    with disposable_run(args.failure_evidence) as server_dir:
         prepare_server(args.server_zip, server_dir, WORLD)
         if args.play_seconds:
             with (server_dir / "server.properties").open("a", encoding="utf-8") as settings:
