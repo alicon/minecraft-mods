@@ -18,12 +18,11 @@ WORLD = SmokeWorld(
 PROBE_SOURCE = Path(__file__).with_name("fixtures") / "mushroom-bedrock-smoke.js"
 PLAYER_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-player-probe.js")
 ADOPTION_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-adoption-probe.js")
-
-
 FLIGHT_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-flight-probe.js")
 AUTOPLAY_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-autoplay.js")
+DAYCARE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-daycare.js")
 TREAT_CASES = PROBE_SOURCE.with_name("mushroom-treat-cases.json")
-AUTOPLAY_CASES = ("survival-feed", "creative-feed", "owner-walk", "guest-walk", "fetch", "sleep-flight")
+AUTOPLAY_CASES = ("survival-feed", "creative-feed", "owner-walk", "guest-walk", "fetch", "sleep-flight", "daycare")
 
 
 def main():
@@ -56,7 +55,9 @@ def main():
                 "sha256": hashlib.sha256(args.addon.read_bytes()).hexdigest(),
                 "server": args.server_zip.name,
                 "serverSha256": hashlib.sha256(args.server_zip.read_bytes()).hexdigest(),
-                "fixtureSha256": hashlib.sha256(AUTOPLAY_SOURCE.read_bytes()).hexdigest(),
+                "fixtures": {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                             for path in ([AUTOPLAY_SOURCE, DAYCARE_SOURCE] if args.play_case == "daycare"
+                                          else [AUTOPLAY_SOURCE])},
                 "seed": args.play_seed, "seconds": args.play_seconds, "case": args.play_case,
             }), flush=True)
         install_probe(server_dir, WORLD, PROBE_SOURCE)
@@ -83,9 +84,15 @@ def main():
                 shutil.copyfile(FLIGHT_PROBE_SOURCE, probe)
                 exercise_world(server_dir, "MUSHROOM_FLIGHT_PASS")
             if args.play_seconds:
-                fixture = AUTOPLAY_SOURCE.read_text(encoding="utf-8")
-                options = f"{args.play_seconds}, {args.play_seed}, {json.dumps(args.play_case)}"
-                probe.write_text(f"{fixture}\nstartAutoplay({options});\n", encoding="utf-8")
+                shutil.copyfile(AUTOPLAY_SOURCE, probe.with_name(AUTOPLAY_SOURCE.name))
+                if args.play_case == "daycare":
+                    shutil.copyfile(DAYCARE_SOURCE, probe.with_name(DAYCARE_SOURCE.name))
+                    script = f'import {{ startDaycare }} from "./{DAYCARE_SOURCE.name}";\n'
+                    script += f"startDaycare({args.play_seconds}, {args.play_seed});\n"
+                else:
+                    script = f'import {{ startAutoplay }} from "./{AUTOPLAY_SOURCE.name}";\n'
+                    script += f"startAutoplay({args.play_seconds}, {args.play_seed}, {json.dumps(args.play_case)});\n"
+                probe.write_text(script, encoding="utf-8")
                 exercise_world(server_dir, "MUSHROOM_PLAY_PASS", play_seconds=args.play_seconds)
         print("Mushroom spawned and remained in the world after a server restart.")
 

@@ -3,21 +3,21 @@ import { spawnSimulatedPlayer } from "@minecraft/server-gametest";
 
 const NAMESPACE = "mushroom_yorkie:";
 const YORKIE = NAMESPACE + "mushroom_yorkie";
-const TREAT = NAMESPACE + "yorkie_treat";
+export const TREAT = NAMESPACE + "yorkie_treat";
 const HARNESS = NAMESPACE + "yorkie_harness";
 const LEAD = "minecraft:lead";
-const FLOOR = 230;
-const pause = (ticks) => system.waitTicks(ticks);
-const ownerOf = (pet) => pet.getComponent("minecraft:is_tamed")?.tamedToPlayerId;
+export const FLOOR = 230;
+export const pause = (ticks) => system.waitTicks(ticks);
+export const ownerOf = (pet) => pet.getComponent("minecraft:is_tamed")?.tamedToPlayerId;
 const holderOf = (pet) => pet.getComponent("minecraft:leashable")?.leashHolder?.id;
-const prop = (pet, name) => pet.getProperty(NAMESPACE + name);
-const bag = (player) => player.getComponent("minecraft:inventory").container;
+export const prop = (pet, name) => pet.getProperty(NAMESPACE + name);
+export const bag = (player) => player.getComponent("minecraft:inventory").container;
 
-function check(condition, message) {
+export function check(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-async function until(predicate, message, ticks = 100) {
+export async function until(predicate, message, ticks = 100) {
   for (let elapsed = 0; elapsed < ticks; elapsed += 2) {
     if (predicate()) return;
     await pause(2);
@@ -34,17 +34,29 @@ async function interact(actor, pet, item, count = 1, raycast = false) {
   }
   await pause(3);
   if (raycast) {
-    let aimed = false;
+    // Aim inside the Yorkie's 0.46-block collider. The automatic entity aim
+    // can point at its upper edge when the dog moves between server ticks.
+    let firstHit;
     for (let tick = 0; tick < 40; tick++) {
-      actor.lookAtEntity(pet);
+      const eye = actor.getHeadLocation();
+      const target = pet.location;
+      const dx = target.x - eye.x;
+      const dz = target.z - eye.z;
+      const dy = target.y + 0.23 - eye.y;
+      actor.setRotation({
+        x: Math.atan2(-dy, Math.hypot(dx, dz)) * 180 / Math.PI,
+        y: Math.atan2(-dx, dz) * 180 / Math.PI,
+      });
       await pause(1);
       const [hit] = actor.getEntitiesFromViewDirection({ maxDistance: 4 });
-      if (hit?.entity.id === pet.id) {
-        aimed = true;
-        break;
-      }
+      firstHit = hit?.entity;
+      if (firstHit?.id === pet.id) break;
     }
-    check(aimed, "input: could not line up the player's crosshair with the intended dog");
+    check(firstHit?.id === pet.id, "input: missed crosshair target " + JSON.stringify({
+      action: item ? "attach" : "release", eye: actor.getHeadLocation(), dog: pet.location,
+      direction: actor.getViewDirection(), velocity: pet.getVelocity(),
+      hit: firstHit?.typeId, goal: prop(pet, "home_goal"),
+    }));
   }
   const accepted = raycast ? actor.interact() : actor.interactWithEntity(pet);
   await pause(1);
@@ -52,7 +64,7 @@ async function interact(actor, pet, item, count = 1, raycast = false) {
   return accepted;
 }
 
-function itemCount(actor, type, label = undefined) {
+export function itemCount(actor, type, label = undefined) {
   const inventory = bag(actor);
   let total = 0;
   for (let slot = 0; slot < inventory.size; ++slot) {
@@ -69,6 +81,7 @@ async function placePair(pair) {
   actor.setGameMode(GameMode.Survival);
   actor.teleport(origin);
   pet.teleport({ ...origin, x: origin.x + 1.5 });
+  pet.clearVelocity();
   bag(actor).clearAll();
   await pause(3);
   if (prop(pet, "ordered_sit")) {
@@ -77,7 +90,7 @@ async function placePair(pair) {
   }
 }
 
-async function startPair(dimension, x, tag) {
+export async function startPair(dimension, x, tag) {
   const origin = { x, y: FLOOR + 1, z: 6.5 };
   const actor = spawnSimulatedPlayer({ dimension, ...origin }, tag, GameMode.Survival);
   const pet = dimension.spawnEntity(YORKIE, { ...origin, x: x + 1.5 }, {
@@ -198,7 +211,7 @@ async function flightDuringSleep(pair, far) {
   }
 }
 
-function startAutoplay(seconds, seed, onlyCase) {
+export function startAutoplay(seconds, seed, onlyCase) {
   world.afterEvents.worldLoad.subscribe(async () => {
     let randomState = seed >>> 0;
     let active = { case: "setup", phase: "setup" };
