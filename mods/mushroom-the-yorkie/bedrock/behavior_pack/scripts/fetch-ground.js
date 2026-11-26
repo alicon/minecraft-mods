@@ -4,13 +4,24 @@ const LOOK_AHEAD = 0.65;
 const STEP_SPEED = 0.20;
 const CANDIDATE_ANGLES = [0, 35, -35, 65, -65].map((degrees) => degrees * Math.PI / 180);
 
+// These plants have no collision. Keep the list explicit so fences, slabs,
+// closed doors and berry bushes cannot become clear just because they are not full blocks.
+const WALK_THROUGH_PLANTS = new Set([
+  "minecraft:short_grass", "minecraft:tall_grass", "minecraft:short_dry_grass",
+  "minecraft:tall_dry_grass", "minecraft:fern", "minecraft:large_fern",
+]);
+
+function hasClearance(block) {
+  return block && (block.isAir || (WALK_THROUGH_PLANTS.has(block.typeId) && !block.isWaterlogged));
+}
+
 function safeFeet(dimension, feet, wetAllowed) {
   const at = blockAt(dimension, feet);
   const above = blockAt(dimension, { ...feet, y: Math.floor(feet.y) + 1 });
-  if (!at || !above?.isAir || !hasDrySupport(dimension, feet)) {
+  if (!at || !hasClearance(above) || !hasDrySupport(dimension, feet)) {
     return false;
   }
-  if (at.isAir) {
+  if (hasClearance(at)) {
     return true;
   }
   return wetAllowed && (at.typeId === "minecraft:water" || at.typeId === "minecraft:flowing_water");

@@ -10,4 +10,16 @@ public final class FetchTerrainGameTests {
 	public void waterEdgePathAllowsPickup(GameTestHelper helper) {
 		FetchTerrainScenarios.waterEdgePathAllowsPickup(helper);
 	}
+
+	/** The native fetch goal must retrieve the original ball through short grass. */
+	@GameTest(maxTicks = 200)
+	public void fetchThroughShortGrass(GameTestHelper helper) {
+		FetchTerrainScenarios.fetchThroughGrass(helper, false);
+	}
+
+	/** The native fetch goal must retrieve the original ball through tall grass. */
+	@GameTest(maxTicks = 200)
+	public void fetchThroughTallGrass(GameTestHelper helper) {
+		FetchTerrainScenarios.fetchThroughGrass(helper, true);
+	}
 }
