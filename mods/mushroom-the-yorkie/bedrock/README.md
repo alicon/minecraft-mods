@@ -64,7 +64,7 @@ Java Mushroom can scent nearby generated structures. On Bedrock 26.66.1, the sta
 
 ## Preview the model on the Mac
 
-With Pillow 10.1 or newer installed, render the geometry, texture atlas and static poses directly from a built package. Add `--reference` with an earlier package for a side-by-side comparison.
+With Pillow 10.1 or newer installed, render the geometry, texture atlas, static poses and the harness with its lead locator directly from a built package. Add `--reference` with an earlier package for a side-by-side comparison.
 
 ```shell
 python3 scripts/render-mushroom-bedrock.py build/bedrock/mushroom-the-yorkie-bedrock-0.1.11.mcaddon \

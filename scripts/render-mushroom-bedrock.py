@@ -18,6 +18,7 @@ VIEWS = (
     ("Sitting", "sit", 82, 6, (0, 6.3, -2), 16),
     ("Sleeping", "sleep", 60, 20, (0, 4.7, -2), 16),
     ("Creative flight", "flight", 63, 7, (0, 6.3, -2), 16),
+    ("Harness", "harness", 95, 15, (0, 6.5, -3), 13),
 )
 ZERO = (0, 0, 0)
 
@@ -119,7 +120,10 @@ def paint_face(canvas, texture, points, uv):
 
 def render(bones, animations, texture, view):
     _, pose, yaw, pitch, center, zoom = view
-    animation = animations.get(f"animation.{STEM}.{pose}", {})
+    animation_name = "idle" if pose == "harness" else pose
+    animation = animations.get(f"animation.{STEM}.{animation_name}", {})
+    motion = animation.get("bones", {})
+    yaw, pitch = math.radians(yaw), math.radians(pitch)
     by_name = {bone["name"]: bone for bone in bones}
     panel = Image.new("RGB", PANEL, "#e2e5e7")
     if pose == "flight" and not animation:
@@ -127,16 +131,29 @@ def render(bones, animations, texture, view):
         return panel
     rendered = []
     for bone in bones:
-        if bone["name"] == "harness" or (pose == "sleep" and bone["name"] in {"right_eye", "left_eye"}):
+        if bone["name"] == "harness" and pose != "harness":
+            continue
+        if pose == "sleep" and bone["name"] in {"right_eye", "left_eye"}:
             continue
         for cube in bone.get("cubes", []):
             for vertices, uv in faces(cube):
-                points = [project(transform(point, bone, by_name, animation.get("bones", {})),
-                                  center, math.radians(yaw), math.radians(pitch), zoom) for point in vertices]
+                points = [project(transform(point, bone, by_name, motion), center, yaw, pitch, zoom)
+                          for point in vertices]
                 depth = sum(point[2] for point in points) / 4
                 rendered.append((depth, [point[:2] for point in points], uv))
     for _, points, uv in sorted(rendered, key=lambda face: face[0]):
         paint_face(panel, texture, points, uv)
+    if pose == "harness":
+        draw = ImageDraw.Draw(panel)
+        locators = [(bone, bone["locators"]["lead"]) for bone in bones if "lead" in bone.get("locators", {})]
+        label = "Lead locator" if locators else "Lead locator missing"
+        draw.text((12, 12), label, fill="#294c5d")
+        _, top, right, bottom = draw.textbbox((12, 12), label)
+        for bone, locator in locators:
+            offset = locator["offset"] if isinstance(locator, dict) else locator
+            x, y, _ = project(transform(offset, bone, by_name, motion), center, yaw, pitch, zoom)
+            draw.line(((right + 6, (top + bottom) / 2), (x, y)), fill="#116788", width=2)
+            draw.ellipse((x - 4, y - 4, x + 4, y + 4), fill="#ffffff", outline="#116788", width=2)
     return panel
 
 
