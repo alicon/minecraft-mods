@@ -42,16 +42,17 @@ async function feed(owner, guest, dog, example) {
   player.setGameMode(example.mode === "creative" ? GameMode.Creative : GameMode.Survival);
   const health = dog.getComponent("minecraft:health");
   const before = health.effectiveMax - example.missingHealth;
+  const wasSitting = dog.getProperty(NS + "ordered_sit");
   health.setCurrentValue(before);
   await use(player, dog, item, 2);
   await system.waitTicks(8);
   const held = bag(player).getItem(0)?.amount ?? 0;
   assert(leashHolder(dog) === (example.leashed ? owner.id : undefined), "changed lead holder");
-  const expectedHealth = before + (example.bedrockHealed ?? example.healed);
+  const expectedHealth = before + example.healed;
   assert(health.currentValue === expectedHealth && held === 2 - example.spent,
     "expected health " + expectedHealth + " and held " + (2 - example.spent)
       + ", observed health " + health.currentValue + " and held " + held);
-  assert(ownerId(dog) === owner.id && !dog.getProperty(NS + "ordered_sit"), "changed owner or sit order");
+  assert(ownerId(dog) === owner.id && dog.getProperty(NS + "ordered_sit") === wasSitting, "changed owner or sit order");
 }
 
 function fillGrass(dimension, type) {

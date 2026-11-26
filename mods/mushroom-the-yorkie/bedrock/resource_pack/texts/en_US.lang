@@ -23,3 +23,4 @@ mushroom.fetch.returned=Mushroom brought the toy back!
 mushroom.fetch.inventory_full=Mushroom is waiting for room in your inventory.
 mushroom.fetch.found=Mushroom picked up the toy!
 mushroom.fetch.unreachable=Mushroom couldn't reach that toy.
+action.interact.mushroom_feed=Feed Mushroom
