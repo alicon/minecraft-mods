@@ -26,6 +26,6 @@ public final class SquirrelModel extends EntityModel<SquirrelRenderer.SquirrelRe
 	@Override
 	public void setupAnim(SquirrelRenderer.SquirrelRenderState state) {
 		super.setupAnim(state);
-		this.pose.animate(state.walkAnimationPos, state.walkAnimationSpeed, state.ageInTicks, state.yRot, state.xRot);
+		this.pose.animate(state.walkAnimationPos, state.walkAnimationSpeed, state.ageInTicks, state.yRot, state.xRot, state.treePitch);
 	}
 }

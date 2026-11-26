@@ -38,6 +38,11 @@ final class MushroomYorkieStateQueries {
 		return !yorkie.level().noCollision(yorkie, support);
 	}
 
+	static boolean restingInDoghouse(MushroomYorkieEntity yorkie) {
+		return yorkie.isMushroomSleeping() && yorkie.level().getBlockState(yorkie.blockPosition()).is(ModBlocks.DOGHOUSE)
+				&& canSleep(yorkie);
+	}
+
 	static boolean isWetForSitting(MushroomYorkieEntity yorkie) {
 		// A dry passenger's seat can put its feet in a water block. Keep the feet
 		// check for unmounted bank contact, but do not erase an order on a floating boat.

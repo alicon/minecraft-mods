@@ -18,9 +18,17 @@
 		{
 			"from": [0, 0, -2], "to": [16, 2, 16],
 			"faces": {
-				"down": {"texture": "#trim"}, "up": {"texture": "#bed"},
+				"down": {"texture": "#trim"}, "up": {"texture": "#trim"},
 				"north": {"texture": "#trim"}, "south": {"texture": "#trim"},
 				"west": {"texture": "#trim"}, "east": {"texture": "#trim"}
+			}
+		},
+		{
+			"from": [3, 2, -2], "to": [13, 4, 14.5],
+			"faces": {
+				"up": {"texture": "#bed"}, "north": {"texture": "#bed"},
+				"south": {"texture": "#bed"}, "west": {"texture": "#bed"},
+				"east": {"texture": "#bed"}
 			}
 		},
 		{
@@ -56,7 +64,7 @@
 			}
 		},
 		{
-			"from": [3.5, 2, 10.5], "to": [12.5, 4, 14.5],
+			"from": [3.5, 4, 10.5], "to": [12.5, 5.5, 14.5],
 			"faces": {
 				"up": {"texture": "#pillow"}, "north": {"texture": "#pillow"},
 				"south": {"texture": "#pillow"}, "west": {"texture": "#pillow"}, "east": {"texture": "#pillow"}

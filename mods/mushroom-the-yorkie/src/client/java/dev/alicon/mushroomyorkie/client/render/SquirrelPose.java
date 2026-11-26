@@ -14,6 +14,7 @@ final class SquirrelPose {
 	/** Model layer used when baking the squirrel model. */
 	static final ModelLayerLocation LAYER_LOCATION = new ModelLayerLocation(MushroomTheYorkie.id("squirrel"), "main");
 
+	private final ModelPart pivot;
 	private final ModelPart head;
 	private final ModelPart tail;
 	private final ModelPart frontLeftLeg;
@@ -23,8 +24,9 @@ final class SquirrelPose {
 
 	/** Creates the model from its baked layer. */
 	SquirrelPose(ModelPart root) {
-		this.head = root.getChild("head");
-		ModelPart body = root.getChild("body");
+		this.pivot = root.getChild("pivot");
+		this.head = this.pivot.getChild("head");
+		ModelPart body = this.pivot.getChild("body");
 		this.tail = body.getChild("tail");
 		this.frontLeftLeg = body.getChild("front_left_leg");
 		this.frontRightLeg = body.getChild("front_right_leg");
@@ -35,14 +37,14 @@ final class SquirrelPose {
 	/** Builds the cuboid layer definition for the squirrel renderer. */
 	static LayerDefinition createBodyLayer() {
 		MeshDefinition mesh = new MeshDefinition();
-		PartDefinition root = mesh.getRoot();
-		PartDefinition body = root.addOrReplaceChild("body", CubeListBuilder.create()
+		PartDefinition pivot = mesh.getRoot().addOrReplaceChild("pivot", CubeListBuilder.create(), PartPose.offset(0.0F, 20.0F, 0.0F));
+		PartDefinition body = pivot.addOrReplaceChild("body", CubeListBuilder.create()
 				.texOffs(32, 32).addBox(-2.0F, -3.2F, -3.4F, 4.0F, 4.0F, 7.0F)
-				.texOffs(20, 16).addBox(-1.3F, -2.3F, -3.65F, 2.6F, 2.6F, 0.6F), PartPose.offset(0.0F, 20.0F, 0.0F));
+				.texOffs(20, 16).addBox(-1.3F, -2.3F, -3.65F, 2.6F, 2.6F, 0.6F), PartPose.ZERO);
 
-		PartDefinition head = root.addOrReplaceChild("head", CubeListBuilder.create()
+		PartDefinition head = pivot.addOrReplaceChild("head", CubeListBuilder.create()
 				.texOffs(0, 16).addBox(-2.3F, -4.0F, -2.8F, 4.6F, 4.2F, 4.4F)
-				.texOffs(20, 16).addBox(-1.6F, -2.0F, -4.2F, 3.2F, 2.0F, 1.6F), PartPose.offset(0.0F, 18.4F, -3.5F));
+				.texOffs(20, 16).addBox(-1.6F, -2.0F, -4.2F, 3.2F, 2.0F, 1.6F), PartPose.offset(0.0F, -1.6F, -3.5F));
 		head.addOrReplaceChild("left_eye", CubeListBuilder.create().texOffs(48, 0)
 				.addBox(0.65F, -2.9F, -3.0F, 0.8F, 0.8F, 0.25F), PartPose.ZERO);
 		head.addOrReplaceChild("right_eye", CubeListBuilder.create().texOffs(48, 0)
@@ -69,9 +71,11 @@ final class SquirrelPose {
 		return CubeListBuilder.create().texOffs(36, 0).addBox(-0.6F, 0.0F, -0.6F, 1.2F, 3.5F, 1.2F);
 	}
 
-	void animate(float walkPosition, float walkSpeed, float ageInTicks, float headYaw, float headPitch) {
-		this.head.xRot = headPitch * Mth.DEG_TO_RAD;
-		this.head.yRot = headYaw * Mth.DEG_TO_RAD;
+	void animate(float walkPosition, float walkSpeed, float ageInTicks, float headYaw, float headPitch, float treePitch) {
+		this.pivot.xRot = -treePitch * Mth.DEG_TO_RAD;
+		float freeLook = 1.0F - Math.min(Math.abs(treePitch) / 78.0F, 1.0F);
+		this.head.xRot = headPitch * Mth.DEG_TO_RAD * freeLook;
+		this.head.yRot = headYaw * Mth.DEG_TO_RAD * freeLook;
 		this.tail.xRot = -0.08F + Mth.sin(ageInTicks * 0.08F) * 0.05F;
 		this.tail.yRot = Mth.sin(ageInTicks * 0.25F) * 0.16F;
 		float walk = walkPosition * 0.9F;

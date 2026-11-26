@@ -130,7 +130,9 @@ final class CreativeProfileGoal extends Goal {
 			this.napNotified = true;
 		}
 		this.yorkie.setSleeping(true);
-		this.yorkie.getLookControl().setLookAt(owner, 10.0F, this.yorkie.getMaxHeadXRot());
+		if (!MushroomYorkieStateQueries.restingInDoghouse(this.yorkie)) {
+			this.yorkie.getLookControl().setLookAt(owner, 10.0F, this.yorkie.getMaxHeadXRot());
+		}
 		this.yorkie.setDeltaMovement(this.yorkie.getDeltaMovement().scale(0.3D));
 		MushroomBehaviorDebugger.debug(this.yorkie, "creative_profile_nap", this.bedTarget == null ? "creative profile: napping nearby" : "creative profile: napping on dog bed", false);
 	}

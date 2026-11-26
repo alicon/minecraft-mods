@@ -91,6 +91,7 @@ final class SquirrelRouteProbe {
 			boolean isClimbing = this.climbing.getBoolean(this.goal);
 			Vec3 position = this.squirrel.position();
 			if (isClimbing && !this.squirrel.hasFoundTree()) {
+				this.helper.assertTrue(this.squirrel.treePoseDirection() == 1, "Ascending squirrel did not publish the upward trunk pose");
 				this.climbingDistance += Math.hypot(position.x - this.previous.x, position.z - this.previous.z);
 				this.peakY = Math.max(this.peakY, position.y);
 				this.largestDrop = Math.max(this.largestDrop, this.peakY - position.y);
@@ -103,6 +104,7 @@ final class SquirrelRouteProbe {
 			frame.add("velocity", point(this.squirrel.getDeltaMovement()));
 			frame.addProperty("health", this.squirrel.getHealth());
 			frame.addProperty("climbing", isClimbing);
+			frame.addProperty("treePose", this.squirrel.treePoseDirection());
 			frame.addProperty("foundTree", this.squirrel.hasFoundTree());
 			frame.addProperty("noGravity", this.squirrel.isNoGravity());
 			frame.addProperty("onGround", this.squirrel.onGround());
