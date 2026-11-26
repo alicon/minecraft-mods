@@ -63,6 +63,16 @@ Use the [Bedrock release checklist](RELEASING.md#release-a-bedrock-add-on) to re
 
 Package tests compare the built archives to the [playtested identifiers](../scripts/fixtures/bedrock-pack-baselines.json). They check pack and module UUIDs, the entity, block and item names stored in worlds, and paired pack versions. Additive content is allowed in a newer version. Refresh each baseline from its verified download when releasing, retaining every identifier from earlier saves. The patrol stores structured state under a versioned key. Preserve existing scalar save keys and migrate their old values explicitly when their meaning changes.
 
+### Saved state
+
+| Bedrock mod | Current saved schema |
+| --- | --- |
+| Mushroom the Yorkie | V1 uses native entity ownership and cargo plus stable scalar keys for pet identity, owner contact, daily bowls and practice toys. Changes to a scalar's meaning need an explicit migration that accepts the old value. |
+| Cops and Robbers | V1 patrol records live under `cops_robbers:patrol_v1/`. Retired-robber markers retain their original scalar keys. |
+| NARwhal Together | Charm cooldowns and concurrent regroup requests are session state. The item identifier persists in inventories. |
+
+Upgrade fixtures check saved ownership, daily care, cargo, structures, patrols, and the Regroup Charm alongside the other active add-ons.
+
 ### Gameplay checks by edition
 
 | Shared behavior | Java Fabric checks | Bedrock checks |
