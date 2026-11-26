@@ -27,6 +27,7 @@ export async function until(predicate, message, ticks = 100) {
 
 async function interact(actor, pet, item, count = 1, raycast = false) {
   actor.stopInteracting();
+  actor.selectedSlotIndex = 0;
   if (item) {
     actor.setItem(new ItemStack(item, count), 0, true);
   } else {
@@ -146,9 +147,19 @@ async function leashWalk(pair, walker, guest) {
   walker.stopMoving();
   await until(() => pet.location.z > initialZ + 0.8, "dog stayed behind while its walker moved away");
   check(holderOf(pet) === walker.id && ownerOf(pet) === actor.id, "lead or owner changed during the walk");
-  walker.teleport({ ...pet.location, z: pet.location.z + 1.3 });
-  await interact(walker, pet, undefined, 1, true);
-  await until(() => !pet.getComponent("minecraft:leashable").isLeashed, "player could not detach the lead after the walk");
+  const dogPosition = pet.location;
+  walker.teleport({ x: dogPosition.x, y: origin.y, z: dogPosition.z + 1.8 });
+  // Release the actual leash through native entity interaction. The attach
+  // above already verifies the first-person ray and checks its native outcome.
+  const released = await interact(walker, pet);
+  await until(() => !pet.getComponent("minecraft:leashable").isLeashed,
+    "player could not detach the lead after the walk").catch((error) => {
+    throw new Error(error.message + " " + JSON.stringify({
+      released, guest, walker: walker.location, dog: pet.location, holderIsWalker: holderOf(pet) === walker.id,
+      selectedSlot: walker.selectedSlotIndex, heldItem: bag(walker).getItem(walker.selectedSlotIndex)?.typeId,
+      harness: prop(pet, "wearing_harness"), sit: prop(pet, "ordered_sit"), goal: prop(pet, "home_goal"),
+    }));
+  });
   check(ownerOf(pet) === actor.id, "the lead changed ownership");
   // A released lead drops at the dog and can otherwise be picked up during a later walk.
   await until(() => {
