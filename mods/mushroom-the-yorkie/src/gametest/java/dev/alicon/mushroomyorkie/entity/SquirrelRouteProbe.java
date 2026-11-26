@@ -175,7 +175,8 @@ final class SquirrelRouteProbe {
 			} finally {
 				this.squirrel.discard();
 			}
-			throw new IllegalStateException("Native squirrel route failed: " + this.label, failure);
+			throw new IllegalStateException("Native squirrel route failed: " + this.label
+					+ " at tick " + this.ticks + ": " + failure.getMessage(), failure);
 		}
 		this.start();
 	}
