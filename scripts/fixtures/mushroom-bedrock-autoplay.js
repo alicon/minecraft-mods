@@ -65,7 +65,7 @@ async function interact(actor, pet, item, count = 1, raycast = false) {
     ++missed;
   }
   throw new Error("input: could not interact at the crosshair " + JSON.stringify({
-    action: item ? "attach" : "release", eye: actor.getHeadLocation(), dog: pet.location,
+    action: item ?? "release", eye: actor.getHeadLocation(), dog: pet.location,
     direction: actor.getViewDirection(), headRotation: actor.headRotation, velocity: pet.getVelocity(),
     hit: firstHit?.typeId, goal: prop(pet, "home_goal"), rejectedInputs: missed,
   }));
@@ -149,6 +149,13 @@ async function leashWalk(pair, walker, guest) {
   check(holderOf(pet) === walker.id && ownerOf(pet) === actor.id, "lead or owner changed during the walk");
   const dogPosition = pet.location;
   walker.teleport({ x: dogPosition.x, y: origin.y, z: dogPosition.z + 1.8 });
+  const health = pet.getComponent("minecraft:health");
+  health.setCurrentValue(health.effectiveMax - 3);
+  await interact(walker, pet, TREAT, 1, true);
+  await until(() => health.currentValue === health.effectiveMax && itemCount(walker, TREAT) === 0,
+    "one treat did not heal the leashed dog and leave the walker's hand");
+  check(holderOf(pet) === walker.id && ownerOf(pet) === actor.id && prop(pet, "wearing_harness"),
+    "feeding changed the lead holder, harness or owner");
   // Release the actual leash through native entity interaction. The attach
   // above already verifies the first-person ray and checks its native outcome.
   const released = await interact(walker, pet);

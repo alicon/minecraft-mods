@@ -77,7 +77,7 @@ Upgrade fixtures check saved ownership, daily care, cargo, structures, patrols, 
 
 | Shared behavior | Java Fabric checks | Bedrock checks |
 | --- | --- | --- |
-| Mushroom ownership and borrowed leads | Native `daycareGuestsShareLeads` on both Fabric targets checks the one-dog limit, harness, guest lead and ownership | Adoption and care persistence probes and the mixed two-player session exercise independent ownership and guest walks |
+| Mushroom ownership and borrowed leads | Native `daycareGuestsShareLeads` on both Fabric targets checks the one-dog limit, harness, guest lead, feeding while leashed, and ownership | Adoption and care persistence probes and the mixed two-player session exercise independent ownership, guest walks, and feeding while leashed |
 | Mushroom treat use | Native `feedsTreatsAcrossEditions` uses the [shared feeding cases](../scripts/fixtures/mushroom-treat-cases.json) | The fetch probe uses the same cases to check health and Survival and Creative inventory |
 | Mushroom fetch and night flight | Native fetch interruption and persistence GameTests plus the bridge transition matrix | The fetch probe verifies interrupted carry and rejoin. The flight probe verifies sleeping through Creative takeoff and resuming flight at dawn |
 | Cops and Robbers kits, patrol, and fire response | Live patrol and structures smoke exercises kit placement, mounted capture, jail drop-off, and extinguishing fires | [Patrol smoke](../mods/cops-and-robbers/bedrock/README.md#verify-the-kits-vehicles-patrol-fire-response-and-jail) with the vehicle, patrol, fire, and jail scenarios enabled |
