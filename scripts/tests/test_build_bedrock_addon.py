@@ -1,6 +1,7 @@
 import importlib.util
 import io
 import json
+import runpy
 import tempfile
 import unittest
 from collections import Counter
@@ -19,6 +20,14 @@ ASSETS = MOD / "src/main/resources/assets/mushroom_yorkie"
 
 
 class BedrockPackageTests(unittest.TestCase):
+    def test_mushroom_visible_asset_contracts(self):
+        checker = runpy.run_path(str(builder.ROOT / "scripts/check-mushroom-bedrock-assets.py"))
+        with tempfile.TemporaryDirectory() as directory:
+            package = builder.build(MOD, Path(directory))
+            for name, problem in checker["check_assets"](package).items():
+                with self.subTest(check=name):
+                    self.assertIsNone(problem)
+
     def test_artifact_has_linked_packs_and_reuses_java_art(self):
         with tempfile.TemporaryDirectory() as directory:
             first = builder.build(MOD, Path(directory) / "first")

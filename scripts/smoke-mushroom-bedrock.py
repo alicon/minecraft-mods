@@ -1,10 +1,12 @@
 """Boot the packaged Mushroom add-on in a fresh Bedrock Dedicated Server world."""
 
 import argparse
+import hashlib
 import io
 import json
 import os
 import queue
+import shlex
 import shutil
 import struct
 import subprocess
@@ -19,6 +21,10 @@ PROBE_ID = "836a477e-ab53-4084-8ff3-600c098fb836"
 PROBE_SOURCE = Path(__file__).with_name("fixtures") / "mushroom-bedrock-smoke.js"
 PLAYER_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-player-probe.js")
 ADOPTION_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-adoption-probe.js")
+FLIGHT_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-flight-probe.js")
+AUTOPLAY_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-autoplay.js")
+TREAT_CASES = PROBE_SOURCE.with_name("mushroom-treat-cases.json")
+AUTOPLAY_CASES = ("survival-feed", "creative-feed", "owner-walk", "guest-walk", "fetch", "sleep-flight")
 SERVER_PROPERTIES = {
     "level-name": WORLD,
     "gamemode": "survival",
@@ -120,29 +126,37 @@ def collect_output(stream, lines):
     lines.put(None)
 
 
-def expect_line(lines, marker, timeout=90):
+def expect_line(lines, marker, timeout=90, heartbeat=None):
     deadline = time.monotonic() + timeout
+    progress_deadline = time.monotonic() + 60 if heartbeat else deadline
     while time.monotonic() < deadline:
         try:
-            line = lines.get(timeout=max(0, deadline - time.monotonic()))
+            line = lines.get(timeout=max(0, min(deadline, progress_deadline) - time.monotonic()))
         except queue.Empty:
+            if heartbeat and progress_deadline < deadline:
+                raise RuntimeError(f"Bedrock autoplay stopped reporting progress while waiting for {marker!r}")
             break
         if line is None:
             raise RuntimeError(f"Server exited while waiting for {marker!r}")
-        if "MUSHROOM_TEST_FAIL" in line or ("ERROR" in line and any(
+        if "MUSHROOM_TEST_FAIL" in line:
+            raise RuntimeError(f"Bedrock scenario failed: {line.strip()}")
+        if "ERROR" in line and any(
             part in line.lower() for part in (
                 "[blocks]", "[components]", "[entity]", "[json]", "[recipes]", "[item]", "[scripting]", "mushroom"
             )
-        )):
+        ):
             raise RuntimeError(f"Bedrock rejected content: {line.strip()}")
         if marker in line:
-            return
+            return line
+        if heartbeat and heartbeat in line:
+            progress_deadline = time.monotonic() + 60
     raise RuntimeError(f"Server did not report {marker!r} in {timeout}s")
 
 
-def exercise_world(server_dir, marker):
+def exercise_world(server_dir, marker, play_seconds=None):
+    emulator = shlex.split(os.environ.get("MUSHROOM_BEDROCK_SERVER_PREFIX", ""))
     with subprocess.Popen(
-        [str(server_dir / "bedrock_server")],
+        [*emulator, str(server_dir / "bedrock_server")],
         cwd=server_dir,
         env={**os.environ, "LD_LIBRARY_PATH": str(server_dir)},
         stdin=subprocess.PIPE,
@@ -157,7 +171,16 @@ def exercise_world(server_dir, marker):
         reader.start()
 
         try:
-            expect_line(lines, marker)
+            if play_seconds is None:
+                expect_line(lines, marker)
+            else:
+                expect_line(lines, "MUSHROOM_PLAY_START", timeout=120)
+                started = time.monotonic()
+                expect_line(lines, marker, timeout=play_seconds + 180, heartbeat="MUSHROOM_PLAY_ACTION")
+                observed = time.monotonic() - started
+                if observed < play_seconds:
+                    raise RuntimeError(f"Only observed {observed:.1f}s of continuous Bedrock play")
+                print(f"MUSHROOM_PLAY_OBSERVED_SECONDS {observed:.1f}", flush=True)
         finally:
             if server.poll() is None:
                 server.stdin.write("stop\n")
@@ -180,7 +203,15 @@ def main():
     parser.add_argument("--verify-care-persistence", action="store_true")
     parser.add_argument("--verify-fetch", action="store_true", help="run an opt-in simulated-player fetch test")
     parser.add_argument("--verify-adoption", action="store_true", help="run an opt-in simulated-player sleep adoption test")
+    parser.add_argument("--verify-flight", action="store_true", help="run an opt-in simulated-player Creative flight test")
+    parser.add_argument("--play-seconds", type=int, help="run seeded simulated-player gameplay for at least this many seconds")
+    parser.add_argument("--play-seed", type=int, default=119, help="seed for the gameplay action order and variants")
+    parser.add_argument("--play-case", choices=AUTOPLAY_CASES, help="replay one gameplay case")
     args = parser.parse_args()
+    if args.play_seconds is not None and args.play_seconds <= 0:
+        parser.error("--play-seconds must be positive")
+    if args.play_case and args.play_seconds is None:
+        parser.error("--play-case requires --play-seconds")
     with tempfile.TemporaryDirectory(prefix="mushroom-bedrock-smoke-") as directory:
         server_dir = Path(directory)
         with ZipFile(args.server_zip) as source:
@@ -189,6 +220,17 @@ def main():
         (server_dir / "server.properties").write_text(
             "".join(f"{key}={value}\n" for key, value in SERVER_PROPERTIES.items()), encoding="utf-8"
         )
+        if args.play_seconds:
+            with (server_dir / "server.properties").open("a", encoding="utf-8") as settings:
+                settings.write(f"level-seed={args.play_seed}\n")
+            print("MUSHROOM_PLAY_BUILD " + json.dumps({
+                "archive": args.addon.name,
+                "sha256": hashlib.sha256(args.addon.read_bytes()).hexdigest(),
+                "server": args.server_zip.name,
+                "serverSha256": hashlib.sha256(args.server_zip.read_bytes()).hexdigest(),
+                "fixtureSha256": hashlib.sha256(AUTOPLAY_SOURCE.read_bytes()).hexdigest(),
+                "seed": args.play_seed, "seconds": args.play_seconds, "case": args.play_case,
+            }), flush=True)
         install_probe(server_dir)
         install_addon(args.upgrade_from or args.addon, server_dir)
         exercise_world(server_dir, "MUSHROOM_TEST_SPAWNED")
@@ -197,15 +239,25 @@ def main():
         exercise_world(server_dir, "MUSHROOM_TEST_REOPENED")
         if args.verify_care_persistence:
             exercise_world(server_dir, "MUSHROOM_TEST_CARE_PERSISTED")
-        if args.verify_fetch or args.verify_adoption:
+        if args.verify_fetch or args.verify_adoption or args.verify_flight or args.play_seconds:
             probe = enable_beta_test_apis(server_dir)
             if args.verify_fetch:
-                shutil.copyfile(PLAYER_PROBE_SOURCE, probe)
+                examples = json.dumps(json.loads(TREAT_CASES.read_text(encoding="utf-8")))
+                probe.write_text(PLAYER_PROBE_SOURCE.read_text(encoding="utf-8")
+                                 + f"\nconst TREAT_EXAMPLES = {examples};\n", encoding="utf-8")
                 exercise_world(server_dir, "MUSHROOM_SIM_PASS")
                 exercise_world(server_dir, "MUSHROOM_SIM_CARGO_SAVED")
             if args.verify_adoption:
                 shutil.copyfile(ADOPTION_PROBE_SOURCE, probe)
                 exercise_world(server_dir, "MUSHROOM_ADOPTION_RECOVERY")
+            if args.verify_flight:
+                shutil.copyfile(FLIGHT_PROBE_SOURCE, probe)
+                exercise_world(server_dir, "MUSHROOM_FLIGHT_PASS")
+            if args.play_seconds:
+                fixture = AUTOPLAY_SOURCE.read_text(encoding="utf-8")
+                options = f"{args.play_seconds}, {args.play_seed}, {json.dumps(args.play_case)}"
+                probe.write_text(f"{fixture}\nstartAutoplay({options});\n", encoding="utf-8")
+                exercise_world(server_dir, "MUSHROOM_PLAY_PASS", play_seconds=args.play_seconds)
         print("Mushroom spawned and remained in the world after a server restart.")
 
 

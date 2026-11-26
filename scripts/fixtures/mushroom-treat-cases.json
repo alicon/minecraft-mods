@@ -1,0 +1,8 @@
+[
+  {"mode":"survival", "missingHealth":6, "missingAfter":3, "treatsBefore":2, "treatsAfter":1},
+  {"mode":"survival", "missingHealth":1, "missingAfter":0, "treatsBefore":1, "treatsAfter":0},
+  {"mode":"survival", "missingHealth":0, "missingAfter":0, "treatsBefore":2, "treatsAfter":1},
+  {"mode":"creative", "missingHealth":6, "missingAfter":3, "treatsBefore":2, "treatsAfter":2},
+  {"mode":"creative", "missingHealth":1, "missingAfter":0, "treatsBefore":1, "treatsAfter":1},
+  {"mode":"creative", "missingHealth":0, "missingAfter":0, "treatsBefore":2, "treatsAfter":2}
+]

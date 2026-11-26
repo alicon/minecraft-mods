@@ -1,6 +1,6 @@
 import { InvalidEntityError, system, world } from "@minecraft/server";
 import { blockAt, centerOf, distanceSquared, nearbyBlocks, restSpot } from "./home-blocks.js";
-import { BED, EMPTY_BOWL, FOOD_BOWL, HOUSE, NAMESPACE, WATER_BOWL, YORKIE, storage } from "./yorkie.js";
+import { BED, EMPTY_BOWL, FLIGHT_MODE, FOOD_BOWL, HOUSE, NAMESPACE, WATER_BOWL, YORKIE, storage } from "./yorkie.js";
 
 const LOOK_RADIUS = 8;
 const CARE_INTERVAL = 10;
@@ -100,11 +100,17 @@ function safeSleep(pup, spot) {
 }
 
 function update(pup, state, day, time, now) {
+  if (pup.getProperty(FLIGHT_MODE) !== "ground") {
+    state.name = undefined;
+    return;
+  }
   const tamed = pup.getComponent("minecraft:is_tamed");
   const owner = tamed?.tamedToPlayer;
   const leashable = pup.getComponent("minecraft:leashable");
+  const sleeping = pup.getProperty(storage("home_goal")) === "sleep";
   if (!tamed || pup.getProperty(storage("ordered_sit")) || pup.isInWater || leashable?.isLeashed
-    || (owner && (owner.dimension.id !== pup.dimension.id || distanceSquared(pup.location, owner.location) > OWNER_RADIUS_SQUARED))) {
+    || (!sleeping && owner && (owner.dimension.id !== pup.dimension.id
+      || distanceSquared(pup.location, owner.location) > OWNER_RADIUS_SQUARED))) {
     requestGoal(pup, "idle");
     state.name = undefined;
     return;
@@ -121,7 +127,7 @@ function update(pup, state, day, time, now) {
     return;
   }
 
-  if (pup.getProperty(storage("home_goal")) === "sleep") {
+  if (sleeping) {
     const spot = restSpot(blockAt(pup.dimension, pup.location));
     if (night && spot && distanceSquared(pup.location, spot.location) < MATTRESS_REACH_SQUARED) {
       return;
