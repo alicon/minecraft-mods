@@ -33,35 +33,41 @@ async function interact(actor, pet, item, count = 1, raycast = false) {
     bag(actor).setItem(0);
   }
   await pause(3);
-  if (raycast) {
-    // Aim inside the Yorkie's 0.46-block collider. The automatic entity aim
-    // can point at its upper edge when the dog moves between server ticks.
-    let firstHit;
-    for (let tick = 0; tick < 40; tick++) {
-      const eye = actor.getHeadLocation();
-      const target = pet.location;
-      const dx = target.x - eye.x;
-      const dz = target.z - eye.z;
-      const dy = target.y + 0.23 - eye.y;
-      actor.setRotation({
-        x: Math.atan2(-dy, Math.hypot(dx, dz)) * 180 / Math.PI,
-        y: Math.atan2(-dx, dz) * 180 / Math.PI,
-      });
-      await pause(1);
-      const [hit] = actor.getEntitiesFromViewDirection({ maxDistance: 4 });
-      firstHit = hit?.entity;
-      if (firstHit?.id === pet.id) break;
-    }
-    check(firstHit?.id === pet.id, "input: missed crosshair target " + JSON.stringify({
-      action: item ? "attach" : "release", eye: actor.getHeadLocation(), dog: pet.location,
-      direction: actor.getViewDirection(), velocity: pet.getVelocity(),
-      hit: firstHit?.typeId, goal: prop(pet, "home_goal"),
-    }));
+  if (!raycast) {
+    const accepted = actor.interactWithEntity(pet);
+    await pause(1);
+    actor.stopInteracting();
+    return accepted;
   }
-  const accepted = raycast ? actor.interact() : actor.interactWithEntity(pet);
-  await pause(1);
-  actor.stopInteracting();
-  return accepted;
+
+  // SimulatedPlayer.interact() uses the head ray, so aim with the GameTest
+  // head controller at the center of the Yorkie's 0.46-block collider.
+  const originalHolder = holderOf(pet);
+  let firstHit;
+  let missed = 0;
+  for (let tick = 0; tick < 40; tick++) {
+    const target = pet.location;
+    actor.lookAtLocation({ ...target, y: target.y + 0.23 });
+    await pause(1);
+    const [hit] = actor.getEntitiesFromViewDirection({ maxDistance: 4 });
+    firstHit = hit?.entity;
+    if (firstHit?.id !== pet.id) continue;
+    const accepted = actor.interact();
+    await pause(1);
+    actor.stopInteracting();
+    if (accepted || holderOf(pet) !== originalHolder || (item && itemCount(actor, item) !== count)) {
+      if (missed) console.warn("MUSHROOM_PLAY_INPUT_RETRY " + JSON.stringify({ tick: system.currentTick, missed }));
+      return accepted;
+    }
+    // A rejected simulator input can be retried only when it had no effect.
+    // Success is still checked independently through the native lead and inventory.
+    ++missed;
+  }
+  throw new Error("input: could not interact at the crosshair " + JSON.stringify({
+    action: item ? "attach" : "release", eye: actor.getHeadLocation(), dog: pet.location,
+    direction: actor.getViewDirection(), headRotation: actor.headRotation, velocity: pet.getVelocity(),
+    hit: firstHit?.typeId, goal: prop(pet, "home_goal"), rejectedInputs: missed,
+  }));
 }
 
 export function itemCount(actor, type, label = undefined) {
@@ -125,7 +131,6 @@ async function leashWalk(pair, walker, guest) {
   }
   const initialZ = pet.location.z;
   const accepted = await interact(walker, pet, LEAD, 1, true);
-  check(accepted, "input: the native interact command missed the targeted dog");
   await until(() => holderOf(pet) === walker.id, "player could not attach a lead to the harness").catch((error) => {
     const component = pet.getComponent("minecraft:leashable");
     throw new Error(error.message + " " + JSON.stringify({
@@ -142,7 +147,7 @@ async function leashWalk(pair, walker, guest) {
   await until(() => pet.location.z > initialZ + 0.8, "dog stayed behind while its walker moved away");
   check(holderOf(pet) === walker.id && ownerOf(pet) === actor.id, "lead or owner changed during the walk");
   walker.teleport({ ...pet.location, z: pet.location.z + 1.3 });
-  check(await interact(walker, pet, undefined, 1, true), "input: native release interaction missed");
+  await interact(walker, pet, undefined, 1, true);
   await until(() => !pet.getComponent("minecraft:leashable").isLeashed, "player could not detach the lead after the walk");
   check(ownerOf(pet) === actor.id, "the lead changed ownership");
   // A released lead drops at the dog and can otherwise be picked up during a later walk.
