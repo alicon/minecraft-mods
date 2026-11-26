@@ -9,6 +9,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerContext;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.item.ItemStack;
@@ -43,6 +44,9 @@ public final class DaycareClientGameTest implements FabricClientGameTest {
 				context.takeScreenshot("daycare-client-failure");
 				throw failure;
 			}
+			server.runOnServer(mc -> mc.getPlayerList().getPlayerByName(DOG_OWNER).connection
+					.disconnect(Component.literal("Daycare test complete")));
+			context.waitTicks(10);
 		}
 	}
 
