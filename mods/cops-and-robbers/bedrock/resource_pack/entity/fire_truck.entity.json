@@ -7,7 +7,7 @@
         "default": "entity_alphatest"
       },
       "textures": {
-        "default": "textures/entity/fire_truck"
+        "default": "textures/alicon/cops_robbers/entity/fire_truck"
       },
       "geometry": {
         "default": "geometry.cops_robbers.vehicle"

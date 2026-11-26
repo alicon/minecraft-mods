@@ -3,7 +3,7 @@
   "texture_name": "atlas.items",
   "texture_data": {
     "narwhal_together_regroup_charm": {
-      "textures": "textures/items/regroup_charm"
+      "textures": "textures/alicon/narwhal_together/items/regroup_charm"
     }
   }
 }

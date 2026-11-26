@@ -119,7 +119,7 @@
               "cooldown": 0.5,
               "interact_text": "action.interact.mushroom_remove_harness",
               "spawn_items": {
-                "table": "loot_tables/harness.json",
+                "table": "loot_tables/alicon/mushroom_yorkie/harness.json",
                 "y_offset": 0.25
               },
               "on_interact": {

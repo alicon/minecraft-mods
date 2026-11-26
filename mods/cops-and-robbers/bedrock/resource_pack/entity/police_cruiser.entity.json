@@ -7,7 +7,7 @@
         "default": "entity_alphatest"
       },
       "textures": {
-        "default": "textures/entity/police_cruiser"
+        "default": "textures/alicon/cops_robbers/entity/police_cruiser"
       },
       "geometry": {
         "default": "geometry.cops_robbers.vehicle"

@@ -7,13 +7,14 @@
     "version": [
       0,
       1,
-      3
+      4
     ],
     "min_engine_version": [
       1,
       26,
       60
-    ]
+    ],
+    "pack_scope": "world"
   },
   "modules": [
     {
@@ -22,7 +23,17 @@
       "version": [
         0,
         1,
-        3
+        4
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "uuid": "4da49bba-bf03-4104-be22-002c8de79336",
+      "version": [
+        0,
+        1,
+        4
       ]
     }
   ]

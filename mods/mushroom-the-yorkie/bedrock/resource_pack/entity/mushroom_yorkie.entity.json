@@ -7,7 +7,7 @@
         "default": "entity_alphatest"
       },
       "textures": {
-        "default": "textures/entity/mushroom_yorkie"
+        "default": "textures/alicon/mushroom_yorkie/entity/mushroom_yorkie"
       },
       "geometry": {
         "default": "geometry.mushroom_yorkie.yorkie"

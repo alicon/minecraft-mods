@@ -28,7 +28,9 @@ def read_pack(path):
         with ZipFile(io.BytesIO(addon.read(resource))) as pack:
             model = json.loads(pack.read(f"models/entity/{STEM}.geo.json"))["minecraft:geometry"][0]
             animations = json.loads(pack.read(f"animations/{STEM}.animation.json"))["animations"]
-            texture = Image.open(io.BytesIO(pack.read(f"textures/entity/{STEM}.png"))).convert("RGBA")
+            client = json.loads(pack.read(f"entity/{STEM}.entity.json"))["minecraft:client_entity"]
+            texture_path = client["description"]["textures"]["default"] + ".png"
+            texture = Image.open(io.BytesIO(pack.read(texture_path))).convert("RGBA")
             version = json.loads(pack.read("manifest.json"))["header"]["version"]
     return model["bones"], animations, texture, ".".join(map(str, version))
 

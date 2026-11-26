@@ -67,7 +67,7 @@ Java Mushroom can scent nearby generated structures. On Bedrock 26.66.1, the sta
 With Pillow 10.1 or newer installed, render the geometry, texture atlas and static poses directly from a built package. Add `--reference` with an earlier package for a side-by-side comparison.
 
 ```shell
-python3 scripts/render-mushroom-bedrock.py build/bedrock/mushroom-the-yorkie-bedrock-0.1.10.mcaddon \
+python3 scripts/render-mushroom-bedrock.py build/bedrock/mushroom-the-yorkie-bedrock-0.1.11.mcaddon \
   --reference build/bedrock/mushroom-the-yorkie-bedrock-0.1.9.mcaddon \
   --output build/bedrock/mushroom-model-preview.png
 ```
@@ -106,10 +106,10 @@ Run the exact candidate on a Linux x64 Bedrock Dedicated Server. The script crea
 ```bash
 set -o pipefail
 python3 -u scripts/smoke-mushroom-bedrock.py build/bedrock/server-1.26.66.1.zip \
-  build/bedrock/mushroom-the-yorkie-bedrock-0.1.10.mcaddon --play-seconds 1800 --play-seed 119 \
+  build/bedrock/mushroom-the-yorkie-bedrock-0.1.11.mcaddon --play-seconds 1800 --play-seed 119 \
   2>&1 | tee build/bedrock/mushroom-seed119.log
 ```
 
 Two native simulated players tame and harness their dogs, then take turns feeding, fetching, walking each other's dogs, and flying while a dog sleeps. The test records the archive checksum, action sequence, game ticks and completed rounds. A sustained run needs a successful process exit, all cases in the final count, and at least the requested wall time in `MUSHROOM_PLAY_OBSERVED_SECONDS`. A timeout or stopped run earns no clean time. Repeat with the same seed to replay the action order. Use `--play-case guest-walk` or another case name to isolate one behavior. For overnight play, set `--play-seconds 28800` and use a new log for each seed.
 
-The arena controls fixture locations and time changes. Longer runs exercise more interactions. Device input, rendering, Realm delivery and uninterrupted natural day/night cycles each need their own recorded test.
+The mixed arena resets fixture positions and moves the clock for the sleep and flight scenario. Add `--play-case daycare` for a persistent two-player session that uses the natural clock and keeps each dog's ownership and each player's inventory across walks, feeding, fetch, and overnight rest. The report counts dawns and measures elapsed game ticks in 24,000-tick days. Use the device playtest for rendering, controller or touch input, and Realm delivery.

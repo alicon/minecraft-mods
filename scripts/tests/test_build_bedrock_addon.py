@@ -47,7 +47,7 @@ class BedrockPackageTests(unittest.TestCase):
                         self.assertIn("manifest.json", pack.namelist())
                         self.assertEqual(pack.read("pack_icon.png"), (ASSETS / "icon.png").read_bytes())
                     self.assertEqual(
-                        resource.read("textures/entity/mushroom_yorkie.png"),
+                        resource.read("textures/alicon/mushroom_yorkie/entity/mushroom_yorkie.png"),
                         (ASSETS / "textures/entity/mushroom_yorkie.png").read_bytes(),
                     )
                     status = {"behavior_pack": json.loads(behavior.read("manifest.json")),
@@ -75,11 +75,11 @@ class BedrockPackageTests(unittest.TestCase):
                         self.assertEqual(behavior.read(path), (bedrock / "behavior_pack" / path).read_bytes())
                         self.assertIn(f"items/{name}_kit.json", behavior.namelist())
                         art = cops / "src/main/resources/assets/cops_robbers" / f"textures/item/{name}_kit.png"
-                        self.assertEqual(resource.read(f"textures/items/{name}_kit.png"), art.read_bytes())
+                        self.assertEqual(resource.read(f"textures/alicon/cops_robbers/items/{name}_kit.png"), art.read_bytes())
                     for name in ("police_cruiser", "fire_truck", "bank_robber"):
                         self.assertIn(f"entities/{name}.json", behavior.namelist())
                         art = cops / "src/main/resources/assets/cops_robbers" / f"textures/entity/{name}.png"
-                        self.assertEqual(resource.read(f"textures/entity/{name}.png"), art.read_bytes())
+                        self.assertEqual(resource.read(f"textures/alicon/cops_robbers/entity/{name}.png"), art.read_bytes())
 
     def test_regroup_recipe_and_art_are_in_the_narwhal_archive(self):
         narwhal = builder.ROOT / "mods" / "narwhal-together"
@@ -95,7 +95,7 @@ class BedrockPackageTests(unittest.TestCase):
                     recipe = json.loads(behavior.read("recipes/regroup_charm.json"))["minecraft:recipe_shapeless"]
                     self.assertEqual(recipe["result"]["item"], "narwhal_together:regroup_charm")
                     self.assertEqual({entry["item"] for entry in recipe["ingredients"]}, {"minecraft:paper", "minecraft:copper_ingot"})
-                    self.assertEqual(resource.read("textures/items/regroup_charm.png"), art.read_bytes())
+                    self.assertEqual(resource.read("textures/alicon/narwhal_together/items/regroup_charm.png"), art.read_bytes())
 
     def test_bedrock_addons_have_separate_pack_ids(self):
         identifiers = []

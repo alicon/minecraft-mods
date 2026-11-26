@@ -7,7 +7,7 @@
         "default": "entity_alphatest"
       },
       "textures": {
-        "default": "textures/entity/bank_robber"
+        "default": "textures/alicon/cops_robbers/entity/bank_robber"
       },
       "geometry": {
         "default": "geometry.cops_robbers.crew"

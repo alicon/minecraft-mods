@@ -38,6 +38,10 @@ Development packs target Bedrock 26.60 with stable pack schemas. Release support
 
 GitHub Actions checks Bedrock scripts against the pinned stable API and builds the add-ons in the package tests. Run the type check locally with `npm --prefix tools/bedrock ci` and `npm --prefix tools/bedrock run check`. The package tests also verify that scripted behavior packs declare the version used to type-check them.
 
+CI also runs Mojang’s Creator Tools on the built archives. Its main suite checks JSON, manifests and resources. Its cooperative Add-On suite checks packaging conventions used when multiple add-ons share a world. Download the reports from the workflow artifacts to inspect warnings and file paths. After building the three packs, run `python3 scripts/check-bedrock-creator-tools.py <candidate.mcaddon> [<other-candidate.mcaddon> ...] --output build/creator-reports` against the intended candidates. [Minecraft Creator Tools](https://github.com/Mojang/minecraft-creator-tools)
+
+Creator Tools 0.21.0 reports two warning types against these candidates. Mojang’s own resource pack uses string paths in `item_texture.json` (JSON192), and its bee behavior uses string arrays for `move_to_block.target_blocks` (JSONF110). Keep these findings visible in the reports and verify item textures in a rendered client and the block-seeking behavior in server smoke tests. [Vanilla item atlas](https://github.com/Mojang/bedrock-samples/blob/main/resource_pack/textures/item_texture.json) · [Vanilla bee behavior](https://github.com/Mojang/bedrock-samples/blob/main/behavior_pack/entities/bee.json)
+
 The `bedrock-smoke` job builds all three packs and runs the scenarios below on a pinned, checksum-verified [Bedrock Dedicated Server](https://www.minecraft.net/en-us/download/server/bedrock). It exercises each add-on in a separate disposable world with both companion add-ons active. Review the pinned server build and checksum when updating the supported Bedrock version.
 
 Each server smoke runner accepts one `--with-addon` argument per additional archive. This command tests NARwhal's upgrade and regrouping while Mushroom and Cops and Robbers stay active.
