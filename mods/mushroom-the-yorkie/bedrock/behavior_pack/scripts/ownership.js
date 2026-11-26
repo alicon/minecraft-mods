@@ -1,4 +1,4 @@
-import { Player, system, world } from "@minecraft/server";
+import { Direction, GameMode, Player, system, world } from "@minecraft/server";
 import { blockAt, distanceSquared, hasDrySupport } from "./home-blocks.js";
 import { YORKIE, storage } from "./yorkie.js";
 
@@ -9,8 +9,21 @@ const LAST_CONTACT = storage("last_owner_contact");
 const DIMENSIONS = ["overworld", "nether", "the_end"];
 const TICKS_PER_DAY = 24000;
 const CONTACT_RADIUS_SQUARED = 32 ** 2;
+const SPAWN_EGG = `${YORKIE}_spawn_egg`;
+const ADOPTION_EGG = storage("adoption_tag");
+const ADOPTION_GROUND = new Set(["minecraft:grass_block", "minecraft:dirt", "minecraft:coarse_dirt"]);
+const FACE_OFFSETS = {
+  [Direction.Down]: { x: 0, y: -1, z: 0 },
+  [Direction.Up]: { x: 0, y: 1, z: 0 },
+  [Direction.North]: { x: 0, y: 0, z: -1 },
+  [Direction.South]: { x: 0, y: 0, z: 1 },
+  [Direction.West]: { x: -1, y: 0, z: 0 },
+  [Direction.East]: { x: 1, y: 0, z: 0 },
+};
 const pending = new Map();
 const waking = new Set();
+const spawning = new Set();
+const spawnOwnerByPet = new Map();
 
 function loadedPetOf(owner) {
   for (const key of DIMENSIONS) {
@@ -76,24 +89,101 @@ async function afterNightRest(owner) {
     return;
   }
 
-  const pet = owner.dimension.spawnEntity(YORKIE, spot, { spawnEvent: "minecraft:entity_spawned" });
+  if (await spawnOwnedPet(owner, spot)) {
+    owner.onScreenDisplay.setActionBar({ translate: "mushroom.owner.woke" });
+  }
+}
+
+async function spawnOwnedPet(owner, spot, canAdopt = () => true) {
+  if (spawning.has(owner.id) || pending.has(owner.id) || ownedPetId(owner) || !canAdopt()) {
+    return false;
+  }
+  const { dimension, id } = owner;
+  spawning.add(id);
+  let pet;
   let adopted = false;
   try {
+    pet = dimension.spawnEntity(YORKIE, spot, { spawnEvent: "minecraft:entity_spawned" });
+    spawnOwnerByPet.set(pet.id, id);
     await system.waitTicks(2);
-    if (owner.isValid && pet.isValid && !ownedPetId(owner) && pet.getComponent("minecraft:tameable")?.tame(owner)) {
+    if (owner.isValid && pet.isValid && owner.dimension.id === dimension.id && canAdopt()
+      && !ownedPetId(owner) && pet.getComponent("minecraft:tameable")?.tame(owner)) {
       adopted = true;
       if (!pet.getComponent("minecraft:is_tamed")) {
         pet.triggerEvent(storage("on_tame"));
       }
       rememberOwner(owner, pet);
-      owner.onScreenDisplay.setActionBar({ translate: "mushroom.owner.woke" });
-      return;
     }
+    return adopted;
   } finally {
-    if (!adopted && pet.isValid) {
-      pet.remove();
+    spawning.delete(id);
+    if (pet) {
+      spawnOwnerByPet.delete(pet.id);
+      if (!adopted && pet.isValid) {
+        pet.remove();
+      }
     }
   }
+}
+
+function isYorkieEgg(type) {
+  return type === SPAWN_EGG || type === ADOPTION_EGG;
+}
+
+async function useAdoptionEgg(owner, dimension, spot, slot, egg, mode) {
+  if (!owner.isValid || owner.dimension.id !== dimension.id || owner.getGameMode() !== mode) {
+    return;
+  }
+  if (ownedPetId(owner)) {
+    owner.onScreenDisplay.setActionBar({ translate: "mushroom.owner.already_adopted" });
+    return;
+  }
+  const inventory = owner.getComponent("minecraft:inventory")?.container;
+  const eggIsHeld = () => owner.selectedSlotIndex === slot && owner.getGameMode() === mode
+    && inventory?.getItem(slot)?.typeId === egg;
+  if (!blockAt(dimension, spot)?.isAir || !await spawnOwnedPet(owner, spot, eggIsHeld)
+    || mode === GameMode.Creative) {
+    return;
+  }
+  const stack = inventory?.getItem(slot);
+  if (stack?.typeId === egg) {
+    if (stack.amount === 1) {
+      inventory?.setItem(slot, undefined);
+    } else {
+      stack.amount--;
+      inventory?.setItem(slot, stack);
+    }
+  }
+}
+
+function installEggEvents() {
+  world.beforeEvents.playerInteractWithBlock.subscribe((event) => {
+    const { block, blockFace, itemStack, player } = event;
+    const egg = itemStack?.typeId;
+    if (event.cancel || !egg || !isYorkieEgg(egg)) {
+      return;
+    }
+    // Native egg placement spawns an untamed dog with no record of the player.
+    event.cancel = true;
+    const mode = player.getGameMode();
+    if (!event.isFirstEvent || (mode !== GameMode.Creative && mode !== GameMode.Survival)
+      || (egg === ADOPTION_EGG && !ADOPTION_GROUND.has(block.typeId))) {
+      return;
+    }
+    const { x, y, z } = block.location;
+    const offset = FACE_OFFSETS[blockFace];
+    const spot = { x: x + offset.x + 0.5, y: y + offset.y, z: z + offset.z + 0.5 };
+    const { dimension } = block;
+    const slot = player.selectedSlotIndex;
+    system.run(() => useAdoptionEgg(player, dimension, spot, slot, egg, mode)
+      .catch((error) => console.warn("Mushroom egg adoption: " + String(error))));
+  });
+  world.beforeEvents.playerInteractWithEntity.subscribe((event) => {
+    // A native spawn egg can otherwise spawn another dog when used on a dog.
+    if (event.target.typeId === YORKIE && event.itemStack?.typeId === SPAWN_EGG) {
+      event.cancel = true;
+    }
+  });
 }
 
 export function watchNightRest() {
@@ -134,11 +224,17 @@ export function watchNightRest() {
 }
 
 export function installOwnershipEvents() {
+  installEggEvents();
   const filter = { entityFilter: { type: YORKIE }, tamingEntityFilter: { type: "minecraft:player" } };
 
   world.beforeEvents.entityTamed.subscribe((event) => {
     const { entity: pet, tamingEntity: owner } = event;
     if (!(owner instanceof Player)) {
+      return;
+    }
+    const spawnOwner = spawnOwnerByPet.get(pet.id);
+    if (spawnOwner && spawnOwner !== owner.id) {
+      event.cancel = true;
       return;
     }
     const existing = ownedPetId(owner) ?? pending.get(owner.id);

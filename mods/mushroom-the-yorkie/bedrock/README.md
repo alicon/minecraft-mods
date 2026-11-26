@@ -24,8 +24,8 @@ Use **right-click** on Windows, the touch layout's **Interact/Use** action on iP
 ## Meet Mushroom
 
 1. Craft eight Yorkie Treats from raw mutton and two bones.
-2. Craft a Mushroom Adoption Egg from a treat, a chicken egg, and paper. Use it on grass or dirt. Creative players can use the Mushroom Spawn Egg.
-3. Hold a Yorkie Treat and interact with Mushroom to tame him or feed him. A treat restores up to three health, and he accepts one at full health too. Interact empty-handed to tell him to sit or follow.
+2. Craft a Mushroom Adoption Egg from a treat, a chicken egg, and paper. Use it on grass or dirt to adopt Mushroom. Creative players can adopt him with the Mushroom Spawn Egg. Each player can adopt one Mushroom. A second egg use leaves the existing dog and the egg in place.
+3. Hold a Yorkie Treat and interact with Mushroom to feed him or tame an untamed dog from an older world. A treat restores up to three health, and he accepts one at full health too. Interact empty-handed to tell him to sit or follow.
 4. Craft a Yorkie Harness from string, leather, and black dye. Use the harness on Mushroom before attaching a lead. To remove it in Bedrock, use shears and pick up the harness.
 5. Craft a copper bowl and combine it with a Yorkie Treat or a water bucket. Place the full bowl nearby. Mushroom can finish one food bowl and one water bowl each Minecraft day, and returns each to an empty bowl.
 6. Set a dog bed or doghouse on solid ground. A following Mushroom seeks a clear, dry spot at night and prefers the doghouse. Keep the entrance open so he can reach the mattress.
@@ -94,6 +94,8 @@ Use `--upgrade-from /path/to/earlier-mushroom.mcaddon` to spawn the Yorkie in an
 Add `--verify-fetch` to exercise interaction with two simulated players on Bedrock Dedicated Server 26.66. It checks treat feeding, ownership, interruption during a carry, inventory limits, cargo persistence, shallow-water returns, covered pools and an unsafe ledge. The fixture enables GameTest in its disposable world after the ordinary add-on checks. The add-on uses the stable Script API.
 
 Add `--verify-adoption` to check that two Survival players can sleep in ordinary beds and wake up with one independently owned Yorkie each. It also checks that a loaded following Yorkie returns after a day away and a Yorkie told to sit stays put.
+
+Add `--verify-egg-adoption` to check Creative and Survival egg use with two players. Repeated uses preserve both owned dogs, Creative keeps its original egg, and Survival spends an egg only on successful adoption.
 
 Add `--verify-flight` to test that a simulated Creative owner can take off, hover and move with Mushroom following. The test checks the sit order, landing after a switch to Survival, staying asleep as the owner flies away, and flight follow at dawn.
 

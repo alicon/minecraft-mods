@@ -22,6 +22,7 @@ WORLD = SmokeWorld(
 PROBE_SOURCE = Path(__file__).with_name("fixtures") / "mushroom-bedrock-smoke.js"
 PLAYER_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-player-probe.js")
 ADOPTION_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-adoption-probe.js")
+EGG_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-egg-probe.js")
 FLIGHT_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-flight-probe.js")
 AUTOPLAY_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-autoplay.js")
 DAYCARE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-daycare.js")
@@ -69,6 +70,7 @@ def main():
     parser.add_argument("--verify-care-persistence", action="store_true")
     parser.add_argument("--verify-fetch", action="store_true", help="run an opt-in simulated-player fetch test")
     parser.add_argument("--verify-adoption", action="store_true", help="run an opt-in simulated-player sleep adoption test")
+    parser.add_argument("--verify-egg-adoption", action="store_true", help="check repeated Creative and Survival egg use")
     parser.add_argument("--verify-flight", action="store_true", help="run an opt-in simulated-player Creative flight test")
     parser.add_argument("--play-seconds", type=int, help="run seeded simulated-player gameplay for at least this many seconds")
     parser.add_argument("--play-seed", type=int, default=119, help="seed for the gameplay action order and variants")
@@ -106,7 +108,7 @@ def main():
         exercise_world(server_dir, "MUSHROOM_TEST_REOPENED")
         if args.verify_care_persistence:
             exercise_world(server_dir, "MUSHROOM_TEST_CARE_PERSISTED")
-        if args.verify_fetch or args.verify_adoption or args.verify_flight or args.play_seconds:
+        if args.verify_fetch or args.verify_adoption or args.verify_egg_adoption or args.verify_flight or args.play_seconds:
             probe = enable_beta_test_apis(server_dir, WORLD)
             if args.verify_fetch:
                 examples = json.dumps(json.loads(TREAT_CASES.read_text(encoding="utf-8")))
@@ -117,6 +119,9 @@ def main():
             if args.verify_adoption:
                 shutil.copyfile(ADOPTION_PROBE_SOURCE, probe)
                 exercise_world(server_dir, "MUSHROOM_ADOPTION_RECOVERY")
+            if args.verify_egg_adoption:
+                shutil.copyfile(EGG_PROBE_SOURCE, probe)
+                exercise_world(server_dir, "MUSHROOM_EGG_PASS")
             if args.verify_flight:
                 shutil.copyfile(FLIGHT_PROBE_SOURCE, probe)
                 exercise_world(server_dir, "MUSHROOM_FLIGHT_PASS")
