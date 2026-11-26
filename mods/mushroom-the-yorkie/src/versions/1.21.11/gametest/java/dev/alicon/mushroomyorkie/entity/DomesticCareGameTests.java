@@ -8,6 +8,12 @@ import net.minecraft.world.level.block.Blocks;
 
 /** Emergency bowl care must coexist with sleep, sit orders, and the daily meal limit. */
 public final class DomesticCareGameTests {
+	/** Both editions exercise the same feeding and inventory examples. */
+	@GameTest
+	public void feedsTreatsAcrossEditions(GameTestHelper helper) {
+		TreatScenarios.feed(helper);
+	}
+
 	/** A sleeping, starving pet may eat; it cannot ignore sitting or eat a second daily meal. */
 	@GameTest
 	public void urgentMealWakesSleepingPet(GameTestHelper helper) {
