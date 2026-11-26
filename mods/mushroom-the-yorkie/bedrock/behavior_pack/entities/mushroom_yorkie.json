@@ -45,6 +45,11 @@
           ],
           "default": "ground",
           "client_sync": true
+        },
+        "mushroom_yorkie:walking_after_stay": {
+          "type": "bool",
+          "default": false,
+          "client_sync": true
         }
       }
     },
@@ -252,6 +257,19 @@
             "deals_damage": "no"
           }
         }
+      },
+      "mushroom_yorkie:clearing_native_sit": {
+        "minecraft:timer": {
+          "looping": false,
+          "time": {
+            "min": 0.1,
+            "max": 0.1
+          },
+          "time_down_event": {
+            "event": "mushroom_yorkie:restore_after_stay",
+            "target": "self"
+          }
+        }
       }
     },
     "components": {
@@ -327,6 +345,11 @@
                   "test": "enum_property",
                   "domain": "mushroom_yorkie:flight_mode",
                   "value": "ground"
+                },
+                {
+                  "test": "bool_property",
+                  "domain": "mushroom_yorkie:walking_after_stay",
+                  "value": false
                 }
               ]
             },
@@ -605,6 +628,63 @@
         },
         "set_property": {
           "mushroom_yorkie:flight_mode": "ground"
+        }
+      },
+      "mushroom_yorkie:leave_stay": {
+        "sequence": [
+          {
+            "remove": {
+              "component_groups": [
+                "mushroom_yorkie:tamed"
+              ]
+            }
+          },
+          {
+            "add": {
+              "component_groups": [
+                "mushroom_yorkie:clearing_native_sit"
+              ]
+            }
+          },
+          {
+            "remove": {
+              "component_groups": [
+                "mushroom_yorkie:awake"
+              ]
+            }
+          },
+          {
+            "set_property": {
+              "mushroom_yorkie:walking_after_stay": true
+            }
+          },
+          {
+            "set_property": {
+              "mushroom_yorkie:ordered_sit": false
+            }
+          }
+        ]
+      },
+      "mushroom_yorkie:finish_stay_walk": {
+        "add": {
+          "component_groups": [
+            "mushroom_yorkie:awake"
+          ]
+        },
+        "set_property": {
+          "mushroom_yorkie:walking_after_stay": false
+        }
+      },
+      "mushroom_yorkie:restore_after_stay": {
+        "remove": {
+          "component_groups": [
+            "mushroom_yorkie:clearing_native_sit"
+          ]
+        },
+        "add": {
+          "component_groups": [
+            "mushroom_yorkie:tamed"
+          ]
         }
       }
     }

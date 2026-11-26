@@ -2,7 +2,7 @@ import { GameMode, InvalidEntityError, system, world } from "@minecraft/server";
 import { availableToy, fetchStack, PRACTICE, THROWER, TOY_TAG } from "./fetch-items.js";
 import { dryDropSpot, nudgeToward, reachableToy } from "./fetch-ground.js";
 import { distanceSquared } from "./home-blocks.js";
-import { FLIGHT_MODE, YORKIE, storage } from "./yorkie.js";
+import { FLIGHT_MODE, WALKING_AFTER_STAY, YORKIE, storage } from "./yorkie.js";
 
 const SEEKING = storage("fetch_seeking");
 const BUSY = storage("fetch_busy");
@@ -42,6 +42,7 @@ function canPlay(pup, owner) {
     && pup.getProperty(FLIGHT_MODE) === "ground"
     && distanceSquared(pup.location, owner.location) <= OWNER_RANGE_SQUARED
     && !pup.getProperty(storage("ordered_sit"))
+    && !pup.getProperty(WALKING_AFTER_STAY)
     && !pup.getComponent("minecraft:leashable")?.isLeashed
     && !dozing(pup);
 }

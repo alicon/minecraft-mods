@@ -1,6 +1,7 @@
 import { Direction, GameMode, Player, system, world } from "@minecraft/server";
 import { blockAt, distanceSquared, hasDrySupport } from "./home-blocks.js";
-import { YORKIE, storage } from "./yorkie.js";
+import { updateStayWalk } from "./stay-walk.js";
+import { WALKING_AFTER_STAY, YORKIE, storage } from "./yorkie.js";
 
 const PET_ID = storage("owned_yorkie_id");
 const DEAD_PREFIX = storage("dead_yorkie_");
@@ -9,6 +10,7 @@ const LAST_CONTACT = storage("last_owner_contact");
 const DIMENSIONS = ["overworld", "nether", "the_end"];
 const TICKS_PER_DAY = 24000;
 const CONTACT_RADIUS_SQUARED = 32 ** 2;
+const STAY_WALK_CHECK_INTERVAL = 40;
 const SPAWN_EGG = `${YORKIE}_spawn_egg`;
 const ADOPTION_EGG = storage("adoption_tag");
 const ADOPTION_GROUND = new Set(["minecraft:grass_block", "minecraft:dirt", "minecraft:coarse_dirt"]);
@@ -79,7 +81,8 @@ async function afterNightRest(owner) {
   if (id) {
     const pet = world.getEntity(id);
     const lastContact = owner.getDynamicProperty(LAST_CONTACT);
-    if (pet?.isValid && !pet.getProperty(storage("ordered_sit")) && typeof lastContact === "number"
+    if (pet?.isValid && !pet.getProperty(storage("ordered_sit")) && !pet.getProperty(WALKING_AFTER_STAY)
+      && !pet.getComponent("minecraft:leashable")?.isLeashed && typeof lastContact === "number"
       && world.getAbsoluteTime() - lastContact >= TICKS_PER_DAY
       && pet.tryTeleport(spot, { dimension: owner.dimension, checkForBlocks: true })) {
       pet.triggerEvent(storage("home_idle"));
@@ -189,10 +192,15 @@ function installEggEvents() {
 export function watchNightRest() {
   let previousTime;
   let nightSkipTick = -Infinity;
+  let nextStayWalkCheck = 0;
   let sleepers = new Set();
   system.runInterval(() => {
     const now = world.getAbsoluteTime();
     const tick = system.currentTick;
+    const checkStayWalk = tick >= nextStayWalkCheck;
+    if (checkStayWalk) {
+      nextStayWalkCheck = tick + STAY_WALK_CHECK_INTERVAL;
+    }
     if (previousTime !== undefined && now - previousTime > 200
       && previousTime % TICKS_PER_DAY >= 12000 && now % TICKS_PER_DAY < 1000) {
       nightSkipTick = tick;
@@ -202,10 +210,12 @@ export function watchNightRest() {
       const petId = owner.getDynamicProperty(PET_ID);
       const pet = typeof petId === "string" ? world.getEntity(petId) : undefined;
       const last = owner.getDynamicProperty(LAST_CONTACT);
-      if (pet?.isValid && pet.dimension.id === owner.dimension.id
-        && (typeof last !== "number" || now - last >= 100)
-        && distanceSquared(pet.location, owner.location) <= CONTACT_RADIUS_SQUARED) {
-        owner.setDynamicProperty(LAST_CONTACT, now);
+      if (pet?.isValid && pet.dimension.id === owner.dimension.id) {
+        const distance = distanceSquared(pet.location, owner.location);
+        if ((typeof last !== "number" || now - last >= 100) && distance <= CONTACT_RADIUS_SQUARED) {
+          owner.setDynamicProperty(LAST_CONTACT, now);
+        }
+        updateStayWalk(pet, owner, distance, checkStayWalk);
       }
       if (owner.dimension.id !== "minecraft:overworld") {
         continue;

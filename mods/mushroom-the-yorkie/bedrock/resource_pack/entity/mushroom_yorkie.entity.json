@@ -33,7 +33,7 @@
             "idle": "!(query.property('mushroom_yorkie:home_goal') == 'sleep') && !query.is_sitting && query.property('mushroom_yorkie:flight_mode') == 'ground'"
           },
           {
-            "walk": "!(query.property('mushroom_yorkie:home_goal') == 'sleep') && !query.is_sitting && query.modified_move_speed > 0.01 && query.property('mushroom_yorkie:flight_mode') == 'ground'"
+            "walk": "!(query.property('mushroom_yorkie:home_goal') == 'sleep') && !query.is_sitting && query.property('mushroom_yorkie:flight_mode') == 'ground' && (query.modified_move_speed > 0.01 || (query.property('mushroom_yorkie:walking_after_stay') && query.ground_speed > 0.10))"
           },
           {
             "sit": "!(query.property('mushroom_yorkie:home_goal') == 'sleep') && query.is_sitting && query.property('mushroom_yorkie:flight_mode') == 'ground'"

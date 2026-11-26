@@ -33,6 +33,8 @@ Use **right-click** on Windows, the touch layout's **Interact/Use** action on iP
 
 In Creative, take off while Mushroom is following and nearby. He trails behind you in the air and comes down when you leave flight. He stays put when sitting or asleep and can follow again after waking. Fetch resumes on the ground.
 
+If you leave a sitting Mushroom more than 32 blocks behind on foot, he can get up and come after you when there is a walkable route through loaded terrain. Close the daycare door or tie his lead to a fence to keep him there.
+
 ## Verify the add-on
 
 ### First-time players and daycare
@@ -96,6 +98,8 @@ Add `--verify-fetch` to exercise interaction with two simulated players on Bedro
 Add `--verify-adoption` to check that two Survival players can sleep in ordinary beds and wake up with one independently owned Yorkie each. It also checks that a loaded following Yorkie returns after a day away and a Yorkie told to sit stays put.
 
 Add `--verify-egg-adoption` to check Creative and Survival egg use with two players. Repeated uses preserve both owned dogs, Creative keeps its original egg, and Survival spends an egg only on successful adoption.
+
+Add `--verify-stay-walk` to test a closed daycare door, a leashed dog, an owner within 32 blocks, and an open route to a distant owner. The test checks that Mushroom walks out, keeps the same owner, and can sit again.
 
 Add `--verify-flight` to test that a simulated Creative owner can take off, hover and move with Mushroom following. The test checks the sit order, landing after a switch to Survival, staying asleep as the owner flies away, and flight follow at dawn.
 

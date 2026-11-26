@@ -44,6 +44,18 @@ def face_clearance(bones, name, required):
     return None
 
 
+def nose_uv(bones):
+    for cube in bones.get("nose", {}).get("cubes", ()):
+        uv = cube.get("uv")
+        if not isinstance(uv, dict) or any(
+            face not in uv or len(uv[face].get("uv_size", ())) != 2
+            or any(size < 1 for size in uv[face]["uv_size"])
+            for face in ("north", "east", "west", "up", "down")
+        ):
+            return "the fractional nose cube needs at least one texel on each exposed face"
+    return None
+
+
 def lead_contact(bones):
     locators = [(bone, bone["locators"]["lead"]) for bone in bones.values()
                 if "lead" in bone.get("locators", {})]
@@ -93,6 +105,7 @@ def check_assets(path):
             animations = json.loads(resource.read(f"animations/{STEM}.animation.json"))["animations"]
     return {
         **{name: face_clearance(bones, name, minimum) for name, minimum in FACE_CLEARANCE.items()},
+        "nose_uv": nose_uv(bones),
         "lead": lead_contact(bones),
         "sleep_look": sleep_pose(entity, animations),
     }
