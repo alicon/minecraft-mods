@@ -8,6 +8,8 @@ Minecraft projects with Java Fabric mods and Bedrock add-ons.
 - **Mushroom the Yorkie**: a tiny pointy-eared Yorkie companion with pet needs, treats, bowls, toys, a softly lit doghouse for sleeping, squirrel chases, lost-dog recovery, and tame/follow/sit behavior.
 - **Cops and Robbers**: police cruisers, fire trucks, cops, robbers, bank tellers, and placeable bank/police station kits.
 
+See the [supported versions and device test results](docs/COMPATIBILITY.md#support-matrix) for each mod.
+
 ## Layout
 
 ```text

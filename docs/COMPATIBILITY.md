@@ -13,11 +13,15 @@ By default, the workspace builds the version in `gradle.properties`. Individual 
 small version matrix with version-specific source roots when the compatibility value is worth the
 extra maintenance.
 
-Current Minecraft target support:
+### Support matrix
 
-- NARwhal Together: Minecraft Java Edition `1.21.11` and `1.21.1`
-- Mushroom the Yorkie: Minecraft Java Edition `1.21.11` and `1.21.1`
-- Cops and Robbers: Minecraft Java Edition `1.21.11`
+| Mod | Fabric targets | Bedrock minimum | Dedicated Server used in CI | Device and Realm results |
+| --- | --- | --- | --- | --- |
+| Mushroom the Yorkie | 1.21.11, 1.21.1 | 26.60 | 26.66.1 | [Mushroom playtests](https://github.com/alicon/minecraft-mods/issues/134) |
+| Cops and Robbers | 1.21.11 | 26.60 | 26.66.1 | [Patrol playtests](https://github.com/alicon/minecraft-mods/issues/138) |
+| NARwhal Together | 1.21.11, 1.21.1 | 26.60 | 26.66.1 | [Regroup playtests](https://github.com/alicon/minecraft-mods/issues/141) |
+
+Each device result applies to the archive version, Minecraft version and join method recorded in its issue.
 
 ## Bedrock development
 
@@ -45,7 +49,15 @@ python3 scripts/smoke-narwhal-bedrock.py /path/to/bedrock-server.zip /path/to/na
   --with-addon /path/to/cops.mcaddon
 ```
 
-Use the [Bedrock release checklist](RELEASING.md#publish-a-bedrock-add-on) to record client and Realm evidence alongside server results.
+Use the [Bedrock release checklist](RELEASING.md#release-a-bedrock-add-on) to record client and Realm evidence alongside server results.
+
+### Testing a game update
+
+1. Keep the previous supported patch and its checksum available. Run the last playtested archive there and on the proposed stable patch. A change seen with the same archive isolates the engine update.
+2. Run the candidate on the proposed patch in a fresh world and on a disposable copy created with the earlier archive. Exercise ownership, inventory across rejoin and the three-pack smoke. Record both archive hashes, exact game versions and the first failing action in the affected mod's issue.
+3. Update the CI pin, this table and release notes after the checks pass. Enter client, controller or touch and Realm results on the same candidate before advertising those platforms.
+
+Package tests compare the built archives to the [playtested identifiers](../scripts/fixtures/bedrock-pack-baselines.json). They check pack and module UUIDs, the entity, block and item names stored in worlds, and paired pack versions. Additive content is allowed in a newer version. Refresh each baseline from its verified download when releasing, retaining every identifier from earlier saves. The patrol stores structured state under a versioned key. Preserve existing scalar save keys and migrate their old values explicitly when their meaning changes.
 
 ### Gameplay checks by edition
 

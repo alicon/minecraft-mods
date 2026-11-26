@@ -1,0 +1,114 @@
+{
+  "mushroom-the-yorkie": {
+    "sha256": "3573141365b25fc97b307779fe7f5e9ef2319db560332e73d176d5c579ede571",
+    "packs": {
+      "data": {
+        "header": "39cd5d27-46ff-4535-8858-c031b7eee2f7",
+        "modules": {
+          "data": "1cd4e75c-9de8-4960-8a64-53750fbf59c2",
+          "script": "b981d811-b2f3-4a9c-9319-f2f4541368c7"
+        }
+      },
+      "resources": {
+        "header": "eca38482-d83d-4767-8fa9-73f548474fdb",
+        "modules": {
+          "resources": "5bcfa939-1372-4502-bf85-002fc47257d0"
+        }
+      }
+    },
+    "version": [
+      0,
+      1,
+      8
+    ],
+    "identifiers": {
+      "entities": [
+        "mushroom_yorkie:mushroom_yorkie"
+      ],
+      "blocks": [
+        "mushroom_yorkie:dog_bed",
+        "mushroom_yorkie:dog_bowl",
+        "mushroom_yorkie:dog_food_bowl",
+        "mushroom_yorkie:dog_water_bowl",
+        "mushroom_yorkie:doghouse"
+      ],
+      "items": [
+        "mushroom_yorkie:adoption_tag",
+        "mushroom_yorkie:yorkie_ball",
+        "mushroom_yorkie:yorkie_chew_toy",
+        "mushroom_yorkie:yorkie_harness",
+        "mushroom_yorkie:yorkie_treat"
+      ]
+    }
+  },
+  "cops-and-robbers": {
+    "sha256": "768266886f7db4e3d9212f3477260feea45a756f8a7c415b6017f3ca31a8a76f",
+    "packs": {
+      "data": {
+        "header": "4da49bba-bf03-4104-be22-002c8de79336",
+        "modules": {
+          "data": "565082a5-e419-442f-908e-406684ec23d4",
+          "script": "372a0f2f-7c0e-4620-97de-9b44c091f0ab"
+        }
+      },
+      "resources": {
+        "header": "e7ed5890-d98c-4beb-91bd-73235b289075",
+        "modules": {
+          "resources": "f1c8e219-a57a-4907-b461-b8ba07e10189"
+        }
+      }
+    },
+    "version": [
+      0,
+      1,
+      3
+    ],
+    "identifiers": {
+      "entities": [
+        "cops_robbers:bank_robber",
+        "cops_robbers:cop",
+        "cops_robbers:fire_truck",
+        "cops_robbers:fireman",
+        "cops_robbers:police_cruiser",
+        "cops_robbers:teller"
+      ],
+      "blocks": [],
+      "items": [
+        "cops_robbers:bank_kit",
+        "cops_robbers:fire_station_kit",
+        "cops_robbers:police_station_kit",
+        "cops_robbers:vehicle_controls"
+      ]
+    }
+  },
+  "narwhal-together": {
+    "sha256": "3c3b893cbe47393bac8f449729acc18ce2b71ff1db98e419e30f7769abb9cfbd",
+    "packs": {
+      "data": {
+        "header": "346db46b-3734-44f5-83e2-11d0d98f339c",
+        "modules": {
+          "data": "2b50b3af-31c9-464a-b40b-1691c6a0674e",
+          "script": "8d9da542-395f-40f9-b338-1a3a527af717"
+        }
+      },
+      "resources": {
+        "header": "6912adcd-312b-4167-8c26-3e80c5a3df71",
+        "modules": {
+          "resources": "475d5e0b-9029-4e63-9951-a8611a905b88"
+        }
+      }
+    },
+    "version": [
+      0,
+      1,
+      0
+    ],
+    "identifiers": {
+      "entities": [],
+      "blocks": [],
+      "items": [
+        "narwhal_together:regroup_charm"
+      ]
+    }
+  }
+}
