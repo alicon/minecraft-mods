@@ -22,4 +22,10 @@ public final class FetchTerrainGameTests {
 	public void fetchThroughTallGrass(GameTestHelper helper) {
 		FetchTerrainScenarios.fetchThroughGrass(helper, true);
 	}
+
+	/** Two players can throw without one dog taking the other player's toy. */
+	@GameTest(template = "fabric-gametest-api-v1:empty")
+	public void fetchKeepsEachOwnersToy(GameTestHelper helper) {
+		FetchTerrainScenarios.fetchKeepsEachOwnersToy(helper);
+	}
 }

@@ -46,6 +46,38 @@ final class FetchTerrainScenarios {
 		}
 	}
 
+	static void fetchKeepsEachOwnersToy(GameTestHelper helper) {
+		var owner = SurvivalGameTestPlayers.createWithoutToyCleanup(helper);
+		var guest = SurvivalGameTestPlayers.createWithoutToyCleanup(helper);
+		var dog = helper.spawn(ModEntities.MUSHROOM_YORKIE, 2, 1, 2);
+		dog.setNoAi(true);
+		owner.setPos(dog.getX() - 1, dog.getY(), dog.getZ());
+		guest.setPos(dog.getX(), dog.getY(), dog.getZ() + 1);
+		dog.claimFor(owner);
+		var guestToy = helper.spawnItem(ModItems.YORKIE_CHEW_TOY, 2, 1, 2);
+		guestToy.setPos(dog.getX(), dog.getY(), dog.getZ());
+		guestToy.setThrower(guest);
+		var ownToy = helper.spawnItem(ModItems.YORKIE_BALL, 3, 1, 2);
+		ownToy.setPos(dog.getX() + 1, dog.getY(), dog.getZ());
+		ownToy.setThrower(owner);
+		try {
+			var fetch = new FetchBallGoal(dog);
+			helper.assertTrue(fetch.canUse(), "Mushroom did not find his owner's ball");
+			fetch.start();
+			fetch.tick();
+			helper.assertTrue(!guestToy.isRemoved() && ownToy.isRemoved()
+					&& dog.getMainHandItem().is(ModItems.YORKIE_BALL),
+					"Mushroom picked up a guest's toy instead of his owner's ball");
+			helper.succeed();
+		} finally {
+			guestToy.discard();
+			ownToy.discard();
+			dog.discard();
+			helper.getLevel().getServer().getPlayerList().remove(guest);
+			helper.getLevel().getServer().getPlayerList().remove(owner);
+		}
+	}
+
 	static void fetchThroughGrass(GameTestHelper helper, boolean tall) {
 		// Other tests in this batch clear their old toy entities while setting up.
 		// Stage this asynchronous round trip after that synchronous setup.
@@ -72,6 +104,7 @@ final class FetchTerrainScenarios {
 		var toy = helper.spawnItem(ModItems.YORKIE_BALL, 6, 1, 3);
 		var target = helper.absolutePos(new BlockPos(6, 1, 3)).getBottomCenter();
 		toy.setPos(target.x, target.y + 0.2, target.z);
+		toy.setThrower(owner);
 		toy.setPickUpDelay(20);
 		helper.startSequence()
 				.thenWaitUntil(() -> helper.assertTrue(toy.isRemoved() && dog.getMainHandItem().is(ModItems.YORKIE_BALL),
