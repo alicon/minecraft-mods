@@ -390,8 +390,8 @@ async function feedAdoptedDog(action, id, bed) {
       const tile = feet(player);
       const fromCamp = Math.hypot(tile[0] - bed[0], tile[1] - bed[1], tile[2] - bed[2]);
       visited.push(tile);
-      // Give a dog below a steep bank time to come back through a safe route.
-      if (dog?.distance <= 8 && Math.abs(dog.pos[1] - player.position.y) <= 2 && fromCamp < 6) {
+      const nearCamp = dog && Math.hypot(...dog.pos.map((axis, index) => axis - bed[index])) <= 14;
+      if (nearCamp && Math.abs(dog.pos[1] - player.position.y) <= 4 && fromCamp < 16) {
         await stepOut(action, player, visited, dog.pos, false, rejectedSteps);
       } else if (fromCamp > 3) {
         await stepOut(action, player, visited, bed, false, rejectedSteps);
@@ -429,7 +429,7 @@ export async function adoptAtNight(action, { bed }, craft) {
       continue;
     }
     assert.ok(player.inWorld && !player.dead && player.health > 4, 'Lost a safe position beside the bed');
-    const dogs = await action('get_entities', { type: DOG, radius: 8 });
+    const dogs = await action('get_entities', { type: DOG, radius: 16 });
     const pup = dogs?.entities.find(entity => entity.name === 'Mushroom');
     const inventory = pup && !player.screen ? await action('get_inventory') : null;
     if (inventory?.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide')) {
