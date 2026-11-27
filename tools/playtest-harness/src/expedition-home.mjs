@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
-import { dryWaypoint, hasPlacedBed, leavesBlockingExit, nearbyBuildingSpots } from './expedition-navigation.mjs';
+import { dryWaypoint, hasPlacedBed, leavesBlockingExit, nearbyBuildingSpots, quarryStep } from './expedition-navigation.mjs';
 import { smeltExpeditionIron } from './expedition-furnace.mjs';
 
 export const WOOD_LOGS = ['oak', 'birch', 'spruce', 'acacia', 'dark_oak', 'jungle', 'cherry', 'pale_oak', 'mangrove']
@@ -333,23 +333,29 @@ export async function adoptAtNight(action, craft, descendFromCanopy) {
   throw new Error('No native night sleep and adoption within the test window');
 }
 
-async function mineVisible(action, bed, alreadyMined, wanted, drops) {
+async function breakVisible(action, pos) {
+  await action('look', { at: pos });
+  await setTimeout(80);
+  if ((await action('observe'))?.crosshair?.pos?.join(',') !== pos.join(',')) return false;
+  return (await action('break_block', { pos, maxTicks: 115 }))?.broken === true;
+}
+
+async function mineVisible(action, bed, alreadyMined, wanted, drops, protectedGround = new Set()) {
   const player = await action('observe');
   assert.ok(player?.inWorld && !player.dead && player.health >= 8, 'The quarry became unsafe for the player');
-  const volume = await action('get_blocks', { center: feet(player), size: [11, 9, 11], format: 'json' });
+  const [px, py, pz] = feet(player);
+  const volume = await action('get_blocks', { center: [px, py, pz], size: [11, 9, 11], format: 'json' });
   const targets = volume.cells.flatMap(({ x, y, z, b }) => {
     const pos = [x, y, z];
-    if (!wanted.has(b) || alreadyMined.has(pos.join(','))
+    const key = pos.join(',');
+    if (!wanted.has(b) || alreadyMined.has(key) || protectedGround.has(key)
+        || (x === px && z === pz && y < py)
         || (y < bed[1] && Math.max(Math.abs(x - bed[0]), Math.abs(z - bed[2])) <= 2)) return [];
     const reach = Math.hypot(x + 0.5 - player.position.x, y + 0.5 - player.position.y - 1.62, z + 0.5 - player.position.z);
     return reach <= 4.15 ? [{ pos, reach }] : [];
   }).sort((a, b) => a.reach - b.reach);
   for (const { pos } of targets.slice(0, 12)) {
-    await action('look', { at: pos });
-    await setTimeout(80);
-    if ((await action('observe'))?.crosshair?.pos?.join(',') !== pos.join(',')) continue;
-    const result = await action('break_block', { pos, maxTicks: 85 });
-    if (!result?.broken) continue;
+    if (!await breakVisible(action, pos)) continue;
     alreadyMined.add(pos.join(','));
     const { entities } = await action('get_entities', { type: 'item', radius: 6 });
     for (const item of entities.filter(entity => drops.has(entity.item?.id))) {
@@ -358,6 +364,23 @@ async function mineVisible(action, bed, alreadyMined, wanted, drops) {
     return true;
   }
   return false;
+}
+
+async function descendQuarry(action, player, bed, stairs, protectedGround) {
+  const start = feet(player);
+  const { cells } = await action('get_blocks', { center: start, size: [7, 7, 7], format: 'json' });
+  const step = quarryStep(cells, start, bed, stairs);
+  if (!step) return false;
+  for (const pos of step.clear) {
+    if (!await breakVisible(action, pos)) return false;
+  }
+  const outcome = await action('go_to', { pos: step.landing, stopDistance: 0.3, maxTicks: 45 });
+  if (!outcome?.arrived || feet(await action('observe')).join(',') !== step.landing.join(',')) return false;
+  const [x, y, z] = start;
+  const [tx, ty, tz] = step.landing;
+  for (const support of [[x, y - 1, z], [tx, ty - 1, tz]]) protectedGround.add(support.join(','));
+  stairs.push(start);
+  return true;
 }
 
 async function openCampTable(action, table, visited) {
@@ -378,16 +401,29 @@ export async function earnStoneKit(action, craft, { table, bed }) {
   const mined = new Set();
   const ore = new Set(['minecraft:stone']);
   const drops = new Set([COBBLESTONE]);
+  const stairs = [];
+  const protectedGround = new Set();
+  let missedStone = 0;
   for (let attempt = 0; attempt < 70; attempt++) {
     const inventory = await action('get_inventory');
     const needed = count(inventory, FURNACE) ? 3 : 11;
     if (count(inventory, COBBLESTONE) >= needed) break;
-    if (await mineVisible(action, bed, mined, ore, drops)) continue;
+    if (await mineVisible(action, bed, mined, ore, drops, protectedGround)) {
+      missedStone = 0;
+      continue;
+    }
     const player = await action('observe');
+    missedStone++;
+    if ((stairs.length > 0 || missedStone >= 8) && stairs.length < 7
+        && await descendQuarry(action, player, bed, stairs, protectedGround)) continue;
     const position = feet(player);
     const distance = Math.hypot(position[0] - table[0], position[2] - table[2]);
     visited.push(position);
     await stepOut(action, player, visited, distance > 40 ? table : undefined);
+  }
+  for (const pos of stairs.reverse()) {
+    const step = await action('go_to', { pos, stopDistance: 0.4, maxTicks: 65 });
+    assert.ok(step?.arrived, 'Could not walk back up the quarry stairs');
   }
   if (count(await action('get_inventory'), 'minecraft:stick') < 2) {
     await ensurePlanks(action, craft, 2);

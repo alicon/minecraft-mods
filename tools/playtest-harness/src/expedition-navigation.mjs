@@ -2,6 +2,8 @@ const CARDINAL = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 const HEADROOM = /:(?:short_grass|tall_grass|fern|large_fern|dead_bush|dandelion|poppy|leaf_litter|wildflowers)$/;
 const SUPPORT = /:(?:grass_block|dirt|coarse_dirt|podzol|stone|sand|gravel|snow_block|\w+_leaves|\w+_log)$/;
 const LEAVES = /_leaves$/;
+const QUARRY_BLOCK = /^minecraft:(?:grass_block|dirt|coarse_dirt|podzol|stone|andesite|diorite|granite|deepslate|(?:deepslate_)?(?:coal|iron)_ore)$/;
+const QUARRY_HAZARD = /^minecraft:(?:water|lava|powder_snow|.*sand|gravel)$/;
 
 function gap(id) {
   return id === undefined || HEADROOM.test(id);
@@ -70,6 +72,28 @@ export function leavesBlockingExit(cells, [x, y, z]) {
 
 function distance(a, b) {
   return Math.hypot(a[0] - b[0], a[2] - b[2]);
+}
+
+export function quarryStep(cells, [x, y, z], bed, walked) {
+  const blocks = new Map(cells.map(({ x, y, z, b }) => [`${x},${y},${z}`, b]));
+  const at = ([bx, by, bz]) => blocks.get(`${bx},${by},${bz}`);
+  const candidates = [];
+  for (const [dx, dz] of CARDINAL) {
+    const tx = x + dx;
+    const tz = z + dz;
+    const landing = [tx, y - 1, tz];
+    if (Math.max(Math.abs(tx - bed[0]), Math.abs(tz - bed[2])) <= 2
+        || walked.some(([px, , pz]) => px === tx && pz === tz)
+        || !QUARRY_BLOCK.test(at([tx, y - 2, tz]) ?? '')) continue;
+    const clear = [y + 1, y, y - 1].map(by => [tx, by, tz]).filter(pos => at(pos));
+    if (!clear.every(pos => gap(at(pos)) || QUARRY_BLOCK.test(at(pos)))) continue;
+    const exposed = [[tx, y + 2, tz], ...CARDINAL.flatMap(([sx, sz]) =>
+      [y - 1, y, y + 1].map(by => [tx + sx, by, tz + sz]))];
+    if (exposed.some(pos => QUARRY_HAZARD.test(at(pos) ?? ''))) continue;
+    candidates.push({ landing, clear });
+  }
+  return candidates.sort((a, b) => b.clear.length - a.clear.length
+    || distance(b.landing, bed) - distance(a.landing, bed))[0] ?? null;
 }
 
 // Each edge fits a standing player through two adjacent columns, including the lift for a step up.

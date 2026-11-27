@@ -99,7 +99,8 @@ the starting area, including the possible canopy spawn.
 
 Set `MUSHROOM_EXPEDITION_STAGE=stone` to continue after breakfast. The player
 scouts for reachable stone, mines cobblestone in view, and returns to the
-crafting table. The integrated server also checks the earned stone pickaxe,
+crafting table. If the surface has no exposed stone, it cuts and retraces a
+short staircase with dry footing away from camp. The integrated server also checks the earned stone pickaxe,
 the furnace, and the original adopted dog's identity.
 
 Set `MUSHROOM_EXPEDITION_STAGE=iron` to continue from the stone kit. The

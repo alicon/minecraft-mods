@@ -5,6 +5,21 @@ function cell(x, y, z, type = 'grass_block') {
   return { x, y, z, b: `minecraft:${type}` };
 }
 
+test('a soil-covered quarry has a dry descending step without undermining camp', async () => {
+  const { quarryStep } = await import('./expedition-navigation.mjs');
+  const start = [0, 5, 0];
+  const bed = [-3, 5, 0];
+  const blocks = [
+    cell(1, 5, 0, 'dirt'), cell(1, 4, 0), cell(1, 3, 0, 'stone'),
+    cell(0, 4, 1, 'dirt'), cell(0, 3, 1, 'stone'), cell(0, 4, 2, 'water'),
+    cell(-1, 4, 0, 'dirt'), cell(-1, 3, 0, 'stone'),
+  ];
+  assert.deepEqual(quarryStep(blocks, start, bed, []), {
+    landing: [1, 4, 0], clear: [[1, 5, 0], [1, 4, 0]],
+  });
+  assert.equal(quarryStep(blocks, start, bed, [[1, 5, 0]]), null);
+});
+
 test('a dry destination across water routes around the shore', async () => {
   const { dryWaypoint } = await import('./expedition-navigation.mjs');
   const blocks = [
