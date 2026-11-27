@@ -59,9 +59,13 @@ export function expeditionPolicy(mode, coachingFile) {
   async function chooseRoute(player, routes, sheep) {
     if (routes.length < 2) return routes[0];
     const offset = ([x, y, z]) => [
-      Math.round(x - player.position.x), Math.round(y - player.position.y), Math.round(z - player.position.z),
+      Number((x - player.position.x).toFixed(1)),
+      Number((y - player.position.y).toFixed(1)),
+      Number((z - player.position.z).toFixed(1)),
     ];
-    const localRoutes = routes.map(({ pos, revisits, surface }) => ({ offset: offset(pos), revisits, surface }));
+    const localRoutes = routes.map(({ pos: [x, y, z], revisits, surface }) => ({
+      offset: offset([x + 0.5, y, z + 0.5]), revisits, surface,
+    }));
     const labels = ['a', 'b', 'c'];
     const criteria = Object.fromEntries(localRoutes.map((route, index) =>
       [labels[index], `Take route ${labels[index]}: ${JSON.stringify(route)}`]));
