@@ -7,6 +7,7 @@ import shutil
 import sys
 import tempfile
 from contextlib import contextmanager
+from dataclasses import replace
 from zipfile import ZIP_DEFLATED, ZipFile
 from pathlib import Path
 
@@ -31,6 +32,7 @@ EXPEDITION_CAMP_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-cam
 EXPEDITION_TRAIL_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-trail.js")
 EXPEDITION_DRAGON_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-dragon.js")
 EXPEDITION_VICTORY_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-victory.js")
+EXPEDITION_EXIT_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-client-exit.js")
 WOODLAND_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-woodland-probe.js")
 FLIGHT_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-flight-probe.js")
 AUTOPLAY_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-autoplay.js")
@@ -42,7 +44,7 @@ AUTOPLAY_CASES = ("survival-feed", "creative-feed", "owner-walk", "guest-walk", 
 
 
 @contextmanager
-def disposable_run(failure_evidence):
+def disposable_run(failure_evidence, world=WORLD):
     with tempfile.TemporaryDirectory(prefix="mushroom-bedrock-smoke-") as directory:
         server_dir = Path(directory)
         try:
@@ -55,10 +57,10 @@ def disposable_run(failure_evidence):
                         # Bundled vanilla content comes from the pinned server ZIP.
                         paths = [
                             server_dir / "server.properties",
-                            server_dir / "worlds" / WORLD.name,
+                            server_dir / "worlds" / world.name,
                             server_dir / "behavior_packs" / FIXTURE_FOLDER,
-                            *server_dir.glob(f"behavior_packs/{WORLD.addon_folder}*"),
-                            *server_dir.glob(f"resource_packs/{WORLD.addon_folder}*"),
+                            *server_dir.glob(f"behavior_packs/{world.addon_folder}*"),
+                            *server_dir.glob(f"resource_packs/{world.addon_folder}*"),
                         ]
                         for source in paths:
                             files = (source,) if source.is_file() else source.rglob("*")
@@ -97,6 +99,29 @@ def install_probe_in_behavior_pack(server_dir, separate_probe, source):
     fixture.unlink()
 
 
+def export_expedition_client_world(server_dir, world, path):
+    world_dir = server_dir / "worlds" / world.name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with ZipFile(path, "x", compression=ZIP_DEFLATED) as archive:
+        for name in ("level.dat", "levelname.txt", "world_behavior_packs.json", "world_resource_packs.json"):
+            archive.write(world_dir / name, name)
+        for file in sorted((world_dir / "db").iterdir()):
+            if file.is_file() and file.name != "LOCK":
+                archive.write(file, file.relative_to(world_dir))
+        for kind in ("behavior", "resource"):
+            links = json.loads((world_dir / f"world_{kind}_packs.json").read_text(encoding="utf-8"))
+            by_id = {}
+            for manifest in (server_dir / f"{kind}_packs").glob("*/manifest.json"):
+                header = json.loads(manifest.read_text(encoding="utf-8"))["header"]
+                by_id[(header["uuid"], tuple(header["version"]))] = manifest.parent
+            for link in links:
+                pack = by_id[(link["pack_id"], tuple(link["version"]))]
+                for file in sorted(pack.rglob("*")):
+                    if file.is_file():
+                        archive.write(file, file.relative_to(server_dir))
+    print(f"MUSHROOM_EXPEDITION_CLIENT_WORLD {path}", flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("server_zip", type=Path)
@@ -117,6 +142,8 @@ def main():
     parser.add_argument("--verify-expedition-dragon", action="store_true", help="check escape from a vanilla dragon's breath")
     parser.add_argument("--verify-expedition-victory", action="store_true",
                         help="stage the final hit and check the native exit opens with the original dog alive")
+    parser.add_argument("--export-expedition-client-exit", type=Path,
+                        help="also stage victory and write a disposable .mcworld for the native client exit check")
     parser.add_argument("--verify-woodland", action="store_true", help="check squirrel chase, safety and native follow")
     parser.add_argument("--verify-flight", action="store_true", help="run an opt-in simulated-player Creative flight test")
     parser.add_argument("--play-seconds", type=int, help="run seeded simulated-player gameplay for at least this many seconds")
@@ -127,6 +154,10 @@ def main():
     args = parser.parse_args()
     if args.failure_evidence and args.failure_evidence.exists():
         parser.error("--failure-evidence must name a new path")
+    if args.export_expedition_client_exit and (
+        args.export_expedition_client_exit.suffix != ".mcworld" or args.export_expedition_client_exit.exists()
+    ):
+        parser.error("--export-expedition-client-exit must name a new .mcworld path")
     if args.play_seconds is not None and args.play_seconds <= 0:
         parser.error("--play-seconds must be positive")
     if args.play_case and args.play_seconds is None:
@@ -219,17 +250,34 @@ def main():
                     exercise_world(server_dir, "MUSHROOM_WOODLAND_PASS", timeout=100)
                     exercise_world(server_dir, "MUSHROOM_WOODLAND_REOPENED", timeout=60)
         print("Mushroom spawned and remained in the world after a server restart.")
-    if args.verify_expedition_victory:
+    if args.verify_expedition_victory or args.export_expedition_client_exit:
         # A prior probe may already have started or changed the End fight.
-        with disposable_run(args.failure_evidence) as server_dir:
-            prepare_server(args.server_zip, server_dir, WORLD)
-            install_probe(server_dir, WORLD, PROBE_SOURCE)
-            install_addon(args.addon, server_dir, WORLD)
-            install_companion_addons(args.with_addon, server_dir, WORLD)
+        world = WORLD
+        if args.export_expedition_client_exit:
+            world = replace(
+                WORLD, name="Mushroom Expedition Client QA",
+                probe_id="8ebaddd4-ab12-4bea-bc61-422d31080d50",
+                script_id="d28d07d1-0e9b-486b-9322-0cbc12af82ff",
+            )
+        with disposable_run(args.failure_evidence, world) as server_dir:
+            prepare_server(args.server_zip, server_dir, world)
+            if args.export_expedition_client_exit:
+                # The client probe starts beside the fountain on this fixture seed.
+                with (server_dir / "server.properties").open("a", encoding="utf-8") as settings:
+                    settings.write("level-seed=158\n")
+            install_probe(server_dir, world, PROBE_SOURCE)
+            install_addon(args.addon, server_dir, world)
+            install_companion_addons(args.with_addon, server_dir, world)
             exercise_world(server_dir, "MUSHROOM_TEST_SPAWNED")
-            probe = enable_beta_test_apis(server_dir, WORLD)
+            manifest = server_dir / "behavior_packs" / FIXTURE_FOLDER / "manifest.json"
+            stable_manifest = manifest.read_bytes()
+            probe = enable_beta_test_apis(server_dir, world)
             shutil.copyfile(EXPEDITION_VICTORY_SOURCE, probe)
             exercise_world(server_dir, "MUSHROOM_EXPEDITION_NATIVE_DRAGON_VICTORY")
+            if args.export_expedition_client_exit:
+                shutil.copyfile(EXPEDITION_EXIT_SOURCE, probe)
+                manifest.write_bytes(stable_manifest)
+                export_expedition_client_world(server_dir, world, args.export_expedition_client_exit)
 
 
 if __name__ == "__main__":

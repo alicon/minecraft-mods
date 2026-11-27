@@ -69,9 +69,16 @@ stages the final hit by reducing the Dragon's health and clearing its crystals.
 That fixture checks that the attack opens the native exit and that the same dog
 is alive with its original owner. Use a real client for the exit and save/reopen.
 
-The separate `mushroom-bedrock-expedition-client-exit.js` probe is for a copy
-of the staged victory save with the generated End fountain and prepared
-Overworld landing. Import the prepared `.mcworld` through **Play → Worlds →
+Export the staged victory save with the generated End fountain and prepared
+Overworld landing for the official client:
+
+```shell
+python3 scripts/smoke-mushroom-bedrock.py SERVER.zip ADDON.mcaddon \
+  --export-expedition-client-exit build/playtest-reports/Mushroom-Expedition-Client-QA.mcworld
+```
+
+The export replaces the simulated-player script with the stable client probe.
+Import the prepared `.mcworld` through **Play → Worlds →
 Import world** in Minecraft for Windows. The probe stages the local player
 and records Mushroom's identity before handing off to normal input. Walk into
 the portal and dismiss the credits. Check `EXPEDITION RETURN VERIFIED` in
