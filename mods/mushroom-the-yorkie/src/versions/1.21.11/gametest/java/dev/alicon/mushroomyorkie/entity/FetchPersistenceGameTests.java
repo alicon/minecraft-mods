@@ -119,6 +119,12 @@ public final class FetchPersistenceGameTests {
 		ExpeditionCampScenarios.borrowedLeadCrossing(helper);
 	}
 
+	/** A complete Leave it lesson earns distinct paws on one dog and leaves borrowed leads intact. */
+	@GameTest(structure = "mushroom_yorkie_gametest:fetch_arena", maxTicks = 450)
+	public void expeditionLeaveItTraining(GameTestHelper helper) {
+		LeaveItTrainingScenarios.train(helper, dog -> roundTrip(helper, dog));
+	}
+
 	private static MushroomYorkieEntity roundTrip(GameTestHelper helper, MushroomYorkieEntity yorkie) {
 		TagValueOutput output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, helper.getLevel().registryAccess());
 		yorkie.saveWithoutId(output);

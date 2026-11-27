@@ -54,6 +54,7 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	final MushroomPeacefulMobMemory peacefulMobMemory = new MushroomPeacefulMobMemory();
 	final MushroomTrustState trust = new MushroomTrustState();
 	final MushroomOwnerPresenceState ownerPresence = new MushroomOwnerPresenceState();
+	final MushroomLeaveItTraining leaveItTraining = new MushroomLeaveItTraining();
 	final MushroomCampState expeditionCamp = new MushroomCampState();
 	net.minecraft.core.GlobalPos lastWarnedTrailStep;
 	final MushroomCreativeFlightRecovery creativeRecoveryFlight = new MushroomCreativeFlightRecovery();

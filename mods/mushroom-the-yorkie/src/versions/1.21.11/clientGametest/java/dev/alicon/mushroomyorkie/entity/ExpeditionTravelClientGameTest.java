@@ -41,6 +41,7 @@ public final class ExpeditionTravelClientGameTest implements FabricClientGameTes
 			ownerId = context.computeOnClient(client -> client.player.getUUID());
 			try {
 				dogId = adoptAfterSleep(context, server, ownerId);
+				ExpeditionGuideClientScenario.practice(context, server, ownerId, dogId);
 				ExpeditionVestClientScenario.equipAndInspect(context, server, ownerId, dogId);
 				ExpeditionCampClientScenario.placeAndMark(context, server, ownerId, dogId);
 				walkThroughPortal(context, world, ownerId, dogId, Level.NETHER, new BlockPos(16, 90, 16), false);
@@ -60,6 +61,7 @@ public final class ExpeditionTravelClientGameTest implements FabricClientGameTes
 			try {
 				assertDog(reopened.getServer(), ownerId, dogId, Level.OVERWORLD, Level.OVERWORLD, false);
 				ExpeditionVestClientScenario.assertPlated(reopened.getServer(), ownerId, dogId);
+				ExpeditionGuideClientScenario.checkReopened(context, reopened.getServer(), ownerId, dogId);
 				ExpeditionCampClientScenario.assertMarked(reopened.getServer(), dogId, ExpeditionEndShelterClientScenario.CAMP);
 				System.out.printf("Expedition rejoin passed: dog=%s save=%s%n", dogId, save.getSaveDirectory());
 				context.takeScreenshot("expedition-rejoin");

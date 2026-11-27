@@ -82,4 +82,10 @@ public final class RecipeCraftingGameTests {
 	public void craftVanillaYellowWool(GameTestHelper helper) {
 		RecipeCraftingScenarios.craft(helper, "vanilla_yellow_wool");
 	}
+	/** Crafts a reusable replacement Field Guide with ordinary crafting. */
+	@GameTest(template = "fabric-gametest-api-v1:empty")
+	public void craftsFieldGuide(GameTestHelper helper) {
+		RecipeCraftingScenarios.craft(helper, "field_guide");
+	}
+
 }

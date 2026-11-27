@@ -24,6 +24,7 @@ final class MushroomYorkieGoals {
 		yorkie.addYorkieGoal(7, new StructureScentGoal(yorkie));
 		yorkie.addYorkieGoal(8, new BarkAtPeacefulMobsGoal(yorkie));
 		yorkie.addYorkieGoal(9, new HesitantHostileMobGoal(yorkie));
+		yorkie.addYorkieGoal(10, new MushroomTrainingWaitGoal(yorkie));
 		yorkie.addYorkieGoal(10, new UntamedStayNearPlayerGoal(yorkie));
 		yorkie.addYorkieGoal(11, new SitWhenOrderedToGoal(yorkie));
 		yorkie.addYorkieGoal(12, new MushroomTrailFollowingGoal(yorkie));

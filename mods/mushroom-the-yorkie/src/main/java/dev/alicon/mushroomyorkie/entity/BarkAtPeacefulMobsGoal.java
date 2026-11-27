@@ -75,6 +75,7 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 	public void stop() {
 		MushroomBehaviorDebugger.debug(this.yorkie, "peaceful_mob_stop", "peaceful mob: stopped barking", true);
 		this.target = null;
+		this.yorkie.leaveItTraining.chasing(null);
 		this.yorkie.getNavigation().stop();
 	}
 
@@ -83,8 +84,9 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 		if (this.target == null) {
 			return;
 		}
-		if (this.target instanceof SquirrelEntity) {
+		if (this.target instanceof SquirrelEntity squirrel) {
 			this.squirrelChaseTicks++;
+			this.yorkie.leaveItTraining.chasing(squirrel);
 		}
 
 		LivingEntity owner = this.yorkie.getOwner();
@@ -129,6 +131,7 @@ final class BarkAtPeacefulMobsGoal extends Goal {
 
 	private boolean canStayInGoal(ServerLevel level) {
 		return this.yorkie.isTame()
+				&& !this.yorkie.leaveItTraining.suppressesBarking()
 				&& !this.yorkie.isOrderedToSit()
 				&& !this.yorkie.isMushroomSleeping()
 				&& !this.yorkie.isNoGravity()

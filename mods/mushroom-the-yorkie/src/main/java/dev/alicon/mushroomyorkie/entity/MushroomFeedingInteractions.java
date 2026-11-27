@@ -42,8 +42,12 @@ public final class MushroomFeedingInteractions {
 				}
 
 				feedTreat(yorkie, player, hand, stack);
-				MushroomFoodStatus.show(player, yorkie);
-				MushroomBehaviorDebugger.debug(yorkie, "fed_treat", "fed treat: needs refreshed and peaceful barking muted", true);
+				boolean trainingReward = yorkie.level() instanceof ServerLevel level
+						&& yorkie.leaveItTraining.reward(level, yorkie, player);
+				if (!trainingReward) {
+					MushroomFoodStatus.show(player, yorkie);
+				}
+				MushroomBehaviorDebugger.debug(yorkie, "fed_treat", "fed treat: needs refreshed", true);
 			}
 
 			return InteractionResult.SUCCESS;
@@ -74,6 +78,7 @@ public final class MushroomFeedingInteractions {
 		}
 
 		yorkie.claimFor(player);
+		MushroomFieldGuide.giveOnAdoption(player);
 		yorkie.level().broadcastEntityEvent(yorkie, (byte) 7);
 		player.displayClientMessage(Component.translatable("message.mushroom_yorkie.tamed"), true);
 		MushroomBehaviorDebugger.debug(yorkie, "tamed", "tamed: claimed by " + player.getName().getString(), true);
@@ -83,7 +88,8 @@ public final class MushroomFeedingInteractions {
 	private static void feedTreat(MushroomYorkieEntity yorkie, Player player, InteractionHand hand, ItemStack stack) {
 		yorkie.useInteractionItem(player, hand, stack);
 		yorkie.needs.feedTreat();
-		if (yorkie.level() instanceof ServerLevel level) {
+		// A training reward must leave squirrels available for another practice or free play.
+		if (yorkie.level() instanceof ServerLevel level && !yorkie.leaveItTraining.suppressesBarking()) {
 			yorkie.mutePeacefulMobBarking(level);
 		}
 		yorkie.heal(3.0F);

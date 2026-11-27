@@ -33,6 +33,7 @@ public final class ModCreativeTabs {
 					output.accept(ModItems.SQUIRREL_SPAWN_EGG);
 					output.accept(ModItems.YORKIE_TREAT);
 					output.accept(ModItems.YORKIE_HARNESS);
+					output.accept(ModItems.FIELD_GUIDE);
 					output.accept(ModItems.PADDED_VEST);
 					output.accept(ModItems.PLATED_VEST);
 					output.accept(ModItems.DOG_BOWL);

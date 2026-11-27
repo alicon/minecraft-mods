@@ -25,6 +25,24 @@ you to come back. Use an empty hand on him to recall him from a few steps away.
 On foot, he barks at crossings with a drop on both sides. Widen the bridge or
 take a safer route. He can warn the player holding his lead as well.
 
+## Field Guide and Leave it
+
+The first Survival adoption gives the player a Field Guide. Craft a
+replacement with a book and string. Hold it and use the normal Use/Interact
+binding to read it. Crouch and use it to cue the closest owned Mushroom within
+16 blocks. The book opens to the next exercise for that dog. The final page
+records the locations where he earned his paws.
+
+Call him while he is chasing a squirrel in sight. Wait for him to turn back
+and come within two blocks, then use a Yorkie Treat on him. Try again with a
+different squirrel. After two paws, stand beside him and cue him to heel.
+Walk past a squirrel on a new trail, keep him close, then cue again to release
+him. Earned paws belong to the dog and survive rejoining and dimension travel.
+
+If he misses a cue, try again in the open with him awake and off the lead.
+A borrowed lead stays with its handler. An unfinished cue expires or clears
+when you leave the world, so you can start the exercise again on another day.
+
 ## Water and vehicle recovery
 
 Owner-assisted dismount clears movement queued at the old seat so a sitting

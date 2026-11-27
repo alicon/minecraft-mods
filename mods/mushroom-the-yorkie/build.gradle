@@ -27,6 +27,7 @@ ext {
 					'dev/alicon/mushroomyorkie/entity/MushroomYorkieEntity.java',
 					'dev/alicon/mushroomyorkie/item/MushroomYorkieSpawnEggItem.java',
 					'dev/alicon/mushroomyorkie/item/SquirrelSpawnEggItem.java',
+					'dev/alicon/mushroomyorkie/item/FieldGuideItem.java',
 					'dev/alicon/mushroomyorkie/item/YorkieBallItem.java',
 					'dev/alicon/mushroomyorkie/item/YorkieChewToyItem.java',
 					'dev/alicon/mushroomyorkie/item/YorkieToyThrowHandler.java'

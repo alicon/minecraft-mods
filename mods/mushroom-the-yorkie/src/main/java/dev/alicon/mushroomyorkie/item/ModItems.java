@@ -3,6 +3,7 @@ package dev.alicon.mushroomyorkie.item;
 import dev.alicon.mushroomyorkie.MushroomTheYorkie;
 import dev.alicon.mushroomyorkie.block.ModBlocks;
 import dev.alicon.mushroomyorkie.entity.ModEntities;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -16,6 +17,8 @@ public final class ModItems {
 	public static final Item YORKIE_TREAT = register("yorkie_treat", new Item(properties("yorkie_treat", 64)));
 	/** Small black harness that lets Mushroom safely wear a lead. */
 	public static final Item YORKIE_HARNESS = register("yorkie_harness", new Item(properties("yorkie_harness", 1)));
+	/** Reusable book of owner training cues, with the active dog's recorded progress. */
+	public static final Item FIELD_GUIDE = register("field_guide", new FieldGuideItem(properties("field_guide", 1)));
 	/** Padded protection that clips onto Mushroom's harness. */
 	public static final Item PADDED_VEST = register("padded_vest", new Item(properties("padded_vest", 1).durability(32)));
 	/** Padded vest fitted with armadillo scute plates. */
@@ -59,6 +62,7 @@ public final class ModItems {
 	/** Loads this class so static item registrations run during mod initialization. */
 	public static void initialize() {
 		YorkieToyThrowHandler.register();
+		PayloadTypeRegistry.playS2C().register(FieldGuidePagesPayload.TYPE, FieldGuidePagesPayload.CODEC);
 	}
 
 	private static Item register(String name, Item item) {

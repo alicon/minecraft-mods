@@ -88,4 +88,10 @@ public final class RecipeCraftingGameTests {
 	public void craftVanillaCopperNuggets(GameTestHelper helper) {
 		RecipeCraftingScenarios.copperNuggets(helper, net.minecraft.world.item.Items.COPPER_NUGGET);
 	}
+	/** Crafts a reusable replacement Field Guide with ordinary crafting. */
+	@GameTest(maxTicks = 20)
+	public void craftsFieldGuide(GameTestHelper helper) {
+		RecipeCraftingScenarios.craft(helper, "field_guide");
+	}
+
 }

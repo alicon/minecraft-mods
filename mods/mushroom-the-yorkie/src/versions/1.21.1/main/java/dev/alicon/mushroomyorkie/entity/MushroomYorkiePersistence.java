@@ -28,6 +28,11 @@ final class MushroomYorkiePersistence {
 			GlobalPos.CODEC.encodeStart(NbtOps.INSTANCE, anchor).result().ifPresent(value -> tag.put(MushroomCampState.ANCHOR_KEY, value));
 		}
 		tag.putBoolean(MushroomCampState.HOLDING_KEY, yorkie.expeditionCamp.holding());
+		var paws = yorkie.leaveItTraining.paws();
+		if (!paws.isEmpty()) {
+			MushroomLeaveItTraining.CODEC.encodeStart(NbtOps.INSTANCE, paws).result()
+					.ifPresent(value -> tag.put(MushroomLeaveItTraining.SAVE_KEY, value));
+		}
 		tag.putLong(PEACEFUL_MOB_BARK_MUTED_UNTIL_KEY, yorkie.ownerPresence.peacefulMobBarkMutedUntil());
 		tag.putLong(LAST_FOOD_BOWL_DAY_KEY, yorkie.domestic.lastFoodBowlDay());
 		tag.putLong(LAST_WATER_BOWL_DAY_KEY, yorkie.domestic.lastWaterBowlDay());
@@ -49,6 +54,9 @@ final class MushroomYorkiePersistence {
 		yorkie.expeditionCamp.mark(tag.contains(MushroomCampState.ANCHOR_KEY)
 				? GlobalPos.CODEC.parse(NbtOps.INSTANCE, tag.get(MushroomCampState.ANCHOR_KEY)).result().orElse(null) : null);
 		yorkie.expeditionCamp.setHolding(tag.getBoolean(MushroomCampState.HOLDING_KEY));
+		var encodedPaws = tag.get(MushroomLeaveItTraining.SAVE_KEY);
+		yorkie.leaveItTraining.restore(encodedPaws == null ? java.util.List.of()
+				: MushroomLeaveItTraining.CODEC.parse(NbtOps.INSTANCE, encodedPaws).result().orElseGet(java.util.List::of));
 		yorkie.ownerPresence.setPeacefulMobBarkMutedUntil(tag.contains(PEACEFUL_MOB_BARK_MUTED_UNTIL_KEY) ? tag.getLong(PEACEFUL_MOB_BARK_MUTED_UNTIL_KEY) : -1L);
 		yorkie.domestic.setLastFoodBowlDay(tag.contains(LAST_FOOD_BOWL_DAY_KEY) ? tag.getLong(LAST_FOOD_BOWL_DAY_KEY) : DomesticCarePolicy.unloadedDay());
 		yorkie.domestic.setLastWaterBowlDay(tag.contains(LAST_WATER_BOWL_DAY_KEY) ? tag.getLong(LAST_WATER_BOWL_DAY_KEY) : DomesticCarePolicy.unloadedDay());

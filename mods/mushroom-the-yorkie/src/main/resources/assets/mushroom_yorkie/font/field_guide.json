@@ -1,0 +1,22 @@
+{
+	"providers": [
+		{
+			"type": "bitmap",
+			"file": "mushroom_yorkie:font/field_guide_paws.png",
+			"ascent": 7,
+			"height": 8,
+			"chars": [
+				"\ue000\ue001"
+			]
+		},
+		{
+			"type": "bitmap",
+			"file": "mushroom_yorkie:font/field_guide_art.png",
+			"ascent": 8,
+			"height": 17,
+			"chars": [
+				"\ue010\ue011\ue012"
+			]
+		}
+	]
+}

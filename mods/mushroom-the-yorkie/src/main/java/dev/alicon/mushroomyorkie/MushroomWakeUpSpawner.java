@@ -1,6 +1,7 @@
 package dev.alicon.mushroomyorkie;
 
 import dev.alicon.mushroomyorkie.entity.MushroomLostRecoveryPolicy;
+import dev.alicon.mushroomyorkie.entity.MushroomFieldGuide;
 import dev.alicon.mushroomyorkie.entity.MushroomYorkieEntity;
 import dev.alicon.mushroomyorkie.spawn.YorkieSpawnPolicy;
 import java.util.List;
@@ -110,6 +111,7 @@ final class MushroomWakeUpSpawner {
 
 		if (level.noCollision(yorkie) && level.addFreshEntity(yorkie)) {
 			player.displayClientMessage(Component.translatable("message.mushroom_yorkie.woke_up"), true);
+			MushroomFieldGuide.giveOnAdoption(player);
 		}
 	}
 

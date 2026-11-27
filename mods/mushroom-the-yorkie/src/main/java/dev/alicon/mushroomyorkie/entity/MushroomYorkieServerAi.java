@@ -14,6 +14,7 @@ final class MushroomYorkieServerAi {
 		yorkie.creativeRecoveryFlight.tick();
 		MushroomOwnerContactHandler.tick(yorkie, level);
 		MushroomNightBehavior.tick(yorkie, level);
+		yorkie.leaveItTraining.tick(level, yorkie);
 		MushroomOwnerPromptHandler.tick(yorkie, level);
 		MushroomDarknessPanicHandler.tick(yorkie, level);
 		MushroomNeedDecayHandler.tick(yorkie, level);
