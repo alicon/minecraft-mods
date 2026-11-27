@@ -135,5 +135,5 @@ test('a sheep scout prefers observed open turf over equally reachable covered gr
     cell(0, 0, 0), cell(1, 0, 0), cell(2, 0, 0), cell(1, 3, 0, 'oak_leaves'),
     cell(0, 0, 1), cell(0, 0, 2), cell(1, 0, 2),
   ];
-  assert.deepEqual(dryWaypoint(blocks, [0, 1, 0], [], undefined, true), [0, 1, 2]);
+  assert.deepEqual(dryWaypoint(blocks, [0, 1, 0], [], undefined, 'grass'), [0, 1, 2]);
 });

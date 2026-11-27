@@ -89,11 +89,11 @@ export function expeditionPolicy(mode, coachingFile) {
       'Choose a useful change of plan. Consider repeated misses, the daylight left, and the coaching note.', options, fallback);
   }
 
-  function chooseEscape(player, progress, choices) {
-    if (Object.keys(choices).length < 2) return Object.keys(choices)[0];
+  function chooseEscape(player, progress, choices, fallback) {
+    if (Object.keys(choices).length < 2) return fallback;
     return ask(player, 'leave_quarry', { goal: 'Get back up the quarry safely.', ...progress },
       'Choose a safe change based on the last movement failure and the ground ahead. Avoid repeating a failed approach. Use the coaching note when it helps.',
-      choices, Object.keys(choices)[0]);
+      choices, fallback);
   }
 
   return { chooseRoute, chooseWork, chooseEscape };

@@ -118,7 +118,7 @@ export function dryStepKey(from, to) {
 
 // Each edge fits a standing player through two adjacent columns, including the lift for a step up.
 // Use the native movement controller for the resulting straight segment.
-export function dryWaypoint(cells, start, visited, destination, seekPasture = false, rejectedSteps = new Set()) {
+export function dryWaypoint(cells, start, visited, destination, preferredGround, rejectedSteps = new Set()) {
   const blocks = new Map(cells.map(({ x, y, z, b }) => [`${x},${y},${z}`, b]));
   const block = (x, y, z) => blocks.get(`${x},${y},${z}`);
   const visits = new Map();
@@ -148,15 +148,22 @@ export function dryWaypoint(cells, start, visited, destination, seekPasture = fa
         const routeRepeatCost = repeatCost + Math.min(12, visits.get(key) ?? 0);
         queue.push({ pos: step, path: route, repeatCost: routeRepeatCost });
         const fresh = Math.min(12, ...visited.map(tile => distance(tile, step)));
-        const pasture = seekPasture ? [[0, 0], ...CARDINAL].filter(([ox, oz]) => {
+        const pasture = preferredGround === 'grass' ? [[0, 0], ...CARDINAL].filter(([ox, oz]) => {
           const px = tx + ox;
           const pz = tz + oz;
           return block(px, ty - 1, pz) === 'minecraft:grass_block'
             && [0, 1, 2, 3].every(dy => gap(block(px, ty + dy, pz)));
         }).length : 0;
+        const exposedRock = preferredGround === 'stone' ? [[0, 0], ...CARDINAL].filter(([ox, oz]) => {
+          const px = tx + ox;
+          const pz = tz + oz;
+          return /:(?:stone|andesite|diorite|granite)$/.test(block(px, ty - 1, pz) ?? '')
+            && gap(block(px, ty, pz)) && gap(block(px, ty + 1, pz));
+        }).length : 0;
         const score = (destination
           ? -2 * distance(destination, step) - route.length * 0.25 + fresh * 0.1
-          : fresh + 0.3 * distance(start, step) - route.length * 0.12 + pasture * 0.65) - routeRepeatCost * 1.5;
+          : fresh + 0.3 * distance(start, step) - route.length * 0.12 + pasture * 0.65
+            + exposedRock * 0.9) - routeRepeatCost * 1.5;
         if (score > bestScore) {
           best = route;
           bestScore = score;

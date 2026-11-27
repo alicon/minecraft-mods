@@ -96,11 +96,11 @@ async function hunt(action, animal, dropMatches) {
   return false;
 }
 
-async function stepOut(action, player, visited, destination, seekPasture = false, rejectedSteps = new Set(), chooseRoute) {
+async function stepOut(action, player, visited, destination, preferredGround, rejectedSteps = new Set(), chooseRoute) {
   const center = feet(player);
-  const width = seekPasture || chooseRoute ? 23 : 17;
+  const width = preferredGround || chooseRoute ? 23 : 17;
   const volume = await action('get_blocks', { center, size: [width, 9, width], format: 'json' });
-  let pos = dryWaypoint(volume.cells, center, visited, destination, seekPasture, rejectedSteps);
+  let pos = dryWaypoint(volume.cells, center, visited, destination, preferredGround, rejectedSteps);
   const repeated = visited.filter(tile => tile.every((coordinate, axis) => coordinate === center[axis])).length > 2;
   if (!pos || repeated) {
     const leaf = leavesBlockingExit(volume.cells, center);
@@ -118,7 +118,7 @@ async function stepOut(action, player, visited, destination, seekPasture = false
         surface: volume.cells.find(cell => cell.x === x && cell.y === y - 1 && cell.z === z)?.b,
       });
       exits.add(dryStepKey(center, route));
-      route = dryWaypoint(volume.cells, center, visited, destination, seekPasture, exits);
+      route = dryWaypoint(volume.cells, center, visited, destination, preferredGround, exits);
     }
     pos = (await chooseRoute(player, routes, destination)).pos;
   }
@@ -165,7 +165,8 @@ async function gatherWool(action, descendFromCanopy, chooseRoute) {
     }
     const here = await action('observe');
     visited.push(feet(here));
-    if (await stepOut(action, here, visited, sheep?.pos, !sheep, rejectedSteps, chooseRoute) || await descendFromCanopy(here)) {
+    if (await stepOut(action, here, visited, sheep?.pos, sheep ? undefined : 'grass', rejectedSteps, chooseRoute)
+        || await descendFromCanopy(here)) {
       stalls = 0;
     } else {
       stalls++;
@@ -480,17 +481,29 @@ async function climbQuarry(action, pos, chooseEscape) {
     const blocked = result?.reason?.match(/blocked by minecraft:\w+_leaves at (-?\d+),(-?\d+),(-?\d+)/);
     const choices = { walk_around: 'Take a different observed dry route toward the next known step.' };
     if (blocked) choices.clear_leaves = 'Break the leaves blocking the view, then try the step again.';
+    const ceiling = result?.reason?.match(/blocked by minecraft:(?:stone|andesite|diorite|granite|dirt|deepslate) at (-?\d+),(-?\d+),(-?\d+) \(above head/);
+    const headroom = ceiling?.slice(1).map(Number);
+    if (headroom && headroom[1] >= here[1] + 2) {
+      const neighborhood = await action('get_blocks', { center: headroom, size: [3, 3, 3], format: 'json' });
+      if (neighborhood?.cells.every(({ b }) => !/:(?:water|lava|gravel|.*sand)$/.test(b))) {
+        choices.clear_headroom = 'Clear the ordinary block overhead to make room to jump up.';
+      }
+    }
     if (pos[1] === here[1] + 1 && Math.abs(pos[0] - here[0]) + Math.abs(pos[2] - here[2]) === 1) {
       const volume = await action('get_blocks', { center: here, size: [5, 5, 5], format: 'json' });
       const dry = dryWaypoint(volume.cells, here, [], pos);
       if (dry?.join(',') === pos.join(',')) choices.jump_step = 'Jump directly onto the verified dry stair.';
     }
+    const fallback = choices.clear_headroom ? 'clear_headroom' : choices.jump_step ? 'jump_step'
+      : blocked ? 'clear_leaves' : 'walk_around';
     const choice = chooseEscape ? await chooseEscape(player, {
       attempt: attempt + 1, stepOffset: pos.map((axis, index) => axis - here[index]),
       lastResult: result?.reason ?? 'Player reached the horizontal target but did not land on the step.',
-    }, choices) : blocked ? 'clear_leaves' : 'walk_around';
+    }, choices, fallback) : fallback;
     if (choice === 'clear_leaves' && blocked) {
       if (await breakVisible(action, blocked.slice(1).map(Number))) continue;
+    } else if (choice === 'clear_headroom' && headroom) {
+      if (await breakVisible(action, headroom)) continue;
     } else if (choice === 'jump_step') {
       const yaw = Math.atan2(player.position.x - pos[0] - 0.5, pos[2] + 0.5 - player.position.z) * 180 / Math.PI;
       await action('move', { yaw, forward: true, jump: true, ticks: 6 });
@@ -602,8 +615,9 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   const stairs = [];
   const protectedGround = new Set();
   let misses = 0;
+  let quarries = 0;
   await hold(action, STONE_PICKAXE);
-  for (let attempt = 0; attempt < 140; attempt++) {
+  for (let attempt = 0; attempt < 190; attempt++) {
     const inventory = await action('get_inventory');
     const wanted = new Set();
     if (count(inventory, RAW_IRON) < IRON_NEEDED) {
@@ -630,14 +644,24 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       ? await policy.chooseWork(player, { material: 'iron', missedStone: misses,
         rawIron: count(inventory, RAW_IRON), needed: IRON_NEEDED, hasCoal: count(inventory, COAL) > 0 }, fallback)
       : fallback;
-    if (stairs.length >= 14) break;
-    if (stairs.length || work === 'quarry') {
+    let openedBlockedQuarry = false;
+    const pickaxe = inventory.slots.find(stack => stack.id === STONE_PICKAXE);
+    const canDig = pickaxe && pickaxe.maxDamage - (pickaxe.damage ?? 0) > 8;
+    if (canDig && stairs.length < 26 && (stairs.length || work === 'quarry')) {
       const descent = await descendQuarry(action, player, bed, stairs, protectedGround);
       if (descent === 'landed') continue;
-      if (descent === 'blocked' || stairs.length) break;
+      openedBlockedQuarry = descent === 'blocked';
     }
-    visited.push(feet(player));
-    await stepOut(action, player, visited, undefined, false, rejectedSteps);
+    if (stairs.length || openedBlockedQuarry) {
+      await leaveQuarry(action, stairs, policy);
+      stairs.length = 0;
+      quarries++;
+      if (quarries >= 3) break;
+      misses = 0;
+    }
+    const scout = await action('observe');
+    visited.push(feet(scout));
+    await stepOut(action, scout, visited, undefined, 'stone', rejectedSteps);
   }
   await leaveQuarry(action, stairs, policy);
   const materials = await action('get_inventory');

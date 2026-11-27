@@ -1,5 +1,5 @@
 diff --git a/src/client/java/com/mcagent/mcp/client/control/GoToTask.java b/src/client/java/com/mcagent/mcp/client/control/GoToTask.java
-index 646bbd5..b18f8bd 100644
+index 646bbd5..5398c1a 100644
 --- a/src/client/java/com/mcagent/mcp/client/control/GoToTask.java
 +++ b/src/client/java/com/mcagent/mcp/client/control/GoToTask.java
 @@ -10,0 +11 @@ import net.minecraft.tags.FluidTags;
@@ -20,7 +20,7 @@ index 646bbd5..b18f8bd 100644
 +			input = NO_MOVEMENT;
 +			return null;
 +		}
-@@ -77,2 +88,14 @@ final class GoToTask {
+@@ -77,2 +88,16 @@ final class GoToTask {
 -		String hazard = hazardAhead(level, p, dx / dist, dz / dist);
 -		if (hazard != null) return finish(p, false, hazard);
 +		// Move toward the waypoint as the view turns. Check the direction
@@ -33,15 +33,30 @@ index 646bbd5..b18f8bd 100644
 +			input = NO_MOVEMENT;
 +			return null;
 +		}
-+		if (p.horizontalCollision && ticks - lastProgress > SOLID_COLLISION_TICKS) {
++		if (p.horizontalCollision && p.onGround() && ticks - lastProgress > SOLID_COLLISION_TICKS) {
 +			String obstacle = blockerAhead(level, p, forwardX, forwardZ);
-+			if (obstacle.startsWith("blocked by")) return finish(p, false, obstacle);
++			if (obstacle.startsWith("blocked by") && !canJumpStep(level, p, forwardX, forwardZ)) {
++				return finish(p, false, obstacle);
++			}
 +		}
-@@ -81,2 +104,2 @@ final class GoToTask {
+@@ -81,2 +106,2 @@ final class GoToTask {
 -		boolean sprint = dist > 4 && p.getFoodData().getFoodLevel() > 6;
 -		input = new Input(true, false, false, false, jump, false, sprint);
 +		boolean sprint = direction == 0 && dist > 4 && p.getFoodData().getFoodLevel() > 6;
 +		input = new Input(Math.abs(direction) < 2, false, direction < 0, direction > 0, jump, false, sprint);
+@@ -89,0 +115,12 @@ final class GoToTask {
++	private static boolean canJumpStep(ClientLevel level, LocalPlayer p, double ux, double uz) {
++		BlockPos step = BlockPos.containing(p.getX() + ux * 0.8, p.getY(), p.getZ() + uz * 0.8);
++		return !level.getBlockState(step).getCollisionShape(level, step).isEmpty()
++				&& collisionFree(level, step.above())
++				&& collisionFree(level, step.above(2))
++				&& collisionFree(level, p.blockPosition().above(2));
++	}
++
++	private static boolean collisionFree(ClientLevel level, BlockPos position) {
++		return level.getBlockState(position).getCollisionShape(level, position).isEmpty();
++	}
++
 diff --git a/src/client/java/com/mcagent/mcp/client/tools/LookTool.java b/src/client/java/com/mcagent/mcp/client/tools/LookTool.java
 index 88e8c05..2f9fcb8 100644
 --- a/src/client/java/com/mcagent/mcp/client/tools/LookTool.java
