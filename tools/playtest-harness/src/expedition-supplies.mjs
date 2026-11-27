@@ -127,7 +127,7 @@ try {
   assert.ok(start?.inWorld && start.dimension === 'minecraft:overworld' && !start.dead);
   const inventory = await action('get_inventory');
   const stage = process.env.MUSHROOM_EXPEDITION_STAGE ?? 'adoption';
-  const policy = expeditionPolicy(process.env.MUSHROOM_EXPEDITION_POLICY ?? 'rules', coachingFile);
+  const policy = await expeditionPolicy(process.env.MUSHROOM_EXPEDITION_POLICY ?? 'rules', coachingFile);
   if (live) policy.waitForCoaching = waitForCoaching;
   let checkpoint;
   if (resume) {
@@ -143,6 +143,7 @@ try {
     assert.ok(checkpoint.quarry === undefined
       || (Array.isArray(checkpoint.quarry) && checkpoint.quarry.length <= 44 && checkpoint.quarry.every(blockPosition)),
     'Invalid recorded quarry path');
+    assert.ok(checkpoint.quarryLanding === undefined || blockPosition(checkpoint.quarryLanding), 'Invalid recorded landing');
     if (checkpoint.phase !== 'adoption') {
       assert.ok(inventory.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide'), 'The adopted owner did not reattach');
     }
@@ -169,8 +170,12 @@ try {
   if (stage === 'iron') {
     if (live) {
       policy.resumeQuarry = checkpoint.quarry;
-      policy.saveQuarry = async stairs => {
+      policy.resumeQuarryLanding = checkpoint.quarryLanding;
+      policy.reenterQuarry = checkpoint.reenterQuarry === true;
+      policy.saveQuarry = async (stairs, landing) => {
         checkpoint.quarry = stairs;
+        checkpoint.quarryLanding = landing;
+        delete checkpoint.reenterQuarry;
         await writeCheckpoint(checkpoint);
       };
     }

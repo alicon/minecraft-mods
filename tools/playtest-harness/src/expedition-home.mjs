@@ -475,7 +475,7 @@ async function descendQuarry(action, player, bed, stairs, protectedGround) {
   const [tx, ty, tz] = step.landing;
   for (const support of [[x, y - 1, z], [tx, ty - 1, tz]]) protectedGround.add(support.join(','));
   stairs.push(start);
-  return 'landed';
+  return step.landing;
 }
 
 async function climbQuarry(action, pos, chooseEscape) {
@@ -536,6 +536,34 @@ async function leaveQuarry(action, stairs, { chooseEscape, waitForCoaching }) {
   }
 }
 
+async function reenterQuarry(action, stairs, landing) {
+  const entrance = stairs[0];
+  const visited = [];
+  const rejected = new Set();
+  for (let attempt = 0; attempt < 16; attempt++) {
+    const player = await action('observe');
+    if (!player?.inWorld || player.dead || player.health < 14) return [];
+    const here = feet(player);
+    if (player.onGround && here.join(',') === entrance.join(',')) break;
+    if (Math.hypot(...here.map((n, axis) => n - entrance[axis])) > 45 || attempt === 15) return [];
+    visited.push(here);
+    await stepOut(action, player, visited, entrance, undefined, rejected);
+  }
+  const retraced = [];
+  for (const [index, tile] of [...stairs.slice(1), landing].entries()) {
+    const player = await action('observe');
+    if (!player?.onGround || player.health < 14) break;
+    const here = feet(player);
+    const { cells } = await action('get_blocks', { center: here, size: [5, 7, 5], format: 'json' });
+    const step = dryWaypoint(cells, here, [], tile);
+    if (step?.join(',') !== tile.join(',')) break;
+    const walked = await action('go_to', { pos: tile, stopDistance: 0.3, maxTicks: 45 });
+    if (!walked?.arrived || !await settleQuarryStep(action, tile)) break;
+    retraced.push(stairs[index]);
+  }
+  return retraced;
+}
+
 async function openCampTable(action, table, visited) {
   const rejectedSteps = new Set();
   for (let attempt = 0; attempt < 24; attempt++) {
@@ -580,7 +608,7 @@ export async function earnStoneKit(action, craft, { table, bed },
     if (work === 'camp' || stairs.length >= 7) break;
     if (stairs.length || work === 'quarry') {
       const descent = await descendQuarry(action, player, bed, stairs, protectedGround);
-      if (descent === 'landed') continue;
+      if (Array.isArray(descent)) continue;
       if (descent === 'blocked' || stairs.length) break;
     }
     const position = feet(player);
@@ -617,21 +645,39 @@ export async function earnStoneKit(action, craft, { table, bed },
 }
 
 export async function earnIronKit(action, craft, { bed }, policy = {}) {
+  const stairs = [];
+  const protectedGround = new Set();
   if (policy.resumeQuarry?.length) {
-    await leaveQuarry(action, policy.resumeQuarry, policy);
-    await policy.saveQuarry?.([]);
+    const player = await action('observe');
+    const landing = policy.resumeQuarryLanding;
+    if (landing && player?.onGround && player.health >= 14 && feet(player).join(',') === landing.join(',')) {
+      stairs.push(...policy.resumeQuarry);
+      for (const [x, y, z] of [...stairs, landing]) protectedGround.add(`${x},${y - 1},${z}`);
+    } else if (policy.reenterQuarry && landing) {
+      stairs.push(...await reenterQuarry(action, policy.resumeQuarry, landing));
+      const arrived = stairs.length ? feet(await action('observe')) : undefined;
+      if (arrived) {
+        for (const [x, y, z] of [...stairs, arrived]) protectedGround.add(`${x},${y - 1},${z}`);
+      }
+      await policy.saveQuarry?.(stairs, arrived);
+    } else {
+      await leaveQuarry(action, policy.resumeQuarry, policy);
+      await policy.saveQuarry?.([]);
+    }
   }
   const startingStock = await action('get_inventory');
   const recipes = IRON_RECIPES.filter(([item]) => !count(startingStock, item));
-  if (!recipes.length) return;
+  if (!recipes.length) {
+    await leaveQuarry(action, stairs, policy);
+    if (stairs.length) await policy.saveQuarry?.([]);
+    return;
+  }
   const wantedIngots = recipes.reduce((amount, [, cost]) => amount + cost, 0);
   const requiredOre = Math.max(0, wantedIngots - count(startingStock, IRON_INGOT));
   const visited = [];
   const rejectedSteps = new Set();
   const mined = new Set();
   const drops = new Set([RAW_IRON, COAL]);
-  const stairs = [];
-  const protectedGround = new Set();
   let misses = 0;
   let quarries = 0;
   let madeBackup = false;
@@ -683,8 +729,8 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
     let openedBlockedQuarry = false;
     if (usable && stairs.length < 44 && player.position.y > 20 && (stairs.length || work === 'quarry')) {
       const descent = await descendQuarry(action, player, bed, stairs, protectedGround);
-      if (descent === 'landed') {
-        await policy.saveQuarry?.(stairs);
+      if (Array.isArray(descent)) {
+        await policy.saveQuarry?.(stairs, descent);
         continue;
       }
       openedBlockedQuarry = descent === 'blocked';

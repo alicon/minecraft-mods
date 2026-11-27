@@ -1,15 +1,27 @@
 import { spawnSync } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { readFile, rename, writeFile } from 'node:fs/promises';
 import { userInfo } from 'node:os';
+import { dirname, join } from 'node:path';
 
-export function expeditionPolicy(mode, coachingFile) {
+export async function expeditionPolicy(mode, coachingFile) {
   if (mode === 'rules') return {};
   if (mode !== 'jev') throw new Error(`Unknown expedition policy ${mode}`);
   const key = process.env.OPENROUTER_API_KEY || spawnSync('/usr/bin/security', [
     'find-generic-password', '-a', userInfo().username, '-s', 'mushroom-qa-openrouter', '-w',
   ], { encoding: 'utf8', timeout: 7_000 }).stdout?.trim();
   if (!key) throw new Error('Set OPENROUTER_API_KEY or add the Mushroom QA OpenRouter key to Keychain');
-  const remaining = { scout_for_wool: 48, prepare_gear: 16, leave_quarry: 12 };
+  const limits = { scout_for_wool: 48, prepare_gear: 16, leave_quarry: 12 };
+  const budgetFile = join(dirname(coachingFile), 'jev-budget.json');
+  const recorded = await readFile(budgetFile, 'utf8').catch(error => {
+    if (error.code !== 'ENOENT') throw error;
+    return '{}';
+  });
+  const saved = JSON.parse(recorded);
+  const remaining = Object.fromEntries(Object.entries(limits).map(([stage, limit]) => {
+    const value = saved[stage] ?? limit;
+    if (!Number.isInteger(value) || value < 0 || value > limit) throw new Error('Invalid saved Jev request budget');
+    return [stage, value];
+  }));
   const lastDecisionTick = new Map();
   let unavailable = false;
   async function ask(player, stage, state, instructions, criteria, fallback) {
@@ -18,6 +30,9 @@ export function expeditionPolicy(mode, coachingFile) {
     }
     lastDecisionTick.set(stage, player.gameTime);
     remaining[stage]--;
+    const budgetUpdate = `${budgetFile}.${process.pid}.tmp`;
+    await writeFile(budgetUpdate, JSON.stringify(remaining), { flag: 'wx' });
+    await rename(budgetUpdate, budgetFile);
     const coaching = (await readFile(coachingFile, 'utf8').catch(() => '')).trim().slice(0, 400);
     const start = performance.now();
     const trace = { at: new Date().toISOString(), policy: 'jev', stage, gameTime: player.gameTime, ...state, chosen: null };

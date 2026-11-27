@@ -118,8 +118,9 @@ The default policy uses local rules. Set `MUSHROOM_EXPEDITION_POLICY=jev` to
 let TypeSafe Jev choose dry scouting routes and how to proceed when the player
 is missing stone or finds a blocked quarry exit. The runner
 uses `OPENROUTER_API_KEY` or the Mac Keychain entry `mushroom-qa-openrouter`.
-Each controller invocation makes at most 76 requests and logs the choices, latency and
-reported input cost in `actions.jsonl`. The controller has a local fallback.
+Each run reserves at most 76 requests, including after controller reattachment.
+It logs the choices, latency and reported input cost in `actions.jsonl`.
+The controller has a local fallback.
 The ordinary Survival actions and assertions are identical in both modes.
 
 Write `coach.txt` inside the printed report directory to send one short gameplay
@@ -134,7 +135,8 @@ If a live controller has exited and its status is `held`, restart the external
 controller from its last saved phase with the same client still open. Use the
 same stage and policy and point to that run's status file. The client connection
 and owner must match the recorded checkpoint. An interrupted iron quarry
-retains the last grounded staircase so a resumed controller can climb out.
+retains its grounded steps. The resumed controller can continue from the
+verified landing or use the recorded route to climb out.
 
 ```shell
 MUSHROOM_EXPEDITION_STATUS="$RUN_DIRECTORY/status" MUSHROOM_EXPEDITION_RESUME=1 \
