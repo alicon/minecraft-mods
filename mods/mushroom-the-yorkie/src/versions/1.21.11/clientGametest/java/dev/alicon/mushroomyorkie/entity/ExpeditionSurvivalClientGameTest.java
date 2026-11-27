@@ -1,19 +1,31 @@
 package dev.alicon.mushroomyorkie.entity;
 
+import dev.alicon.mushroomyorkie.item.ModItems;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.gamerules.GameRules;
+import net.minecraft.world.level.entity.EntityTypeTest;
 
 public final class ExpeditionSurvivalClientGameTest implements FabricClientGameTest {
-	private static final int SUPPLY_WINDOW_TICKS = 3600;
+	private static final int ADOPTION_WINDOW_TICKS = 26_000;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
 		if (!Boolean.getBoolean("mushroom.expedition.survivalTest")) {
 			return;
 		}
+		String statusPath = System.getenv("MUSHROOM_EXPEDITION_STATUS");
+		if (statusPath == null || !Path.of(statusPath).isAbsolute()) {
+			throw new AssertionError("Set MUSHROOM_EXPEDITION_STATUS to a new absolute run status path");
+		}
+		Path status = Path.of(statusPath);
 		String seed = System.getenv("MUSHROOM_EXPEDITION_SEED");
 		String spawnRadius = System.getenv("MUSHROOM_EXPEDITION_SPAWN_RADIUS");
 		try (var world = context.worldBuilder().setUseConsistentSettings(false).adjustSettings(settings -> {
@@ -37,29 +49,48 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 						|| minecraft.getWorldData().isAllowCommands()) {
 					throw new AssertionError("Expected a fresh Normal Survival player with an empty inventory");
 				}
-				System.out.printf("Expedition supplies ready: seed=%s world=%s owner=%s%n",
+				System.out.printf("Expedition Survival ready: seed=%s world=%s owner=%s%n",
 						minecraft.overworld().getSeed(), minecraft.getWorldData().getLevelName(), ownerId);
 			});
 			try {
-				for (int elapsed = 0; elapsed < SUPPLY_WINDOW_TICKS; elapsed += 10) {
-					boolean crafted = server.computeOnServer(minecraft -> {
+				Files.writeString(status, "ready", StandardOpenOption.CREATE_NEW);
+				for (int elapsed = 0; elapsed < ADOPTION_WINDOW_TICKS; elapsed += 10) {
+					String result = Files.readString(status);
+					if ("failed".equals(result)) {
+						throw new AssertionError("The Survival controller reported a failure. See its action trace.");
+					}
+					boolean finished = "finished".equals(result);
+					String dogEvidence = server.computeOnServer(minecraft -> {
 						var owner = minecraft.getPlayerList().getPlayer(ownerId);
-						if (!owner.isAlive()) {
-							throw new AssertionError("The Survival player died before earning early supplies");
+						if (owner == null || !owner.isAlive()) {
+							throw new AssertionError("The Survival player is missing or dead");
 						}
-						return owner.getInventory().contains(stack -> stack.is(Items.WOODEN_PICKAXE));
+						if (!finished) {
+							return null;
+						}
+						var dogs = minecraft.overworld().getEntities(EntityTypeTest.forClass(MushroomYorkieEntity.class),
+								dog -> dog.isAlive() && dog.belongsTo(owner));
+						if (owner.isSleeping() || dogs.size() != 1 || !owner.getInventory().contains(stack -> stack.is(ModItems.FIELD_GUIDE))
+								|| !owner.getInventory().contains(stack -> stack.is(Items.WOODEN_PICKAXE))
+								|| minecraft.overworld().getDayTime() < 24_000L) {
+							throw new AssertionError("Expected to wake the next day with one living owned dog, the guide, and the pickaxe");
+						}
+						return dogs.getFirst().getUUID().toString();
 					});
-					if (crafted) {
-						System.out.printf("Expedition supplies passed: wooden pickaxe after %s ticks%n", elapsed);
-						context.takeScreenshot("expedition-survival-early-supplies");
+					if (dogEvidence != null) {
+						System.out.printf("Expedition Survival adoption passed: dog=%s owner=%s ticks=%s%n",
+								dogEvidence, ownerId, elapsed);
+						context.takeScreenshot("expedition-survival-adoption");
 						return;
 					}
 					context.waitTicks(10);
 				}
-				throw new AssertionError("No wooden pickaxe was earned within the Survival pilot window");
+				throw new AssertionError("No ordinary adoption within the Survival pilot window");
 			} catch (AssertionError failure) {
 				context.takeScreenshot("expedition-survival-failure");
 				throw failure;
+			} catch (IOException io) {
+				throw new UncheckedIOException(io);
 			}
 		}
 	}

@@ -42,33 +42,33 @@ armor, camp and training progress. A final Nether crossing checks that a seated
 dog stays behind.
 Screenshots are under `mods/mushroom-the-yorkie/build/run/clientGameTest/screenshots/`.
 
-### Mushroom fresh-world supplies pilot
+### Mushroom fresh-world Survival adoption
 
 Build [mc-agent-mcp at 3cf75f3](https://github.com/ArchitektSpeer/mc-agent-mcp/tree/3cf75f33ee93b7e999f16dc320ef09f85c2f0de2)
-with Java 21 and `./gradlew build -Ploom_version=1.17.21`. Use the
-`build/devlibs/mc-agent-mcp-0.2.1-dev.jar` artifact. Start the client from this
-repository with Java 21:
+with Java 21 and `./gradlew build -Ploom_version=1.17.21`. Pass the resulting
+`build/devlibs/mc-agent-mcp-0.2.1-dev.jar` to the runner from the repository
+root. The runner requires Java 21 and Node 22 or later.
 
 ```shell
 MUSHROOM_EXPEDITION_SEED=1 MUSHROOM_EXPEDITION_SPAWN_RADIUS=0 \
-  ./gradlew :mushroom-the-yorkie:runClientGameTest \
-  -Pclient_game_tests -Pyorkie_expedition_survival \
-  -Pyorkie_expedition_agent_jar=/path/to/mc-agent-mcp-0.2.1-dev.jar
+  sh scripts/run-mushroom-java-survival.sh /path/to/mc-agent-mcp-0.2.1-dev.jar
 ```
 
-When the client logs `Expedition supplies ready`, run the player in a second
-terminal with Node 22 or later:
-
-```shell
-node tools/playtest-harness/src/expedition-supplies.mjs
-```
+The runner prints a new directory under `build/playtest-reports/` containing
+the action trace, client and controller logs, and screenshots.
 
 The client starts in a fresh Normal Survival world with an empty inventory and
-commands disabled. The player searches local terrain for a tree, gathers logs,
-and crafts a wooden pickaxe with ordinary client actions. The native server
-verifies that the pickaxe reached the player's inventory. The action log is JSON
-Lines on stdout. The pilot uses local rules and bills zero model tokens.
-The seed and spawn-radius settings reproduce the canopy start.
+commands disabled. The player gathers wood, crafts the wooden pickaxe, packs
+the crafting table, collects matching wool and mutton from sheep, and crafts
+a bed. It uses remaining daylight to gather reachable supplies close to the
+bed and then sleeps at normal sunset and feeds the adopted dog. The
+controller uses a local view of the loaded world and checks the actual crosshair
+before attacking or feeding. The integrated server verifies the next morning,
+one living owned Mushroom, and the Field Guide in the player's inventory.
+Allow roughly one full Minecraft day for setup. The game test captures the final
+view or, on controller failure, the view at failure. It uses local rules and
+bills zero model tokens. Use the seed and spawn-radius settings above to replay
+the starting area, including the possible canopy spawn.
 
 ### Playtest bridge and server GameTests
 
