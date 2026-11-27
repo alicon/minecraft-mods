@@ -50,6 +50,7 @@ async function action(name, args = {}) {
 
 async function walk(pos, stopDistance) {
   for (let attempt = 0; attempt < 4; attempt++) {
+    await action('look', { pitch: 4 });
     const outcome = await action('go_to', { pos, stopDistance, maxTicks: 125 });
     if (outcome?.arrived) return;
     const obstruction = outcome?.reason?.match(/blocked by minecraft:[\w]+_leaves at (-?\d+),(-?\d+),(-?\d+)/);
@@ -117,9 +118,9 @@ try {
   assert.ok(start?.inWorld && start.dimension === 'minecraft:overworld' && !start.dead);
   const inventory = await action('get_inventory');
   assert.equal(inventory.slots.length, 0, 'Expected an empty expedition inventory');
-  await gatherStarterTools(start);
-  const camp = await adoptAtNight(action, craft, descendFromCanopy);
   const stage = process.env.MUSHROOM_EXPEDITION_STAGE ?? 'adoption';
+  await gatherStarterTools(start);
+  const camp = await adoptAtNight(action, craft, descendFromCanopy, stage !== 'adoption');
   if (stage === 'stone' || stage === 'iron') {
     await earnStoneKit(action, craft, camp);
   }

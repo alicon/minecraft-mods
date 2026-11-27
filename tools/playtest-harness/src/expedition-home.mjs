@@ -106,6 +106,8 @@ async function stepOut(action, player, visited, destination, seekPasture = false
     if (leaf && (await action('break_block', { pos: leaf, maxTicks: 30 }))?.broken) return true;
     if (!pos) return false;
   }
+  // The native walker turns toward its destination but keeps the previous pitch.
+  await action('look', { pitch: 4 });
   const result = await action('go_to', { pos, stopDistance: 0.3, maxTicks: 90 });
   const moved = result?.arrived || Math.hypot(result?.position?.[0] - player.position.x,
     result?.position?.[2] - player.position.z) >= 0.6;
@@ -304,7 +306,7 @@ async function feedAdoptedDog(action, id, bed, mealCount) {
   throw new Error('Could not feed the adopted dog after checking reach and the native crosshair');
 }
 
-export async function adoptAtNight(action, craft, descendFromCanopy) {
+export async function adoptAtNight(action, craft, descendFromCanopy, prepareStone = false) {
   const color = await gatherWool(action, descendFromCanopy);
   await ensurePlanks(action, craft, 3);
   // Bring the first table to the flock so sleeping doesn't depend on retracing the route.
@@ -315,6 +317,8 @@ export async function adoptAtNight(action, craft, descendFromCanopy) {
   await action('stop', { closeScreen: true });
   const bedPos = await placeBeside(action, bed);
   await prepareCamp(action, craft, table, bedPos);
+  if (prepareStone) await earnStoneKit(action, craft, { table, bed: bedPos }, true);
+  await action('look', { pitch: 4 });
   await hold(action, MUTTON);
   const mealCount = count(await action('get_inventory'), MUTTON);
 
@@ -405,7 +409,9 @@ async function openCampTable(action, table, visited) {
   throw new Error('Could not walk back to the crafting table after quarrying');
 }
 
-export async function earnStoneKit(action, craft, { table, bed }) {
+export async function earnStoneKit(action, craft, { table, bed }, beforeNight = false) {
+  const initial = await action('get_inventory');
+  if (count(initial, STONE_PICKAXE) && count(initial, FURNACE)) return;
   await hold(action, PICKAXE);
   const visited = [];
   const rejectedSteps = new Set();
@@ -419,34 +425,50 @@ export async function earnStoneKit(action, craft, { table, bed }) {
     const inventory = await action('get_inventory');
     const needed = count(inventory, FURNACE) ? 3 : 11;
     if (count(inventory, COBBLESTONE) >= needed) break;
+    const player = await action('observe');
+    if (beforeNight && (player.timeOfDay >= 11_000 || player.health < 14)) break;
     if (await mineVisible(action, bed, mined, ore, drops, protectedGround)) {
       missedStone = 0;
       continue;
     }
-    const player = await action('observe');
     missedStone++;
     if ((stairs.length > 0 || missedStone >= 8) && stairs.length < 7
         && await descendQuarry(action, player, bed, stairs, protectedGround)) continue;
     const position = feet(player);
     const distance = Math.hypot(position[0] - table[0], position[2] - table[2]);
     visited.push(position);
-    await stepOut(action, player, visited, distance > 40 ? table : undefined, false, rejectedSteps);
+    const returnToCamp = distance > (beforeNight ? 9 : 40);
+    await stepOut(action, player, visited, returnToCamp ? table : undefined, false, rejectedSteps);
   }
   for (const pos of stairs.reverse()) {
+    await action('look', { pitch: 4 });
     const step = await action('go_to', { pos, stopDistance: 0.4, maxTicks: 65 });
     assert.ok(step?.arrived, 'Could not walk back up the quarry stairs');
+  }
+  const materials = await action('get_inventory');
+  const furnace = count(materials, FURNACE);
+  if (count(materials, COBBLESTONE) < (furnace ? 3 : 11)) {
+    if (!beforeNight) throw new Error('Could not earn enough cobblestone for a pickaxe and furnace');
+    const campSteps = [];
+    const campRejections = new Set();
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const player = await action('observe');
+      const at = feet(player);
+      if (Math.hypot(at[0] - bed[0], at[1] - bed[1], at[2] - bed[2]) <= 3) break;
+      campSteps.push(at);
+      await stepOut(action, player, campSteps, bed, false, campRejections);
+    }
+    return;
   }
   if (count(await action('get_inventory'), 'minecraft:stick') < 2) {
     await ensurePlanks(action, craft, 2);
     await craft('minecraft:stick', 4);
   }
   await openCampTable(action, table, visited);
-  const inventory = await action('get_inventory');
-  const furnace = count(inventory, FURNACE);
-  assert.ok(count(inventory, COBBLESTONE) >= (furnace ? 3 : 11), 'Could not earn enough cobblestone for a pickaxe and furnace');
   await craft(STONE_PICKAXE, 1);
   if (!furnace) await craft(FURNACE, 1);
   await action('stop', { closeScreen: true });
+  if (beforeNight) await action('go_to', { pos: bed, stopDistance: 1.6, maxTicks: 55 });
 }
 
 export async function earnIronKit(action, craft, { bed }) {
