@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
-import { adoptAtNight, WOOD_LOGS } from './expedition-home.mjs';
+import { adoptAtNight, earnStoneKit, WOOD_LOGS } from './expedition-home.mjs';
 import { hasDrySupport } from './expedition-navigation.mjs';
 
 const configFile = new URL(
@@ -118,7 +118,10 @@ try {
   const inventory = await action('get_inventory');
   assert.equal(inventory.slots.length, 0, 'Expected an empty expedition inventory');
   await gatherStarterTools(start);
-  await adoptAtNight(action, craft, descendFromCanopy);
+  const camp = await adoptAtNight(action, craft, descendFromCanopy);
+  if (process.env.MUSHROOM_EXPEDITION_STAGE === 'stone') {
+    await earnStoneKit(action, craft, camp);
+  }
   await reportStatus('finished');
 } catch (error) {
   await reportStatus('failed');

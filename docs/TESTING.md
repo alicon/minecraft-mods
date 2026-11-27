@@ -48,7 +48,8 @@ Bedrock Dedicated Server archive.
 ```shell
 python3 scripts/build-bedrock-addon.py mushroom-the-yorkie
 python3 scripts/smoke-mushroom-bedrock.py SERVER.zip ADDON.mcaddon \
-  --verify-expedition-travel --verify-expedition-vest --verify-expedition-camp
+  --verify-expedition-travel --verify-expedition-vest --verify-expedition-camp \
+  --verify-expedition-trail --verify-expedition-dragon
 ```
 
 The travel fixture stages safe Nether and End crossings and checks the original
@@ -57,7 +58,13 @@ arrival and a lead already held by a guest. A second fixture walks a Survival
 simulated player through a native Nether portal. The vest fixture checks same-tick
 owner and guest inputs, damage, repair, plates, removal and saved wear. The camp
 fixture exercises native placement, ownership, a safe route around a wall, recall,
-and a missing mat. A restart checks the same dog's mark and safety hold.
+and a missing mat. It also throws a lingering potion in the End to exercise a
+native cloud and keep Mushroom clear while the owner is still inside it.
+A restart checks the same dog's mark and safety hold. The trail fixture
+checks a one-wide bridge for an owner and for a guest holding the lead, then
+widens it and verifies that Mushroom resumes walking across.
+The Dragon fixture observes a native fireball impact and tests the original dog
+walking out of the resulting breath cloud on prepared footing.
 
 ### Mushroom fresh-world Survival adoption
 
@@ -86,6 +93,11 @@ Allow roughly one full Minecraft day for setup. The game test captures the final
 view or, on controller failure, the view at failure. It uses local rules and
 bills zero model tokens. Use the seed and spawn-radius settings above to replay
 the starting area, including the possible canopy spawn.
+
+Set `MUSHROOM_EXPEDITION_STAGE=stone` to continue after breakfast. The player
+scouts for reachable stone, mines cobblestone in view, and returns to the
+crafting table. The integrated server also checks the earned stone pickaxe,
+the furnace, and the original adopted dog's identity.
 
 ### Playtest bridge and server GameTests
 

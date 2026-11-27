@@ -6,6 +6,8 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.world.Difficulty;
@@ -15,6 +17,7 @@ import net.minecraft.world.level.entity.EntityTypeTest;
 
 public final class ExpeditionSurvivalClientGameTest implements FabricClientGameTest {
 	private static final int ADOPTION_WINDOW_TICKS = 26_000;
+	private static final int STONE_WINDOW_TICKS = 38_000;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -28,6 +31,8 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 		Path status = Path.of(statusPath);
 		String seed = System.getenv("MUSHROOM_EXPEDITION_SEED");
 		String spawnRadius = System.getenv("MUSHROOM_EXPEDITION_SPAWN_RADIUS");
+		boolean stoneStage = "stone".equals(System.getenv("MUSHROOM_EXPEDITION_STAGE"));
+		int windowTicks = stoneStage ? STONE_WINDOW_TICKS : ADOPTION_WINDOW_TICKS;
 		try (var world = context.worldBuilder().setUseConsistentSettings(false).adjustSettings(settings -> {
 			settings.setName("Codex Expedition Survival");
 			settings.setDifficulty(Difficulty.NORMAL);
@@ -53,8 +58,9 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 						minecraft.overworld().getSeed(), minecraft.getWorldData().getLevelName(), ownerId);
 			});
 			try {
+				var originalDog = new AtomicReference<UUID>();
 				Files.writeString(status, "ready", StandardOpenOption.CREATE_NEW);
-				for (int elapsed = 0; elapsed < ADOPTION_WINDOW_TICKS; elapsed += 10) {
+				for (int elapsed = 0; elapsed < windowTicks; elapsed += 10) {
 					String result = Files.readString(status);
 					if ("failed".equals(result)) {
 						throw new AssertionError("The Survival controller reported a failure. See its action trace.");
@@ -65,27 +71,42 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 						if (owner == null || !owner.isAlive()) {
 							throw new AssertionError("The Survival player is missing or dead");
 						}
-						if (!finished) {
+						boolean hasGuide = owner.getInventory().contains(stack -> stack.is(ModItems.FIELD_GUIDE));
+						if (!finished && !hasGuide) {
 							return null;
 						}
 						var dogs = minecraft.overworld().getEntities(EntityTypeTest.forClass(MushroomYorkieEntity.class),
 								dog -> dog.isAlive() && dog.belongsTo(owner));
-						if (owner.isSleeping() || dogs.size() != 1 || !owner.getInventory().contains(stack -> stack.is(ModItems.FIELD_GUIDE))
+						if (dogs.size() == 1) {
+							originalDog.compareAndSet(null, dogs.getFirst().getUUID());
+						}
+						if (!finished) {
+							return null;
+						}
+						if (owner.isSleeping() || dogs.size() != 1 || !hasGuide
 								|| !owner.getInventory().contains(stack -> stack.is(Items.WOODEN_PICKAXE))
 								|| minecraft.overworld().getDayTime() < 24_000L) {
 							throw new AssertionError("Expected to wake the next day with one living owned dog, the guide, and the pickaxe");
 						}
+						if (!dogs.getFirst().getUUID().equals(originalDog.get())) {
+							throw new AssertionError("The dog at the end was not the dog first adopted");
+						}
+						if (stoneStage && (!owner.getInventory().contains(stack -> stack.is(Items.STONE_PICKAXE))
+								|| !owner.getInventory().contains(stack -> stack.is(Items.FURNACE)))) {
+							throw new AssertionError("The player did not finish with the earned stone pickaxe and furnace");
+						}
 						return dogs.getFirst().getUUID().toString();
 					});
 					if (dogEvidence != null) {
-						System.out.printf("Expedition Survival adoption passed: dog=%s owner=%s ticks=%s%n",
-								dogEvidence, ownerId, elapsed);
-						context.takeScreenshot("expedition-survival-adoption");
+						String stage = stoneStage ? "stone" : "adoption";
+						System.out.printf("Expedition Survival %s passed: dog=%s owner=%s ticks=%s%n",
+								stage, dogEvidence, ownerId, elapsed);
+						context.takeScreenshot("expedition-survival-" + stage);
 						return;
 					}
 					context.waitTicks(10);
 				}
-				throw new AssertionError("No ordinary adoption within the Survival pilot window");
+				throw new AssertionError("The Survival controller did not finish the selected stage within its window");
 			} catch (AssertionError failure) {
 				context.takeScreenshot("expedition-survival-failure");
 				throw failure;
