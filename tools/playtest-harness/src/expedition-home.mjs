@@ -326,7 +326,7 @@ async function cookAtCamp(action, craft) {
   } finally {
     await action('stop', { closeScreen: true });
     await hold(action, STONE_PICKAXE);
-    assert.ok(await breakVisible(action, furnace), 'Could not pack the camp furnace after cooking');
+    assert.ok((await breakVisible(action, furnace))?.broken, 'Could not pack the camp furnace after cooking');
     await action('go_to', { pos: furnace, stopDistance: 0.3, maxTicks: 55 });
   }
 }
@@ -483,32 +483,67 @@ export async function adoptAtNight(action, { bed }, craft) {
 async function breakVisible(action, pos) {
   await action('look', { at: pos });
   await setTimeout(80);
-  if ((await action('observe'))?.crosshair?.pos?.join(',') !== pos.join(',')) return false;
-  return (await action('break_block', { pos, maxTicks: 115 }))?.broken === true;
+  if ((await action('observe'))?.crosshair?.pos?.join(',') !== pos.join(',')) return null;
+  return action('break_block', { pos, maxTicks: 115 });
 }
 
-async function mineVisible(action, bed, alreadyMined, wanted, drops, protectedGround = new Set()) {
+async function moveAwayFromFire(action, hazards) {
+  let player = await action('observe');
+  if (!player?.inWorld || player.dead) return;
+  const tile = feet(player);
+  const nearest = hazards.reduce((best, block) => {
+    const distance = Math.hypot(block.x - tile[0], block.y - tile[1], block.z - tile[2]);
+    return !best || distance < best.distance ? { ...block, distance } : best;
+  }, null);
+  const away = nearest && [tile[0] + 7 * Math.sign(tile[0] - nearest.x), tile[1],
+    tile[2] + 7 * Math.sign(tile[2] - nearest.z)];
+  const destination = away && away.join(',') !== tile.join(',') ? away : undefined;
+  const visited = [];
+  const rejectedSteps = new Set();
+  for (let step = 0; step < 3; step++) {
+    const here = feet(player);
+    if (Math.hypot(...here.map((axis, index) => axis - tile[index])) >= 6) return;
+    visited.push(here);
+    await stepOut(action, player, visited, destination, undefined, rejectedSteps);
+    player = await action('observe');
+    if (!player?.inWorld || player.dead) return;
+  }
+}
+
+export async function mineVisible(action, bed, alreadyMined, wanted, drops, protectedGround = new Set()) {
   const player = await action('observe');
   assert.ok(player?.inWorld && !player.dead && player.health >= 8, 'The quarry became unsafe for the player');
   const [px, py, pz] = feet(player);
   const volume = await action('get_blocks', { center: [px, py, pz], size: [11, 9, 11], format: 'json' });
+  const fire = volume.cells.filter(({ b }) => /:(?:lava|fire|soul_fire)$/.test(b));
   const targets = volume.cells.flatMap(({ x, y, z, b }) => {
     const pos = [x, y, z];
     const key = pos.join(',');
     if (!wanted.has(b) || alreadyMined.has(key) || protectedGround.has(key)
         || (x === px && z === pz && y < py)
-        || (y < bed[1] && Math.max(Math.abs(x - bed[0]), Math.abs(z - bed[2])) <= 2)) return [];
+        || (y < bed[1] && Math.max(Math.abs(x - bed[0]), Math.abs(z - bed[2])) <= 2)
+        || fire.some(pool => Math.abs(pool.y - y) <= 1
+          && Math.max(Math.abs(pool.x - x), Math.abs(pool.z - z)) <= 1)) return [];
     const reach = Math.hypot(x + 0.5 - player.position.x, y + 0.5 - player.position.y - 1.62, z + 0.5 - player.position.z);
     return reach <= 4.15 ? [{ pos, reach }] : [];
   }).sort((a, b) => a.reach - b.reach);
+  if (!targets.length) return false;
+  const sumDrops = stock => [...drops].reduce((total, item) => total + count(stock, item), 0);
+  const before = sumDrops(await action('get_inventory'));
   for (const { pos } of targets.slice(0, 12)) {
-    if (!await breakVisible(action, pos)) continue;
+    const result = await breakVisible(action, pos);
+    if (/took damage from (?:lava|.*fire)/i.test(result?.reason ?? '')) {
+      await moveAwayFromFire(action, fire);
+      return false;
+    }
+    if (!result?.broken) continue;
     alreadyMined.add(pos.join(','));
     const { entities } = await action('get_entities', { type: 'item', radius: 6 });
     for (const item of entities.filter(entity => drops.has(entity.item?.id))) {
       await action('go_to', { entityId: item.id, stopDistance: 0.35, maxTicks: 35 });
     }
-    return true;
+    await setTimeout(125);
+    return sumDrops(await action('get_inventory')) > before;
   }
   return false;
 }
@@ -540,7 +575,12 @@ async function descendQuarry(action, player, bed, stairs, protectedGround) {
   if (!step) return 'unavailable';
   let opened = false;
   for (const pos of step.clear) {
-    if (!await breakVisible(action, pos)) return opened ? 'blocked' : 'unavailable';
+    const result = await breakVisible(action, pos);
+    if (/took damage from (?:lava|.*fire)/i.test(result?.reason ?? '')) {
+      await moveAwayFromFire(action, cells.filter(({ b }) => /:(?:lava|fire|soul_fire)$/.test(b)));
+      return 'blocked';
+    }
+    if (!result?.broken) return opened ? 'blocked' : 'unavailable';
     opened = true;
   }
   const outcome = await action('go_to', { pos: step.landing, stopDistance: 0.3, maxTicks: 45 });
@@ -584,9 +624,9 @@ async function climbQuarry(action, pos, chooseEscape) {
       lastResult: result?.reason ?? 'Player reached the horizontal target but did not land on the step.',
     }, choices, fallback) : fallback;
     if (choice === 'clear_leaves' && blocked) {
-      if (await breakVisible(action, blocked.slice(1).map(Number))) continue;
+      if ((await breakVisible(action, blocked.slice(1).map(Number)))?.broken) continue;
     } else if (choice === 'clear_headroom' && headroom) {
-      if (await breakVisible(action, headroom)) continue;
+      if ((await breakVisible(action, headroom))?.broken) continue;
     } else if (choice === 'jump_step') {
       const yaw = Math.atan2(player.position.x - pos[0] - 0.5, pos[2] + 0.5 - player.position.z) * 180 / Math.PI;
       await action('move', { yaw, forward: true, jump: true, ticks: 6 });
@@ -678,7 +718,6 @@ export async function earnStoneKit(action, craft, { table, bed },
     { beforeNight = false, chooseWork, chooseEscape, waitForCoaching } = {}) {
   const initial = await action('get_inventory');
   if (count(initial, STONE_PICKAXE) && count(initial, FURNACE)) return;
-  await hold(action, PICKAXE);
   const visited = [];
   const rejectedSteps = new Set();
   const mined = new Set();
@@ -694,6 +733,19 @@ export async function earnStoneKit(action, craft, { table, bed },
     if (count(inventory, COBBLESTONE) >= needed) break;
     const player = await action('observe');
     if (beforeNight && (player.timeOfDay >= 11_000 || player.health < 14)) break;
+    if (!inventory.slots.some(stack => stack.id === PICKAXE && durability(stack) > 5)) {
+      const needsSticks = count(inventory, 'minecraft:stick') < 2;
+      await ensurePlanks(action, craft, needsSticks ? 9 : 7);
+      if (needsSticks) await craft('minecraft:stick', 4);
+      await craft('minecraft:crafting_table', 1);
+      const toolTable = await placeBeside(action, 'minecraft:crafting_table');
+      await openCampTable(action, toolTable, visited);
+      await craft(PICKAXE, 1);
+      await action('stop', { closeScreen: true });
+      await hold(action, PICKAXE);
+      continue;
+    }
+    if (inventory.mainHand?.id !== PICKAXE || durability(inventory.mainHand) <= 5) await hold(action, PICKAXE);
     if (await mineVisible(action, bed, mined, ore, drops, protectedGround)) {
       missedStone = 0;
       continue;

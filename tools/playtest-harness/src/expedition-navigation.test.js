@@ -5,6 +5,62 @@ function cell(x, y, z, type = 'grass_block') {
   return { x, y, z, b: `minecraft:${type}` };
 }
 
+test('a fire interruption stops further mining and walks away from the lava', async () => {
+  const { mineVisible } = await import('./expedition-home.mjs');
+  const positions = [];
+  let attempts = 0;
+  let target;
+  let player = { inWorld: true, health: 9, position: { x: 0.5, y: 1, z: 0.5 } };
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe': return { ...player, crosshair: { pos: target } };
+      case 'get_blocks': return { cells: args.size[0] === 11
+        ? [cell(1, 1, 0, 'stone'), cell(2, 1, 0, 'stone'), cell(-2, 0, 0, 'lava')]
+        : Array.from({ length: 10 }, (_, x) => cell(x, 0, 0)) };
+      case 'get_inventory': return { slots: [] };
+      case 'look':
+        target = args.at;
+        return {};
+      case 'break_block':
+        attempts++;
+        player = { ...player, health: 8 };
+        return { broken: false, reason: 'interrupted: took damage from fire (health 8.0)' };
+      case 'go_to': {
+        const [x, y, z] = args.pos;
+        positions.push(args.pos);
+        player = { ...player, position: { x: x + 0.5, y, z: z + 0.5 } };
+        return { arrived: true };
+      }
+      default: throw new Error(`Unexpected action: ${name}`);
+    }
+  };
+  assert.equal(await mineVisible(action, [50, 1, 0], new Set(),
+    new Set(['minecraft:stone']), new Set(['minecraft:cobblestone'])), false);
+  assert.equal(attempts, 1);
+  assert.deepEqual(positions, [[7, 1, 0]]);
+});
+
+test('breaking an ore without picking up its drop does not count as mining progress', async () => {
+  const { mineVisible } = await import('./expedition-home.mjs');
+  let breaks = 0;
+  const action = async name => {
+    switch (name) {
+      case 'observe': return { inWorld: true, health: 20, position: { x: 0.5, y: 1, z: 0.5 }, crosshair: { pos: [1, 1, 0] } };
+      case 'get_blocks': return { cells: [cell(1, 1, 0, 'iron_ore')] };
+      case 'get_inventory': return { slots: [] };
+      case 'look': return {};
+      case 'break_block':
+        breaks++;
+        return { broken: true };
+      case 'get_entities': return { entities: [] };
+      default: throw new Error(`Unexpected action: ${name}`);
+    }
+  };
+  assert.equal(await mineVisible(action, [50, 1, 0], new Set(),
+    new Set(['minecraft:iron_ore']), new Set(['minecraft:raw_iron'])), false);
+  assert.equal(breaks, 1);
+});
+
 test('a route to an elevated camp climbs instead of stopping directly below it', async () => {
   const { dryWaypoint } = await import('./expedition-navigation.mjs');
   const terrain = [
