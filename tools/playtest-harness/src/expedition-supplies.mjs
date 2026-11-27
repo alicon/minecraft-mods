@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
-import { adoptAtNight } from './expedition-home.mjs';
+import { adoptAtNight, WOOD_LOGS } from './expedition-home.mjs';
 import { hasDrySupport } from './expedition-navigation.mjs';
 
 const configFile = new URL(
@@ -132,9 +132,8 @@ async function reportStatus(status) {
 }
 
 async function gatherStarterTools(start) {
-  const woodTypes = ['oak', 'birch', 'spruce', 'acacia', 'dark_oak', 'jungle', 'cherry', 'pale_oak'];
   const scanArgs = {
-    blocks: woodTypes.map(wood => `${wood}_log`),
+    blocks: WOOD_LOGS,
     radius: 16,
     max: 48,
   };

@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
 import { dryWaypoint, leavesBlockingExit, nearbyBuildingSpots } from './expedition-navigation.mjs';
 
+export const WOOD_LOGS = ['oak', 'birch', 'spruce', 'acacia', 'dark_oak', 'jungle', 'cherry', 'pale_oak', 'mangrove']
+  .map(wood => `${wood}_log`);
 const WOOL = /^minecraft:(.+)_wool$/;
 const MUTTON = 'minecraft:mutton';
 const DOG = 'mushroom_yorkie:mushroom_yorkie';
@@ -156,6 +158,41 @@ async function placeBeside(action, item) {
   throw new Error(`No nearby supported position for ${item}`);
 }
 
+async function findBedPlanks(action, craft) {
+  const inventory = await action('get_inventory');
+  if (inventory.slots.reduce((total, stack) => total + (stack.id.endsWith('_planks') ? stack.count : 0), 0) >= 3) {
+    return;
+  }
+  const carried = inventory.slots.find(stack => stack.id.endsWith('_log'));
+  if (carried) {
+    await craft(carried.id.replace(/_log$/, '_planks'), 4);
+    return;
+  }
+  const { position } = await action('observe');
+  const wood = await action('scan_blocks', { blocks: WOOD_LOGS, radius: 12, max: 40 });
+  const candidates = wood.matches.flatMap(({ name, positions }) => positions.map(pos => ({ name, pos })))
+    .filter(({ pos }) => Math.abs(pos[1] - position.y) < 2.5)
+    .sort((a, b) => Math.hypot(a.pos[0] - position.x, a.pos[2] - position.z)
+      - Math.hypot(b.pos[0] - position.x, b.pos[2] - position.z));
+  for (const tree of candidates.slice(0, 8)) {
+    const approached = await action('go_to', { pos: tree.pos, stopDistance: 2.1, maxTicks: 65 });
+    if (!approached?.arrived) continue;
+    await action('look', { at: tree.pos });
+    await setTimeout(80);
+    if ((await action('observe')).crosshair?.pos?.join(',') !== tree.pos.join(',')) continue;
+    if (!(await action('break_block', { pos: tree.pos, maxTicks: 100 }))?.broken) continue;
+    const drops = await action('get_entities', { type: 'item', radius: 5 });
+    for (const item of drops.entities.filter(candidate => candidate.item?.id === tree.name)) {
+      await action('go_to', { entityId: item.id, stopDistance: 0.3, maxTicks: 55 });
+    }
+    await setTimeout(350);
+    if (count(await action('get_inventory'), tree.name) === 0) continue;
+    await craft(tree.name.replace(/_log$/, '_planks'), 4);
+    return;
+  }
+  throw new Error('Could not collect a reachable log for the bed planks');
+}
+
 async function prepareCamp(action, craft, table, bed) {
   const checked = new Set();
   const wanted = /:(?:stone|coal_ore|\w+_log)$/;
@@ -231,6 +268,7 @@ async function feedAdoptedDog(action, id) {
 
 export async function adoptAtNight(action, craft, descendFromCanopy) {
   const color = await gatherWool(action, descendFromCanopy);
+  await findBedPlanks(action, craft);
   // Bring the first table to the flock so sleeping doesn't depend on retracing the route.
   const table = await placeBeside(action, 'minecraft:crafting_table');
   assert.equal((await action('interact_block', { pos: table }))?.screenOpened, 'CraftingScreen');
