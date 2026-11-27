@@ -513,6 +513,35 @@
           ]
         },
         {
+          "name": "vest",
+          "parent": "body",
+          "pivot": [0, 6, 0],
+          "cubes": [
+            { "origin": [-3.2, 6.0, -3.4], "size": [6.4, 4.4, 6.8], "uv": [0, 36] }
+          ]
+        },
+        {
+          "name": "scute_plates",
+          "parent": "body",
+          "pivot": [0, 6, 0],
+          "cubes": [
+            { "origin": [-2.4, 10.4, -2.8], "size": [4.8, 0.5, 5.6], "uv": [28, 36] }
+          ]
+        },
+        {
+          "name": "vest_cracks",
+          "parent": "body",
+          "pivot": [0, 6, 0],
+          "cubes": [
+            { "origin": [-3.24, 9.5, -1.8], "size": [0.08, 0.2, 1.2], "uv": { "west": { "uv": [50, 38], "uv_size": [1, 1] } } },
+            { "origin": [-3.24, 9.1, -0.8], "size": [0.08, 0.6, 0.25], "uv": { "west": { "uv": [50, 38], "uv_size": [1, 1] } } },
+            { "origin": [-3.24, 9.1, -0.65], "size": [0.08, 0.2, 1.2], "uv": { "west": { "uv": [50, 38], "uv_size": [1, 1] } } },
+            { "origin": [3.16, 9.5, -1.8], "size": [0.08, 0.2, 1.2], "uv": { "east": { "uv": [50, 38], "uv_size": [1, 1] } } },
+            { "origin": [3.16, 9.1, -0.8], "size": [0.08, 0.6, 0.25], "uv": { "east": { "uv": [50, 38], "uv_size": [1, 1] } } },
+            { "origin": [3.16, 9.1, -0.65], "size": [0.08, 0.2, 1.2], "uv": { "east": { "uv": [50, 38], "uv_size": [1, 1] } } }
+          ]
+        },
+        {
           "name": "front_right_leg",
           "parent": "body",
           "pivot": [

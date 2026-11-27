@@ -24,6 +24,9 @@ PLAYER_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-player-probe.js")
 ADOPTION_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-adoption-probe.js")
 EGG_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-egg-probe.js")
 STAY_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-stay-probe.js")
+EXPEDITION_TRAVEL_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-travel.js")
+EXPEDITION_PORTAL_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-nether-portal.js")
+EXPEDITION_VEST_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-vest.js")
 WOODLAND_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-woodland-probe.js")
 FLIGHT_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-flight-probe.js")
 AUTOPLAY_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-autoplay.js")
@@ -64,20 +67,30 @@ def disposable_run(failure_evidence):
             raise
 
 
-def install_woodland_probe(server_dir, separate_probe):
-    # Script dynamic properties belong to their behavior pack's UUID. Attach this probe
-    # only to a disposable installed copy so it can read the exact saved lesson records.
+@contextmanager
+def install_probe_in_behavior_pack(server_dir, separate_probe, source):
+    # Script dynamic properties belong to the behavior pack. Attach the
+    # probe only to the disposable installation so it can verify saved data.
     pack = server_dir / "behavior_packs" / WORLD.addon_folder
     manifest_path = pack / "manifest.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    original_manifest = manifest_path.read_bytes()
+    manifest = json.loads(original_manifest)
     manifest["dependencies"].append({"module_name": "@minecraft/server-gametest", "version": "1.0.0-beta"})
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     entry = next(module["entry"] for module in manifest["modules"] if module["type"] == "script")
-    fixture = "woodland-probe.fixture.js"
-    shutil.copyfile(WOODLAND_PROBE_SOURCE, (pack / entry).with_name(fixture))
-    with (pack / entry).open("a", encoding="utf-8") as main_script:
-        main_script.write(f'\nimport "./{fixture}";\n')
+    main_script = pack / entry
+    original_script = main_script.read_bytes()
+    fixture = main_script.with_name(source.stem + ".fixture.js")
+    shutil.copyfile(source, fixture)
+    with main_script.open("a", encoding="utf-8") as output:
+        output.write(f'\nimport "./{fixture.name}";\n')
     separate_probe.write_text("export {};\n", encoding="utf-8")
+    yield
+    # Successful probes can share a test world. Failures retain their exact
+    # installed files for the caller's failure archive.
+    manifest_path.write_bytes(original_manifest)
+    main_script.write_bytes(original_script)
+    fixture.unlink()
 
 
 def main():
@@ -93,6 +106,8 @@ def main():
     parser.add_argument("--verify-adoption", action="store_true", help="run an opt-in simulated-player sleep adoption test")
     parser.add_argument("--verify-egg-adoption", action="store_true", help="check repeated Creative and Survival egg use")
     parser.add_argument("--verify-stay-walk", action="store_true", help="check open and closed daycare exits and tethering")
+    parser.add_argument("--verify-expedition-travel", action="store_true", help="check same-dog dimension travel and sitting")
+    parser.add_argument("--verify-expedition-vest", action="store_true", help="check vest ownership, protection and saved wear")
     parser.add_argument("--verify-woodland", action="store_true", help="check squirrel chase, safety and native follow")
     parser.add_argument("--verify-flight", action="store_true", help="run an opt-in simulated-player Creative flight test")
     parser.add_argument("--play-seconds", type=int, help="run seeded simulated-player gameplay for at least this many seconds")
@@ -132,7 +147,9 @@ def main():
         if args.verify_care_persistence:
             exercise_world(server_dir, "MUSHROOM_TEST_CARE_PERSISTED")
         if any((args.verify_fetch, args.verify_adoption, args.verify_egg_adoption,
-                args.verify_stay_walk, args.verify_flight, args.verify_woodland, args.verify_parity, args.play_seconds)):
+                args.verify_stay_walk, args.verify_expedition_travel, args.verify_expedition_vest,
+                args.verify_flight, args.verify_woodland,
+                args.verify_parity, args.play_seconds)):
             probe = enable_beta_test_apis(server_dir, WORLD)
             if args.verify_parity or args.verify_fetch:
                 examples = json.dumps(json.loads(FOOD_CASES.read_text(encoding="utf-8")))
@@ -154,6 +171,15 @@ def main():
             if args.verify_stay_walk:
                 shutil.copyfile(STAY_PROBE_SOURCE, probe)
                 exercise_world(server_dir, "MUSHROOM_STAY_WALK_PASS")
+            if args.verify_expedition_travel:
+                shutil.copyfile(EXPEDITION_TRAVEL_SOURCE, probe)
+                exercise_world(server_dir, "MUSHROOM_EXPEDITION_TRAVEL_PASS")
+                shutil.copyfile(EXPEDITION_PORTAL_SOURCE, probe)
+                exercise_world(server_dir, "MUSHROOM_EXPEDITION_NATIVE_NETHER_PASS")
+            if args.verify_expedition_vest:
+                with install_probe_in_behavior_pack(server_dir, probe, EXPEDITION_VEST_SOURCE):
+                    exercise_world(server_dir, "MUSHROOM_EXPEDITION_VEST_PASS")
+                    exercise_world(server_dir, "MUSHROOM_EXPEDITION_VEST_REOPENED")
             if args.verify_flight:
                 shutil.copyfile(FLIGHT_PROBE_SOURCE, probe)
                 exercise_world(server_dir, "MUSHROOM_FLIGHT_PASS")
@@ -169,9 +195,9 @@ def main():
                 probe.write_text(script, encoding="utf-8")
                 exercise_world(server_dir, "MUSHROOM_PLAY_PASS", play_seconds=args.play_seconds)
             if args.verify_woodland:
-                install_woodland_probe(server_dir, probe)
-                exercise_world(server_dir, "MUSHROOM_WOODLAND_PASS", timeout=100)
-                exercise_world(server_dir, "MUSHROOM_WOODLAND_REOPENED", timeout=60)
+                with install_probe_in_behavior_pack(server_dir, probe, WOODLAND_PROBE_SOURCE):
+                    exercise_world(server_dir, "MUSHROOM_WOODLAND_PASS", timeout=100)
+                    exercise_world(server_dir, "MUSHROOM_WOODLAND_REOPENED", timeout=60)
         print("Mushroom spawned and remained in the world after a server restart.")
 
 

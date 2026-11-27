@@ -11,6 +11,12 @@
     "mushroom_yorkie_harness": {
       "textures": "textures/alicon/mushroom_yorkie/items/yorkie_harness"
     },
+    "mushroom_yorkie_padded_vest": {
+      "textures": ["textures/alicon/mushroom_yorkie/items/padded_vest"]
+    },
+    "mushroom_yorkie_plated_vest": {
+      "textures": ["textures/alicon/mushroom_yorkie/items/plated_vest"]
+    },
     "mushroom_yorkie_adoption": {
       "textures": "textures/alicon/mushroom_yorkie/items/mushroom_yorkie_spawn_egg"
     }

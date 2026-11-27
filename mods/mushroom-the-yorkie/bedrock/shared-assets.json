@@ -8,6 +8,8 @@
     "textures/alicon/mushroom_yorkie/items/field_guide.png": "src/main/resources/assets/mushroom_yorkie/textures/item/field_guide.png",
     "textures/alicon/mushroom_yorkie/items/yorkie_treat.png": "src/main/resources/assets/mushroom_yorkie/textures/item/yorkie_treat.png",
     "textures/alicon/mushroom_yorkie/items/yorkie_harness.png": "src/main/resources/assets/mushroom_yorkie/textures/item/yorkie_harness.png",
+    "textures/alicon/mushroom_yorkie/items/padded_vest.png": "src/main/resources/assets/mushroom_yorkie/textures/item/padded_vest.png",
+    "textures/alicon/mushroom_yorkie/items/plated_vest.png": "src/main/resources/assets/mushroom_yorkie/textures/item/plated_vest.png",
     "textures/alicon/mushroom_yorkie/items/mushroom_yorkie_spawn_egg.png": "src/main/resources/assets/mushroom_yorkie/textures/item/mushroom_yorkie_spawn_egg.png"
   }
 }

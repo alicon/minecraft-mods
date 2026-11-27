@@ -20,6 +20,17 @@ VIEWS = (
     ("Creative flight", "flight", 63, 7, (0, 6.3, -2), 16),
     ("Harness", "harness", 95, 15, (0, 6.5, -3), 13),
 )
+VEST_EQUIPMENT = {
+    "padded": {"harness", "vest"},
+    "plated": {"harness", "vest", "scute_plates"},
+    "cracked": {"harness", "vest", "scute_plates", "vest_cracks"},
+}
+VEST_VIEWS = (
+    ("Padded vest", "padded", 62, 15, (0, 6.5, -1.5), 15),
+    ("Scute plates", "plated", 62, 15, (0, 6.5, -1.5), 15),
+    ("Cracked vest", "cracked", 62, 15, (0, 6.5, -1.5), 15),
+)
+EQUIPMENT_BONES = set().union(*VEST_EQUIPMENT.values())
 ZERO = (0, 0, 0)
 
 
@@ -120,7 +131,8 @@ def paint_face(canvas, texture, points, uv):
 
 def render(bones, animations, texture, view):
     _, pose, yaw, pitch, center, zoom = view
-    animation_name = "idle" if pose == "harness" else pose
+    equipment = VEST_EQUIPMENT.get(pose, {"harness"} if pose == "harness" else set())
+    animation_name = "idle" if equipment else pose
     animation = animations.get(f"animation.{STEM}.{animation_name}", {})
     motion = animation.get("bones", {})
     yaw, pitch = math.radians(yaw), math.radians(pitch)
@@ -131,7 +143,7 @@ def render(bones, animations, texture, view):
         return panel
     rendered = []
     for bone in bones:
-        if bone["name"] == "harness" and pose != "harness":
+        if bone["name"] in EQUIPMENT_BONES and bone["name"] not in equipment:
             continue
         if pose == "sleep" and bone["name"] in {"right_eye", "left_eye"}:
             continue
@@ -162,19 +174,21 @@ def main():
     parser.add_argument("addon", type=Path)
     parser.add_argument("--reference", type=Path, help="older add-on to show above the current one")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--vest", action="store_true", help="show the padded, plated and cracked vest")
     args = parser.parse_args()
     paths = [args.reference, args.addon] if args.reference else [args.addon]
+    views = VEST_VIEWS if args.vest else VIEWS
     gap = 14
     row_height = PANEL[1] + 35
-    sheet = Image.new("RGB", (len(VIEWS) * (PANEL[0] + gap) + gap, len(paths) * row_height + 55), "#f7f8f8")
+    sheet = Image.new("RGB", (len(views) * (PANEL[0] + gap) + gap, len(paths) * row_height + 55), "#f7f8f8")
     draw = ImageDraw.Draw(sheet)
     font = ImageFont.load_default(size=17)
     draw.text((gap, 10), "Mushroom the Yorkie · Bedrock model preview", font=font, fill="#1a2829")
-    for column, view in enumerate(VIEWS):
+    for column, view in enumerate(views):
         draw.text((gap + column * (PANEL[0] + gap), 36), view[0], font=font, fill="#1a2829")
     for row, path in enumerate(paths):
         bones, animations, texture, version = read_pack(path)
-        for column, view in enumerate(VIEWS):
+        for column, view in enumerate(views):
             left, top = gap + column * (PANEL[0] + gap), 60 + row * row_height
             sheet.paste(render(bones, animations, texture, view), (left, top))
         draw.text((gap, top + PANEL[1] + 3), version, font=font, fill="#1a2829")

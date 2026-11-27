@@ -22,6 +22,17 @@
           "default": false,
           "client_sync": true
         },
+        "mushroom_yorkie:vest_kind": {
+          "type": "enum",
+          "values": ["none", "padded", "plated"],
+          "default": "none",
+          "client_sync": true
+        },
+        "mushroom_yorkie:vest_cracked": {
+          "type": "bool",
+          "default": false,
+          "client_sync": true
+        },
         "mushroom_yorkie:home_goal": {
           "type": "enum",
           "values": [
@@ -306,6 +317,69 @@
               }
             },
             {
+              "cooldown": 0.25,
+              "interact_text": "action.interact.mushroom_vest_equip",
+              "on_interact": {
+                "filters": {
+                  "all_of": [
+                    { "test": "is_owner", "subject": "other", "value": true },
+                    {
+                      "any_of": [
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "mushroom_yorkie:padded_vest" },
+                        { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "mushroom_yorkie:plated_vest" }
+                      ]
+                    }
+                  ]
+                },
+                "event": "mushroom_yorkie:use_expedition_vest",
+                "target": "self"
+              }
+            },
+            {
+              "cooldown": 0.25,
+              "interact_text": "action.interact.mushroom_vest_maintain",
+              "on_interact": {
+                "filters": {
+                  "all_of": [
+                    { "test": "is_owner", "subject": "other", "value": true },
+                    {
+                      "any_of": [
+                        {
+                          "all_of": [
+                            { "test": "enum_property", "domain": "mushroom_yorkie:vest_kind", "value": "padded" },
+                            { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:leather" }
+                          ]
+                        },
+                        {
+                          "all_of": [
+                            { "test": "enum_property", "domain": "mushroom_yorkie:vest_kind", "operator": "!=", "value": "none" },
+                            { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:armadillo_scute" }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "event": "mushroom_yorkie:maintain_expedition_vest",
+                "target": "self"
+              }
+            },
+            {
+              "cooldown": 0.25,
+              "interact_text": "action.interact.mushroom_vest_remove",
+              "on_interact": {
+                "filters": {
+                  "all_of": [
+                    { "test": "is_owner", "subject": "other", "value": true },
+                    { "test": "enum_property", "domain": "mushroom_yorkie:vest_kind", "operator": "!=", "value": "none" },
+                    { "test": "has_equipment", "subject": "other", "domain": "main_hand", "value": "minecraft:shears" }
+                  ]
+                },
+                "event": "mushroom_yorkie:unclip_expedition_vest",
+                "target": "self"
+              }
+            },
+            {
               "cooldown": 0.5,
               "interact_text": "action.interact.mushroom_remove_harness",
               "spawn_items": {
@@ -329,6 +403,11 @@
                       "test": "bool_property",
                       "domain": "mushroom_yorkie:wearing_harness",
                       "value": true
+                    },
+                    {
+                      "test": "enum_property",
+                      "domain": "mushroom_yorkie:vest_kind",
+                      "value": "none"
                     }
                   ]
                 },
@@ -592,6 +671,9 @@
       }
     },
     "events": {
+      "mushroom_yorkie:use_expedition_vest": {},
+      "mushroom_yorkie:maintain_expedition_vest": {},
+      "mushroom_yorkie:unclip_expedition_vest": {},
       "mushroom_yorkie:feed_1": {},
       "mushroom_yorkie:feed_1_5": {},
       "mushroom_yorkie:feed_2": {},

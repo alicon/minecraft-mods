@@ -16,6 +16,15 @@
           "harness": "query.property('mushroom_yorkie:wearing_harness')"
         },
         {
+          "vest": "query.property('mushroom_yorkie:vest_kind') != 'none'"
+        },
+        {
+          "scute_plates": "query.property('mushroom_yorkie:vest_kind') == 'plated'"
+        },
+        {
+          "vest_cracks": "query.property('mushroom_yorkie:vest_cracked')"
+        },
+        {
           "left_eye": "!(query.property('mushroom_yorkie:home_goal') == 'sleep')"
         },
         {

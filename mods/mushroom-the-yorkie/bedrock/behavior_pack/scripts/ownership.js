@@ -47,6 +47,11 @@ function ownedPetId(owner) {
   return loadedPetOf(owner);
 }
 
+export function recordedPetOf(owner) {
+  const id = owner.getDynamicProperty(PET_ID);
+  return typeof id === "string" ? world.getEntity(id) : undefined;
+}
+
 function rememberOwner(owner, pet) {
   const previous = owner.getDynamicProperty(PET_ID);
   if (typeof previous === "string" && world.getDynamicProperty(DEAD_PREFIX + previous) === true) {

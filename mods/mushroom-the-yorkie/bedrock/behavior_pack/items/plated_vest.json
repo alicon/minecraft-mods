@@ -1,0 +1,25 @@
+{
+  "format_version": "1.26.60",
+  "minecraft:item": {
+    "description": {
+      "identifier": "mushroom_yorkie:plated_vest",
+      "menu_category": {
+        "category": "equipment"
+      }
+    },
+    "components": {
+      "minecraft:icon": {
+        "textures": {
+          "default": "mushroom_yorkie_plated_vest"
+        }
+      },
+      "minecraft:display_name": {
+        "value": "item.mushroom_yorkie:plated_vest.name"
+      },
+      "minecraft:max_stack_size": 1,
+      "minecraft:durability": {
+        "max_durability": 64
+      }
+    }
+  }
+}

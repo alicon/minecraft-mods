@@ -42,6 +42,21 @@ armor, camp and training progress. A final Nether crossing checks that a seated
 dog stays behind.
 Screenshots are under `mods/mushroom-the-yorkie/build/run/clientGameTest/screenshots/`.
 
+For Bedrock, build the add-on and run the expedition fixtures with the official
+Bedrock Dedicated Server archive.
+
+```shell
+python3 scripts/build-bedrock-addon.py mushroom-the-yorkie
+python3 scripts/smoke-mushroom-bedrock.py SERVER.zip ADDON.mcaddon \
+  --verify-expedition-travel --verify-expedition-vest
+```
+
+The travel fixture stages safe Nether and End crossings and checks the original
+dog's identity. It also covers an ordered sit, an unsafe landing, a remote End
+arrival and a lead already held by a guest. A second fixture walks a Survival
+simulated player through a native Nether portal. The vest fixture checks same-tick
+owner and guest inputs, damage, repair, plates, removal and saved wear.
+
 ### Mushroom fresh-world Survival adoption
 
 Build [mc-agent-mcp at 3cf75f3](https://github.com/ArchitektSpeer/mc-agent-mcp/tree/3cf75f33ee93b7e999f16dc320ef09f85c2f0de2)
