@@ -141,6 +141,15 @@ MUSHROOM_EXPEDITION_STATUS="$RUN_DIRECTORY/status" MUSHROOM_EXPEDITION_RESUME=1 
   node tools/playtest-harness/src/expedition-supplies.mjs >> "$RUN_DIRECTORY/actions.jsonl"
 ```
 
+Summarize the action logs and the native save/reopen evidence for comparison:
+
+```shell
+python3 scripts/summarize-mushroom-expedition.py "$RUN_DIRECTORY" "$OTHER_RUN_DIRECTORY"
+```
+
+Keep assisted runs out of unattended policy comparisons. Charge reported
+inference spend from failed attempts to the policy that made them.
+
 For the smoother spectator camera, apply the tracked patch to the isolated
 bridge checkout before rebuilding the bridge JAR. Use a separate JAR for each
 running client so a build can finish while a playtest is still active.
