@@ -39,6 +39,7 @@ final class MushroomHarnessInteractions {
 	}
 
 	static void removeHarness(MushroomYorkieEntity yorkie, Player player) {
+		MushroomExpeditionEquipment.removeVest(yorkie, player);
 		yorkie.setHarness(false);
 		ItemStack removedHarness = new ItemStack(ModItems.YORKIE_HARNESS);
 		if (!player.addItem(removedHarness)) {

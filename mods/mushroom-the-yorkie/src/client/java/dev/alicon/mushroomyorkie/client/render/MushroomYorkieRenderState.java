@@ -6,6 +6,9 @@ final class MushroomYorkieRenderState extends LivingEntityRenderState {
 	boolean sitting;
 	boolean sleeping;
 	boolean harness;
+	boolean vest;
+	boolean scutePlates;
+	boolean vestCracked;
 	boolean flyingWithOwner;
 	float verticalSpeed;
 	int flightTrickType;

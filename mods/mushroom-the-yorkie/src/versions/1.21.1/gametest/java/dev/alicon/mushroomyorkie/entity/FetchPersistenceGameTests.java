@@ -92,6 +92,13 @@ public final class FetchPersistenceGameTests {
 		FetchFlightScenarios.airborneReturnSurvivesReload(helper, yorkie -> roundTrip(helper, yorkie), false);
 	}
 
+	/** Reopen damaged and worn-out expedition armor with the original dog and owner. */
+	@GameTest(template = "fabric-gametest-api-v1:empty", timeoutTicks = 20)
+	public void expeditionVestSurvivesReload(GameTestHelper helper) {
+		ExpeditionVestScenarios.armor(helper, dog -> roundTrip(helper, dog),
+				(dog, damage) -> dog.hurt(damage, 4.0F));
+	}
+
 	private static MushroomYorkieEntity roundTrip(GameTestHelper helper, MushroomYorkieEntity yorkie) {
 		CompoundTag data = yorkie.saveWithoutId(new CompoundTag());
 		yorkie.discard();

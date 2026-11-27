@@ -94,6 +94,13 @@ public final class FetchPersistenceGameTests {
 		FetchFlightScenarios.airborneReturnSurvivesReload(helper, yorkie -> roundTrip(helper, yorkie), false);
 	}
 
+	/** Reopen damaged and worn-out expedition armor with the original dog and owner. */
+	@GameTest(maxTicks = 20)
+	public void expeditionVestSurvivesReload(GameTestHelper helper) {
+		ExpeditionVestScenarios.armor(helper, dog -> roundTrip(helper, dog),
+				(dog, damage) -> helper.hurt(dog, damage, 4.0F));
+	}
+
 	private static MushroomYorkieEntity roundTrip(GameTestHelper helper, MushroomYorkieEntity yorkie) {
 		TagValueOutput output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, helper.getLevel().registryAccess());
 		yorkie.saveWithoutId(output);

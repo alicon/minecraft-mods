@@ -1,0 +1,17 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "equipment",
+	"key": {
+		"L": "minecraft:leather",
+		"S": "minecraft:string",
+		"W": "#minecraft:wool"
+	},
+	"pattern": [
+		"WLW",
+		" S "
+	],
+	"result": {
+		"count": 1,
+		"id": "mushroom_yorkie:padded_vest"
+	}
+}

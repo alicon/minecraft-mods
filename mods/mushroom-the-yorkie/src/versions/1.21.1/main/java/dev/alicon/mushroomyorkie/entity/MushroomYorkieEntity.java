@@ -155,6 +155,21 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		return this.entityData.get(DATA_HARNESS);
 	}
 
+	/** Whether to render the padded vest on the existing harness. */
+	public boolean hasExpeditionVest() {
+		return this.hasHarness() && MushroomExpeditionEquipment.isVest(MushroomExpeditionEquipment.vest(this));
+	}
+
+	/** Whether the equipped vest has scute plates. */
+	public boolean hasScutePlates() {
+		return this.hasHarness() && MushroomExpeditionEquipment.vest(this).is(dev.alicon.mushroomyorkie.item.ModItems.PLATED_VEST);
+	}
+
+	/** Whether visible damage should be shown on the equipped vest. */
+	public boolean isExpeditionVestCracked() {
+		return MushroomExpeditionEquipment.cracked(MushroomExpeditionEquipment.vest(this));
+	}
+
 	void setHarness(boolean harness) {
 		this.entityData.set(DATA_HARNESS, harness);
 	}
@@ -252,7 +267,11 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 
 	@Override
 	public boolean hurt(DamageSource damageSource, float amount) {
-		boolean hurt = super.hurt(damageSource, amount);
+		float absorbed = MushroomExpeditionEquipment.absorption(this, damageSource, amount);
+		boolean hurt = super.hurt(damageSource, amount - absorbed);
+		if (hurt && this.isAlive()) {
+			MushroomExpeditionEquipment.wear(this, absorbed);
+		}
 		if (hurt && this.level() instanceof ServerLevel level && damageSource.getEntity() instanceof Player player && this.belongsTo(player)) {
 			MushroomScoldingHandler.recordTrustedPlayerHit(this, level, player);
 		}

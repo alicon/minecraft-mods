@@ -29,6 +29,9 @@ public final class MushroomYorkieModel extends EntityModel<MushroomYorkieEntity>
 	private final ModelPart leftEar;
 	private final ModelPart rightEar;
 	private final ModelPart harness;
+	private final ModelPart vest;
+	private final ModelPart scutePlates;
+	private final ModelPart vestCracks;
 	private final ModelPart tail;
 	private final ModelPart frontLeftLeg;
 	private final ModelPart frontRightLeg;
@@ -50,6 +53,9 @@ public final class MushroomYorkieModel extends EntityModel<MushroomYorkieEntity>
 		this.leftEar = this.head.getChild("left_ear");
 		this.rightEar = this.head.getChild("right_ear");
 		this.harness = this.body.getChild("harness");
+		this.vest = this.body.getChild("vest");
+		this.scutePlates = this.body.getChild("scute_plates");
+		this.vestCracks = this.body.getChild("vest_cracks");
 		this.tail = this.body.getChild("tail");
 		this.frontLeftLeg = this.body.getChild("front_left_leg");
 		this.frontRightLeg = this.body.getChild("front_right_leg");
@@ -109,6 +115,17 @@ public final class MushroomYorkieModel extends EntityModel<MushroomYorkieEntity>
 				.addBox(-2.75F, -4.35F, 1.5F, 5.5F, 0.55F, 1.0F)
 				.texOffs(48, 4)
 				.addBox(-0.35F, -4.45F, -2.5F, 0.7F, 0.65F, 5.0F), PartPose.ZERO);
+		body.addOrReplaceChild("vest", CubeListBuilder.create()
+				.texOffs(0, 36)
+				.addBox(-3.2F, -4.4F, -3.4F, 6.4F, 3.8F, 6.8F), PartPose.ZERO);
+		body.addOrReplaceChild("scute_plates", CubeListBuilder.create()
+				.texOffs(28, 36)
+				.addBox(-2.4F, -4.8F, -2.8F, 4.8F, 0.5F, 5.6F), PartPose.ZERO);
+		body.addOrReplaceChild("vest_cracks", CubeListBuilder.create()
+				.texOffs(50, 36)
+				.addBox(-3.24F, -3.9F, -1.9F, 0.08F, 1.1F, 2.8F)
+				.texOffs(50, 36)
+				.addBox(3.16F, -3.9F, -1.9F, 0.08F, 1.1F, 2.8F), PartPose.ZERO);
 		body.addOrReplaceChild("front_left_leg", legBuilder(), PartPose.offset(1.8F, 1.0F, -3.2F));
 		body.addOrReplaceChild("front_right_leg", legBuilder(), PartPose.offset(-1.8F, 1.0F, -3.2F));
 		body.addOrReplaceChild("back_left_leg", legBuilder(), PartPose.offset(1.8F, 1.0F, 3.4F));
@@ -135,6 +152,9 @@ public final class MushroomYorkieModel extends EntityModel<MushroomYorkieEntity>
 		this.body.zRot = 0.0F;
 		this.tail.xRot = -0.25F;
 		this.harness.visible = entity.hasHarness();
+		this.vest.visible = entity.hasExpeditionVest();
+		this.scutePlates.visible = entity.hasScutePlates();
+		this.vestCracks.visible = this.vest.visible && entity.isExpeditionVestCracked();
 		this.leftEye.visible = true;
 		this.rightEye.visible = true;
 		this.leftEar.zRot = 0.28F + Mth.sin(ageInTicks * 0.15F) * 0.04F;

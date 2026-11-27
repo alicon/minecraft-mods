@@ -22,6 +22,11 @@ final class MushroomYorkieInteractions {
 			return handled;
 		}
 
+		handled = MushroomExpeditionEquipment.handle(yorkie, player, hand, stack);
+		if (handled != null) {
+			return handled;
+		}
+
 		handled = MushroomToyInteractions.handle(yorkie, player, stack);
 		if (handled != null) {
 			return handled;

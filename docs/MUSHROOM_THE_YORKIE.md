@@ -1,5 +1,17 @@
 # Mushroom The Yorkie
 
+## Expedition vest
+
+Craft a Padded Yorkie Vest with wool, leather and string. Use it on your
+harnessed Mushroom. Leather repairs the padded vest. Use an armadillo scute on
+the padded vest to add plates and use another scute to repair the plated vest.
+Shears unclip it and return the vest with its current wear.
+
+The padded vest absorbs up to 30% of impact damage and the plated vest up to
+50%. Falls, projectiles, melee hits, and explosions can wear it out. Lava and
+other sustained hazards still hurt. Watch for cracks and an action-bar warning.
+A worn-out vest stays on the harness and accepts repairs.
+
 ## Water and vehicle recovery
 
 Owner-assisted dismount clears movement queued at the old seat so a sitting

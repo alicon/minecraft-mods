@@ -16,6 +16,10 @@ public final class ModItems {
 	public static final Item YORKIE_TREAT = register("yorkie_treat", new Item(properties("yorkie_treat", 64)));
 	/** Small black harness that lets Mushroom safely wear a lead. */
 	public static final Item YORKIE_HARNESS = register("yorkie_harness", new Item(properties("yorkie_harness", 1)));
+	/** Padded protection that clips onto Mushroom's harness. */
+	public static final Item PADDED_VEST = register("padded_vest", new Item(properties("padded_vest", 1).durability(32)));
+	/** Padded vest fitted with armadillo scute plates. */
+	public static final Item PLATED_VEST = register("plated_vest", new Item(properties("plated_vest", 1).durability(64)));
 	/** Copper dog bowl that can be placed in a Mushroom home. */
 	public static final Item DOG_BOWL = register("dog_bowl", new BlockItem(ModBlocks.DOG_BOWL, properties("dog_bowl", 16)));
 	/** Dog bowl filled with one serving of food for Mushroom. */

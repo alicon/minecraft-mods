@@ -53,6 +53,12 @@ public final class RecipeCraftingGameTests {
 		RecipeCraftingScenarios.craft(helper, "yorkie_harness");
 	}
 
+	/** Craft padding from wool of any color, leather and string. */
+	@GameTest(template = "fabric-gametest-api-v1:empty", timeoutTicks = 20)
+	public void craftPaddedVest(GameTestHelper helper) {
+		RecipeCraftingScenarios.craft(helper, "padded_vest");
+	}
+
 	/** Loaded doghouse recipe must produce its intended item and quantity. */
 	@GameTest(template = "fabric-gametest-api-v1:empty", timeoutTicks = 20)
 	public void craftDoghouse(GameTestHelper helper) {
