@@ -1,6 +1,6 @@
 import { GameMode, InvalidEntityError, system, world } from "@minecraft/server";
 import { distanceSquared } from "./home-blocks.js";
-import { FLIGHT_MODE, WALKING_AFTER_STAY, YORKIE, storage } from "./yorkie.js";
+import { FLIGHT_MODE, WALKING_AFTER_STAY, YORKIE, storage, waitingForExpeditionSafety } from "./yorkie.js";
 
 const FOLLOW_RANGE_SQUARED = 48 ** 2;
 const TRAIL_DISTANCE = 1.4;
@@ -15,7 +15,7 @@ function canFollowByAir(pup, owner) {
     && !pup.getProperty(storage("ordered_sit"))
     && !pup.getProperty(WALKING_AFTER_STAY)
     && pup.getProperty(storage("home_goal")) !== "sleep"
-    && pup.getProperty(storage("home_goal")) !== "camp"
+    && !waitingForExpeditionSafety(pup)
     && !pup.getComponent("minecraft:leashable")?.isLeashed
     && !pup.getComponent("minecraft:riding")
     && distanceSquared(pup.location, owner.location) <= FOLLOW_RANGE_SQUARED;

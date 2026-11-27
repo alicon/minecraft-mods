@@ -1,4 +1,4 @@
-import { blockAt, distanceSquared, hasSafeExpeditionSupport } from "./home-blocks.js";
+import { blockAt, distanceSquared, hasSafeExpeditionSupport, isExpeditionHazard } from "./home-blocks.js";
 
 export const CAMP_MAT = "mushroom_yorkie:camp_mat";
 const CAMP_RANGE = 24;
@@ -26,6 +26,27 @@ export function canStepTo(dimension, clouds, from, to) {
   return dryCampFooting(dimension, { ...to, y: Math.floor(to.y) })
     && clouds.every(cloud => !inCloud(cloud, to)
       || (inCloud(cloud, from) && distanceSquared(cloud, to) > distanceSquared(cloud, from)));
+}
+
+function exposedSide(dimension, side) {
+  const ground = dimension.getBlockFromRay({ x: side.x + 0.5, y: side.y + 0.9, z: side.z + 0.5 },
+    { x: 0, y: -1, z: 0 }, { maxDistance: 3.9, includePassableBlocks: false, includeLiquidBlocks: false })?.block;
+  if (!ground) return true;
+  for (let y = side.y; y >= ground.y; y--) {
+    const block = blockAt(dimension, { ...side, y });
+    if (!block || isExpeditionHazard(block)) return true;
+  }
+  return false;
+}
+
+export function unsafeTrailStep(dimension, step, dx, dz) {
+  const block = blockAt(dimension, step);
+  if (block?.typeId === "minecraft:portal" || block?.typeId === "minecraft:nether_portal") return false;
+  if (!block || isExpeditionHazard(block) || isExpeditionHazard(blockAt(dimension, { ...step, y: step.y - 1 }))) {
+    return true;
+  }
+  return exposedSide(dimension, { x: step.x + dz, y: step.y, z: step.z + dx })
+    && exposedSide(dimension, { x: step.x - dz, y: step.y, z: step.z - dx });
 }
 
 export function findRetreat(dimension, location, camp, clouds) {

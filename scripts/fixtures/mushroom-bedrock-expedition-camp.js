@@ -1,4 +1,4 @@
-import { BlockVolume, Direction, EntityDamageCause, GameMode, ItemStack, system, world } from "@minecraft/server";
+import { BlockVolume, Direction, EntityDamageCause, GameMode, ItemStack, Potions, system, world } from "@minecraft/server";
 import { spawnSimulatedPlayer } from "@minecraft/server-gametest";
 
 const YORKIE = "mushroom_yorkie:mushroom_yorkie";
@@ -104,6 +104,44 @@ async function exerciseRetreat(dimension, dog, owner, guest) {
   console.warn("MUSHROOM_EXPEDITION_CAMP_RETREAT " + dog.id);
 }
 
+async function exerciseCloudRetreat() {
+  const dimension = world.getDimension("the_end");
+  const origin = { x: 104.5, y: 211, z: 88.5 };
+  const from = { x: 97, y: 210, z: 81 };
+  const to = { x: 112, y: 218, z: 96 };
+  await world.tickingAreaManager.createTickingArea("mushroom_cloud_fixture", { dimension, from, to });
+  dimension.fillBlocks(new BlockVolume(from, { ...to, y: from.y }), "minecraft:end_stone");
+  const player = spawnSimulatedPlayer({ dimension, ...origin, x: origin.x + 3 }, "CloudOwner", GameMode.Survival);
+  const dog = dimension.spawnEntity(YORKIE, origin);
+  await system.waitTicks(5);
+  if (!dog.getComponent("minecraft:tameable")?.tame(player)) throw new Error("Cloud fixture dog did not tame");
+  player.teleport({ ...origin, x: origin.x + 3 });
+  player.selectedSlotIndex = 5;
+  player.getComponent("minecraft:inventory").container.setItem(5, Potions.resolve("minecraft:slowness", "ThrownLingering"));
+  await system.waitTicks(3);
+  player.lookAtLocation(origin);
+  await system.waitTicks(2);
+  player.useItemInSlot(5);
+  const nativeCloud = () => dimension.getEntities({
+    type: "minecraft:area_effect_cloud", location: origin, maxDistance: 4,
+  })[0];
+  await waitFor(nativeCloud, "The native lingering potion did not create a cloud");
+  const cloud = nativeCloud().location;
+  const clearOfCloud = () => distance(dog.location, cloud) > 4 && dog.getProperty(HOME) === "camp";
+  await waitFor(clearOfCloud, "Mushroom did not walk out of the native cloud", 180);
+  for (let tick = 0; tick < 50; tick += 2) {
+    if (!clearOfCloud()) throw new Error("The owner standing in the cloud called Mushroom back into it");
+    await system.waitTicks(2);
+  }
+  const safe = dog.location;
+  const away = Math.atan2(safe.z - cloud.z, safe.x - cloud.x);
+  player.teleport({ x: safe.x + 1.25 * Math.cos(away), y: safe.y, z: safe.z + 1.25 * Math.sin(away) });
+  await waitFor(() => dog.getProperty(HOME) === "idle", "The owner could not release the hold from outside the cloud");
+  if (dog.getComponent("minecraft:health").currentValue <= 0) throw new Error("The original dog died in the cloud fixture");
+  player.disconnect();
+  console.warn("MUSHROOM_EXPEDITION_CAMP_NATIVE_CLOUD " + dog.id);
+}
+
 world.afterEvents.worldLoad.subscribe(async () => {
   try {
     const dimension = world.getDimension("overworld");
@@ -147,6 +185,7 @@ world.afterEvents.worldLoad.subscribe(async () => {
     await placeMat(owner, SECOND);
     await waitFor(() => dog.getDynamicProperty(CAMP) === expected(SECOND), "The owner could not replace his camp");
     await exerciseRetreat(dimension, dog, owner, guest);
+    await exerciseCloudRetreat();
 
     world.setDynamicProperty(SAVED_DOG, dog.id);
     world.setDynamicProperty(SAVED_CAMP, expected(SECOND));

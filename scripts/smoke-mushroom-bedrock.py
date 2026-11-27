@@ -28,6 +28,7 @@ EXPEDITION_TRAVEL_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-t
 EXPEDITION_PORTAL_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-nether-portal.js")
 EXPEDITION_VEST_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-vest.js")
 EXPEDITION_CAMP_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-camp.js")
+EXPEDITION_TRAIL_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-trail.js")
 WOODLAND_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-woodland-probe.js")
 FLIGHT_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-flight-probe.js")
 AUTOPLAY_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-autoplay.js")
@@ -110,6 +111,7 @@ def main():
     parser.add_argument("--verify-expedition-travel", action="store_true", help="check same-dog dimension travel and sitting")
     parser.add_argument("--verify-expedition-vest", action="store_true", help="check vest ownership, protection and saved wear")
     parser.add_argument("--verify-expedition-camp", action="store_true", help="check marking a safe camp and saved ownership")
+    parser.add_argument("--verify-expedition-trail", action="store_true", help="check a narrow bridge and its widened route")
     parser.add_argument("--verify-woodland", action="store_true", help="check squirrel chase, safety and native follow")
     parser.add_argument("--verify-flight", action="store_true", help="run an opt-in simulated-player Creative flight test")
     parser.add_argument("--play-seconds", type=int, help="run seeded simulated-player gameplay for at least this many seconds")
@@ -149,7 +151,8 @@ def main():
         if args.verify_care_persistence:
             exercise_world(server_dir, "MUSHROOM_TEST_CARE_PERSISTED")
         if any((args.verify_fetch, args.verify_adoption, args.verify_egg_adoption,
-                args.verify_stay_walk, args.verify_expedition_travel, args.verify_expedition_vest, args.verify_expedition_camp,
+                args.verify_stay_walk, args.verify_expedition_travel, args.verify_expedition_vest,
+                args.verify_expedition_camp, args.verify_expedition_trail,
                 args.verify_flight, args.verify_woodland,
                 args.verify_parity, args.play_seconds)):
             probe = enable_beta_test_apis(server_dir, WORLD)
@@ -186,6 +189,9 @@ def main():
                 with install_probe_in_behavior_pack(server_dir, probe, EXPEDITION_CAMP_SOURCE):
                     exercise_world(server_dir, "MUSHROOM_EXPEDITION_CAMP_PASS")
                     exercise_world(server_dir, "MUSHROOM_EXPEDITION_CAMP_REOPENED")
+            if args.verify_expedition_trail:
+                shutil.copyfile(EXPEDITION_TRAIL_SOURCE, probe)
+                exercise_world(server_dir, "MUSHROOM_EXPEDITION_TRAIL_PASS")
             if args.verify_flight:
                 shutil.copyfile(FLIGHT_PROBE_SOURCE, probe)
                 exercise_world(server_dir, "MUSHROOM_FLIGHT_PASS")

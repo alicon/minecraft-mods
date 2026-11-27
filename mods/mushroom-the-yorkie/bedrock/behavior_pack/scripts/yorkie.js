@@ -11,3 +11,8 @@ export const WALKING_AFTER_STAY = NAMESPACE + "walking_after_stay";
 export function storage(key) {
   return NAMESPACE + key;
 }
+
+export function waitingForExpeditionSafety(pup) {
+  const goal = pup.getProperty(storage("home_goal"));
+  return goal === "camp" || goal === "trail";
+}

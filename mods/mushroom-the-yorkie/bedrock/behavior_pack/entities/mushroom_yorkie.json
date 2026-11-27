@@ -42,7 +42,8 @@
             "house",
             "bed",
             "sleep",
-            "camp"
+            "camp",
+            "trail"
           ],
           "default": "idle",
           "client_sync": true
@@ -603,6 +604,12 @@
                   "operator": "!="
                 },
                 {
+                  "test": "enum_property",
+                  "domain": "mushroom_yorkie:home_goal",
+                  "value": "trail",
+                  "operator": "!="
+                },
+                {
                   "test": "has_component",
                   "value": "minecraft:behavior.random_stroll",
                   "operator": "!="
@@ -876,6 +883,16 @@
         },
         "set_property": {
           "mushroom_yorkie:home_goal": "camp"
+        }
+      },
+      "mushroom_yorkie:home_trail": {
+        "remove": {
+          "component_groups": [
+            "mushroom_yorkie:awake"
+          ]
+        },
+        "set_property": {
+          "mushroom_yorkie:home_goal": "trail"
         }
       },
       "mushroom_yorkie:woodland_cue_none": {

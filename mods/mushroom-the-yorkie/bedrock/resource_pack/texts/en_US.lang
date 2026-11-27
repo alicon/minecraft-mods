@@ -47,3 +47,4 @@ mushroom.camp.no_dog=Bring your Mushroom nearby to mark his camp.
 mushroom.camp.unsafe=Put the camp mat on clear, safe ground.
 mushroom.camp.marked=Mushroom will remember this camp.
 mushroom.camp.retreat=Mushroom is looking for safe ground.
+mushroom.camp.trail_unsafe=Mushroom won't cross here. Make the trail safer or take another route.

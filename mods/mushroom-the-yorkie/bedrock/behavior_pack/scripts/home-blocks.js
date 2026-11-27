@@ -10,6 +10,7 @@ const DOORS = {
 const DANGEROUS_EXPEDITION_FLOOR = new Set([
   "minecraft:magma", "minecraft:magma_block", "minecraft:cactus",
   "minecraft:campfire", "minecraft:soul_campfire", "minecraft:powder_snow",
+  "minecraft:lava", "minecraft:flowing_lava", "minecraft:fire", "minecraft:soul_fire",
   "minecraft:portal", "minecraft:nether_portal", "minecraft:end_portal",
   "minecraft:end_gateway", "minecraft:pointed_dripstone", "minecraft:sweet_berry_bush",
 ]);
@@ -61,7 +62,11 @@ export function hasDrySupport(dimension, location) {
 
 export function hasSafeExpeditionSupport(dimension, location) {
   const support = blockAt(dimension, { ...location, y: Math.floor(location.y) - 1 });
-  return Boolean(support && !DANGEROUS_EXPEDITION_FLOOR.has(support.typeId) && hasDrySupport(dimension, location));
+  return Boolean(support && !isExpeditionHazard(support) && hasDrySupport(dimension, location));
+}
+
+export function isExpeditionHazard(block) {
+  return Boolean(block && DANGEROUS_EXPEDITION_FLOOR.has(block.typeId));
 }
 
 export function restSpot(block) {

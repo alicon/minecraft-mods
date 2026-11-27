@@ -2,7 +2,7 @@ import { GameMode, InvalidEntityError, system, world } from "@minecraft/server";
 import { availableToy, fetchStack, PRACTICE, THROWER, TOY_TAG } from "./fetch-items.js";
 import { dryDropSpot, nudgeToward, reachableToy } from "./fetch-ground.js";
 import { distanceSquared } from "./home-blocks.js";
-import { FLIGHT_MODE, WALKING_AFTER_STAY, YORKIE, storage } from "./yorkie.js";
+import { FLIGHT_MODE, WALKING_AFTER_STAY, YORKIE, storage, waitingForExpeditionSafety } from "./yorkie.js";
 
 const SEEKING = storage("fetch_seeking");
 const BUSY = storage("fetch_busy");
@@ -40,7 +40,7 @@ function canPlay(pup, owner) {
   return owner?.isValid && owner.dimension.id === pup.dimension.id
     && owner.getGameMode() !== GameMode.Spectator
     && pup.getProperty(FLIGHT_MODE) === "ground"
-    && pup.getProperty(storage("home_goal")) !== "camp"
+    && !waitingForExpeditionSafety(pup)
     && distanceSquared(pup.location, owner.location) <= OWNER_RANGE_SQUARED
     && !pup.getProperty(storage("ordered_sit"))
     && !pup.getProperty(WALKING_AFTER_STAY)

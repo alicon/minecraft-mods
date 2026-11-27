@@ -25,8 +25,8 @@ you to come back. In Bedrock, build his retreat path on one level. Return to
 within two blocks to call him back when it is safe. In Java, you can also use
 an empty hand to recall him from a few steps away.
 
-In Java, he barks at crossings with a drop on both sides. Widen the bridge or
-take a safer route. He can warn the player holding his lead as well.
+He barks at crossings with a drop on both sides. Widen the bridge or take a
+safer route. He can warn the player holding his lead as well.
 
 ## Field Guide and Leave it
 

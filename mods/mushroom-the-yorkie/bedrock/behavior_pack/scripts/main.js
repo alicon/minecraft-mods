@@ -1,6 +1,7 @@
 import { world } from "@minecraft/server";
 import { startDomesticCare } from "./domestic-care.js";
 import { installExpeditionCamp } from "./expedition-camp.js";
+import { startExpeditionTrail } from "./expedition-trail.js";
 import { installExpeditionTravel } from "./expedition-travel.js";
 import { installExpeditionVest } from "./expedition-vest.js";
 import { startFetch } from "./fetch.js";
@@ -19,6 +20,7 @@ installFieldGuide();
 installToyEvents();
 installFoodHealing();
 world.afterEvents.worldLoad.subscribe(startCreativeFlight);
+world.afterEvents.worldLoad.subscribe(startExpeditionTrail);
 world.afterEvents.worldLoad.subscribe(startDomesticCare);
 world.afterEvents.worldLoad.subscribe(watchNightRest);
 world.afterEvents.worldLoad.subscribe(startFetch);

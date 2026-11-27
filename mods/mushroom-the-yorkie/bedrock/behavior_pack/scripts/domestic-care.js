@@ -1,6 +1,9 @@
 import { InvalidEntityError, system, world } from "@minecraft/server";
 import { blockAt, centerOf, distanceSquared, nearbyBlocks, restSpot } from "./home-blocks.js";
-import { BED, EMPTY_BOWL, FLIGHT_MODE, FOOD_BOWL, HOUSE, NAMESPACE, WALKING_AFTER_STAY, WATER_BOWL, YORKIE, storage } from "./yorkie.js";
+import {
+  BED, EMPTY_BOWL, FLIGHT_MODE, FOOD_BOWL, HOUSE, NAMESPACE, WALKING_AFTER_STAY, WATER_BOWL, YORKIE,
+  storage, waitingForExpeditionSafety,
+} from "./yorkie.js";
 
 const LOOK_RADIUS = 8;
 const CARE_INTERVAL = 10;
@@ -101,7 +104,7 @@ function safeSleep(pup, spot) {
 
 function update(pup, state, day, time, now) {
   if (pup.getProperty(FLIGHT_MODE) !== "ground" || pup.getProperty(WALKING_AFTER_STAY)
-    || pup.getProperty(storage("home_goal")) === "camp") {
+    || waitingForExpeditionSafety(pup)) {
     state.name = undefined;
     return;
   }

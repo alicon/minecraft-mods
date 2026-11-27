@@ -108,6 +108,7 @@ function updateRetreat(dog, tick) {
   const arrived = camp && distanceSquared(dog.location, camp) < 0.6 ** 2;
   if (!threatened && (!camp || arrived || !retreat.route.length) && owner?.dimension.id === dog.dimension.id
       && owner.getComponent("minecraft:health")?.currentValue > 0
+      && outsideClouds(clouds, owner.location)
       && distanceSquared(owner.location, dog.location) <= RECALL_RANGE ** 2) {
     dog.triggerEvent(storage("home_idle"));
     retreats.delete(dog.id);
@@ -133,7 +134,15 @@ function updateRetreat(dog, tick) {
 
 export function installExpeditionCamp() {
   world.afterEvents.playerPlaceBlock.subscribe(({ player, block }) => {
-    if (block.typeId === CAMP_MAT) markCamp(player, block);
+    if (block.typeId !== CAMP_MAT) return;
+    const { dimension, location } = block;
+    // Native placement may report the new block before the world queries used
+    // to validate its footing see the completed placement.
+    system.run(() => {
+      if (!player.isValid || player.dimension.id !== dimension.id) return;
+      const placed = blockAt(dimension, location);
+      if (placed?.typeId === CAMP_MAT) markCamp(player, placed);
+    });
   });
   world.afterEvents.entityHurt.subscribe(({ hurtEntity: dog, damage }) => {
     if (damage <= 0 || !savedCamp(dog)) return;
