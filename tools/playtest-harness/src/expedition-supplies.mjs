@@ -142,6 +142,7 @@ try {
     if (checkpoint.phase !== 'adoption') {
       assert.ok(inventory.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide'), 'The adopted owner did not reattach');
     }
+    await action('stop', { closeScreen: true });
     await reportStatus('ready');
     console.log(JSON.stringify({ at: new Date().toISOString(), action: 'controller_reattached', phase: checkpoint.phase }));
   } else {
@@ -161,7 +162,7 @@ try {
     checkpoint.phase = 'iron';
     if (live && stage === 'iron') await writeCheckpoint(checkpoint);
   }
-  if (stage === 'iron') await earnIronKit(action, craft, checkpoint.camp);
+  if (stage === 'iron') await earnIronKit(action, craft, checkpoint.camp, policy);
   await reportStatus('finished');
 } catch (error) {
   await reportStatus(live ? 'held' : 'failed');

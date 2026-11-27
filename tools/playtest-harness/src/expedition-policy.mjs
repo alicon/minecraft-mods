@@ -73,15 +73,16 @@ export function expeditionPolicy(mode, coachingFile) {
   }
 
   function chooseWork(player, progress, fallback) {
+    const mineral = progress.material === 'iron' ? 'iron ore' : 'stone';
     const options = {
-      scout: 'Walk on dry ground and look for exposed stone at a different spot.',
+      scout: `Walk on dry ground and look for exposed ${mineral} at a different spot.`,
       quarry: 'Dig one supported staircase and keep a safe route back to camp.',
     };
     if (progress.beforeNight && player.timeOfDay >= 9700) {
       options.camp = 'Return to the bed and continue mining after sleeping.';
     }
-    return ask(player, 'prepare_gear', { goal: 'Earn cobblestone for Survival gear.', ...progress },
-      'Choose a useful change of plan after looking for exposed stone. Consider repeated misses, the daylight left, and the coaching note.', options, fallback);
+    return ask(player, 'prepare_gear', { goal: `Find ${mineral} to make the Survival gear.`, ...progress },
+      'Choose a useful change of plan. Consider repeated misses, the daylight left, and the coaching note.', options, fallback);
   }
 
   function chooseEscape(player, progress, choices) {

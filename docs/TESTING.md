@@ -118,7 +118,7 @@ The default policy uses local rules. Set `MUSHROOM_EXPEDITION_POLICY=jev` to
 let TypeSafe Jev choose dry scouting routes and how to proceed when the player
 is missing stone or finds a blocked quarry exit. The runner
 uses `OPENROUTER_API_KEY` or the Mac Keychain entry `mushroom-qa-openrouter`.
-The trial makes at most 76 requests and logs the choices, latency and
+Each controller invocation makes at most 76 requests and logs the choices, latency and
 reported input cost in `actions.jsonl`. The controller has a local fallback.
 The ordinary Survival actions and assertions are identical in both modes.
 

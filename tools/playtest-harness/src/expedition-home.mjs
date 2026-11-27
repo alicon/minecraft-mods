@@ -502,6 +502,18 @@ async function climbQuarry(action, pos, chooseEscape) {
   return false;
 }
 
+async function leaveQuarry(action, stairs, { chooseEscape, waitForCoaching }) {
+  const entry = stairs[0];
+  for (const pos of stairs.reverse()) {
+    if (await climbQuarry(action, pos, chooseEscape)) continue;
+    const player = await action('observe');
+    if (player?.onGround && player.position.y >= entry[1]) return;
+    if (await waitForCoaching?.({ reason: 'Quarry exit blocked', target: pos })
+      && await climbQuarry(action, pos, chooseEscape)) continue;
+    throw new Error('Could not find a safe way back up the quarry stairs');
+  }
+}
+
 async function openCampTable(action, table, visited) {
   const rejectedSteps = new Set();
   for (let attempt = 0; attempt < 24; attempt++) {
@@ -555,15 +567,7 @@ export async function earnStoneKit(action, craft, { table, bed },
     const returnToCamp = distance > (beforeNight ? 9 : 40);
     await stepOut(action, player, visited, returnToCamp ? table : undefined, false, rejectedSteps);
   }
-  for (const pos of stairs.reverse()) {
-    if (await climbQuarry(action, pos, chooseEscape)) continue;
-    const entry = stairs.at(-1);
-    const player = await action('observe');
-    if (player?.onGround && player.position.y >= entry[1]) break;
-    if (await waitForCoaching?.({ reason: 'Quarry exit blocked', target: pos })
-      && await climbQuarry(action, pos, chooseEscape)) continue;
-    throw new Error('Could not find a safe way back up the quarry stairs');
-  }
+  await leaveQuarry(action, stairs, { chooseEscape, waitForCoaching });
   const materials = await action('get_inventory');
   const furnace = count(materials, FURNACE);
   if (count(materials, COBBLESTONE) < (furnace ? 3 : 11)) {
@@ -590,11 +594,14 @@ export async function earnStoneKit(action, craft, { table, bed },
   if (beforeNight) await action('go_to', { pos: bed, stopDistance: 1.6, maxTicks: 55 });
 }
 
-export async function earnIronKit(action, craft, { bed }) {
+export async function earnIronKit(action, craft, { bed }, policy = {}) {
   const visited = [];
   const rejectedSteps = new Set();
   const mined = new Set();
   const drops = new Set([RAW_IRON, COAL]);
+  const stairs = [];
+  const protectedGround = new Set();
+  let misses = 0;
   await hold(action, STONE_PICKAXE);
   for (let attempt = 0; attempt < 140; attempt++) {
     const inventory = await action('get_inventory');
@@ -606,15 +613,33 @@ export async function earnIronKit(action, craft, { bed }) {
     if (!count(inventory, COAL)) wanted.add('minecraft:coal_ore');
     if (!wanted.size) break;
     const player = await action('observe');
-    if (player.food <= 16 && count(inventory, MUTTON) > 1) {
-      await hold(action, MUTTON);
+    const meal = count(inventory, 'minecraft:cooked_mutton') ? 'minecraft:cooked_mutton'
+      : count(inventory, MUTTON) > 1 ? MUTTON : undefined;
+    if (player.food <= 16 && meal) {
+      await hold(action, meal);
       await action('use_item', { ticks: 36 });
       await hold(action, STONE_PICKAXE);
     }
-    if (await mineVisible(action, bed, mined, wanted, drops)) continue;
+    if (await mineVisible(action, bed, mined, wanted, drops, protectedGround)) {
+      misses = 0;
+      continue;
+    }
+    misses++;
+    const fallback = misses >= 15 ? 'quarry' : 'scout';
+    const work = policy.chooseWork && misses >= 8 && !stairs.length
+      ? await policy.chooseWork(player, { material: 'iron', missedStone: misses,
+        rawIron: count(inventory, RAW_IRON), needed: IRON_NEEDED, hasCoal: count(inventory, COAL) > 0 }, fallback)
+      : fallback;
+    if (stairs.length >= 14) break;
+    if (stairs.length || work === 'quarry') {
+      const descent = await descendQuarry(action, player, bed, stairs, protectedGround);
+      if (descent === 'landed') continue;
+      if (descent === 'blocked' || stairs.length) break;
+    }
     visited.push(feet(player));
     await stepOut(action, player, visited, undefined, false, rejectedSteps);
   }
+  await leaveQuarry(action, stairs, policy);
   const materials = await action('get_inventory');
   assert.ok(count(materials, RAW_IRON) >= IRON_NEEDED && count(materials, COAL) > 0,
     'Could not earn enough reachable iron ore and coal for the expedition kit');
