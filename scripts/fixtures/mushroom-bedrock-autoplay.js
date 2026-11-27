@@ -144,7 +144,7 @@ async function food(pair, creative, injured) {
   check(!prop(pet, "ordered_sit"), "feeding toggled the sit order");
 }
 
-async function leashWalk(pair, walker, guest) {
+async function leashWalk(pair, walker, guest, blocker) {
   const { actor, pet, origin } = pair;
   if (guest) {
     walker.teleport({ ...origin, z: origin.z + 1 });
@@ -171,9 +171,30 @@ async function leashWalk(pair, walker, guest) {
   walker.teleport({ x: dogPosition.x, y: origin.y, z: dogPosition.z + 1.8 });
   const health = pet.getComponent("minecraft:health");
   health.setCurrentValue(health.effectiveMax - 3);
+  let blockerHealth;
+  if (blocker) {
+    // Recreate the guest's own dog occupying the sightline before the meal.
+    const besideWalker = walker.location;
+    blocker.teleport({ ...besideWalker, x: besideWalker.x + 1 });
+    await interact(walker, blocker);
+    await until(() => prop(blocker, "ordered_sit"), "the bystander dog could not sit for the overlap setup");
+    const target = pet.location;
+    blocker.teleport({ x: target.x, y: origin.y, z: target.z + 0.32 });
+    walker.teleport({ x: target.x, y: origin.y, z: target.z + 2.6 });
+    walker.lookAtLocation({ ...target, y: target.y + 0.23 });
+    await pause(2);
+    const [first] = walker.getEntitiesFromViewDirection({ maxDistance: 4 });
+    check(first?.entity.id === blocker.id, "the bystander was outside the staged sightline");
+    blockerHealth = blocker.getComponent("minecraft:health").currentValue;
+    console.warn("MUSHROOM_PLAY_BYSTANDER " + JSON.stringify({ target: pet.id, blocker: blocker.id, tick: system.currentTick }));
+  }
   await interact(walker, pet, TREAT, 1, true);
   await until(() => health.currentValue === health.effectiveMax && itemCount(walker, TREAT) === 0,
     "one treat did not heal the leashed dog and leave the walker's hand");
+  if (blocker) {
+    check(blockerHealth === blocker.getComponent("minecraft:health").currentValue && prop(blocker, "ordered_sit"),
+      "feeding the leashed dog changed the bystander");
+  }
   check(holderOf(pet) === walker.id && ownerOf(pet) === actor.id && prop(pet, "wearing_harness"),
     "feeding changed the lead holder, harness or owner");
   // Release the actual leash through native entity interaction. The attach
@@ -279,7 +300,7 @@ export function startAutoplay(seconds, seed, onlyCase) {
         ["survival-feed", (pair, _, variant) => food(pair, false, variant)],
         ["creative-feed", (pair, _, variant) => food(pair, true, variant)],
         ["owner-walk", (pair) => leashWalk(pair, pair.actor, false)],
-        ["guest-walk", (pair, other) => leashWalk(pair, other.actor, true)],
+        ["guest-walk", (pair, other, variant) => leashWalk(pair, other.actor, true, variant ? other.pet : undefined)],
         ["fetch", (pair, _, variant) => fetchToy(pair, variant, `Autoplay toy ${seed}-${round}`)],
         ["sleep-flight", (pair, _, variant) => flightDuringSleep(pair, variant)],
       ].filter(([name]) => !onlyCase || name === onlyCase);
