@@ -47,6 +47,17 @@ test('a horizontal arrival still waits for the player to land one block lower', 
   assert.equal(reports.length, 0);
 });
 
+test('reattaching after the iron kit was earned does not start mining again', async () => {
+  const { earnIronKit } = await import('./expedition-home.mjs');
+  const calls = [];
+  const action = async name => {
+    calls.push(name);
+    return { slots: ['iron_pickaxe', 'bucket', 'shield'].map(item => ({ id: `minecraft:${item}`, count: 1 })) };
+  };
+  await earnIronKit(action, () => assert.fail('kit is already earned'), { bed: [0, 60, 0] });
+  assert.deepEqual(calls, ['get_inventory']);
+});
+
 test('a dry destination across water routes around the shore', async () => {
   const { dryWaypoint } = await import('./expedition-navigation.mjs');
   const blocks = [
