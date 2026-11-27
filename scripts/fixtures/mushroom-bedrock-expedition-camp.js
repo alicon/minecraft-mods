@@ -7,10 +7,13 @@ const CAMP = "mushroom_yorkie:expedition_camp";
 const HOME = "mushroom_yorkie:home_goal";
 const SAVED_DOG = "camp_fixture_dog";
 const SAVED_CAMP = "camp_fixture_position";
-const FIRST = { x: 9, y: 231, z: 8 };
-const SECOND = { x: 12, y: 231, z: 8 };
-const UNSAFE = { x: 9, y: 231, z: 11 };
-const RETREAT_START = { x: 4.5, y: 231, z: 8.5 };
+// The combined suite keeps prior dogs in its save. Keep the camp inputs out
+// of the earlier vest and portal yards so another dog cannot block placement.
+const campAt = (x, z, y = 231) => ({ x: x + 192, y, z });
+const FIRST = campAt(9, 8);
+const SECOND = campAt(12, 8);
+const UNSAFE = campAt(9, 11);
+const RETREAT_START = campAt(4.5, 8.5);
 let matPlacement;
 let matUse;
 
@@ -60,11 +63,11 @@ function distance(from, to) {
 
 async function exerciseRetreat(dimension, dog, owner, guest) {
   const camp = { x: SECOND.x + 0.5, y: SECOND.y, z: SECOND.z + 0.5 };
-  const magma = { x: 8, y: 230, z: 6 };
-  dimension.fillBlocks(new BlockVolume({ x: 8, y: 231, z: 7 }, { x: 8, y: 232, z: 9 }), "minecraft:stone");
+  const magma = campAt(8, 6, 230);
+  dimension.fillBlocks(new BlockVolume(campAt(8, 7), campAt(8, 9, 232)), "minecraft:stone");
   dimension.setBlockType(magma, "minecraft:magma");
-  owner.teleport({ x: 14.5, y: 231, z: 12.5 });
-  guest.teleport({ x: 14.5, y: 231, z: 5.5 });
+  owner.teleport(campAt(14.5, 12.5));
+  guest.teleport(campAt(14.5, 5.5));
   dog.teleport(RETREAT_START);
   await system.waitTicks(2);
   const health = dog.getComponent("minecraft:health");
@@ -89,8 +92,8 @@ async function exerciseRetreat(dimension, dog, owner, guest) {
   }
   owner.teleport({ ...camp, z: camp.z - 1.5 });
   await waitFor(() => dog.getProperty(HOME) === "idle", "The returning owner could not recall Mushroom");
-  owner.teleport({ x: 14.5, y: 231, z: 12.5 });
-  guest.teleport({ x: 14.5, y: 231, z: 5.5 });
+  owner.teleport(campAt(14.5, 12.5));
+  guest.teleport(campAt(14.5, 5.5));
   dimension.setBlockType(SECOND, "minecraft:air");
   dog.teleport(RETREAT_START);
   health.setCurrentValue(health.effectiveMax);
@@ -145,8 +148,8 @@ async function exerciseCloudRetreat() {
 world.afterEvents.worldLoad.subscribe(async () => {
   try {
     const dimension = world.getDimension("overworld");
-    const from = { x: 1, y: 230, z: 1 };
-    const to = { x: 15, y: 235, z: 15 };
+    const from = campAt(1, 1, 230);
+    const to = campAt(15, 15, 235);
     await world.tickingAreaManager.createTickingArea("mushroom_camp_fixture", { dimension, from, to });
     const savedDog = world.getDynamicProperty(SAVED_DOG);
     if (typeof savedDog === "string") {
@@ -161,9 +164,9 @@ world.afterEvents.worldLoad.subscribe(async () => {
     world.gameRules.doMobSpawning = false;
     world.setTimeOfDay(1000);
     dimension.fillBlocks(new BlockVolume(from, { ...to, y: from.y }), "minecraft:stone");
-    const owner = spawnSimulatedPlayer({ dimension, x: 8.5, y: 231, z: 6.5 }, "CampOwner", GameMode.Survival);
-    const guest = spawnSimulatedPlayer({ dimension, x: 6.5, y: 231, z: 9.5 }, "CampGuest", GameMode.Survival);
-    const dog = dimension.spawnEntity(YORKIE, { x: 7.5, y: 231, z: 8.5 });
+    const owner = spawnSimulatedPlayer({ dimension, ...campAt(8.5, 6.5) }, "CampOwner", GameMode.Survival);
+    const guest = spawnSimulatedPlayer({ dimension, ...campAt(6.5, 9.5) }, "CampGuest", GameMode.Survival);
+    const dog = dimension.spawnEntity(YORKIE, campAt(7.5, 8.5));
     await system.waitTicks(6);
     if (!dog.getComponent("minecraft:tameable").tame(owner)) throw new Error("The fixture dog could not be tamed");
     const expected = position => JSON.stringify({ dimension: dimension.id, ...position });

@@ -3,9 +3,10 @@ import { spawnSimulatedPlayer } from "@minecraft/server-gametest";
 
 const YORKIE = "mushroom_yorkie:mushroom_yorkie";
 const HOME = "mushroom_yorkie:home_goal";
-const START = { x: 4.5, y: 231, z: 8.5 };
-const OTHER_SIDE = { ...START, x: 11.5 };
-const WAITING_EDGE = 6.0;
+const trailAt = (x, z, y = 231) => ({ x: x + 240, y, z });
+const START = trailAt(4.5, 8.5);
+const OTHER_SIDE = trailAt(11.5, 8.5);
+const WAITING_EDGE = trailAt(6, 8.5).x;
 
 async function waitFor(condition, message, ticks = 120) {
   for (let i = 0; i < ticks; i += 2) {
@@ -16,7 +17,7 @@ async function waitFor(condition, message, ticks = 120) {
 }
 
 function stone(dimension, x1, z1, x2, z2) {
-  dimension.fillBlocks(new BlockVolume({ x: x1, y: 230, z: z1 }, { x: x2, y: 230, z: z2 }), "minecraft:stone");
+  dimension.fillBlocks(new BlockVolume(trailAt(x1, z1, 230), trailAt(x2, z2, 230)), "minecraft:stone");
 }
 
 function describe(dog) {
@@ -27,11 +28,11 @@ function describe(dog) {
 }
 
 async function verifyNarrowCrossing(dimension, dog, handler, leashed) {
-  const narrow = new BlockVolume({ x: 6, y: 230, z: 7 }, { x: 9, y: 230, z: 9 });
+  const narrow = new BlockVolume(trailAt(6, 7, 230), trailAt(9, 9, 230));
   dimension.fillBlocks(narrow, "minecraft:air");
   stone(dimension, 6, 8, 9, 8);
   dog.teleport(START);
-  handler.teleport({ ...START, x: 5.5 });
+  handler.teleport(trailAt(5.5, 8.5));
   await system.waitTicks(3);
   const lead = dog.getComponent("minecraft:leashable");
   if (leashed) lead.leashTo(handler);
@@ -47,7 +48,7 @@ async function verifyNarrowCrossing(dimension, dog, handler, leashed) {
     await system.waitTicks(2);
   }
   dimension.fillBlocks(narrow, "minecraft:stone");
-  await waitFor(() => dog.getProperty(HOME) === "idle" && dog.location.x >= 9.5,
+  await waitFor(() => dog.getProperty(HOME) === "idle" && dog.location.x >= trailAt(9.5, 8.5).x,
     () => "Mushroom did not resume across the widened bridge: " + describe(dog));
   if (leashed && lead.leashHolder?.id !== handler.id) throw new Error("Widening the bridge changed the lead holder");
 }
@@ -56,7 +57,7 @@ world.afterEvents.worldLoad.subscribe(async () => {
   try {
     const dimension = world.getDimension("overworld");
     await world.tickingAreaManager.createTickingArea("expedition_trail_fixture", {
-      dimension, from: { x: 1, y: 228, z: 1 }, to: { x: 15, y: 237, z: 15 },
+      dimension, from: trailAt(1, 1, 228), to: trailAt(15, 15, 237),
     });
     world.gameRules.doMobSpawning = false;
     world.setTimeOfDay(1000);
@@ -69,7 +70,7 @@ world.afterEvents.worldLoad.subscribe(async () => {
     if (!dog.getComponent("minecraft:tameable")?.tame(owner)) throw new Error("Fixture dog did not tame");
     const id = dog.id;
     await verifyNarrowCrossing(dimension, dog, owner, false);
-    owner.teleport({ ...START, x: 2.5, z: 5.5 });
+    owner.teleport(trailAt(2.5, 5.5));
     dog.triggerEvent("mushroom_yorkie:equip_harness");
     await system.waitTicks(3);
     await verifyNarrowCrossing(dimension, dog, guest, true);
