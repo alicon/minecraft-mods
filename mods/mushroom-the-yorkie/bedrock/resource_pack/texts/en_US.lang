@@ -24,3 +24,7 @@ mushroom.fetch.inventory_full=Mushroom is waiting for room in your inventory.
 mushroom.fetch.found=Mushroom picked up the toy!
 mushroom.fetch.unreachable=Mushroom couldn't reach that toy.
 action.interact.mushroom_feed=Feed Mushroom
+entity.mushroom_yorkie:squirrel.name=Squirrel
+item.spawn_egg.entity.mushroom_yorkie:squirrel.name=Squirrel Spawn Egg
+item.mushroom_yorkie:field_guide.name=Mushroom's Field Guide
+mushroom.guide.use=Read Field Guide

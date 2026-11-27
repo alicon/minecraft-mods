@@ -1,0 +1,62 @@
+{
+  "format_version": "1.8.0",
+  "animations": {
+    "animation.mushroom_yorkie.squirrel.look": {
+      "loop": true,
+      "bones": {
+        "head": {
+          "rotation": [
+            "query.target_x_rotation",
+            "query.target_y_rotation",
+            0
+          ]
+        }
+      }
+    },
+    "animation.mushroom_yorkie.squirrel.tail": {
+      "loop": true,
+      "bones": {
+        "tail": {
+          "rotation": [
+            "-5 + math.sin(query.life_time * 230) * (4 + math.clamp(query.modified_move_speed * 13, 0, 9))",
+            "math.sin(query.life_time * 290) * (9 + math.clamp(query.modified_move_speed * 16, 0, 12))",
+            0
+          ]
+        }
+      }
+    },
+    "animation.mushroom_yorkie.squirrel.walk": {
+      "loop": true,
+      "bones": {
+        "front_left_leg": {
+          "rotation": [
+            "math.cos(query.modified_distance_moved * 150) * math.clamp(query.modified_move_speed * 45, 0, 38)",
+            0,
+            0
+          ]
+        },
+        "front_right_leg": {
+          "rotation": [
+            "-(math.cos(query.modified_distance_moved * 150) * math.clamp(query.modified_move_speed * 45, 0, 38))",
+            0,
+            0
+          ]
+        },
+        "back_left_leg": {
+          "rotation": [
+            "-(math.cos(query.modified_distance_moved * 150) * math.clamp(query.modified_move_speed * 45, 0, 38))",
+            0,
+            0
+          ]
+        },
+        "back_right_leg": {
+          "rotation": [
+            "math.cos(query.modified_distance_moved * 150) * math.clamp(query.modified_move_speed * 45, 0, 38)",
+            0,
+            0
+          ]
+        }
+      }
+    }
+  }
+}

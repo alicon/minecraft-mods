@@ -1,0 +1,38 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "mushroom_yorkie:squirrel",
+      "materials": {
+        "default": "entity_alphatest"
+      },
+      "textures": {
+        "default": "textures/alicon/mushroom_yorkie/entity/mushroom_yorkie"
+      },
+      "geometry": {
+        "default": "geometry.mushroom_yorkie.squirrel"
+      },
+      "spawn_egg": {
+        "base_color": "#9b542e",
+        "overlay_color": "#d2a077"
+      },
+      "animations": {
+        "look": "animation.mushroom_yorkie.squirrel.look",
+        "tail": "animation.mushroom_yorkie.squirrel.tail",
+        "walk": "animation.mushroom_yorkie.squirrel.walk"
+      },
+      "scripts": {
+        "animate": [
+          "look",
+          "tail",
+          {
+            "walk": "query.modified_move_speed > 0.01"
+          }
+        ]
+      },
+      "render_controllers": [
+        "controller.render.default"
+      ]
+    }
+  }
+}

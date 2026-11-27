@@ -35,6 +35,19 @@ In Creative, take off while Mushroom is following and nearby. He trails behind y
 
 If you leave a sitting Mushroom more than 32 blocks behind on foot, he can get up and come after you when there is a walkable route through loaded terrain. Close the daycare door or tie his lead to a fence to keep him there.
 
+## The Field Guide and squirrels
+
+Adoption gives the owner Mushroom's Field Guide. A book and string make a
+replacement. Hold it and use the normal Use/Interact action to read it.
+Crouch and Use to issue the cue while Mushroom chases a squirrel, then give
+him a Yorkie Treat when he returns. Practice with a second squirrel, then cue
+heel and walk him past a squirrel before releasing him to play. He keeps
+his own three paw prints and their locations when you leave.
+
+Squirrels have spawn rules for forests and taiga. Mushroom
+chases on walkable ground. He gives up at blocked paths or if his owner moves
+too far away. The squirrel's tail moves while it runs and while it pauses.
+
 ## Verify the add-on
 
 ### First-time players and daycare
@@ -62,7 +75,7 @@ Players can also adopt Mushroom by sleeping through a full night in an Overworld
 
 ## Edition differences
 
-Java Mushroom can scent nearby generated structures. On Bedrock 26.66.1, the stable scripting surface has no bounded way to locate a nearby generated structure and get its coordinates. The Bedrock build covers adoption, care, ground fetch, and Creative flight follow. Airborne fetch, flight tricks, structure scenting, vehicle and portal behavior, and squirrels still need parity work. [Structure scenting](https://github.com/alicon/minecraft-mods/issues/133) · [Travel and recovery](https://github.com/alicon/minecraft-mods/issues/131) · [Squirrels](https://github.com/alicon/minecraft-mods/issues/132)
+Java Mushroom can scent nearby generated structures. On Bedrock 26.66.1, the stable scripting surface has no bounded way to locate a nearby generated structure and get its coordinates. The Bedrock build covers adoption, care, ground fetch, and Creative flight follow. Airborne fetch, flight tricks, structure scenting, vehicle and portal behavior, and squirrel tree climbing still need parity work. [Structure scenting](https://github.com/alicon/minecraft-mods/issues/133) · [Travel and recovery](https://github.com/alicon/minecraft-mods/issues/131) · [Squirrels](https://github.com/alicon/minecraft-mods/issues/132)
 
 ## Preview the model on the Mac
 
@@ -102,6 +115,12 @@ Add `--verify-adoption` to check that two Survival players can sleep in ordinary
 Add `--verify-egg-adoption` to check Creative and Survival egg use with two players. Repeated uses preserve both owned dogs, Creative keeps its original egg, and Survival spends an egg only on successful adoption.
 
 Add `--verify-stay-walk` to test a closed daycare door, a leashed dog, an owner within 32 blocks, and an open route to a distant owner. The test checks that Mushroom walks out, keeps the same owner, and can sit again.
+
+Add `--verify-woodland` for the squirrel and Field Guide scenario. Two
+simulated players check a non-damaging chase, return to normal following,
+wall handling, owner-only cues, and training progress through reopening
+the disposable world. Use the official client checks for the rendered guide,
+controller and touch controls, and natural spawn and animation evidence.
 
 Add `--verify-flight` to test that a simulated Creative owner can take off, hover and move with Mushroom following. The test checks the sit order, landing after a switch to Survival, staying asleep as the owner flies away, and flight follow at dawn.
 

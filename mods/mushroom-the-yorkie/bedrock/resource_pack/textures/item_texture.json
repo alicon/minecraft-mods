@@ -2,6 +2,9 @@
   "resource_pack_name": "mushroom_yorkie",
   "texture_name": "atlas.items",
   "texture_data": {
+    "mushroom_yorkie_field_guide": {
+      "textures": ["textures/alicon/mushroom_yorkie/items/field_guide"]
+    },
     "mushroom_yorkie_treat": {
       "textures": "textures/alicon/mushroom_yorkie/items/yorkie_treat"
     },

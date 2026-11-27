@@ -6,6 +6,17 @@
       "is_spawnable": true,
       "is_summonable": true,
       "properties": {
+        "mushroom_yorkie:woodland_cue": {
+          "type": "enum",
+          "values": ["none", "recall", "reward", "heel"],
+          "default": "none",
+          "client_sync": true
+        },
+        "mushroom_yorkie:woodland_chase": {
+          "type": "bool",
+          "default": false,
+          "client_sync": true
+        },
         "mushroom_yorkie:wearing_harness": {
           "type": "bool",
           "default": false,
@@ -68,15 +79,6 @@
       },
       "mushroom_yorkie:tamed": {
         "minecraft:is_tamed": {},
-        "minecraft:healable": {
-          "force_use": true,
-          "items": [
-            {
-              "item": "mushroom_yorkie:yorkie_treat",
-              "heal_amount": 3
-            }
-          ]
-        },
         "minecraft:sittable": {
           "sit_event": {
             "event": "mushroom_yorkie:ordered_sit",
@@ -92,6 +94,47 @@
         },
         "minecraft:interact": {
           "interactions": [
+            {
+              "use_item": true,
+              "interact_text": "action.interact.mushroom_feed",
+              "on_interact": {
+                "filters": {
+                  "all_of": [
+                    {
+                      "test": "enum_property",
+                      "domain": "mushroom_yorkie:woodland_cue",
+                      "value": "reward"
+                    },
+                    {
+                      "test": "has_equipment",
+                      "subject": "other",
+                      "domain": "main_hand",
+                      "value": "mushroom_yorkie:yorkie_treat"
+                    },
+                    {
+                      "test": "is_owner",
+                      "subject": "other"
+                    }
+                  ]
+                },
+                "event": "mushroom_yorkie:training_treat",
+                "target": "self"
+              }
+            },
+            {
+              "use_item": true,
+              "interact_text": "action.interact.mushroom_feed",
+              "on_interact": {
+                "filters": {
+                  "test": "has_equipment",
+                  "subject": "other",
+                  "domain": "main_hand",
+                  "value": "mushroom_yorkie:yorkie_treat"
+                },
+                "event": "mushroom_yorkie:feed_3",
+                "target": "self"
+              }
+            },
             {
               "use_item": true,
               "interact_text": "action.interact.mushroom_feed",
@@ -484,6 +527,16 @@
                   "value": false
                 },
                 {
+                  "test": "bool_property",
+                  "domain": "mushroom_yorkie:woodland_chase",
+                  "value": false
+                },
+                {
+                  "test": "enum_property",
+                  "domain": "mushroom_yorkie:woodland_cue",
+                  "value": "none"
+                },
+                {
                   "test": "enum_property",
                   "domain": "mushroom_yorkie:flight_mode",
                   "value": "ground"
@@ -544,6 +597,7 @@
       "mushroom_yorkie:feed_2": {},
       "mushroom_yorkie:feed_2_5": {},
       "mushroom_yorkie:feed_3": {},
+      "mushroom_yorkie:training_treat": {},
       "mushroom_yorkie:feed_4": {},
       "minecraft:entity_spawned": {
         "add": {
@@ -709,6 +763,50 @@
         },
         "set_property": {
           "mushroom_yorkie:home_goal": "sleep"
+        }
+      },
+      "mushroom_yorkie:woodland_chase_begin": {
+        "remove": {
+          "component_groups": [
+            "mushroom_yorkie:awake"
+          ]
+        },
+        "set_property": {
+          "mushroom_yorkie:woodland_chase": true
+        }
+      },
+      "mushroom_yorkie:woodland_cue_none": {
+        "set_property": {
+          "mushroom_yorkie:woodland_cue": "none"
+        }
+      },
+      "mushroom_yorkie:woodland_cue_recall": {
+        "remove": {
+          "component_groups": ["mushroom_yorkie:awake"]
+        },
+        "set_property": {
+          "mushroom_yorkie:woodland_cue": "recall"
+        }
+      },
+      "mushroom_yorkie:woodland_cue_reward": {
+        "remove": {
+          "component_groups": ["mushroom_yorkie:awake"]
+        },
+        "set_property": {
+          "mushroom_yorkie:woodland_cue": "reward"
+        }
+      },
+      "mushroom_yorkie:woodland_cue_heel": {
+        "remove": {
+          "component_groups": ["mushroom_yorkie:awake"]
+        },
+        "set_property": {
+          "mushroom_yorkie:woodland_cue": "heel"
+        }
+      },
+      "mushroom_yorkie:woodland_chase_end": {
+        "set_property": {
+          "mushroom_yorkie:woodland_chase": false
         }
       },
       "mushroom_yorkie:fetch_seek_on": {

@@ -1,0 +1,24 @@
+{
+  "format_version": "1.26.60",
+  "minecraft:item": {
+    "description": {
+      "identifier": "mushroom_yorkie:field_guide",
+      "menu_category": {
+        "category": "items"
+      }
+    },
+    "components": {
+      "minecraft:display_name": {
+        "value": "item.mushroom_yorkie:field_guide.name"
+      },
+      "minecraft:icon": {
+        "textures": {
+          "default": "mushroom_yorkie_field_guide"
+        }
+      },
+      "minecraft:max_stack_size": 1,
+      "minecraft:interact_button": "mushroom.guide.use",
+      "mushroom_yorkie:guide_use": {}
+    }
+  }
+}

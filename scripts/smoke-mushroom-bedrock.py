@@ -24,6 +24,7 @@ PLAYER_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-player-probe.js")
 ADOPTION_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-adoption-probe.js")
 EGG_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-egg-probe.js")
 STAY_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-stay-probe.js")
+WOODLAND_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-woodland-probe.js")
 FLIGHT_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-flight-probe.js")
 AUTOPLAY_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-autoplay.js")
 DAYCARE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-daycare.js")
@@ -63,6 +64,22 @@ def disposable_run(failure_evidence):
             raise
 
 
+def install_woodland_probe(server_dir, separate_probe):
+    # Script dynamic properties belong to their behavior pack's UUID. Attach this probe
+    # only to a disposable installed copy so it can read the exact saved lesson records.
+    pack = server_dir / "behavior_packs" / WORLD.addon_folder
+    manifest_path = pack / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["dependencies"].append({"module_name": "@minecraft/server-gametest", "version": "1.0.0-beta"})
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    entry = next(module["entry"] for module in manifest["modules"] if module["type"] == "script")
+    fixture = "woodland-probe.fixture.js"
+    shutil.copyfile(WOODLAND_PROBE_SOURCE, (pack / entry).with_name(fixture))
+    with (pack / entry).open("a", encoding="utf-8") as main_script:
+        main_script.write(f'\nimport "./{fixture}";\n')
+    separate_probe.write_text("export {};\n", encoding="utf-8")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("server_zip", type=Path)
@@ -76,6 +93,7 @@ def main():
     parser.add_argument("--verify-adoption", action="store_true", help="run an opt-in simulated-player sleep adoption test")
     parser.add_argument("--verify-egg-adoption", action="store_true", help="check repeated Creative and Survival egg use")
     parser.add_argument("--verify-stay-walk", action="store_true", help="check open and closed daycare exits and tethering")
+    parser.add_argument("--verify-woodland", action="store_true", help="check squirrel chase, safety and native follow")
     parser.add_argument("--verify-flight", action="store_true", help="run an opt-in simulated-player Creative flight test")
     parser.add_argument("--play-seconds", type=int, help="run seeded simulated-player gameplay for at least this many seconds")
     parser.add_argument("--play-seed", type=int, default=119, help="seed for the gameplay action order and variants")
@@ -114,7 +132,7 @@ def main():
         if args.verify_care_persistence:
             exercise_world(server_dir, "MUSHROOM_TEST_CARE_PERSISTED")
         if any((args.verify_fetch, args.verify_adoption, args.verify_egg_adoption,
-                args.verify_stay_walk, args.verify_flight, args.verify_parity, args.play_seconds)):
+                args.verify_stay_walk, args.verify_flight, args.verify_woodland, args.verify_parity, args.play_seconds)):
             probe = enable_beta_test_apis(server_dir, WORLD)
             if args.verify_parity or args.verify_fetch:
                 examples = json.dumps(json.loads(FOOD_CASES.read_text(encoding="utf-8")))
@@ -150,6 +168,10 @@ def main():
                     script += f"startAutoplay({args.play_seconds}, {args.play_seed}, {json.dumps(args.play_case)});\n"
                 probe.write_text(script, encoding="utf-8")
                 exercise_world(server_dir, "MUSHROOM_PLAY_PASS", play_seconds=args.play_seconds)
+            if args.verify_woodland:
+                install_woodland_probe(server_dir, probe)
+                exercise_world(server_dir, "MUSHROOM_WOODLAND_PASS", timeout=100)
+                exercise_world(server_dir, "MUSHROOM_WOODLAND_REOPENED", timeout=60)
         print("Mushroom spawned and remained in the world after a server restart.")
 
 
