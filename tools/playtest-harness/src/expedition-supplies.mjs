@@ -171,7 +171,7 @@ try {
     if (live) await writeCheckpoint(checkpoint);
   }
   if (checkpoint.phase === 'adoption') {
-    await adoptAtNight(action, checkpoint.camp);
+    await adoptAtNight(action, checkpoint.camp, craft);
     checkpoint.phase = 'stone';
     if (live && stage !== 'adoption') await writeCheckpoint(checkpoint);
   }

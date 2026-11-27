@@ -104,7 +104,9 @@ The client starts in a fresh Normal Survival world with an empty inventory and
 commands disabled. The player gathers wood, crafts a wooden pickaxe and sword, packs
 the crafting table, collects matching wool and mutton from sheep, and crafts
 a bed. It uses remaining daylight to gather reachable supplies close to the
-bed and then sleeps at normal sunset and feeds the adopted dog. The
+bed, replenish food and timber, and cook when it has a furnace and enough
+mutton to keep a meal for the dog. It then sleeps at normal sunset and
+feeds the adopted dog. The
 controller uses a local view of the loaded world and checks the actual crosshair
 before attacking or feeding. The integrated server verifies the next morning,
 one living owned Mushroom, and the Field Guide in the player's inventory.

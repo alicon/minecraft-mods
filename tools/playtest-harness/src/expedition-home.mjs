@@ -214,11 +214,12 @@ async function placeBeside(action, item) {
   throw new Error(`No nearby supported position for ${item}`);
 }
 
-async function harvestReachableLog(action) {
+async function harvestReachableLog(action, camp) {
   const { position } = await action('observe');
   const wood = await action('scan_blocks', { blocks: WOOD_LOGS, radius: 12, max: 40 });
   const candidates = wood.matches.flatMap(({ name, positions }) => positions.map(pos => ({ name, pos })))
     .filter(({ pos }) => Math.abs(pos[1] - position.y) < 2.5)
+    .filter(({ pos }) => !camp || Math.hypot(...pos.map((axis, index) => axis - camp[index])) <= 9)
     .sort((a, b) => Math.hypot(a.pos[0] - position.x, a.pos[2] - position.z)
       - Math.hypot(b.pos[0] - position.x, b.pos[2] - position.z));
   for (const tree of candidates.slice(0, 8)) {
@@ -227,15 +228,15 @@ async function harvestReachableLog(action) {
     await action('look', { at: tree.pos });
     await setTimeout(80);
     if ((await action('observe')).crosshair?.pos?.join(',') !== tree.pos.join(',')) continue;
+    const stock = count(await action('get_inventory'), tree.name);
     if (!(await action('break_block', { pos: tree.pos, maxTicks: 100 }))?.broken) continue;
     const drops = await action('get_entities', { type: 'item', radius: 5 });
     for (const item of drops.entities.filter(candidate => candidate.item?.id === tree.name)) {
       await action('go_to', { entityId: item.id, stopDistance: 0.3, maxTicks: 55 });
     }
     await setTimeout(350);
-    if (count(await action('get_inventory'), tree.name) > 0) return tree.name;
+    if (count(await action('get_inventory'), tree.name) > stock) return tree.name;
   }
-  throw new Error('Could not collect a reachable log for more planks');
 }
 
 async function ensurePlanks(action, craft, needed) {
@@ -245,6 +246,7 @@ async function ensurePlanks(action, craft, needed) {
     if (planks >= needed) return;
     if (batch === Math.ceil(needed / 4)) break;
     const log = slots.find(stack => stack.id.endsWith('_log'))?.id ?? await harvestReachableLog(action);
+    assert.ok(log, 'Could not collect a reachable log for more planks');
     await craft(log.replace(/_log$/, '_planks'), 4);
   }
   throw new Error('The crafted planks did not arrive in the inventory');
@@ -327,6 +329,43 @@ async function cookAtCamp(action, craft) {
   }
 }
 
+async function provisionCampBeforeSleep(action, craft, bed) {
+  const triedAnimals = new Set();
+  for (let job = 0; job < 24; job++) {
+    const player = await action('observe');
+    if (!player?.onGround || player.timeOfDay >= 10_300 || player.health < 14) break;
+    const inventory = await action('get_inventory');
+    if (count(inventory, FIELD_GUIDE)) return;
+    if (count(inventory, MUTTON) < 5) {
+      const { entities } = await action('get_entities', { type: 'sheep', radius: 8, max: 12 });
+      const sheep = entities.find(entity => entity.distance <= 6 && !triedAnimals.has(entity.id)
+        && Math.hypot(...entity.pos.map((coordinate, axis) => coordinate - bed[axis])) <= 8);
+      if (sheep) {
+        triedAnimals.add(sheep.id);
+        await hunt(action, sheep, item => item === MUTTON);
+        continue;
+      }
+    }
+    const timber = inventory.slots.reduce((total, { id, count: amount }) => {
+      if (id.endsWith('_log')) return total + amount * 4;
+      if (id.endsWith('_planks')) return total + amount;
+      return total;
+    }, 0);
+    if (timber >= 32 || !await harvestReachableLog(action, bed)) break;
+  }
+  await cookAtCamp(action, craft);
+  const visited = [];
+  const rejectedSteps = new Set();
+  for (let step = 0; step < 24; step++) {
+    const player = await action('observe');
+    const here = feet(player);
+    if (Math.hypot(...here.map((axis, index) => axis - bed[index])) <= 2) return;
+    visited.push(here);
+    await stepOut(action, player, visited, bed, false, rejectedSteps);
+  }
+  throw new Error('Could not walk back to the bed after collecting camp supplies');
+}
+
 async function feedAdoptedDog(action, id, bed) {
   const visited = [];
   const rejectedSteps = new Set();
@@ -376,11 +415,11 @@ export async function prepareAdoptionCamp(action, craft, descendFromCanopy,
   const bedPos = await placeBeside(action, bed);
   await prepareCamp(action, craft, table, bedPos);
   if (prepareStone) await earnStoneKit(action, craft, { table, bed: bedPos }, { ...policy, beforeNight: true });
-  await cookAtCamp(action, craft);
   return { table, bed: bedPos };
 }
 
-export async function adoptAtNight(action, { bed }) {
+export async function adoptAtNight(action, { bed }, craft) {
+  await provisionCampBeforeSleep(action, craft, bed);
   await action('look', { pitch: 4 });
   await hold(action, MUTTON);
 
@@ -806,7 +845,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
     await craft('minecraft:stick', 4);
   }
   if (needsCharcoal && !(await action('get_inventory')).slots.some(stack => stack.id.endsWith('_log'))) {
-    await harvestReachableLog(action);
+    assert.ok(await harvestReachableLog(action), 'Could not collect a reachable log for charcoal');
   }
   await craft('minecraft:crafting_table', 1);
   const table = await placeBeside(action, 'minecraft:crafting_table');
