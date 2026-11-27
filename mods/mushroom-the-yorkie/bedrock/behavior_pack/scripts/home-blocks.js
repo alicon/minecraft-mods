@@ -7,6 +7,12 @@ const DOORS = {
   east: { x: 1, z: 0 },
   west: { x: -1, z: 0 },
 };
+const DANGEROUS_EXPEDITION_FLOOR = new Set([
+  "minecraft:magma", "minecraft:magma_block", "minecraft:cactus",
+  "minecraft:campfire", "minecraft:soul_campfire", "minecraft:powder_snow",
+  "minecraft:portal", "minecraft:nether_portal", "minecraft:end_portal",
+  "minecraft:end_gateway", "minecraft:pointed_dripstone", "minecraft:sweet_berry_bush",
+]);
 
 export function blockAt(dimension, location) {
   try {
@@ -51,6 +57,11 @@ export function hasDrySupport(dimension, location) {
   const support = blockAt(dimension, { ...location, y: Math.floor(location.y) - 1 });
   return Boolean(support && !support.isAir && !support.isLiquid && !support.isWaterlogged
     && dimension.getBlockBelow(support.location, { maxDistance: 1 })?.y === support.y);
+}
+
+export function hasSafeExpeditionSupport(dimension, location) {
+  const support = blockAt(dimension, { ...location, y: Math.floor(location.y) - 1 });
+  return Boolean(support && !DANGEROUS_EXPEDITION_FLOOR.has(support.typeId) && hasDrySupport(dimension, location));
 }
 
 export function restSpot(block) {

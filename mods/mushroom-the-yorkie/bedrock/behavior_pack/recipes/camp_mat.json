@@ -1,0 +1,32 @@
+{
+  "format_version": "1.21.30",
+  "minecraft:recipe_shaped": {
+    "description": {
+      "identifier": "mushroom_yorkie:camp_mat"
+    },
+    "tags": [
+      "crafting_table"
+    ],
+    "pattern": [
+      "WW",
+      " S"
+    ],
+    "key": {
+      "W": {
+        "tag": "minecraft:wool"
+      },
+      "S": {
+        "item": "minecraft:string"
+      }
+    },
+    "result": {
+      "item": "mushroom_yorkie:camp_mat",
+      "count": 1
+    },
+    "unlock": [
+      {
+        "item": "minecraft:string"
+      }
+    ]
+  }
+}

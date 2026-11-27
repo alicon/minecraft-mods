@@ -1,5 +1,5 @@
 import { system, world } from "@minecraft/server";
-import { blockAt, distanceSquared, hasDrySupport } from "./home-blocks.js";
+import { blockAt, distanceSquared, hasSafeExpeditionSupport } from "./home-blocks.js";
 import { recordedPetOf } from "./ownership.js";
 import { YORKIE, storage } from "./yorkie.js";
 
@@ -12,12 +12,6 @@ const END_ARRIVAL = { x: 100, y: 50, z: 0 };
 const SPAWN_LOAD_RADIUS = 12;
 const RECENT_DEPARTURE_TICKS = 15;
 const ORDERED_SIT = storage("ordered_sit");
-const DANGEROUS_FLOOR = new Set([
-  "minecraft:magma", "minecraft:magma_block", "minecraft:cactus",
-  "minecraft:campfire", "minecraft:soul_campfire", "minecraft:powder_snow",
-  "minecraft:portal", "minecraft:nether_portal", "minecraft:end_portal",
-  "minecraft:end_gateway", "minecraft:pointed_dripstone", "minecraft:sweet_berry_bush",
-]);
 const latestCrossing = new Map();
 const nearbyTravelers = new Map();
 let nextSpawnArea = 0;
@@ -32,10 +26,8 @@ function mayTravel(dog, ownerId, followedAtCrossing) {
 }
 
 function safeFooting(dimension, spot) {
-  const support = blockAt(dimension, { ...spot, y: spot.y - 1 });
-  return support && !DANGEROUS_FLOOR.has(support.typeId)
-    && blockAt(dimension, spot)?.isAir && blockAt(dimension, { ...spot, y: spot.y + 1 })?.isAir
-    && hasDrySupport(dimension, spot);
+  return blockAt(dimension, spot)?.isAir && blockAt(dimension, { ...spot, y: spot.y + 1 })?.isAir
+    && hasSafeExpeditionSupport(dimension, spot);
 }
 
 function remoteEnd(dimension, location) {

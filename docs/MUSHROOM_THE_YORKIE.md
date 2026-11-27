@@ -15,10 +15,11 @@ A worn-out vest stays on the harness and accepts repairs.
 ## Expedition camp and crossings
 
 Craft a camp mat with two wool blocks and string. Put it on solid ground in
-your shelter. With Mushroom nearby, use the placed mat with an empty hand to
-mark it for him. He remembers one camp at a time, even when you quit or travel.
+your shelter with Mushroom nearby. In Java, use the placed mat with an empty
+hand. In Bedrock, placing the mat marks the camp. He remembers one camp at a
+time, even when you quit or travel.
 
-When he retreats, he looks for a safe path to the marked mat. If the mat has
+In Java, when he retreats, he looks for a safe path to the marked mat. If the mat has
 been moved or the path is unsafe, he tries to stop on safe ground. He waits for
 you to come back. Use an empty hand on him to recall him from a few steps away.
 

@@ -42,3 +42,7 @@ mushroom.vest.intact=Mushroom’s vest is already in good shape.
 mushroom.vest.removed=You unclipped Mushroom’s vest.
 mushroom.vest.cracked=Mushroom’s vest is wearing out. Repair it before the next crossing.
 mushroom.vest.worn_out=Mushroom’s vest is worn out and needs repair.
+tile.mushroom_yorkie:camp_mat.name=Yorkie Camp Mat
+mushroom.camp.no_dog=Bring your Mushroom nearby to mark his camp.
+mushroom.camp.unsafe=Put the camp mat on clear, safe ground.
+mushroom.camp.marked=Mushroom will remember this camp.
