@@ -99,6 +99,11 @@ scouts for reachable stone, mines cobblestone in view, and returns to the
 crafting table. The integrated server also checks the earned stone pickaxe,
 the furnace, and the original adopted dog's identity.
 
+Set `MUSHROOM_EXPEDITION_STAGE=iron` to continue from the stone kit. The
+controller looks for exposed iron and coal, verifies the actual mining
+crosshair, and waits for the native furnace to smelt the ore. The server
+checks the earned iron pickaxe, bucket, shield, and original dog.
+
 ### Playtest bridge and server GameTests
 
 Matrix setup refuses a dead test owner before screenshots or fixture mutations.

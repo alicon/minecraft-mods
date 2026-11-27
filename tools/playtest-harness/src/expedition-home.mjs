@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
 import { dryWaypoint, hasPlacedBed, leavesBlockingExit, nearbyBuildingSpots } from './expedition-navigation.mjs';
+import { smeltExpeditionIron } from './expedition-furnace.mjs';
 
 export const WOOD_LOGS = ['oak', 'birch', 'spruce', 'acacia', 'dark_oak', 'jungle', 'cherry', 'pale_oak', 'mangrove']
   .map(wood => `${wood}_log`);
@@ -11,6 +12,9 @@ const PICKAXE = 'minecraft:wooden_pickaxe';
 const STONE_PICKAXE = 'minecraft:stone_pickaxe';
 const COBBLESTONE = 'minecraft:cobblestone';
 const FURNACE = 'minecraft:furnace';
+const RAW_IRON = 'minecraft:raw_iron';
+const COAL = 'minecraft:coal';
+const IRON_NEEDED = 7;
 const SWORDS = ['minecraft:stone_sword', 'minecraft:wooden_sword'];
 const CAMP_WORK_END = 11_900;
 const BACKUP_MEAT = {
@@ -174,16 +178,7 @@ async function placeBeside(action, item) {
   throw new Error(`No nearby supported position for ${item}`);
 }
 
-async function ensurePlanks(action, craft, needed) {
-  const inventory = await action('get_inventory');
-  if (inventory.slots.reduce((total, stack) => total + (stack.id.endsWith('_planks') ? stack.count : 0), 0) >= needed) {
-    return;
-  }
-  const carried = inventory.slots.find(stack => stack.id.endsWith('_log'));
-  if (carried) {
-    await craft(carried.id.replace(/_log$/, '_planks'), 4);
-    return;
-  }
+async function harvestReachableLog(action) {
   const { position } = await action('observe');
   const wood = await action('scan_blocks', { blocks: WOOD_LOGS, radius: 12, max: 40 });
   const candidates = wood.matches.flatMap(({ name, positions }) => positions.map(pos => ({ name, pos })))
@@ -202,11 +197,21 @@ async function ensurePlanks(action, craft, needed) {
       await action('go_to', { entityId: item.id, stopDistance: 0.3, maxTicks: 55 });
     }
     await setTimeout(350);
-    if (count(await action('get_inventory'), tree.name) === 0) continue;
-    await craft(tree.name.replace(/_log$/, '_planks'), 4);
-    return;
+    if (count(await action('get_inventory'), tree.name) > 0) return tree.name;
   }
   throw new Error('Could not collect a reachable log for more planks');
+}
+
+async function ensurePlanks(action, craft, needed) {
+  for (let batch = 0; batch <= Math.ceil(needed / 4); batch++) {
+    const { slots } = await action('get_inventory');
+    const planks = slots.filter(stack => stack.id.endsWith('_planks')).reduce((total, stack) => total + stack.count, 0);
+    if (planks >= needed) return;
+    if (batch === Math.ceil(needed / 4)) break;
+    const log = slots.find(stack => stack.id.endsWith('_log'))?.id ?? await harvestReachableLog(action);
+    await craft(log.replace(/_log$/, '_planks'), 4);
+  }
+  throw new Error('The crafted planks did not arrive in the inventory');
 }
 
 async function prepareCamp(action, craft, table, bed) {
@@ -306,9 +311,16 @@ export async function adoptAtNight(action, craft, descendFromCanopy) {
 
   for (let attempt = 0; attempt < 180; attempt++) {
     const player = await action('observe');
-    assert.ok(player?.inWorld && !player.dead && player.health > 4, 'Lost a safe position beside the bed');
-    const pup = (await action('get_entities', { type: DOG, radius: 8 })).entities.find(entity => entity.name === 'Mushroom');
-    if (pup && !player.screen && (await action('get_inventory')).slots.some(stack => stack.id === 'mushroom_yorkie:field_guide')) {
+    if (!player || player.screen === 'InBedChatScreen') {
+      // The integrated client can briefly stall while the world advances to morning.
+      await setTimeout(500);
+      continue;
+    }
+    assert.ok(player.inWorld && !player.dead && player.health > 4, 'Lost a safe position beside the bed');
+    const dogs = await action('get_entities', { type: DOG, radius: 8 });
+    const pup = dogs?.entities.find(entity => entity.name === 'Mushroom');
+    const inventory = pup && !player.screen ? await action('get_inventory') : null;
+    if (inventory?.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide')) {
       await feedAdoptedDog(action, pup.id, bedPos, mealCount);
       return { table, bed: bedPos };
     }
@@ -316,18 +328,18 @@ export async function adoptAtNight(action, craft, descendFromCanopy) {
       await action('interact_block', { pos: bedPos, face: 'up' });
     }
     // Let the actual cycle advance. Using the bed is the only action that advances it to morning.
-    await setTimeout(player.screen === 'InBedChatScreen' ? 100 : 4500);
+    await setTimeout(player.timeOfDay >= 23_460 || !dogs ? 500 : 4500);
   }
   throw new Error('No native night sleep and adoption within the test window');
 }
 
-async function collectCobblestone(action, bed, alreadyMined) {
+async function mineVisible(action, bed, alreadyMined, wanted, drops) {
   const player = await action('observe');
   assert.ok(player?.inWorld && !player.dead && player.health >= 8, 'The quarry became unsafe for the player');
   const volume = await action('get_blocks', { center: feet(player), size: [11, 9, 11], format: 'json' });
   const targets = volume.cells.flatMap(({ x, y, z, b }) => {
     const pos = [x, y, z];
-    if (b !== 'minecraft:stone' || alreadyMined.has(pos.join(','))
+    if (!wanted.has(b) || alreadyMined.has(pos.join(','))
         || (y < bed[1] && Math.max(Math.abs(x - bed[0]), Math.abs(z - bed[2])) <= 2)) return [];
     const reach = Math.hypot(x + 0.5 - player.position.x, y + 0.5 - player.position.y - 1.62, z + 0.5 - player.position.z);
     return reach <= 4.15 ? [{ pos, reach }] : [];
@@ -340,7 +352,7 @@ async function collectCobblestone(action, bed, alreadyMined) {
     if (!result?.broken) continue;
     alreadyMined.add(pos.join(','));
     const { entities } = await action('get_entities', { type: 'item', radius: 6 });
-    for (const item of entities.filter(entity => entity.item?.id === COBBLESTONE)) {
+    for (const item of entities.filter(entity => drops.has(entity.item?.id))) {
       await action('go_to', { entityId: item.id, stopDistance: 0.35, maxTicks: 35 });
     }
     return true;
@@ -348,15 +360,29 @@ async function collectCobblestone(action, bed, alreadyMined) {
   return false;
 }
 
+async function openCampTable(action, table, visited) {
+  for (let attempt = 0; attempt < 24; attempt++) {
+    const player = await action('observe');
+    if (Math.hypot(player.position.x - table[0] - 0.5, player.position.y - table[1],
+      player.position.z - table[2] - 0.5) < 3.6
+      && (await action('interact_block', { pos: table }))?.screenOpened === 'CraftingScreen') return;
+    visited.push(feet(player));
+    await stepOut(action, player, visited, table);
+  }
+  throw new Error('Could not walk back to the crafting table after quarrying');
+}
+
 export async function earnStoneKit(action, craft, { table, bed }) {
   await hold(action, PICKAXE);
   const visited = [];
   const mined = new Set();
+  const ore = new Set(['minecraft:stone']);
+  const drops = new Set([COBBLESTONE]);
   for (let attempt = 0; attempt < 70; attempt++) {
     const inventory = await action('get_inventory');
     const needed = count(inventory, FURNACE) ? 3 : 11;
     if (count(inventory, COBBLESTONE) >= needed) break;
-    if (await collectCobblestone(action, bed, mined)) continue;
+    if (await mineVisible(action, bed, mined, ore, drops)) continue;
     const player = await action('observe');
     const position = feet(player);
     const distance = Math.hypot(position[0] - table[0], position[2] - table[2]);
@@ -367,21 +393,56 @@ export async function earnStoneKit(action, craft, { table, bed }) {
     await ensurePlanks(action, craft, 2);
     await craft('minecraft:stick', 4);
   }
-  for (let attempt = 0; attempt < 24; attempt++) {
-    const player = await action('observe');
-    if (Math.hypot(player.position.x - table[0] - 0.5, player.position.y - table[1],
-      player.position.z - table[2] - 0.5) < 3.6
-      && (await action('interact_block', { pos: table }))?.screenOpened === 'CraftingScreen') {
-      const inventory = await action('get_inventory');
-      const furnace = count(inventory, FURNACE);
-      assert.ok(count(inventory, COBBLESTONE) >= (furnace ? 3 : 11), 'Could not earn enough cobblestone for a pickaxe and furnace');
-      await craft(STONE_PICKAXE, 1);
-      if (!furnace) await craft(FURNACE, 1);
-      await action('stop', { closeScreen: true });
-      return;
+  await openCampTable(action, table, visited);
+  const inventory = await action('get_inventory');
+  const furnace = count(inventory, FURNACE);
+  assert.ok(count(inventory, COBBLESTONE) >= (furnace ? 3 : 11), 'Could not earn enough cobblestone for a pickaxe and furnace');
+  await craft(STONE_PICKAXE, 1);
+  if (!furnace) await craft(FURNACE, 1);
+  await action('stop', { closeScreen: true });
+}
+
+export async function earnIronKit(action, craft, { bed }) {
+  const visited = [];
+  const mined = new Set();
+  const drops = new Set([RAW_IRON, COAL]);
+  await hold(action, STONE_PICKAXE);
+  for (let attempt = 0; attempt < 140; attempt++) {
+    const inventory = await action('get_inventory');
+    const wanted = new Set();
+    if (count(inventory, RAW_IRON) < IRON_NEEDED) {
+      wanted.add('minecraft:iron_ore');
+      wanted.add('minecraft:deepslate_iron_ore');
     }
+    if (!count(inventory, COAL)) wanted.add('minecraft:coal_ore');
+    if (!wanted.size) break;
+    const player = await action('observe');
+    if (player.food <= 16 && count(inventory, MUTTON) > 1) {
+      await hold(action, MUTTON);
+      await action('use_item', { ticks: 36 });
+      await hold(action, STONE_PICKAXE);
+    }
+    if (await mineVisible(action, bed, mined, wanted, drops)) continue;
     visited.push(feet(player));
-    await stepOut(action, player, visited, table);
+    await stepOut(action, player, visited);
   }
-  throw new Error('Could not walk back to the crafting table after quarrying');
+  const materials = await action('get_inventory');
+  assert.ok(count(materials, RAW_IRON) >= IRON_NEEDED && count(materials, COAL) > 0,
+    'Could not earn enough reachable iron ore and coal for the expedition kit');
+  await ensurePlanks(action, craft, 10);
+  if (count(await action('get_inventory'), 'minecraft:stick') < 2) {
+    await ensurePlanks(action, craft, 12);
+    await craft('minecraft:stick', 4);
+  }
+  await craft('minecraft:crafting_table', 1);
+  const table = await placeBeside(action, 'minecraft:crafting_table');
+  const furnace = await placeBeside(action, FURNACE);
+  await action('interact_block', { pos: furnace });
+  await smeltExpeditionIron(action, IRON_NEEDED);
+  await action('stop', { closeScreen: true });
+  await openCampTable(action, table, visited);
+  for (const item of ['minecraft:iron_pickaxe', 'minecraft:bucket', 'minecraft:shield']) {
+    await craft(item, 1);
+  }
+  await action('stop', { closeScreen: true });
 }

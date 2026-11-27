@@ -18,6 +18,7 @@ import net.minecraft.world.level.entity.EntityTypeTest;
 public final class ExpeditionSurvivalClientGameTest implements FabricClientGameTest {
 	private static final int ADOPTION_WINDOW_TICKS = 26_000;
 	private static final int STONE_WINDOW_TICKS = 38_000;
+	private static final int IRON_WINDOW_TICKS = 56_000;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -31,8 +32,14 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 		Path status = Path.of(statusPath);
 		String seed = System.getenv("MUSHROOM_EXPEDITION_SEED");
 		String spawnRadius = System.getenv("MUSHROOM_EXPEDITION_SPAWN_RADIUS");
-		boolean stoneStage = "stone".equals(System.getenv("MUSHROOM_EXPEDITION_STAGE"));
-		int windowTicks = stoneStage ? STONE_WINDOW_TICKS : ADOPTION_WINDOW_TICKS;
+		String requestedStage = System.getenv("MUSHROOM_EXPEDITION_STAGE");
+		String stage = requestedStage == null ? "adoption" : requestedStage;
+		int windowTicks = switch (stage) {
+			case "adoption" -> ADOPTION_WINDOW_TICKS;
+			case "stone" -> STONE_WINDOW_TICKS;
+			case "iron" -> IRON_WINDOW_TICKS;
+			default -> throw new AssertionError("Unknown expedition stage " + stage);
+		};
 		try (var world = context.worldBuilder().setUseConsistentSettings(false).adjustSettings(settings -> {
 			settings.setName("Codex Expedition Survival");
 			settings.setDifficulty(Difficulty.NORMAL);
@@ -91,14 +98,18 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 						if (!dogs.getFirst().getUUID().equals(originalDog.get())) {
 							throw new AssertionError("The dog at the end was not the dog first adopted");
 						}
-						if (stoneStage && (!owner.getInventory().contains(stack -> stack.is(Items.STONE_PICKAXE))
+						if ("stone".equals(stage) && (!owner.getInventory().contains(stack -> stack.is(Items.STONE_PICKAXE))
 								|| !owner.getInventory().contains(stack -> stack.is(Items.FURNACE)))) {
 							throw new AssertionError("The player did not finish with the earned stone pickaxe and furnace");
+						}
+						if ("iron".equals(stage) && (!owner.getInventory().contains(stack -> stack.is(Items.IRON_PICKAXE))
+								|| !owner.getInventory().contains(stack -> stack.is(Items.BUCKET))
+								|| !owner.getInventory().contains(stack -> stack.is(Items.SHIELD)))) {
+							throw new AssertionError("The player did not finish with the earned iron pickaxe, bucket and shield");
 						}
 						return dogs.getFirst().getUUID().toString();
 					});
 					if (dogEvidence != null) {
-						String stage = stoneStage ? "stone" : "adoption";
 						System.out.printf("Expedition Survival %s passed: dog=%s owner=%s ticks=%s%n",
 								stage, dogEvidence, ownerId, elapsed);
 						context.takeScreenshot("expedition-survival-" + stage);
