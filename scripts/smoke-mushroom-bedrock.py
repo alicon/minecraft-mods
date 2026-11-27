@@ -30,6 +30,7 @@ EXPEDITION_VEST_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-ves
 EXPEDITION_CAMP_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-camp.js")
 EXPEDITION_TRAIL_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-trail.js")
 EXPEDITION_DRAGON_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-dragon.js")
+EXPEDITION_VICTORY_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-victory.js")
 WOODLAND_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-woodland-probe.js")
 FLIGHT_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-flight-probe.js")
 AUTOPLAY_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-autoplay.js")
@@ -114,6 +115,8 @@ def main():
     parser.add_argument("--verify-expedition-camp", action="store_true", help="check marking a safe camp and saved ownership")
     parser.add_argument("--verify-expedition-trail", action="store_true", help="check a narrow bridge and its widened route")
     parser.add_argument("--verify-expedition-dragon", action="store_true", help="check escape from a vanilla dragon's breath")
+    parser.add_argument("--verify-expedition-victory", action="store_true",
+                        help="stage the final hit and check the native exit opens with the original dog alive")
     parser.add_argument("--verify-woodland", action="store_true", help="check squirrel chase, safety and native follow")
     parser.add_argument("--verify-flight", action="store_true", help="run an opt-in simulated-player Creative flight test")
     parser.add_argument("--play-seconds", type=int, help="run seeded simulated-player gameplay for at least this many seconds")
@@ -216,6 +219,17 @@ def main():
                     exercise_world(server_dir, "MUSHROOM_WOODLAND_PASS", timeout=100)
                     exercise_world(server_dir, "MUSHROOM_WOODLAND_REOPENED", timeout=60)
         print("Mushroom spawned and remained in the world after a server restart.")
+    if args.verify_expedition_victory:
+        # A prior probe may already have started or changed the End fight.
+        with disposable_run(args.failure_evidence) as server_dir:
+            prepare_server(args.server_zip, server_dir, WORLD)
+            install_probe(server_dir, WORLD, PROBE_SOURCE)
+            install_addon(args.addon, server_dir, WORLD)
+            install_companion_addons(args.with_addon, server_dir, WORLD)
+            exercise_world(server_dir, "MUSHROOM_TEST_SPAWNED")
+            probe = enable_beta_test_apis(server_dir, WORLD)
+            shutil.copyfile(EXPEDITION_VICTORY_SOURCE, probe)
+            exercise_world(server_dir, "MUSHROOM_EXPEDITION_NATIVE_DRAGON_VICTORY")
 
 
 if __name__ == "__main__":

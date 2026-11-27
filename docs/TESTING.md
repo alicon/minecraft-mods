@@ -49,7 +49,7 @@ Bedrock Dedicated Server archive.
 python3 scripts/build-bedrock-addon.py mushroom-the-yorkie
 python3 scripts/smoke-mushroom-bedrock.py SERVER.zip ADDON.mcaddon \
   --verify-expedition-travel --verify-expedition-vest --verify-expedition-camp \
-  --verify-expedition-trail --verify-expedition-dragon
+  --verify-expedition-trail --verify-expedition-dragon --verify-expedition-victory
 ```
 
 The travel fixture stages safe Nether and End crossings and checks the original
@@ -63,8 +63,11 @@ native cloud and keep Mushroom clear while the owner is still inside it.
 A restart checks the same dog's mark and safety hold. The trail fixture
 checks a one-wide bridge for an owner and for a guest holding the lead, then
 widens it and verifies that Mushroom resumes walking across.
-The Dragon fixture observes a native fireball impact and tests the original dog
-walking out of the resulting breath cloud on prepared footing.
+The Dragon fixture watches for a native fireball and its breath cloud, then
+tests the original dog walking out on prepared footing. A separate fresh world
+stages the final hit by reducing the Dragon's health and clearing its crystals.
+That fixture checks that the attack opens the native exit and that the same dog
+is alive with its original owner. Use a real client for the exit and save/reopen.
 
 ### Mushroom fresh-world Survival adoption
 
