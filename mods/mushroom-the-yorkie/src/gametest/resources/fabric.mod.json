@@ -6,7 +6,8 @@
 	"environment": "*",
 	"entrypoints": {
 		"fabric-client-gametest": [
-			"dev.alicon.mushroomyorkie.entity.DaycareClientGameTest"
+			"dev.alicon.mushroomyorkie.entity.DaycareClientGameTest",
+			"dev.alicon.mushroomyorkie.entity.ExpeditionTravelClientGameTest"
 		],
 		"fabric-gametest": [
 			"dev.alicon.mushroomyorkie.gametest.MushroomYorkieGameTests",

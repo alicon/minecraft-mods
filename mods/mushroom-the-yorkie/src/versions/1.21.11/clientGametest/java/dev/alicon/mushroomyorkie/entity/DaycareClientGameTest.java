@@ -29,6 +29,9 @@ public final class DaycareClientGameTest implements FabricClientGameTest {
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
+		if (Boolean.getBoolean("mushroom.expedition.clientTest")) {
+			return;
+		}
 		int soakSeconds = Integer.parseInt(System.getenv().getOrDefault("MUSHROOM_DAYCARE_SOAK_SECONDS", "0"));
 		if (soakSeconds != 0 && (soakSeconds < 90 || soakSeconds > 14400)) {
 			throw new IllegalArgumentException("Set MUSHROOM_DAYCARE_SOAK_SECONDS from 90 to 14400 seconds");

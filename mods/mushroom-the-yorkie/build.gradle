@@ -53,6 +53,12 @@ tasks.named('processGametestResources') {
 	from(rootProject.file('scripts/fixtures/mushroom-food-cases.json'))
 }
 
+if (tasks.findByName('runClientGameTest') != null && project.hasProperty('yorkie_expedition_client')) {
+	tasks.named('runClientGameTest') {
+		systemProperty 'mushroom.expedition.clientTest', 'true'
+	}
+}
+
 if (project.hasProperty('yorkie_daycare_guest')) {
 	def profile = layout.buildDirectory.dir('daycare-client-guest').get().asFile
 	tasks.named('runClient') {

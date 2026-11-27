@@ -22,6 +22,23 @@ Prefer the narrowest useful command while iterating, then run broader checks bef
 
 ## Automated CLI Checks
 
+### Mushroom expedition travel
+
+Run the focused Java 1.21.11 travel fixture in a real Fabric client:
+
+```shell
+./gradlew :mushroom-the-yorkie:runClientGameTest -Pclient_game_tests -Pyorkie_expedition_client
+```
+
+The fixture creates a disposable Normal Survival world with a fresh inventory.
+It stages a bed and portal entrances, then uses the normal Use and movement
+bindings. Each crossing checks the original dog's UUID, ownership, and living
+arrival. The fixture stages the End exit portal to exercise the credits and
+return path, then saves and reopens to verify the same dog again.
+Screenshots are under `mods/mushroom-the-yorkie/build/run/clientGameTest/screenshots/`.
+
+### Playtest bridge and server GameTests
+
 Matrix setup refuses a dead test owner before screenshots or fixture mutations.
 Preserve the original failure first. For an already-dead owner in the disposable
 Overworld test save, explicitly run:
