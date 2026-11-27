@@ -109,14 +109,14 @@ export function quarryStep(cells, [x, y, z], bed, walked) {
     || distance(b.landing, bed) - distance(a.landing, bed))[0] ?? null;
 }
 
-// Each edge fits a standing player through two adjacent columns, including the lift for a step up.
-// Use the native movement controller for the resulting straight segment.
 export function dryStepKey(from, to) {
   const dx = Math.sign(to[0] - from[0]);
   const dz = Math.sign(to[2] - from[2]);
   return `${from.join(',')}>${from[0] + dx},${from[2] + dz}`;
 }
 
+// Each edge fits a standing player through two adjacent columns, including the lift for a step up.
+// Use the native movement controller for the resulting straight segment.
 export function dryWaypoint(cells, start, visited, destination, seekPasture = false, rejectedSteps = new Set()) {
   const blocks = new Map(cells.map(({ x, y, z, b }) => [`${x},${y},${z}`, b]));
   const block = (x, y, z) => blocks.get(`${x},${y},${z}`);

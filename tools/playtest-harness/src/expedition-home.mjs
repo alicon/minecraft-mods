@@ -278,6 +278,7 @@ async function prepareCamp(action, craft, table, bed) {
 
 async function feedAdoptedDog(action, id, bed, mealCount) {
   const visited = [];
+  const rejectedSteps = new Set();
   for (let attempt = 0; attempt < 30; attempt++) {
     if (await visible(action, id)) {
       await action('interact_entity', { entityId: id });
@@ -291,7 +292,7 @@ async function feedAdoptedDog(action, id, bed, mealCount) {
       const dog = (await action('get_entities', { type: DOG, radius: 16 })).entities.find(entity => entity.id === id);
       if (dog?.distance > 3 && attempt >= 5) {
         visited.push(feet(player));
-        await stepOut(action, player, visited, dog.pos);
+        await stepOut(action, player, visited, dog.pos, false, rejectedSteps);
       } else if (dog && attempt >= 8) {
         await action('go_to', { entityId: id, stopDistance: 2, maxTicks: 20 });
       } else if (!dog && attempt >= 5) {
@@ -392,13 +393,14 @@ async function descendQuarry(action, player, bed, stairs, protectedGround) {
 }
 
 async function openCampTable(action, table, visited) {
+  const rejectedSteps = new Set();
   for (let attempt = 0; attempt < 24; attempt++) {
     const player = await action('observe');
     if (Math.hypot(player.position.x - table[0] - 0.5, player.position.y - table[1],
       player.position.z - table[2] - 0.5) < 3.6
       && (await action('interact_block', { pos: table }))?.screenOpened === 'CraftingScreen') return;
     visited.push(feet(player));
-    await stepOut(action, player, visited, table);
+    await stepOut(action, player, visited, table, false, rejectedSteps);
   }
   throw new Error('Could not walk back to the crafting table after quarrying');
 }
@@ -406,6 +408,7 @@ async function openCampTable(action, table, visited) {
 export async function earnStoneKit(action, craft, { table, bed }) {
   await hold(action, PICKAXE);
   const visited = [];
+  const rejectedSteps = new Set();
   const mined = new Set();
   const ore = new Set(['minecraft:stone']);
   const drops = new Set([COBBLESTONE]);
@@ -427,7 +430,7 @@ export async function earnStoneKit(action, craft, { table, bed }) {
     const position = feet(player);
     const distance = Math.hypot(position[0] - table[0], position[2] - table[2]);
     visited.push(position);
-    await stepOut(action, player, visited, distance > 40 ? table : undefined);
+    await stepOut(action, player, visited, distance > 40 ? table : undefined, false, rejectedSteps);
   }
   for (const pos of stairs.reverse()) {
     const step = await action('go_to', { pos, stopDistance: 0.4, maxTicks: 65 });
@@ -448,6 +451,7 @@ export async function earnStoneKit(action, craft, { table, bed }) {
 
 export async function earnIronKit(action, craft, { bed }) {
   const visited = [];
+  const rejectedSteps = new Set();
   const mined = new Set();
   const drops = new Set([RAW_IRON, COAL]);
   await hold(action, STONE_PICKAXE);
@@ -468,7 +472,7 @@ export async function earnIronKit(action, craft, { bed }) {
     }
     if (await mineVisible(action, bed, mined, wanted, drops)) continue;
     visited.push(feet(player));
-    await stepOut(action, player, visited);
+    await stepOut(action, player, visited, undefined, false, rejectedSteps);
   }
   const materials = await action('get_inventory');
   assert.ok(count(materials, RAW_IRON) >= IRON_NEEDED && count(materials, COAL) > 0,
