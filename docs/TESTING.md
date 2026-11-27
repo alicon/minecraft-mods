@@ -38,6 +38,34 @@ return path, then saves and reopens to verify the same dog again. An empty-hand
 Use orders him to sit before a final Nether crossing checks that he stays behind.
 Screenshots are under `mods/mushroom-the-yorkie/build/run/clientGameTest/screenshots/`.
 
+### Mushroom fresh-world supplies pilot
+
+Build [mc-agent-mcp at 3cf75f3](https://github.com/ArchitektSpeer/mc-agent-mcp/tree/3cf75f33ee93b7e999f16dc320ef09f85c2f0de2)
+with Java 21 and `./gradlew build -Ploom_version=1.17.21`. Use the
+`build/devlibs/mc-agent-mcp-0.2.1-dev.jar` artifact. Start the client from this
+repository with Java 21:
+
+```shell
+MUSHROOM_EXPEDITION_SEED=1 MUSHROOM_EXPEDITION_SPAWN_RADIUS=0 \
+  ./gradlew :mushroom-the-yorkie:runClientGameTest \
+  -Pclient_game_tests -Pyorkie_expedition_survival \
+  -Pyorkie_expedition_agent_jar=/path/to/mc-agent-mcp-0.2.1-dev.jar
+```
+
+When the client logs `Expedition supplies ready`, run the player in a second
+terminal with Node 22 or later:
+
+```shell
+node tools/playtest-harness/src/expedition-supplies.mjs
+```
+
+The client starts in a fresh Normal Survival world with an empty inventory and
+commands disabled. The player searches local terrain for a tree, gathers logs,
+and crafts a wooden pickaxe with ordinary client actions. The native server
+verifies that the pickaxe reached the player's inventory. The action log is JSON
+Lines on stdout. The pilot uses local rules and bills zero model tokens.
+The seed and spawn-radius settings reproduce the canopy start.
+
 ### Playtest bridge and server GameTests
 
 Matrix setup refuses a dead test owner before screenshots or fixture mutations.

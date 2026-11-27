@@ -59,6 +59,21 @@ if (tasks.findByName('runClientGameTest') != null && project.hasProperty('yorkie
 	}
 }
 
+if (tasks.findByName('runClientGameTest') != null && project.hasProperty('yorkie_expedition_survival')) {
+	def agentJarPath = project.findProperty('yorkie_expedition_agent_jar')
+	if (agentJarPath == null || !file(agentJarPath).isFile()) {
+		throw new GradleException("Set yorkie_expedition_agent_jar to the named development JAR from mc-agent-mcp")
+	}
+	def agentJar = file(agentJarPath)
+	configurations.configureEach {
+		resolutionStrategy.force('net.fabricmc:fabric-loader:0.19.5')
+	}
+	tasks.named('runClientGameTest') {
+		systemProperty 'mushroom.expedition.survivalTest', 'true'
+		systemProperty 'fabric.addMods', agentJar.absolutePath
+	}
+}
+
 if (project.hasProperty('yorkie_daycare_guest')) {
 	def profile = layout.buildDirectory.dir('daycare-client-guest').get().asFile
 	tasks.named('runClient') {

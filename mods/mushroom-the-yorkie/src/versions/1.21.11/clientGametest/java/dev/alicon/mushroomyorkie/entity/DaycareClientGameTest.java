@@ -29,7 +29,7 @@ public final class DaycareClientGameTest implements FabricClientGameTest {
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
-		if (Boolean.getBoolean("mushroom.expedition.clientTest")) {
+		if (Boolean.getBoolean("mushroom.expedition.clientTest") || Boolean.getBoolean("mushroom.expedition.survivalTest")) {
 			return;
 		}
 		int soakSeconds = Integer.parseInt(System.getenv().getOrDefault("MUSHROOM_DAYCARE_SOAK_SECONDS", "0"));

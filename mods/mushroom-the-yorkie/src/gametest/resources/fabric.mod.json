@@ -7,7 +7,8 @@
 	"entrypoints": {
 		"fabric-client-gametest": [
 			"dev.alicon.mushroomyorkie.entity.DaycareClientGameTest",
-			"dev.alicon.mushroomyorkie.entity.ExpeditionTravelClientGameTest"
+			"dev.alicon.mushroomyorkie.entity.ExpeditionTravelClientGameTest",
+			"dev.alicon.mushroomyorkie.entity.ExpeditionSurvivalClientGameTest"
 		],
 		"fabric-gametest": [
 			"dev.alicon.mushroomyorkie.gametest.MushroomYorkieGameTests",
