@@ -54,3 +54,12 @@ test('repeated backtracking toward inaccessible sheep gives way to exploring the
   assert.deepEqual(dryWaypoint(blocks, start, [], sheep), [1, 1, 0]);
   assert.deepEqual(dryWaypoint(blocks, start, Array(4).fill([1, 1, 0]), sheep), [0, 1, 1]);
 });
+
+test('a sheep scout prefers observed open turf over equally reachable covered ground', async () => {
+  const { dryWaypoint } = await import('./expedition-navigation.mjs');
+  const blocks = [
+    cell(0, 0, 0), cell(1, 0, 0), cell(2, 0, 0), cell(1, 3, 0, 'oak_leaves'),
+    cell(0, 0, 1), cell(0, 0, 2), cell(1, 0, 2),
+  ];
+  assert.deepEqual(dryWaypoint(blocks, [0, 1, 0], [], undefined, true), [0, 1, 2]);
+});

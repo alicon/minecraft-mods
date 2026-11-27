@@ -7,6 +7,11 @@ const MUTTON = 'minecraft:mutton';
 const DOG = 'mushroom_yorkie:mushroom_yorkie';
 const PICKAXE = 'minecraft:wooden_pickaxe';
 const CAMP_WORK_END = 11_900;
+const BACKUP_MEAT = {
+  'minecraft:cow': 'minecraft:beef',
+  'minecraft:pig': 'minecraft:porkchop',
+};
+const BACKUP_FOOD = [...Object.values(BACKUP_MEAT), 'minecraft:apple'];
 
 function count({ slots }, item) {
   return slots.reduce((total, stack) => total + (stack.id === item ? stack.count : 0), 0);
@@ -43,19 +48,20 @@ async function visible(action, entityId) {
   return (await action('observe'))?.crosshair?.id === entityId;
 }
 
-async function huntSheep(action, sheep) {
-  await hold(action, 'minecraft:wooden_pickaxe');
+async function hunt(action, animal, dropMatches) {
+  await hold(action, PICKAXE);
   for (let hit = 0; hit < 5; hit++) {
-    const visibleSheep = (await action('get_entities', { type: 'sheep', radius: 8 })).entities.find(entity => entity.id === sheep.id);
-    if (!visibleSheep) return false;
-    const near = await action('go_to', { entityId: sheep.id, stopDistance: 1.65, maxTicks: 40 });
-    if (!near?.arrived || !await visible(action, sheep.id)) return false;
-    await action('attack_entity', { entityId: sheep.id });
+    const present = (await action('get_entities', { type: animal.type, radius: 8 })).entities
+      .some(entity => entity.id === animal.id);
+    if (!present) return false;
+    const near = await action('go_to', { entityId: animal.id, stopDistance: 1.65, maxTicks: 40 });
+    if (!near?.arrived || !await visible(action, animal.id)) return false;
+    await action('attack_entity', { entityId: animal.id });
     await setTimeout(725);
-    const { entities } = await action('get_entities', { type: 'sheep', radius: 16 });
-    if (!entities.some(entity => entity.id === sheep.id)) {
+    const { entities } = await action('get_entities', { type: animal.type, radius: 16 });
+    if (!entities.some(entity => entity.id === animal.id)) {
       const drops = await action('get_entities', { type: 'item', radius: 6 });
-      for (const drop of drops.entities.filter(drop => WOOL.test(drop.item?.id) || drop.item?.id === MUTTON)) {
+      for (const drop of drops.entities.filter(drop => dropMatches(drop.item?.id))) {
         await action('go_to', { entityId: drop.id, stopDistance: 0.3, maxTicks: 65 });
       }
       await setTimeout(350);
@@ -65,10 +71,10 @@ async function huntSheep(action, sheep) {
   return false;
 }
 
-async function stepOut(action, player, visited, destination) {
+async function stepOut(action, player, visited, destination, seekPasture = false) {
   const center = feet(player);
   const volume = await action('get_blocks', { center, size: [17, 9, 17], format: 'json' });
-  const pos = dryWaypoint(volume.cells, center, visited, destination);
+  const pos = dryWaypoint(volume.cells, center, visited, destination, seekPasture);
   const repeated = visited.filter(tile => tile.every((coordinate, axis) => coordinate === center[axis])).length > 2;
   if (!pos || repeated) {
     const leaf = leavesBlockingExit(volume.cells, center);
@@ -82,7 +88,7 @@ async function stepOut(action, player, visited, destination) {
 
 async function gatherWool(action, descendFromCanopy) {
   const visited = [];
-  const triedSheep = new Map();
+  const triedAnimals = new Map();
   let stalls = 0;
   for (let round = 0; round < 200; round++) {
     const inventory = await action('get_inventory');
@@ -91,20 +97,30 @@ async function gatherWool(action, descendFromCanopy) {
 
     const player = await action('observe');
     assert.ok(player?.inWorld && !player.dead && player.health > 4, 'Sheep search ran out of safe health');
-    if (player.food <= 16 && count(inventory, MUTTON) > 1) {
-      await hold(action, MUTTON);
+    const meal = count(inventory, MUTTON) > 1 ? MUTTON : BACKUP_FOOD.find(item => count(inventory, item) > 0);
+    if (player.food <= 16 && meal) {
+      await hold(action, meal);
       await action('use_item', { ticks: 36 });
     }
-    const nearby = await action('get_entities', { type: 'sheep', radius: 56, max: 8 });
-    const sheep = nearby.entities.find(entity => (triedSheep.get(entity.id) ?? -10) < round - 3
+    const nearby = await action('get_entities', { type: 'sheep', radius: 96, max: 16 });
+    const sheep = nearby.entities.find(entity => (triedAnimals.get(entity.id) ?? -10) < round - 3
       && Math.abs(entity.pos[1] - player.position.y) <= 8);
     if (sheep?.distance <= 6) {
-      triedSheep.set(sheep.id, round);
-      if (await huntSheep(action, sheep)) continue;
+      triedAnimals.set(sheep.id, round);
+      if (await hunt(action, sheep, item => WOOL.test(item) || item === MUTTON)) continue;
+    }
+    if (!meal && player.food <= 15) {
+      const { entities } = await action('get_entities', { radius: 6, max: 24 });
+      const animal = entities.find(entity => BACKUP_MEAT[entity.type]
+        && (triedAnimals.get(entity.id) ?? -10) < round - 3);
+      if (animal) {
+        triedAnimals.set(animal.id, round);
+        if (await hunt(action, animal, item => item === BACKUP_MEAT[animal.type])) continue;
+      }
     }
     const here = await action('observe');
     visited.push(feet(here));
-    if (await stepOut(action, here, visited, sheep?.pos) || await descendFromCanopy(here)) {
+    if (await stepOut(action, here, visited, sheep?.pos, !sheep) || await descendFromCanopy(here)) {
       stalls = 0;
     } else {
       stalls++;
