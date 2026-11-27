@@ -115,11 +115,28 @@ original player. Use the seed and spawn-radius settings above to replay
 the starting area, including the possible canopy spawn.
 
 The default policy uses local rules. Set `MUSHROOM_EXPEDITION_POLICY=jev` to
-let TypeSafe Jev choose among dry routes while scouting for wool. The runner
+let TypeSafe Jev choose dry scouting routes and how to proceed when the player
+is missing stone or finds a blocked quarry exit. The runner
 uses `OPENROUTER_API_KEY` or the Mac Keychain entry `mushroom-qa-openrouter`.
-The trial makes at most 48 requests, logs the model's choices, latency and
-reported input cost in `actions.jsonl`, and uses the local route if a call fails.
+The trial makes at most 76 requests and logs the choices, latency and
+reported input cost in `actions.jsonl`. The controller has a local fallback.
 The ordinary Survival actions and assertions are identical in both modes.
+
+Write `coach.txt` inside the printed report directory to send one short gameplay
+instruction to the next Jev decision. The note is read again for every call
+and is recorded in the action trace. The client stays in the same world.
+Set `MUSHROOM_EXPEDITION_LIVE=1` to keep a failed controller's world open for
+inspection. If the controller has tried its quarry exit options and waits for
+coaching, replacing the note resumes its recovery attempt in the same world.
+The standard QA invocation still exits after a controller failure.
+
+For the smoother spectator camera, apply the tracked patch to the isolated
+bridge checkout before rebuilding the bridge JAR. Use a separate JAR for each
+running client so a build can finish while a playtest is still active.
+
+```shell
+git -C "$BRIDGE_CHECKOUT" apply --unidiff-zero "$PWD/tools/playtest-harness/patches/mc-agent-mcp-smooth-camera.patch"
+```
 
 Set `MUSHROOM_EXPEDITION_STAGE=stone` to earn the stone kit. The player can
 use the daylight before adoption and finish any remaining work after breakfast. It

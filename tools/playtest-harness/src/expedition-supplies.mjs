@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFile, rename, writeFile } from 'node:fs/promises';
-import { isAbsolute } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import { adoptAtNight, earnIronKit, earnStoneKit, WOOD_LOGS } from './expedition-home.mjs';
 import { hasDrySupport } from './expedition-navigation.mjs';
-import { expeditionScoutPolicy } from './expedition-policy.mjs';
+import { expeditionPolicy } from './expedition-policy.mjs';
 
 const configFile = new URL(
   '../../../mods/mushroom-the-yorkie/build/run/clientGameTest/config/mcagent.json',
@@ -17,6 +17,8 @@ assert.ok(config.authToken);
 const statusFile = process.env.MUSHROOM_EXPEDITION_STATUS;
 assert.ok(statusFile && isAbsolute(statusFile), 'Set MUSHROOM_EXPEDITION_STATUS to the absolute run status path');
 assert.equal(await readFile(statusFile, 'utf8'), 'ready', 'No fresh disposable expedition is ready');
+const coachingFile = join(dirname(statusFile), 'coach.txt');
+const live = process.env.MUSHROOM_EXPEDITION_LIVE === '1';
 
 const url = `http://127.0.0.1:${config.port}/mcp`;
 let session;
@@ -121,18 +123,19 @@ try {
   const inventory = await action('get_inventory');
   assert.equal(inventory.slots.length, 0, 'Expected an empty expedition inventory');
   const stage = process.env.MUSHROOM_EXPEDITION_STAGE ?? 'adoption';
-  const chooseRoute = expeditionScoutPolicy(process.env.MUSHROOM_EXPEDITION_POLICY ?? 'rules');
+  const policy = expeditionPolicy(process.env.MUSHROOM_EXPEDITION_POLICY ?? 'rules', coachingFile);
+  if (live) policy.waitForCoaching = waitForCoaching;
   await gatherStarterTools(start);
-  const camp = await adoptAtNight(action, craft, descendFromCanopy, { prepareStone: stage !== 'adoption', chooseRoute });
+  const camp = await adoptAtNight(action, craft, descendFromCanopy, { prepareStone: stage !== 'adoption', ...policy });
   if (stage === 'stone' || stage === 'iron') {
-    await earnStoneKit(action, craft, camp);
+    await earnStoneKit(action, craft, camp, policy);
   }
   if (stage === 'iron') {
     await earnIronKit(action, craft, camp);
   }
   await reportStatus('finished');
 } catch (error) {
-  await reportStatus('failed');
+  await reportStatus(live ? 'held' : 'failed');
   throw error;
 }
 
@@ -140,6 +143,21 @@ async function reportStatus(status) {
   const temporary = `${statusFile}.${process.pid}.tmp`;
   await writeFile(temporary, status, { flag: 'wx' });
   await rename(temporary, statusFile);
+}
+
+async function waitForCoaching(context) {
+  const prior = await readFile(coachingFile, 'utf8').catch(() => '');
+  console.log(JSON.stringify({ at: new Date().toISOString(), action: 'awaiting_coaching', ...context }));
+  await reportStatus('awaiting-coaching');
+  for (let second = 0; second < 180; second++) {
+    await setTimeout(1000);
+    const next = await readFile(coachingFile, 'utf8').catch(() => '');
+    if (next.trim() && next !== prior) {
+      await reportStatus('ready');
+      return true;
+    }
+  }
+  return false;
 }
 
 async function gatherStarterTools(start) {

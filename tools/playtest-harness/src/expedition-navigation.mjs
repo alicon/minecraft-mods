@@ -4,6 +4,7 @@ const SUPPORT = /:(?:grass_block|dirt|coarse_dirt|podzol|stone|sand|gravel|snow_
 const LEAVES = /_leaves$/;
 const QUARRY_BLOCK = /^minecraft:(?:grass_block|dirt|coarse_dirt|podzol|stone|andesite|diorite|granite|deepslate|(?:deepslate_)?(?:coal|iron)_ore)$/;
 const QUARRY_HAZARD = /^minecraft:(?:water|lava|powder_snow|.*sand|gravel)$/;
+const MAX_WALK_SEGMENT = 10;
 
 function gap(id) {
   return id === undefined || HEADROOM.test(id);
@@ -170,5 +171,5 @@ export function dryWaypoint(cells, start, visited, destination, seekPasture = fa
   const straight = best.findIndex((step, index) =>
     step[0] !== start[0] + (index + 1) * dx || step[2] !== start[2] + (index + 1) * dz);
   const length = straight < 0 ? best.length : straight;
-  return best[Math.min(6, length) - 1];
+  return best[Math.min(MAX_WALK_SEGMENT, length) - 1];
 }

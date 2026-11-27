@@ -31,6 +31,22 @@ test('a soil-covered quarry has a dry descending step without undermining camp',
   assert.equal(quarryStep(blocks, start, bed, [[1, 5, 0]]), null);
 });
 
+test('a horizontal arrival still waits for the player to land one block lower', async () => {
+  const { settleQuarryStep } = await import('./expedition-home.mjs');
+  const landing = [410, 68, 235];
+  const reports = [
+    { position: { x: 410.5, y: 69, z: 235.29 }, onGround: true, inWorld: true, health: 20 },
+    { position: { x: 410.5, y: 68.6, z: 235.44 }, onGround: false, inWorld: true, health: 20 },
+    { position: { x: 410.5, y: 68, z: 235.52 }, onGround: true, inWorld: true, health: 20 },
+  ];
+  const action = async name => {
+    assert.equal(name, 'observe');
+    return reports.shift();
+  };
+  assert.equal(await settleQuarryStep(action, landing, async () => {}), true);
+  assert.equal(reports.length, 0);
+});
+
 test('a dry destination across water routes around the shore', async () => {
   const { dryWaypoint } = await import('./expedition-navigation.mjs');
   const blocks = [
@@ -38,6 +54,16 @@ test('a dry destination across water routes around the shore', async () => {
     cell(0, 0, 1), cell(1, 0, 1), cell(2, 0, 1),
   ];
   assert.deepEqual(dryWaypoint(blocks, [0, 1, 0], [], [2, 1, 0]), [0, 1, 1]);
+});
+
+test('an open stretch can run ten blocks while a trunk interrupts the segment', async () => {
+  const { dryWaypoint } = await import('./expedition-navigation.mjs');
+  const ground = Array.from({ length: 13 }, (_, x) => cell(x, 0, 0));
+  const start = [0, 1, 0];
+  const destination = [12, 1, 0];
+  assert.deepEqual(dryWaypoint(ground, start, [], destination), [10, 1, 0]);
+  const trees = [...ground, cell(7, 1, 0, 'oak_log'), cell(7, 2, 0, 'oak_log')];
+  assert.deepEqual(dryWaypoint(trees, start, [], destination), [6, 1, 0]);
 });
 
 test('a two-block sand bank and a low ceiling both block the direct step', async () => {

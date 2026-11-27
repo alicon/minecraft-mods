@@ -98,7 +98,8 @@ async function hunt(action, animal, dropMatches) {
 
 async function stepOut(action, player, visited, destination, seekPasture = false, rejectedSteps = new Set(), chooseRoute) {
   const center = feet(player);
-  const volume = await action('get_blocks', { center, size: [17, 9, 17], format: 'json' });
+  const width = seekPasture || chooseRoute ? 23 : 17;
+  const volume = await action('get_blocks', { center, size: [width, 9, width], format: 'json' });
   let pos = dryWaypoint(volume.cells, center, visited, destination, seekPasture, rejectedSteps);
   const repeated = visited.filter(tile => tile.every((coordinate, axis) => coordinate === center[axis])).length > 2;
   if (!pos || repeated) {
@@ -321,7 +322,7 @@ async function feedAdoptedDog(action, id, bed, mealCount) {
   throw new Error('Could not feed the adopted dog after checking reach and the native crosshair');
 }
 
-export async function adoptAtNight(action, craft, descendFromCanopy, { prepareStone = false, chooseRoute } = {}) {
+export async function adoptAtNight(action, craft, descendFromCanopy, { prepareStone = false, chooseRoute, ...policy } = {}) {
   const color = await gatherWool(action, descendFromCanopy, chooseRoute);
   await ensurePlanks(action, craft, 3);
   // Bring the first table to the flock so sleeping doesn't depend on retracing the route.
@@ -332,7 +333,7 @@ export async function adoptAtNight(action, craft, descendFromCanopy, { prepareSt
   await action('stop', { closeScreen: true });
   const bedPos = await placeBeside(action, bed);
   await prepareCamp(action, craft, table, bedPos);
-  if (prepareStone) await earnStoneKit(action, craft, { table, bed: bedPos }, true);
+  if (prepareStone) await earnStoneKit(action, craft, { table, bed: bedPos }, { ...policy, beforeNight: true });
   await action('look', { pitch: 4 });
   await hold(action, MUTTON);
   const mealCount = count(await action('get_inventory'), MUTTON);
@@ -394,21 +395,77 @@ async function mineVisible(action, bed, alreadyMined, wanted, drops, protectedGr
   return false;
 }
 
+export async function settleQuarryStep(action, landing, wait = setTimeout) {
+  const target = landing.join(',');
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const player = await action('observe');
+    if (!player?.inWorld || player.dead || player.health < 8 || player.inWater) return false;
+    if (player.onGround && feet(player).join(',') === target) return true;
+    if (attempt === 3 && player.onGround && Math.abs(player.position.y - landing[1] - 1) < 0.05) {
+      const dx = landing[0] + 0.5 - player.position.x;
+      const dz = landing[2] + 0.5 - player.position.z;
+      // The walker's stopping radius can leave part of the player's body
+      // supported by the old ledge. Walk into the verified opening.
+      if (Math.hypot(dx, dz) <= 0.45) {
+        await action('move', { forward: true, yaw: Math.atan2(-dx, dz) * 180 / Math.PI, ticks: 2 });
+      }
+    }
+    await wait(125);
+  }
+  return false;
+}
+
 async function descendQuarry(action, player, bed, stairs, protectedGround) {
   const start = feet(player);
   const { cells } = await action('get_blocks', { center: start, size: [7, 7, 7], format: 'json' });
   const step = quarryStep(cells, start, bed, stairs);
-  if (!step) return false;
+  if (!step) return 'unavailable';
+  let opened = false;
   for (const pos of step.clear) {
-    if (!await breakVisible(action, pos)) return false;
+    if (!await breakVisible(action, pos)) return opened ? 'blocked' : 'unavailable';
+    opened = true;
   }
   const outcome = await action('go_to', { pos: step.landing, stopDistance: 0.3, maxTicks: 45 });
-  if (!outcome?.arrived || feet(await action('observe')).join(',') !== step.landing.join(',')) return false;
+  if (!outcome?.arrived || !await settleQuarryStep(action, step.landing)) return 'blocked';
   const [x, y, z] = start;
   const [tx, ty, tz] = step.landing;
   for (const support of [[x, y - 1, z], [tx, ty - 1, tz]]) protectedGround.add(support.join(','));
   stairs.push(start);
-  return true;
+  return 'landed';
+}
+
+async function climbQuarry(action, pos, chooseEscape) {
+  const visited = [];
+  const rejectedSteps = new Set();
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const result = await action('go_to', { pos, stopDistance: 0.3, maxTicks: 35 });
+    if (result?.arrived && await settleQuarryStep(action, pos)) return true;
+    const player = await action('observe');
+    if (!player?.inWorld || player.dead || player.health < 8) return false;
+    const here = feet(player);
+    const blocked = result?.reason?.match(/blocked by minecraft:\w+_leaves at (-?\d+),(-?\d+),(-?\d+)/);
+    const choices = { walk_around: 'Take a different observed dry route toward the next known step.' };
+    if (blocked) choices.clear_leaves = 'Break the leaves blocking the view, then try the step again.';
+    if (pos[1] === here[1] + 1 && Math.abs(pos[0] - here[0]) + Math.abs(pos[2] - here[2]) === 1) {
+      const volume = await action('get_blocks', { center: here, size: [5, 5, 5], format: 'json' });
+      const dry = dryWaypoint(volume.cells, here, [], pos);
+      if (dry?.join(',') === pos.join(',')) choices.jump_step = 'Jump directly onto the verified dry stair.';
+    }
+    const choice = chooseEscape ? await chooseEscape(player, {
+      attempt: attempt + 1, stepOffset: pos.map((axis, index) => axis - here[index]),
+      lastResult: result?.reason ?? 'Player reached the horizontal target but did not land on the step.',
+    }, choices) : blocked ? 'clear_leaves' : 'walk_around';
+    if (choice === 'clear_leaves' && blocked) {
+      if (await breakVisible(action, blocked.slice(1).map(Number))) continue;
+    } else if (choice === 'jump_step') {
+      const yaw = Math.atan2(player.position.x - pos[0] - 0.5, pos[2] + 0.5 - player.position.z) * 180 / Math.PI;
+      await action('move', { yaw, forward: true, jump: true, ticks: 6 });
+      if (await settleQuarryStep(action, pos)) return true;
+    }
+    visited.push(here);
+    await stepOut(action, player, visited, pos, false, rejectedSteps);
+  }
+  return false;
 }
 
 async function openCampTable(action, table, visited) {
@@ -424,7 +481,8 @@ async function openCampTable(action, table, visited) {
   throw new Error('Could not walk back to the crafting table after quarrying');
 }
 
-export async function earnStoneKit(action, craft, { table, bed }, beforeNight = false) {
+export async function earnStoneKit(action, craft, { table, bed },
+    { beforeNight = false, chooseWork, chooseEscape, waitForCoaching } = {}) {
   const initial = await action('get_inventory');
   if (count(initial, STONE_PICKAXE) && count(initial, FURNACE)) return;
   await hold(action, PICKAXE);
@@ -447,8 +505,16 @@ export async function earnStoneKit(action, craft, { table, bed }, beforeNight = 
       continue;
     }
     missedStone++;
-    if ((stairs.length > 0 || missedStone >= 8) && stairs.length < 7
-        && await descendQuarry(action, player, bed, stairs, protectedGround)) continue;
+    const normalWork = missedStone >= 8 ? 'quarry' : 'scout';
+    const work = chooseWork && !stairs.length && missedStone >= 4
+      ? await chooseWork(player, { beforeNight, missedStone, cobblestone: count(inventory, COBBLESTONE), needed }, normalWork)
+      : normalWork;
+    if (work === 'camp' || stairs.length >= 7) break;
+    if (stairs.length || work === 'quarry') {
+      const descent = await descendQuarry(action, player, bed, stairs, protectedGround);
+      if (descent === 'landed') continue;
+      if (descent === 'blocked' || stairs.length) break;
+    }
     const position = feet(player);
     const distance = Math.hypot(position[0] - table[0], position[2] - table[2]);
     visited.push(position);
@@ -456,8 +522,13 @@ export async function earnStoneKit(action, craft, { table, bed }, beforeNight = 
     await stepOut(action, player, visited, returnToCamp ? table : undefined, false, rejectedSteps);
   }
   for (const pos of stairs.reverse()) {
-    const step = await action('go_to', { pos, stopDistance: 0.4, maxTicks: 65 });
-    assert.ok(step?.arrived, 'Could not walk back up the quarry stairs');
+    if (await climbQuarry(action, pos, chooseEscape)) continue;
+    const entry = stairs.at(-1);
+    const player = await action('observe');
+    if (player?.onGround && player.position.y >= entry[1]) break;
+    if (await waitForCoaching?.({ reason: 'Quarry exit blocked', target: pos })
+      && await climbQuarry(action, pos, chooseEscape)) continue;
+    throw new Error('Could not find a safe way back up the quarry stairs');
   }
   const materials = await action('get_inventory');
   const furnace = count(materials, FURNACE);

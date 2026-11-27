@@ -1,0 +1,117 @@
+diff --git a/src/client/java/com/mcagent/mcp/client/control/GoToTask.java b/src/client/java/com/mcagent/mcp/client/control/GoToTask.java
+index 646bbd5..b18f8bd 100644
+--- a/src/client/java/com/mcagent/mcp/client/control/GoToTask.java
++++ b/src/client/java/com/mcagent/mcp/client/control/GoToTask.java
+@@ -10,0 +11 @@ import net.minecraft.tags.FluidTags;
++import net.minecraft.util.Mth;
+@@ -24,0 +26 @@ final class GoToTask {
++	private static final int SOLID_COLLISION_TICKS = 10;
+@@ -25,0 +28,2 @@ final class GoToTask {
++	private static final float TURN_DEGREES_PER_TICK = 12.0F;
++	private static final Input NO_MOVEMENT = new Input(false, false, false, false, false, false, false);
+@@ -73 +77,3 @@ final class GoToTask {
+-		float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
++		float desiredYaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
++		float yawError = Mth.wrapDegrees(desiredYaw - p.getYRot());
++		float yaw = p.getYRot() + Mth.clamp(yawError, -TURN_DEGREES_PER_TICK, TURN_DEGREES_PER_TICK);
+@@ -75,0 +82,5 @@ final class GoToTask {
++		int direction = Math.round(Mth.wrapDegrees(desiredYaw - yaw) / 45.0F);
++		if (Math.abs(direction) > 2) {
++			input = NO_MOVEMENT;
++			return null;
++		}
+@@ -77,2 +88,14 @@ final class GoToTask {
+-		String hazard = hazardAhead(level, p, dx / dist, dz / dist);
+-		if (hazard != null) return finish(p, false, hazard);
++		// Move toward the waypoint as the view turns. Check the direction
++		// these actual inputs will take us, including a diagonal strafe.
++		double heading = Math.toRadians(yaw + direction * 45.0F);
++		double forwardX = -Math.sin(heading), forwardZ = Math.cos(heading);
++		String hazard = hazardAhead(level, p, forwardX, forwardZ);
++		if (hazard != null) {
++			if (Math.abs(yawError) <= TURN_DEGREES_PER_TICK) return finish(p, false, hazard);
++			input = NO_MOVEMENT;
++			return null;
++		}
++		if (p.horizontalCollision && ticks - lastProgress > SOLID_COLLISION_TICKS) {
++			String obstacle = blockerAhead(level, p, forwardX, forwardZ);
++			if (obstacle.startsWith("blocked by")) return finish(p, false, obstacle);
++		}
+@@ -81,2 +104,2 @@ final class GoToTask {
+-		boolean sprint = dist > 4 && p.getFoodData().getFoodLevel() > 6;
+-		input = new Input(true, false, false, false, jump, false, sprint);
++		boolean sprint = direction == 0 && dist > 4 && p.getFoodData().getFoodLevel() > 6;
++		input = new Input(Math.abs(direction) < 2, false, direction < 0, direction > 0, jump, false, sprint);
+diff --git a/src/client/java/com/mcagent/mcp/client/tools/LookTool.java b/src/client/java/com/mcagent/mcp/client/tools/LookTool.java
+index 88e8c05..2f9fcb8 100644
+--- a/src/client/java/com/mcagent/mcp/client/tools/LookTool.java
++++ b/src/client/java/com/mcagent/mcp/client/tools/LookTool.java
+@@ -5 +4,0 @@ import com.mcagent.mcp.client.GameBridge;
+-import com.mcagent.mcp.client.control.AgentControl;
+@@ -17,0 +17,4 @@ public final class LookTool implements McpTool {
++	private static final int MAX_TURN_TICKS = 24;
++	private static final float YAW_STEP = 12.0F;
++	private static final float PITCH_STEP = 10.0F;
++
+@@ -19,0 +23,2 @@ public final class LookTool implements McpTool {
++	private record View(float yaw, float pitch) {}
++
+@@ -63 +68 @@ public final class LookTool implements McpTool {
+-		return bridge.callOnGameThread(() -> {
++		View destination = bridge.callOnGameThread(() -> {
+@@ -64,0 +70 @@ public final class LookTool implements McpTool {
++			Vec3 target = null;
+@@ -66 +72 @@ public final class LookTool implements McpTool {
+-				AgentControl.lookAt(p, Vec3.atCenterOf(new net.minecraft.core.BlockPos(at[0], at[1], at[2])));
++				target = Vec3.atCenterOf(new net.minecraft.core.BlockPos(at[0], at[1], at[2]));
+@@ -70,7 +76 @@ public final class LookTool implements McpTool {
+-				AgentControl.lookAt(p, e.getBoundingBox().getCenter());
+-			} else {
+-				if (hasYaw) {
+-					p.setYRot((float) yaw);
+-					p.setYHeadRot((float) yaw);
+-				}
+-				if (hasPitch) p.setXRot(Mth.clamp((float) pitch, -90.0F, 90.0F));
++				target = e.getBoundingBox().getCenter();
+@@ -78,6 +78,7 @@ public final class LookTool implements McpTool {
+-			// The crosshair target (mc.hitResult) is recomputed during rendering, so report
+-			// the rotation only; observe returns the crosshair target.
+-			JsonObject o = new JsonObject();
+-			o.addProperty("yaw", Json.round2(p.getYRot()));
+-			o.addProperty("pitch", Json.round2(p.getXRot()));
+-			return o;
++			if (target == null) {
++				return new View(hasYaw ? (float) yaw : p.getYRot(),
++						hasPitch ? Mth.clamp((float) pitch, -90.0F, 90.0F) : p.getXRot());
++			}
++			Vec3 offset = target.subtract(p.getEyePosition());
++			return new View((float) Math.toDegrees(Math.atan2(-offset.x, offset.z)),
++					(float) -Math.toDegrees(Math.atan2(offset.y, Math.hypot(offset.x, offset.z))));
+@@ -84,0 +86,27 @@ public final class LookTool implements McpTool {
++		// This loop runs on the HTTP thread. Yield between small rotations so
++		// the game can render the turn and continue ticking the world.
++		for (int i = 0; i < MAX_TURN_TICKS; i++) {
++			JsonObject result = bridge.callOnGameThread(() -> turnToward(destination));
++			if (result != null) return result;
++			try {
++				Thread.sleep(50);
++			} catch (InterruptedException e) {
++				Thread.currentThread().interrupt();
++				throw new ToolException("turn was interrupted");
++			}
++		}
++		throw new ToolException("view changed before the turn settled");
++	}
++
++	private static JsonObject turnToward(View target) {
++		LocalPlayer p = GameBridge.requirePlayer();
++		float yawError = Mth.wrapDegrees(target.yaw() - p.getYRot());
++		float pitchError = target.pitch() - p.getXRot();
++		p.setYRot(p.getYRot() + Mth.clamp(yawError, -YAW_STEP, YAW_STEP));
++		p.setYHeadRot(p.getYRot());
++		p.setXRot(p.getXRot() + Mth.clamp(pitchError, -PITCH_STEP, PITCH_STEP));
++		if (Math.abs(yawError) > YAW_STEP || Math.abs(pitchError) > PITCH_STEP) return null;
++		JsonObject result = new JsonObject();
++		result.addProperty("yaw", Json.round2(p.getYRot()));
++		result.addProperty("pitch", Json.round2(p.getXRot()));
++		return result;
