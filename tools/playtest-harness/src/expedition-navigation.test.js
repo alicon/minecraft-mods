@@ -5,6 +5,15 @@ function cell(x, y, z, type = 'grass_block') {
   return { x, y, z, b: `minecraft:${type}` };
 }
 
+test('a route to an elevated camp climbs instead of stopping directly below it', async () => {
+  const { dryWaypoint } = await import('./expedition-navigation.mjs');
+  const terrain = [
+    cell(0, 0, 0), cell(1, 0, 0), cell(2, 0, 0),
+    cell(0, 1, 1), cell(1, 2, 1), cell(2, 3, 1), cell(2, 3, 0),
+  ];
+  assert.deepEqual(dryWaypoint(terrain, [0, 1, 0], [], [2, 4, 0]), [0, 2, 1]);
+});
+
 test('the respawn route picks up the original dropped guide before the remaining gear', async () => {
   const { recoverDroppedLoadout } = await import('./expedition-home.mjs');
   const guide = 'mushroom_yorkie:field_guide';

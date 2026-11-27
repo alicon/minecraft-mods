@@ -81,7 +81,8 @@ The export replaces the simulated-player script with the stable client probe.
 Import the prepared `.mcworld` through **Play → Worlds →
 Import world** in Minecraft for Windows. The probe stages the local player
 and records Mushroom's identity before handing off to normal input. Walk into
-the portal and dismiss the credits. Check `EXPEDITION RETURN VERIFIED` in
+the portal, jumping over the raised rim and stepping around the center pillar
+if needed, then dismiss the credits. Check `EXPEDITION RETURN VERIFIED` in
 chat, then save and reopen the same world and check `EXPEDITION REOPEN VERIFIED`.
 Both assertions require a living dog with the recorded ID and original owner.
 

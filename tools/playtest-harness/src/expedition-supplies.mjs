@@ -146,7 +146,7 @@ try {
     assert.equal(checkpoint.owner, start.name);
     assert.equal(checkpoint.bridgeFingerprint, bridgeFingerprint, 'The recorded client is no longer listening');
     assert.ok(Number.isFinite(checkpoint.gameTime) && checkpoint.gameTime <= start.gameTime);
-    assert.ok(['adoption', 'stone', 'iron'].includes(checkpoint.phase));
+    assert.ok(['camp', 'adoption', 'stone', 'iron'].includes(checkpoint.phase));
     for (const pos of [checkpoint.camp?.bed, checkpoint.camp?.table]) {
       assert.ok(blockPosition(pos), 'Invalid recorded camp');
     }
@@ -155,7 +155,8 @@ try {
     'Invalid recorded quarry path');
     assert.ok(checkpoint.quarryLanding === undefined || blockPosition(checkpoint.quarryLanding), 'Invalid recorded landing');
     await action('stop', { closeScreen: true });
-    if (checkpoint.phase !== 'adoption' && !inventory.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide')) {
+    if (['stone', 'iron'].includes(checkpoint.phase)
+        && !inventory.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide')) {
       const death = await readFile(join(dirname(statusFile), 'last-owner-death'), 'utf8').catch(() => '');
       const [dimension, x, y, z, tick] = death.trim().split(' ');
       const destination = [x, y, z].map(Number);
@@ -174,8 +175,13 @@ try {
   } else {
     assert.equal(inventory.slots.length, 0, 'Expected an empty expedition inventory');
     await gatherStarterTools(start);
-    const camp = await prepareAdoptionCamp(action, craft, descendFromCanopy, { prepareStone: stage !== 'adoption', ...policy });
-    checkpoint = { owner: start.name, gameTime: start.gameTime, bridgeFingerprint, stage, phase: 'adoption', camp };
+    const camp = await prepareAdoptionCamp(action, craft, descendFromCanopy, policy);
+    checkpoint = { owner: start.name, gameTime: start.gameTime, bridgeFingerprint, stage, phase: 'camp', camp };
+    if (live) await writeCheckpoint(checkpoint);
+  }
+  if (checkpoint.phase === 'camp') {
+    if (stage !== 'adoption') await earnStoneKit(action, craft, checkpoint.camp, { ...policy, beforeNight: true });
+    checkpoint.phase = 'adoption';
     if (live) await writeCheckpoint(checkpoint);
   }
   if (checkpoint.phase === 'adoption') {

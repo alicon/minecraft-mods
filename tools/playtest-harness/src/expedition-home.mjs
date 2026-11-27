@@ -402,8 +402,7 @@ async function feedAdoptedDog(action, id, bed) {
   throw new Error('Could not feed the adopted dog after checking reach and the native crosshair');
 }
 
-export async function prepareAdoptionCamp(action, craft, descendFromCanopy,
-    { prepareStone = false, chooseRoute, ...policy } = {}) {
+export async function prepareAdoptionCamp(action, craft, descendFromCanopy, { chooseRoute } = {}) {
   const color = await gatherWool(action, descendFromCanopy, chooseRoute);
   await ensurePlanks(action, craft, 3);
   // Bring the first table to the flock so sleeping doesn't depend on retracing the route.
@@ -414,7 +413,6 @@ export async function prepareAdoptionCamp(action, craft, descendFromCanopy,
   await action('stop', { closeScreen: true });
   const bedPos = await placeBeside(action, bed);
   await prepareCamp(action, craft, table, bedPos);
-  if (prepareStone) await earnStoneKit(action, craft, { table, bed: bedPos }, { ...policy, beforeNight: true });
   return { table, bed: bedPos };
 }
 
