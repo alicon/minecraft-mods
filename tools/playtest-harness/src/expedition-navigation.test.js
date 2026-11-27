@@ -45,6 +45,31 @@ test('a gear recovery with low health stops before approaching the old death loc
   }, [10, 64, 10]), /return to the dropped gear became unsafe/);
 });
 
+test('feeding only succeeds when the original dog is reached and consumes one meal', async () => {
+  const { feedAdoptedDog } = await import('./expedition-home.mjs');
+  for (const hit of [19, 22]) {
+    let count = 2;
+    const dog = { id: 22, distance: 2, pos: [2, 64, 0] };
+    const action = async (name, args) => {
+      switch (name) {
+        case 'observe': return { position: { x: 0, y: 64, z: 0 }, crosshair: { id: hit } };
+        case 'get_entities': return { entities: [dog] };
+        case 'get_inventory': return { mainHand: { id: 'minecraft:mutton' }, slots: [{ id: 'minecraft:mutton', count }] };
+        case 'look':
+          assert.equal(args.entityId, dog.id);
+          return {};
+        case 'interact_entity':
+          assert.equal(args.entityId, dog.id);
+          count--;
+          return {};
+        default: throw new Error(`Unexpected action: ${name}`);
+      }
+    };
+    assert.equal(await feedAdoptedDog(action, dog.id, [0, 64, 0], 1), hit === dog.id);
+    assert.equal(count, hit === dog.id ? 1 : 2);
+  }
+});
+
 test('forest-floor litter can be cleared for a bed with two dry supports', async () => {
   const { bedSpotsWithGroundCover, nearbyBuildingSpots } = await import('./expedition-navigation.mjs');
   const position = { x: 0.15, y: 1, z: 0.5 };

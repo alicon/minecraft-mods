@@ -4,7 +4,8 @@ import { readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import {
-  adoptAtNight, earnIronKit, earnStoneKit, prepareAdoptionCamp, recoverDroppedLoadout, WOOD_LOGS,
+  adoptAtNight, earnIronKit, earnStoneKit, feedAdoptedDog, forageExpeditionMeal, prepareAdoptionCamp,
+  recoverDroppedLoadout, WOOD_LOGS,
 } from './expedition-home.mjs';
 import { hasDrySupport } from './expedition-navigation.mjs';
 import { expeditionPolicy } from './expedition-policy.mjs';
@@ -154,6 +155,7 @@ try {
       || (Array.isArray(checkpoint.quarry) && checkpoint.quarry.length <= 44 && checkpoint.quarry.every(blockPosition)),
     'Invalid recorded quarry path');
     assert.ok(checkpoint.quarryLanding === undefined || blockPosition(checkpoint.quarryLanding), 'Invalid recorded landing');
+    assert.ok(checkpoint.dog === undefined || Number.isInteger(checkpoint.dog), 'Invalid recorded dog');
     await action('stop', { closeScreen: true });
     if (['stone', 'iron'].includes(checkpoint.phase)
         && !inventory.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide')) {
@@ -185,9 +187,14 @@ try {
     if (live) await writeCheckpoint(checkpoint);
   }
   if (checkpoint.phase === 'adoption') {
-    await adoptAtNight(action, checkpoint.camp, craft);
+    checkpoint.dog = await adoptAtNight(action, checkpoint.camp, craft);
+    checkpoint.fedDog = await feedAdoptedDog(action, checkpoint.dog, checkpoint.camp.bed, stage === 'adoption' ? 120 : 24);
     checkpoint.phase = 'stone';
     if (live && stage !== 'adoption') await writeCheckpoint(checkpoint);
+    if (!checkpoint.fedDog) {
+      if (stage === 'adoption') throw new Error('Could not feed the adopted dog at the camp');
+      console.log(JSON.stringify({ at: new Date().toISOString(), action: 'mushroom_meal_pending', dog: checkpoint.dog }));
+    }
   }
   if (stage !== 'adoption' && checkpoint.phase === 'stone') {
     await earnStoneKit(action, craft, checkpoint.camp, policy);
@@ -207,6 +214,14 @@ try {
       };
     }
     await earnIronKit(action, craft, checkpoint.camp, policy);
+  }
+  if (checkpoint.fedDog === false) {
+    assert.ok(await forageExpeditionMeal(action), 'Could not earn a meal for the original dog');
+    const player = await action('observe');
+    const position = [player.position.x, player.position.y, player.position.z].map(Math.floor);
+    assert.ok(await feedAdoptedDog(action, checkpoint.dog, position), 'Could not feed the original dog before finishing');
+    checkpoint.fedDog = true;
+    if (live) await writeCheckpoint(checkpoint);
   }
   await reportStatus('finished');
 } catch (error) {

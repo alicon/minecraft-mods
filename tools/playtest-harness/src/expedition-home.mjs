@@ -30,6 +30,7 @@ const BACKUP_MEAT = {
 };
 const BACKUP_FOOD = [...Object.values(BACKUP_MEAT), 'minecraft:apple'];
 const COOKED_FOOD = ['minecraft:cooked_mutton', 'minecraft:cooked_beef', 'minecraft:cooked_porkchop'];
+const DOG_FOOD = [MUTTON, ...BACKUP_FOOD, ...COOKED_FOOD];
 const FEEDING_SEARCH_RADIUS = 24;
 
 function count({ slots }, item) {
@@ -367,23 +368,26 @@ async function provisionCampBeforeSleep(action, craft, bed) {
   throw new Error('Could not walk back to the bed after collecting camp supplies');
 }
 
-async function feedAdoptedDog(action, id, bed) {
+export async function feedAdoptedDog(action, id, bed, attempts = 120) {
+  const startingStock = await action('get_inventory');
+  if (!DOG_FOOD.some(item => count(startingStock, item))) return false;
   const visited = [];
   const rejectedSteps = new Set();
-  for (let attempt = 0; attempt < 120; attempt++) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
     const player = await action('observe');
     const observed = await action('get_entities', { type: DOG, radius: FEEDING_SEARCH_RADIUS });
     const dog = observed?.entities.find(entity => entity.id === id);
     if (dog?.distance <= 4.4) {
       const inventory = await action('get_inventory');
-      const mealCount = count(inventory, MUTTON);
-      assert.ok(mealCount > 0, 'No meal is available for the adopted dog');
-      if (inventory.mainHand?.id !== MUTTON) await hold(action, MUTTON);
+      const meal = DOG_FOOD.find(item => count(inventory, item));
+      if (!meal) return false;
+      const mealCount = count(inventory, meal);
+      if (inventory.mainHand?.id !== meal) await hold(action, meal);
       if (await visible(action, id)) {
         await action('interact_entity', { entityId: id });
         await setTimeout(350);
-        const remaining = count(await action('get_inventory'), MUTTON);
-        if (remaining === mealCount - 1) return;
+        const remaining = count(await action('get_inventory'), meal);
+        if (remaining === mealCount - 1) return true;
         assert.equal(remaining, mealCount, 'A single feeding changed the raw meal count unexpectedly');
       }
     }
@@ -405,7 +409,34 @@ async function feedAdoptedDog(action, id, bed) {
     }
     await setTimeout(550);
   }
-  throw new Error('Could not feed the adopted dog after checking reach and the native crosshair');
+  return false;
+}
+
+async function seekExpeditionFood(action, player, visited, rejectedSteps, tried) {
+  const nearby = await action('get_entities', { radius: 24, max: 64 });
+  const animal = nearby?.entities.find(entity => (BACKUP_MEAT[entity.type] || entity.type === 'minecraft:sheep')
+    && !tried.has(entity.id) && Math.abs(entity.pos[1] - player.position.y) < 3);
+  if (animal?.distance <= 6) {
+    tried.add(animal.id);
+    await hunt(action, animal, item => item === (BACKUP_MEAT[animal.type] ?? MUTTON));
+  } else {
+    visited.push(feet(player));
+    await stepOut(action, player, visited, animal?.pos, 'grass', rejectedSteps);
+  }
+}
+
+export async function forageExpeditionMeal(action) {
+  const visited = [];
+  const rejectedSteps = new Set();
+  const tried = new Set();
+  for (let attempt = 0; attempt < 28; attempt++) {
+    const inventory = await action('get_inventory');
+    if (DOG_FOOD.some(item => count(inventory, item))) return true;
+    const player = await action('observe');
+    if (!player?.inWorld || player.dead || player.health < 12) return false;
+    await seekExpeditionFood(action, player, visited, rejectedSteps, tried);
+  }
+  return false;
 }
 
 export async function prepareAdoptionCamp(action, craft, descendFromCanopy, { chooseRoute } = {}) {
@@ -425,7 +456,6 @@ export async function prepareAdoptionCamp(action, craft, descendFromCanopy, { ch
 export async function adoptAtNight(action, { bed }, craft) {
   await provisionCampBeforeSleep(action, craft, bed);
   await action('look', { pitch: 4 });
-  await hold(action, MUTTON);
 
   for (let attempt = 0; attempt < 180; attempt++) {
     const player = await action('observe');
@@ -439,8 +469,7 @@ export async function adoptAtNight(action, { bed }, craft) {
     const pup = dogs?.entities.find(entity => entity.name === 'Mushroom');
     const inventory = pup && !player.screen ? await action('get_inventory') : null;
     if (inventory?.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide')) {
-      await feedAdoptedDog(action, pup.id, bed);
-      return;
+      return pup.id;
     }
     if (!player.screen && player.timeOfDay >= 12_542 && player.timeOfDay < 23_460) {
       await action('interact_block', { pos: bed, face: 'up' });
@@ -779,16 +808,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
         await policy.saveQuarry?.([]);
         continue;
       }
-      const nearby = await action('get_entities', { radius: 24, max: 48 });
-      const animal = nearby?.entities.find(entity => (BACKUP_MEAT[entity.type] || entity.type === 'minecraft:sheep')
-        && !triedFoodSources.has(entity.id) && Math.abs(entity.pos[1] - player.position.y) < 3);
-      if (animal?.distance <= 6) {
-        triedFoodSources.add(animal.id);
-        await hunt(action, animal, item => item === (BACKUP_MEAT[animal.type] ?? MUTTON));
-      } else {
-        visited.push(feet(player));
-        await stepOut(action, player, visited, animal?.pos, 'grass', rejectedSteps);
-      }
+      await seekExpeditionFood(action, player, visited, rejectedSteps, triedFoodSources);
       continue;
     }
     if (usable && await mineVisible(action, bed, mined, wanted, drops, protectedGround)) {
