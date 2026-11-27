@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
-import { adoptAtNight, earnIronKit, earnStoneKit, WOOD_LOGS } from './expedition-home.mjs';
+import { adoptAtNight, earnIronKit, earnStoneKit, prepareAdoptionCamp, WOOD_LOGS } from './expedition-home.mjs';
 import { hasDrySupport } from './expedition-navigation.mjs';
 import { expeditionPolicy } from './expedition-policy.mjs';
 
@@ -14,10 +15,13 @@ const config = JSON.parse(await readFile(configFile, 'utf8'));
 assert.equal(config.bindAddress, '127.0.0.1');
 assert.equal(config.allowCommands, false);
 assert.ok(config.authToken);
+const bridgeFingerprint = createHash('sha256').update(config.authToken).digest('hex');
 const statusFile = process.env.MUSHROOM_EXPEDITION_STATUS;
 assert.ok(statusFile && isAbsolute(statusFile), 'Set MUSHROOM_EXPEDITION_STATUS to the absolute run status path');
-assert.equal(await readFile(statusFile, 'utf8'), 'ready', 'No fresh disposable expedition is ready');
+const resume = process.env.MUSHROOM_EXPEDITION_RESUME === '1';
+assert.equal(await readFile(statusFile, 'utf8'), resume ? 'held' : 'ready', 'The disposable expedition is not in the expected state');
 const coachingFile = join(dirname(statusFile), 'coach.txt');
+const checkpointFile = join(dirname(statusFile), 'controller-checkpoint.json');
 const live = process.env.MUSHROOM_EXPEDITION_LIVE === '1';
 
 const url = `http://127.0.0.1:${config.port}/mcp`;
@@ -121,18 +125,43 @@ try {
   const start = await action('observe');
   assert.ok(start?.inWorld && start.dimension === 'minecraft:overworld' && !start.dead);
   const inventory = await action('get_inventory');
-  assert.equal(inventory.slots.length, 0, 'Expected an empty expedition inventory');
   const stage = process.env.MUSHROOM_EXPEDITION_STAGE ?? 'adoption';
   const policy = expeditionPolicy(process.env.MUSHROOM_EXPEDITION_POLICY ?? 'rules', coachingFile);
   if (live) policy.waitForCoaching = waitForCoaching;
-  await gatherStarterTools(start);
-  const camp = await adoptAtNight(action, craft, descendFromCanopy, { prepareStone: stage !== 'adoption', ...policy });
-  if (stage === 'stone' || stage === 'iron') {
-    await earnStoneKit(action, craft, camp, policy);
+  let checkpoint;
+  if (resume) {
+    checkpoint = JSON.parse(await readFile(checkpointFile, 'utf8'));
+    assert.equal(checkpoint.stage, stage);
+    assert.equal(checkpoint.owner, start.name);
+    assert.equal(checkpoint.bridgeFingerprint, bridgeFingerprint, 'The recorded client is no longer listening');
+    assert.ok(Number.isFinite(checkpoint.gameTime) && checkpoint.gameTime <= start.gameTime);
+    assert.ok(['adoption', 'stone', 'iron'].includes(checkpoint.phase));
+    for (const pos of [checkpoint.camp?.bed, checkpoint.camp?.table]) {
+      assert.ok(Array.isArray(pos) && pos.length === 3 && pos.every(Number.isInteger), 'Invalid recorded camp');
+    }
+    if (checkpoint.phase !== 'adoption') {
+      assert.ok(inventory.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide'), 'The adopted owner did not reattach');
+    }
+    await reportStatus('ready');
+    console.log(JSON.stringify({ at: new Date().toISOString(), action: 'controller_reattached', phase: checkpoint.phase }));
+  } else {
+    assert.equal(inventory.slots.length, 0, 'Expected an empty expedition inventory');
+    await gatherStarterTools(start);
+    const camp = await prepareAdoptionCamp(action, craft, descendFromCanopy, { prepareStone: stage !== 'adoption', ...policy });
+    checkpoint = { owner: start.name, gameTime: start.gameTime, bridgeFingerprint, stage, phase: 'adoption', camp };
+    if (live) await writeCheckpoint(checkpoint);
   }
-  if (stage === 'iron') {
-    await earnIronKit(action, craft, camp);
+  if (checkpoint.phase === 'adoption') {
+    await adoptAtNight(action, checkpoint.camp);
+    checkpoint.phase = 'stone';
+    if (live && stage !== 'adoption') await writeCheckpoint(checkpoint);
   }
+  if (stage !== 'adoption' && checkpoint.phase === 'stone') {
+    await earnStoneKit(action, craft, checkpoint.camp, policy);
+    checkpoint.phase = 'iron';
+    if (live && stage === 'iron') await writeCheckpoint(checkpoint);
+  }
+  if (stage === 'iron') await earnIronKit(action, craft, checkpoint.camp);
   await reportStatus('finished');
 } catch (error) {
   await reportStatus(live ? 'held' : 'failed');
@@ -140,9 +169,17 @@ try {
 }
 
 async function reportStatus(status) {
-  const temporary = `${statusFile}.${process.pid}.tmp`;
-  await writeFile(temporary, status, { flag: 'wx' });
-  await rename(temporary, statusFile);
+  await replaceFile(statusFile, status);
+}
+
+async function writeCheckpoint(checkpoint) {
+  await replaceFile(checkpointFile, JSON.stringify(checkpoint));
+}
+
+async function replaceFile(path, content) {
+  const temporary = `${path}.${process.pid}.tmp`;
+  await writeFile(temporary, content, { flag: 'wx' });
+  await rename(temporary, path);
 }
 
 async function waitForCoaching(context) {

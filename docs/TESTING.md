@@ -130,6 +130,17 @@ inspection. If the controller has tried its quarry exit options and waits for
 coaching, replacing the note resumes its recovery attempt in the same world.
 The standard QA invocation still exits after a controller failure.
 
+If a live controller has exited and its status is `held`, restart the external
+controller from its last saved phase with the same client still open. Use the
+same stage and policy and point to that run's status file. The client connection
+and owner must match the recorded checkpoint.
+
+```shell
+MUSHROOM_EXPEDITION_STATUS="$RUN_DIRECTORY/status" MUSHROOM_EXPEDITION_RESUME=1 \
+  MUSHROOM_EXPEDITION_LIVE=1 MUSHROOM_EXPEDITION_STAGE=iron MUSHROOM_EXPEDITION_POLICY=jev \
+  node tools/playtest-harness/src/expedition-supplies.mjs >> "$RUN_DIRECTORY/actions.jsonl"
+```
+
 For the smoother spectator camera, apply the tracked patch to the isolated
 bridge checkout before rebuilding the bridge JAR. Use a separate JAR for each
 running client so a build can finish while a playtest is still active.

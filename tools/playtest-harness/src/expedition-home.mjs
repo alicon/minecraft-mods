@@ -3,7 +3,7 @@ import { setTimeout } from 'node:timers/promises';
 import {
   bedSpotsWithGroundCover, dryStepKey, dryWaypoint, hasPlacedBed, leavesBlockingExit, nearbyBuildingSpots, quarryStep,
 } from './expedition-navigation.mjs';
-import { smeltExpeditionIron } from './expedition-furnace.mjs';
+import { cookExpeditionMutton, smeltExpeditionIron } from './expedition-furnace.mjs';
 
 export const WOOD_LOGS = ['oak', 'birch', 'spruce', 'acacia', 'dark_oak', 'jungle', 'cherry', 'pale_oak', 'mangrove']
   .map(wood => `${wood}_log`);
@@ -292,19 +292,48 @@ async function prepareCamp(action, craft, table, bed) {
   await action('go_to', { pos: bed, stopDistance: 1.6, maxTicks: 55 });
 }
 
-async function feedAdoptedDog(action, id, bed, mealCount) {
+async function cookAtCamp(action, craft) {
+  const player = await action('observe');
+  const supplies = await action('get_inventory');
+  if (!player?.inWorld || player.timeOfDay >= 10_300 || player.health < 14
+      || count(supplies, MUTTON) < 3 || !count(supplies, STONE_PICKAXE) || !count(supplies, FURNACE)
+      || !supplies.slots.some(stack => stack.id.endsWith('_log') || (stack.id.endsWith('_planks') && stack.count >= 2))) return;
+  if (!supplies.slots.some(stack => stack.id.endsWith('_planks') && stack.count >= 2)) {
+    const log = supplies.slots.find(stack => stack.id.endsWith('_log')).id;
+    await craft(log.replace(/_log$/, '_planks'), 4);
+  }
+  const furnace = await placeBeside(action, FURNACE);
+  try {
+    if ((await action('interact_block', { pos: furnace }))?.screenOpened === 'FurnaceScreen') {
+      await cookExpeditionMutton(action);
+    }
+  } finally {
+    await action('stop', { closeScreen: true });
+    await hold(action, STONE_PICKAXE);
+    assert.ok(await breakVisible(action, furnace), 'Could not pack the camp furnace after cooking');
+    await action('go_to', { pos: furnace, stopDistance: 0.3, maxTicks: 55 });
+  }
+}
+
+async function feedAdoptedDog(action, id, bed) {
   const visited = [];
   const rejectedSteps = new Set();
   for (let attempt = 0; attempt < 120; attempt++) {
     const player = await action('observe');
     const observed = await action('get_entities', { type: DOG, radius: 16 });
     const dog = observed?.entities.find(entity => entity.id === id);
-    if (dog?.distance <= 4.4 && await visible(action, id)) {
-      await action('interact_entity', { entityId: id });
-      await setTimeout(350);
-      const remaining = count(await action('get_inventory'), MUTTON);
-      if (remaining === mealCount - 1) return;
-      assert.equal(remaining, mealCount, 'A single feeding consumed more than one meal');
+    if (dog?.distance <= 4.4) {
+      const inventory = await action('get_inventory');
+      const mealCount = count(inventory, MUTTON);
+      assert.ok(mealCount > 0, 'No meal is available for the adopted dog');
+      if (inventory.mainHand?.id !== MUTTON) await hold(action, MUTTON);
+      if (await visible(action, id)) {
+        await action('interact_entity', { entityId: id });
+        await setTimeout(350);
+        const remaining = count(await action('get_inventory'), MUTTON);
+        if (remaining === mealCount - 1) return;
+        assert.equal(remaining, mealCount, 'A single feeding changed the raw meal count unexpectedly');
+      }
     }
     if (player && attempt % 4 === 3) {
       const tile = feet(player);
@@ -322,7 +351,8 @@ async function feedAdoptedDog(action, id, bed, mealCount) {
   throw new Error('Could not feed the adopted dog after checking reach and the native crosshair');
 }
 
-export async function adoptAtNight(action, craft, descendFromCanopy, { prepareStone = false, chooseRoute, ...policy } = {}) {
+export async function prepareAdoptionCamp(action, craft, descendFromCanopy,
+    { prepareStone = false, chooseRoute, ...policy } = {}) {
   const color = await gatherWool(action, descendFromCanopy, chooseRoute);
   await ensurePlanks(action, craft, 3);
   // Bring the first table to the flock so sleeping doesn't depend on retracing the route.
@@ -334,9 +364,13 @@ export async function adoptAtNight(action, craft, descendFromCanopy, { prepareSt
   const bedPos = await placeBeside(action, bed);
   await prepareCamp(action, craft, table, bedPos);
   if (prepareStone) await earnStoneKit(action, craft, { table, bed: bedPos }, { ...policy, beforeNight: true });
+  await cookAtCamp(action, craft);
+  return { table, bed: bedPos };
+}
+
+export async function adoptAtNight(action, { bed }) {
   await action('look', { pitch: 4 });
   await hold(action, MUTTON);
-  const mealCount = count(await action('get_inventory'), MUTTON);
 
   for (let attempt = 0; attempt < 180; attempt++) {
     const player = await action('observe');
@@ -350,11 +384,11 @@ export async function adoptAtNight(action, craft, descendFromCanopy, { prepareSt
     const pup = dogs?.entities.find(entity => entity.name === 'Mushroom');
     const inventory = pup && !player.screen ? await action('get_inventory') : null;
     if (inventory?.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide')) {
-      await feedAdoptedDog(action, pup.id, bedPos, mealCount);
-      return { table, bed: bedPos };
+      await feedAdoptedDog(action, pup.id, bed);
+      return;
     }
     if (!player.screen && player.timeOfDay >= 12_542 && player.timeOfDay < 23_460) {
-      await action('interact_block', { pos: bedPos, face: 'up' });
+      await action('interact_block', { pos: bed, face: 'up' });
     }
     // Let the actual cycle advance. Using the bed is the only action that advances it to morning.
     await setTimeout(player.timeOfDay >= 23_460 || !dogs ? 500 : 4500);

@@ -5,6 +5,29 @@ const INGOT = 'minecraft:iron_ingot';
 const RAW_IRON = 'minecraft:raw_iron';
 const COAL = 'minecraft:coal';
 
+export async function cookExpeditionMutton(action) {
+  const menu = await action('get_container');
+  assert.equal(menu?.type, 'minecraft:furnace');
+  const meat = menu.slots.find(stack => stack.section === 'player' && stack.id === 'minecraft:mutton' && stack.count >= 3);
+  const fuel = menu.slots.find(stack => stack.section === 'player' && stack.id.endsWith('_planks') && stack.count >= 2);
+  if (!meat || !fuel || menu.slots.some(stack => stack.section !== 'player')) return;
+  for (const [stack, slot] of [[meat, 0], [fuel, 1]]) {
+    await action('click_slot', { slot: stack.slot, action: 'left' });
+    await action('click_slot', { slot, action: 'right' });
+    await action('click_slot', { slot, action: 'right' });
+    await action('click_slot', { slot: stack.slot, action: 'left' });
+  }
+  for (let poll = 0; poll < 36; poll++) {
+    const current = await action('get_container');
+    if (current?.containerId !== menu.containerId) break;
+    if (current.slots.some(stack => stack.section === 'result' && stack.id === 'minecraft:cooked_mutton' && stack.count >= 2)) break;
+    await setTimeout(650);
+  }
+  await action('transfer_items', { to: 'player', item: 'minecraft:cooked_mutton' });
+  await action('transfer_items', { to: 'player', item: meat.id });
+  await action('transfer_items', { to: 'player', item: fuel.id });
+}
+
 export async function smeltExpeditionIron(action, needed) {
   const furnace = await action('get_container');
   assert.equal(furnace?.type, 'minecraft:furnace', 'The native furnace menu must be open');

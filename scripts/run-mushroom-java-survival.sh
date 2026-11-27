@@ -60,7 +60,9 @@ if [ -d "$expedition_screens" ]; then
     -exec cp {} "$expedition_report/screenshots" \;
 fi
 if [ "$expedition_result" -ne 0 ]; then exit "$expedition_result"; fi
-if [ "$expedition_controller" -ne 0 ]; then exit "$expedition_controller"; fi
+if [ "$expedition_controller" -ne 0 ] && [ "${MUSHROOM_EXPEDITION_LIVE:-0}" != 1 ]; then
+  exit "$expedition_controller"
+fi
 if [ ! -f "$MUSHROOM_EXPEDITION_STATUS" ] || [ "$(cat "$MUSHROOM_EXPEDITION_STATUS")" != finished ]; then
   echo "The client exited before finishing the expedition. See $expedition_report/game.log" >&2
   exit 1
