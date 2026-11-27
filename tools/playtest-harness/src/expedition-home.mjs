@@ -687,6 +687,7 @@ export async function earnStoneKit(action, craft, { table, bed },
   const stairs = [];
   const protectedGround = new Set();
   let missedStone = 0;
+  let abandonedQuarries = 0;
   for (let attempt = 0; attempt < 70; attempt++) {
     const inventory = await action('get_inventory');
     const needed = count(inventory, FURNACE) ? 3 : 11;
@@ -702,17 +703,25 @@ export async function earnStoneKit(action, craft, { table, bed },
     const work = chooseWork && !stairs.length && missedStone >= 4
       ? await chooseWork(player, { beforeNight, missedStone, cobblestone: count(inventory, COBBLESTONE), needed }, normalWork)
       : normalWork;
-    if (work === 'camp' || stairs.length >= 7) break;
+    if (work === 'camp') break;
     if (stairs.length || work === 'quarry') {
-      const descent = await descendQuarry(action, player, bed, stairs, protectedGround);
+      const descent = stairs.length < 7
+        ? await descendQuarry(action, player, bed, stairs, protectedGround)
+        : 'unavailable';
       if (Array.isArray(descent)) continue;
-      if (descent === 'blocked' || stairs.length) break;
+      if (descent === 'blocked' || stairs.length) {
+        await leaveQuarry(action, stairs, { chooseEscape, waitForCoaching });
+        stairs.length = 0;
+        missedStone = 0;
+        if (++abandonedQuarries >= 3) break;
+      }
     }
-    const position = feet(player);
+    const scout = await action('observe');
+    const position = feet(scout);
     const distance = Math.hypot(position[0] - table[0], position[2] - table[2]);
     visited.push(position);
     const returnToCamp = distance > (beforeNight ? 9 : 40);
-    await stepOut(action, player, visited, returnToCamp ? table : undefined, false, rejectedSteps);
+    await stepOut(action, scout, visited, returnToCamp ? table : undefined, 'stone', rejectedSteps);
   }
   await leaveQuarry(action, stairs, { chooseEscape, waitForCoaching });
   const materials = await action('get_inventory');
