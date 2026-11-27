@@ -247,19 +247,29 @@ async function prepareCamp(action, craft, table, bed) {
   await action('go_to', { pos: bed, stopDistance: 1.6, maxTicks: 55 });
 }
 
-async function feedAdoptedDog(action, id) {
+async function feedAdoptedDog(action, id, bed) {
   await hold(action, MUTTON);
   const before = count(await action('get_inventory'), MUTTON);
-  for (let attempt = 0; attempt < 12; attempt++) {
-    if (attempt % 3 === 0) {
-      await action('go_to', { entityId: id, stopDistance: attempt ? 1.05 : 1.65, maxTicks: 45 });
-    }
+  const visited = [];
+  for (let attempt = 0; attempt < 30; attempt++) {
     if (await visible(action, id)) {
       await action('interact_entity', { entityId: id });
       await setTimeout(350);
       const remaining = count(await action('get_inventory'), MUTTON);
       if (remaining === before - 1) return;
       assert.equal(remaining, before, 'A single feeding consumed more than one meal');
+    }
+    if (attempt % 3 === 2) {
+      const player = await action('observe');
+      const dog = (await action('get_entities', { type: DOG, radius: 16 })).entities.find(entity => entity.id === id);
+      if (dog?.distance > 3 && attempt >= 5) {
+        visited.push(feet(player));
+        await stepOut(action, player, visited, dog.pos);
+      } else if (dog && attempt >= 8) {
+        await action('go_to', { entityId: id, stopDistance: 2, maxTicks: 20 });
+      } else if (!dog && attempt >= 5) {
+        await action('go_to', { pos: bed, stopDistance: 2, maxTicks: 55 });
+      }
     }
     await setTimeout(150);
   }
@@ -283,7 +293,7 @@ export async function adoptAtNight(action, craft, descendFromCanopy) {
     assert.ok(player?.inWorld && !player.dead && player.health > 4, 'Lost a safe position beside the bed');
     const pup = (await action('get_entities', { type: DOG, radius: 8 })).entities.find(entity => entity.name === 'Mushroom');
     if (pup && !player.screen && (await action('get_inventory')).slots.some(stack => stack.id === 'mushroom_yorkie:field_guide')) {
-      await feedAdoptedDog(action, pup.id);
+      await feedAdoptedDog(action, pup.id, bedPos);
       return;
     }
     if (!player.screen && player.timeOfDay >= 12_542 && player.timeOfDay < 23_460) {
