@@ -25,11 +25,13 @@ async function aim(player, dog, item) {
   player.selectedSlotIndex = 0;
   inventory(player).setItem(0, typeof item === "string" ? new ItemStack(item) : item);
   await system.waitTicks(3);
-  player.lookAtLocation({ ...dog.location, y: dog.location.y + 0.23 });
-  await system.waitTicks(2);
-  const target = player.getEntitiesFromViewDirection({ maxDistance: 3 })[0]?.entity;
-  expect(target?.id === dog.id, "The player's crosshair missed the dog: " + JSON.stringify({
-    actor: player.location, dog: dog.location, target: target?.typeId,
+  for (let attempt = 0; attempt < 8; attempt++) {
+    player.lookAtLocation({ ...dog.location, y: dog.location.y + 0.23 });
+    await system.waitTicks(1);
+    if (player.getEntitiesFromViewDirection({ maxDistance: 3 })[0]?.entity.id === dog.id) return;
+  }
+  throw new Error("The player's crosshair missed the dog: " + JSON.stringify({
+    actor: player.location, dog: dog.location,
   }));
 }
 
