@@ -11,10 +11,16 @@ export function hasDrySupport(id) {
   return SUPPORT.test(id ?? '');
 }
 
+export function hasPlacedBed(cells, [x, y, z], item) {
+  return cells.some(cell => cell.x === x && cell.y === y && cell.z === z && cell.b === item)
+    && cells.some(cell => cell.y === y && cell.b === item && Math.abs(cell.x - x) + Math.abs(cell.z - z) === 1);
+}
+
 export function nearbyBuildingSpots(cells, player, bed) {
   const blocks = new Map(cells.map(({ x, y, z, b }) => [`${x},${y},${z}`, b]));
   const fits = (x, y, z) => !blocks.get(`${x},${y},${z}`)
     && hasDrySupport(blocks.get(`${x},${y - 1},${z}`));
+  const fitsBed = (x, y, z) => fits(x, y, z) && !blocks.get(`${x},${y + 1},${z}`);
   const spots = [];
   const playerX = Math.floor(player.x);
   const playerY = Math.floor(player.y);
@@ -30,13 +36,18 @@ export function nearbyBuildingSpots(cells, player, bed) {
         // Vanilla extends the head of the bed away from the player.
         const head = Math.abs(dx) > Math.abs(dz)
           ? [x + Math.sign(dx), y, z] : [x, y, z + Math.sign(dz)];
-        if (bed && (!fits(...head) || blocks.get(`${x},${y + 1},${z}`)
-          || blocks.get(`${head[0]},${y + 1},${head[2]}`))) continue;
-        spots.push({ pos: [x, y, z], score: reach + Math.abs(y - playerY) });
+        let alternatives = 0;
+        if (bed) {
+          if (!fitsBed(x, y, z) || !fitsBed(...head)) continue;
+          // Native placement can use a different body facing from the click.
+          // Open, supported ground tolerates more than one orientation.
+          alternatives = CARDINAL.filter(([ox, oz]) => fitsBed(x + ox, y, z + oz)).length;
+        }
+        spots.push({ pos: [x, y, z], score: reach + Math.abs(y - playerY), alternatives });
       }
     }
   }
-  return spots.sort((a, b) => a.score - b.score).map(({ pos }) => pos);
+  return spots.sort((a, b) => b.alternatives - a.alternatives || a.score - b.score).map(({ pos }) => pos);
 }
 
 export function leavesBlockingExit(cells, [x, y, z]) {

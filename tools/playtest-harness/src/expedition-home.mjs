@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
-import { dryWaypoint, leavesBlockingExit, nearbyBuildingSpots } from './expedition-navigation.mjs';
+import { dryWaypoint, hasPlacedBed, leavesBlockingExit, nearbyBuildingSpots } from './expedition-navigation.mjs';
 
 export const WOOD_LOGS = ['oak', 'birch', 'spruce', 'acacia', 'dark_oak', 'jungle', 'cherry', 'pale_oak', 'mangrove']
   .map(wood => `${wood}_log`);
@@ -151,9 +151,22 @@ async function placeBeside(action, item) {
   await hold(action, item);
   const player = await action('observe');
   const { cells } = await action('get_blocks', { center: feet(player), size: [11, 5, 11], format: 'json' });
-  for (const pos of nearbyBuildingSpots(cells, player.position, item.endsWith('_bed'))) {
+  const bed = item.endsWith('_bed');
+  for (const pos of nearbyBuildingSpots(cells, player.position, bed)) {
     const result = await action('place_block', { pos });
-    if (result?.placed && result.blockAtPos === item) return pos;
+    if (!result?.placed || result.blockAtPos !== item) continue;
+    if (!bed) return pos;
+    await setTimeout(300);
+    const placed = await action('get_blocks', { center: pos, size: [3, 1, 3], format: 'json' });
+    if (hasPlacedBed(placed.cells, pos, item)) return pos;
+
+    const { entities } = await action('get_entities', { type: 'item', radius: 8 });
+    const droppedBed = entities.find(entity => entity.item?.id === item);
+    if (droppedBed) await action('go_to', { entityId: droppedBed.id, stopDistance: 0.3, maxTicks: 45 });
+    if (!count(await action('get_inventory'), item)) {
+      throw new Error(`Native placement consumed the ${item} without leaving a complete bed at ${pos}`);
+    }
+    await hold(action, item);
   }
   throw new Error(`No nearby supported position for ${item}`);
 }

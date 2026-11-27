@@ -46,6 +46,15 @@ test('bed placement finds a supported pair beyond a crowded immediate neighbor',
   assert.deepEqual(nearbyBuildingSpots([...blocks, cell(0, 2, 3)], position, true), []);
 });
 
+test('a predicted bed is incomplete until both adjacent halves appear in the loaded world', async () => {
+  const { hasPlacedBed } = await import('./expedition-navigation.mjs');
+  const foot = [290, 68, 222];
+  const item = 'minecraft:white_bed';
+  assert.equal(hasPlacedBed([], foot, item), false);
+  assert.equal(hasPlacedBed([cell(...foot, 'white_bed'), cell(289, 68, 221, 'white_bed')], foot, item), false);
+  assert.equal(hasPlacedBed([cell(...foot, 'white_bed'), cell(289, 68, 222, 'white_bed')], foot, item), true);
+});
+
 test('repeated backtracking toward inaccessible sheep gives way to exploring the dry bank', async () => {
   const { dryWaypoint } = await import('./expedition-navigation.mjs');
   const blocks = [cell(0, 0, 0), cell(1, 0, 0), cell(0, 0, 1), cell(0, 0, 2)];
