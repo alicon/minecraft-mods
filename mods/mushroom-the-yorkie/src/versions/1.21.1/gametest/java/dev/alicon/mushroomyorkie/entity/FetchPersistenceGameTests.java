@@ -99,6 +99,24 @@ public final class FetchPersistenceGameTests {
 				(dog, damage) -> dog.hurt(damage, 4.0F));
 	}
 
+	/** A dog can take cover, persist the owner's camp, and wait for recall if the mat disappears. */
+	@GameTest(template = "fabric-gametest-api-v1:empty", timeoutTicks = 180)
+	public void expeditionCampSurvivesReload(GameTestHelper helper) {
+		ExpeditionCampScenarios.retreatAndRecall(helper, dog -> roundTrip(helper, dog));
+	}
+
+	/** A following dog pauses when both sides of a narrow bridge drop away. */
+	@GameTest(template = "fabric-gametest-api-v1:empty", timeoutTicks = 180)
+	public void expeditionCrossesAfterWideningBridge(GameTestHelper helper) {
+		ExpeditionCampScenarios.narrowCrossing(helper);
+	}
+
+	/** Warning at an unsafe crossing preserves a guest's lead and the dog's owner. */
+	@GameTest(template = "fabric-gametest-api-v1:empty", timeoutTicks = 100)
+	public void expeditionWarnsWhileGuestHoldsLead(GameTestHelper helper) {
+		ExpeditionCampScenarios.borrowedLeadCrossing(helper);
+	}
+
 	private static MushroomYorkieEntity roundTrip(GameTestHelper helper, MushroomYorkieEntity yorkie) {
 		CompoundTag data = yorkie.saveWithoutId(new CompoundTag());
 		yorkie.discard();

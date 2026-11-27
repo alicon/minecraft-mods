@@ -17,6 +17,8 @@ final class MushroomOwnerTravelHandler {
 
 	private static void afterPlayerChangeWorld(ServerPlayer player, ServerLevel origin, ServerLevel destination) {
 		for (MushroomYorkieEntity yorkie : followingYorkies(player, origin)) {
+			// The destination entity inherits this timer and can leave the portal before it can send him back.
+			yorkie.setPortalCooldown();
 			MushroomOwnerTravelPlatform.teleportFollowingYorkie(yorkie, destination, player);
 		}
 	}
@@ -24,7 +26,7 @@ final class MushroomOwnerTravelHandler {
 	private static List<? extends MushroomYorkieEntity> followingYorkies(ServerPlayer player, ServerLevel origin) {
 		return origin.getEntities(
 				EntityTypeTest.forClass(MushroomYorkieEntity.class),
-				yorkie -> MushroomOwnerTravelPolicy.shouldFollow(
+				yorkie -> !yorkie.isHoldingExpeditionShelter() && MushroomOwnerTravelPolicy.shouldFollow(
 						yorkie.isAlive(),
 						// The player has already left origin, so vanilla's level-local owner lookup no longer resolves here.
 						yorkie.belongsTo(player),

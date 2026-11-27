@@ -19,6 +19,8 @@ public final class ModBlocks {
 	public static final Block DOG_WATER_BOWL = register("dog_water_bowl", new DogBowlBlock(bowlProperties("dog_water_bowl")));
 	/** Soft indoor dog bed for Mushroom. */
 	public static final Block DOG_BED = register("dog_bed", new DogBedBlock(woolProperties("dog_bed")));
+	/** Thin wool marker the owner can assign as Mushroom's camp. */
+	public static final Block CAMP_MAT = register("camp_mat", new CampMatBlock(MushroomBlockProperties.noCollision(woolProperties("camp_mat"))));
 	/** Open-fronted softly lit home where Mushroom can sleep outdoors. */
 	public static final Block DOGHOUSE = register("doghouse", new DoghouseBlock(doghouseProperties("doghouse")));
 

@@ -59,6 +59,12 @@ public final class RecipeCraftingGameTests {
 		RecipeCraftingScenarios.craft(helper, "padded_vest");
 	}
 
+	/** A mixed wool and string recipe makes a portable camp marker. */
+	@GameTest(template = "fabric-gametest-api-v1:empty", timeoutTicks = 20)
+	public void craftCampMat(GameTestHelper helper) {
+		RecipeCraftingScenarios.craft(helper, "camp_mat");
+	}
+
 	/** Loaded doghouse recipe must produce its intended item and quantity. */
 	@GameTest(template = "fabric-gametest-api-v1:empty", timeoutTicks = 20)
 	public void craftDoghouse(GameTestHelper helper) {

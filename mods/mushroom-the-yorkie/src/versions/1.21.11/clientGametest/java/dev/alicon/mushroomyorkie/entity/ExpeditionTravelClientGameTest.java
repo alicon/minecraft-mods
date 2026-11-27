@@ -42,9 +42,13 @@ public final class ExpeditionTravelClientGameTest implements FabricClientGameTes
 			try {
 				dogId = adoptAfterSleep(context, server, ownerId);
 				ExpeditionVestClientScenario.equipAndInspect(context, server, ownerId, dogId);
+				ExpeditionCampClientScenario.placeAndMark(context, server, ownerId, dogId);
 				walkThroughPortal(context, world, ownerId, dogId, Level.NETHER, new BlockPos(16, 90, 16), false);
 				walkThroughPortal(context, world, ownerId, dogId, Level.OVERWORLD, new BlockPos(24, 95, 24), false);
 				walkThroughPortal(context, world, ownerId, dogId, Level.END, new BlockPos(48, 90, 48), false);
+				ExpeditionEndShelterClientScenario.shelterThroughOwnerDeath(context, server, ownerId, dogId);
+				walkThroughPortal(context, world, ownerId, dogId, Level.END, new BlockPos(48, 90, 48), false);
+				ExpeditionEndShelterClientScenario.recallInEnd(context, server, dogId);
 				walkThroughPortal(context, world, ownerId, dogId, Level.OVERWORLD, new BlockPos(112, 65, 0), false);
 			} catch (RuntimeException | AssertionError exception) {
 				context.takeScreenshot("expedition-travel-failure");
@@ -56,6 +60,7 @@ public final class ExpeditionTravelClientGameTest implements FabricClientGameTes
 			try {
 				assertDog(reopened.getServer(), ownerId, dogId, Level.OVERWORLD, Level.OVERWORLD, false);
 				ExpeditionVestClientScenario.assertPlated(reopened.getServer(), ownerId, dogId);
+				ExpeditionCampClientScenario.assertMarked(reopened.getServer(), dogId, ExpeditionEndShelterClientScenario.CAMP);
 				System.out.printf("Expedition rejoin passed: dog=%s save=%s%n", dogId, save.getSaveDirectory());
 				context.takeScreenshot("expedition-rejoin");
 				askDogToSit(context, reopened.getServer(), dogId);

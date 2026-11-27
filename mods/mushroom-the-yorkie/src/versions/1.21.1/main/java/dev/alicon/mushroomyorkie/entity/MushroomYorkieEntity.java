@@ -53,6 +53,8 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	final MushroomPeacefulMobMemory peacefulMobMemory = new MushroomPeacefulMobMemory();
 	final MushroomTrustState trust = new MushroomTrustState();
 	final MushroomOwnerPresenceState ownerPresence = new MushroomOwnerPresenceState();
+	final MushroomCampState expeditionCamp = new MushroomCampState();
+	net.minecraft.core.GlobalPos lastWarnedTrailStep;
 	final MushroomCreativeFlightRecovery creativeRecoveryFlight = new MushroomCreativeFlightRecovery();
 	final MushroomFlightRoute fetchFlight = new MushroomFlightRoute(this);
 	final MushroomWaterEscape waterEscape = new MushroomWaterEscape(this);
@@ -153,6 +155,11 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	/** Harness gate for leash behavior; interactions should mutate harness through MushroomYorkieInteractions. */
 	public boolean hasHarness() {
 		return this.entityData.get(DATA_HARNESS);
+	}
+
+	/** Indicates that the dog is waiting for the owner's return or recall after a retreat. */
+	public boolean isHoldingExpeditionShelter() {
+		return this.expeditionCamp.holding();
 	}
 
 	/** Whether to render the padded vest on the existing harness. */

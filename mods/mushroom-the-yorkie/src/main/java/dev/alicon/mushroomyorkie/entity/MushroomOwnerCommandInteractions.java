@@ -48,6 +48,10 @@ final class MushroomOwnerCommandInteractions {
 			return;
 		}
 
+		if (MushroomCampInteractions.recall(yorkie, player)) {
+			return;
+		}
+
 		if (!yorkie.isOrderedToSit() && MushroomYorkieStateQueries.isWetForSitting(yorkie)) {
 			player.displayClientMessage(Component.translatable("message.mushroom_yorkie.sit_water"), true);
 			MushroomBehaviorDebugger.debug(yorkie, "sit_blocked_water", "ordered: sit blocked while Mushroom is in water", true);

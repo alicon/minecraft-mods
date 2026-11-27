@@ -32,10 +32,12 @@ Run the focused Java 1.21.11 travel fixture in a real Fabric client:
 
 The fixture creates a disposable Normal Survival world with a fresh inventory.
 It stages a bed and portal entrances, then uses the normal Use and movement
-bindings. Each crossing checks the original dog's UUID, ownership, and living
-arrival. The fixture stages the End exit portal to exercise the credits and
-return path, then saves and reopens to verify the same dog again. An empty-hand
-Use orders him to sit before a final Nether crossing checks that he stays behind.
+bindings. It also equips the vest, attaches scute plates and places the camp
+mat. In the End, a staged breath cloud tests whether Mushroom retreats and
+keeps shelter while his owner dies and returns. Each crossing checks the
+original dog's UUID, ownership and living arrival. A staged exit exercises
+the credits and return path, then save and reopen verify the same dog,
+armor and camp. A final Nether crossing checks that a seated dog stays behind.
 Screenshots are under `mods/mushroom-the-yorkie/build/run/clientGameTest/screenshots/`.
 
 ### Mushroom fresh-world supplies pilot

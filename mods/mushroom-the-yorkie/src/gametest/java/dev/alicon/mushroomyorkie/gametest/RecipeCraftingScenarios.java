@@ -32,6 +32,7 @@ final class RecipeCraftingScenarios {
 					Items.LEATHER, Items.BLACK_DYE, Items.LEATHER, null, Items.STRING, null));
 			case "padded_vest" -> new Craft(ModItems.PADDED_VEST, 1, grid(3, 2, Items.WHITE_WOOL, Items.LEATHER, Items.BLUE_WOOL,
 					null, Items.STRING, null));
+			case "camp_mat" -> new Craft(ModItems.CAMP_MAT, 1, grid(2, 2, Items.WHITE_WOOL, Items.GREEN_WOOL, null, Items.STRING));
 			case "doghouse" -> new Craft(ModItems.DOGHOUSE, 1, grid(3, 3, Items.DARK_OAK_PLANKS, Items.DARK_OAK_PLANKS, Items.DARK_OAK_PLANKS,
 					Items.CHERRY_PLANKS, Items.LANTERN, Items.CHERRY_PLANKS, Items.CHERRY_PLANKS, Items.RED_WOOL, Items.CHERRY_PLANKS));
 			default -> throw new IllegalArgumentException("Unknown crafting fixture: " + name);

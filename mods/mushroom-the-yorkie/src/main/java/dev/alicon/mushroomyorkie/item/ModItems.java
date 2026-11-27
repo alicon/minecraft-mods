@@ -28,6 +28,8 @@ public final class ModItems {
 	public static final Item DOG_WATER_BOWL = register("dog_water_bowl", new BlockItem(ModBlocks.DOG_WATER_BOWL, properties("dog_water_bowl", 16)));
 	/** Soft placeable bed that Mushroom can curl up on at night. */
 	public static final Item DOG_BED = register("dog_bed", new BlockItem(ModBlocks.DOG_BED, properties("dog_bed", 16)));
+	/** Placeable marker for Mushroom's expedition camp. */
+	public static final Item CAMP_MAT = register("camp_mat", new BlockItem(ModBlocks.CAMP_MAT, properties("camp_mat", 16)));
 	/** Cozy placeable doghouse with a bed and a tiny warm light for Mushroom. */
 	public static final Item DOGHOUSE = register("doghouse", new BlockItem(ModBlocks.DOGHOUSE, properties("doghouse", 16)));
 	/** Wool toy ball Mushroom can fetch when dropped away from his owner. */

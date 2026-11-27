@@ -39,6 +39,7 @@ public final class ModCreativeTabs {
 					output.accept(ModItems.DOG_FOOD_BOWL);
 					output.accept(ModItems.DOG_WATER_BOWL);
 					output.accept(ModItems.DOG_BED);
+					output.accept(ModItems.CAMP_MAT);
 					output.accept(ModItems.DOGHOUSE);
 					output.accept(ModItems.YORKIE_BALL);
 					output.accept(ModItems.YORKIE_CHEW_TOY);

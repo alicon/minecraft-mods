@@ -12,6 +12,19 @@ The padded vest absorbs up to 30% of impact damage and the plated vest up to
 other sustained hazards still hurt. Watch for cracks and an action-bar warning.
 A worn-out vest stays on the harness and accepts repairs.
 
+## Expedition camp and crossings
+
+Craft a camp mat with two wool blocks and string. Put it on solid ground in
+your shelter. With Mushroom nearby, use the placed mat with an empty hand to
+mark it for him. He remembers one camp at a time, even when you quit or travel.
+
+When he retreats, he looks for a safe path to the marked mat. If the mat has
+been moved or the path is unsafe, he tries to stop on safe ground. He waits for
+you to come back. Use an empty hand on him to recall him from a few steps away.
+
+On foot, he barks at crossings with a drop on both sides. Widen the bridge or
+take a safer route. He can warn the player holding his lead as well.
+
 ## Water and vehicle recovery
 
 Owner-assisted dismount clears movement queued at the old seat so a sitting

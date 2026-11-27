@@ -1,0 +1,16 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "equipment",
+	"key": {
+		"W": "#minecraft:wool",
+		"S": "minecraft:string"
+	},
+	"pattern": [
+		"WW",
+		" S"
+	],
+	"result": {
+		"id": "mushroom_yorkie:camp_mat",
+		"count": 1
+	}
+}
