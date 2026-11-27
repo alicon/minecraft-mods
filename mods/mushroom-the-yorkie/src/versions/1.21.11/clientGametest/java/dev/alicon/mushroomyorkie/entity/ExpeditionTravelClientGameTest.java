@@ -19,6 +19,7 @@ import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.Vec3;
 import org.lwjgl.glfw.GLFW;
 
@@ -40,10 +41,10 @@ public final class ExpeditionTravelClientGameTest implements FabricClientGameTes
 			ownerId = context.computeOnClient(client -> client.player.getUUID());
 			try {
 				dogId = adoptAfterSleep(context, server, ownerId);
-				walkThroughPortal(context, world, ownerId, dogId, Level.NETHER, new BlockPos(16, 90, 16));
-				walkThroughPortal(context, world, ownerId, dogId, Level.OVERWORLD, new BlockPos(24, 95, 24));
-				walkThroughPortal(context, world, ownerId, dogId, Level.END, new BlockPos(48, 90, 48));
-				walkThroughPortal(context, world, ownerId, dogId, Level.OVERWORLD, new BlockPos(112, 65, 0));
+				walkThroughPortal(context, world, ownerId, dogId, Level.NETHER, new BlockPos(16, 90, 16), false);
+				walkThroughPortal(context, world, ownerId, dogId, Level.OVERWORLD, new BlockPos(24, 95, 24), false);
+				walkThroughPortal(context, world, ownerId, dogId, Level.END, new BlockPos(48, 90, 48), false);
+				walkThroughPortal(context, world, ownerId, dogId, Level.OVERWORLD, new BlockPos(112, 65, 0), false);
 			} catch (RuntimeException | AssertionError exception) {
 				context.takeScreenshot("expedition-travel-failure");
 				throw exception;
@@ -52,14 +53,37 @@ public final class ExpeditionTravelClientGameTest implements FabricClientGameTes
 		try (var reopened = save.open()) {
 			reopened.getClientWorld().waitForChunksRender();
 			try {
-				assertDog(reopened.getServer(), ownerId, dogId, Level.OVERWORLD);
+				assertDog(reopened.getServer(), ownerId, dogId, Level.OVERWORLD, Level.OVERWORLD, false);
+				System.out.printf("Expedition rejoin passed: dog=%s save=%s%n", dogId, save.getSaveDirectory());
+				context.takeScreenshot("expedition-rejoin");
+				askDogToSit(context, reopened.getServer(), dogId);
+				walkThroughPortal(context, reopened, ownerId, dogId, Level.NETHER, new BlockPos(16, 90, 16), true);
 			} catch (AssertionError failure) {
 				context.takeScreenshot("expedition-reopen-failure");
 				throw failure;
 			}
-			System.out.printf("Expedition rejoin passed: dog=%s save=%s%n", dogId, save.getSaveDirectory());
-			context.takeScreenshot("expedition-rejoin");
 		}
+	}
+
+	private static void askDogToSit(ClientGameTestContext context, TestServerContext server, UUID dogId) {
+		server.runCommand("tp @a 16.5 90 17.5");
+		var aim = server.computeOnServer(minecraft -> {
+			var dog = (MushroomYorkieEntity) minecraft.overworld().getEntity(dogId);
+			dog.setPos(16.5, 90.0, 15.2);
+			dog.getNavigation().stop();
+			return dog.getBoundingBox().getCenter();
+		});
+		context.waitFor(client -> client.player.blockPosition().equals(new BlockPos(16, 90, 17)));
+		context.runOnClient(client -> client.player.lookAt(EntityAnchorArgument.Anchor.EYES, aim));
+		context.waitFor(client -> client.hitResult instanceof EntityHitResult hit && hit.getEntity().getUUID().equals(dogId));
+		context.getInput().pressKey(options -> options.keyUse);
+		for (int tick = 0; tick < 20; tick++) {
+			if (server.computeOnServer(minecraft -> ((MushroomYorkieEntity) minecraft.overworld().getEntity(dogId)).isOrderedToSit())) {
+				return;
+			}
+			context.waitTick();
+		}
+		throw new AssertionError("Native empty-hand Use did not order Mushroom to sit");
 	}
 
 	private static UUID adoptAfterSleep(ClientGameTestContext context, TestServerContext server, UUID ownerId) {
@@ -97,7 +121,7 @@ public final class ExpeditionTravelClientGameTest implements FabricClientGameTes
 	}
 
 	private static void walkThroughPortal(ClientGameTestContext context, TestSingleplayerContext world,
-			UUID ownerId, UUID dogId, ResourceKey<Level> target, BlockPos staging) {
+			UUID ownerId, UUID dogId, ResourceKey<Level> target, BlockPos staging, boolean sitting) {
 		TestServerContext server = world.getServer();
 		var origin = server.computeOnServer(minecraft -> owner(minecraft, ownerId).level().dimension());
 		int x = staging.getX();
@@ -151,20 +175,24 @@ public final class ExpeditionTravelClientGameTest implements FabricClientGameTes
 		context.waitFor(client -> client.screen == null && client.level != null && client.player != null
 				&& client.level.dimension().equals(target), PORTAL_WAIT_TICKS);
 		world.getClientWorld().waitForChunksRender();
-		assertDog(server, ownerId, dogId, target);
-		System.out.printf("Expedition portal passed: %s -> %s dog=%s%n", origin.identifier(), target.identifier(), dogId);
-		context.takeScreenshot("expedition-from-" + origin.identifier().getPath() + "-to-" + target.identifier().getPath());
+		assertDog(server, ownerId, dogId, target, sitting ? origin : target, sitting);
+		System.out.printf("Expedition portal passed: %s -> %s dog=%s sitting=%s%n", origin.identifier(), target.identifier(), dogId, sitting);
+		if (!sitting) {
+			context.takeScreenshot("expedition-from-" + origin.identifier().getPath() + "-to-" + target.identifier().getPath());
+		}
 	}
 
-	private static void assertDog(TestServerContext server, UUID ownerId, UUID dogId, ResourceKey<Level> target) {
+	private static void assertDog(TestServerContext server, UUID ownerId, UUID dogId,
+			ResourceKey<Level> playerDimension, ResourceKey<Level> dogDimension, boolean sitting) {
 		server.runOnServer(minecraft -> {
 			var owner = owner(minecraft, ownerId);
 			var owned = dogs(minecraft, owner);
-			if (!owner.level().dimension().equals(target) || owned.size() != 1
+			if (!owner.level().dimension().equals(playerDimension) || owned.size() != 1
 					|| !owned.getFirst().isAlive() || !owned.getFirst().getUUID().equals(dogId)
-					|| !owned.getFirst().level().dimension().equals(target)) {
-				throw new AssertionError("Expected original living dog " + dogId + " at " + target.identifier()
-						+ " with its owner, observed "
+					|| !owned.getFirst().level().dimension().equals(dogDimension)
+					|| owned.getFirst().isOrderedToSit() != sitting) {
+				throw new AssertionError("Expected original living dog " + dogId + " at " + dogDimension.identifier()
+						+ " sitting=" + sitting + ", observed "
 						+ owned.stream().map(dog -> dog.getUUID() + "@" + dog.level().dimension().identifier()).toList());
 			}
 		});

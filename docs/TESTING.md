@@ -34,7 +34,8 @@ The fixture creates a disposable Normal Survival world with a fresh inventory.
 It stages a bed and portal entrances, then uses the normal Use and movement
 bindings. Each crossing checks the original dog's UUID, ownership, and living
 arrival. The fixture stages the End exit portal to exercise the credits and
-return path, then saves and reopens to verify the same dog again.
+return path, then saves and reopens to verify the same dog again. An empty-hand
+Use orders him to sit before a final Nether crossing checks that he stays behind.
 Screenshots are under `mods/mushroom-the-yorkie/build/run/clientGameTest/screenshots/`.
 
 ### Playtest bridge and server GameTests
