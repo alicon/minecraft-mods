@@ -25,7 +25,9 @@ const resume = process.env.MUSHROOM_EXPEDITION_RESUME === '1';
 assert.equal(await readFile(statusFile, 'utf8'), resume ? 'held' : 'ready', 'The disposable expedition is not in the expected state');
 const coachingFile = join(dirname(statusFile), 'coach.txt');
 const checkpointFile = join(dirname(statusFile), 'controller-checkpoint.json');
+const deathFile = join(dirname(statusFile), 'last-owner-death');
 const live = process.env.MUSHROOM_EXPEDITION_LIVE === '1';
+const deathAtStart = live ? await readFile(deathFile, 'utf8').catch(() => '') : '';
 const blockPosition = pos => Array.isArray(pos) && pos.length === 3 && pos.every(Number.isInteger);
 
 const url = `http://127.0.0.1:${config.port}/mcp`;
@@ -65,7 +67,12 @@ async function action(name, args = {}) {
   const result = await rpc('tools/call', { name, arguments: args });
   const observation = result.structuredContent ?? result.content;
   console.log(JSON.stringify({ at: new Date().toISOString(), action: name, args, observation, ok: !result.isError }));
-  if (name === 'observe' && !result.isError) lastPlayer = observation;
+  if (name === 'observe' && !result.isError) {
+    lastPlayer = observation;
+    if (observation?.dead || (live && await readFile(deathFile, 'utf8').catch(() => '') !== deathAtStart)) {
+      throw new Error('The Survival player died and needs to recover before continuing');
+    }
+  }
   return result.isError ? null : observation;
 }
 
@@ -159,8 +166,7 @@ try {
     await action('stop', { closeScreen: true });
     if (['stone', 'iron'].includes(checkpoint.phase)
         && !inventory.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide')) {
-      const death = await readFile(join(dirname(statusFile), 'last-owner-death'), 'utf8').catch(() => '');
-      const [dimension, x, y, z, tick] = death.trim().split(' ');
+      const [dimension, x, y, z, tick] = deathAtStart.trim().split(' ');
       const destination = [x, y, z].map(Number);
       assert.ok(dimension === start.dimension && blockPosition(destination)
         && Number(tick) > checkpoint.gameTime && Number(tick) <= start.gameTime,

@@ -122,8 +122,8 @@ export function dryWaypoint(cells, start, visited, destination, preferredGround,
   const blocks = new Map(cells.map(({ x, y, z, b }) => [`${x},${y},${z}`, b]));
   const block = (x, y, z) => blocks.get(`${x},${y},${z}`);
   const visits = new Map();
-  for (const pos of visited) {
-    const key = pos.join(',');
+  for (const [x, , z] of visited) {
+    const key = `${x},${z}`;
     visits.set(key, (visits.get(key) ?? 0) + 1);
   }
   const queue = [{ pos: start, path: [], repeatCost: 0 }];
@@ -145,7 +145,7 @@ export function dryWaypoint(cells, start, visited, destination, preferredGround,
             || (ty < y && !gap(block(tx, y + 1, tz)))) continue;
         seen.add(key);
         const route = [...path, step];
-        const routeRepeatCost = repeatCost + Math.min(12, visits.get(key) ?? 0);
+        const routeRepeatCost = repeatCost + Math.min(12, visits.get(`${tx},${tz}`) ?? 0);
         queue.push({ pos: step, path: route, repeatCost: routeRepeatCost });
         const fresh = Math.min(12, ...visited.map(tile => distance(tile, step)));
         const pasture = preferredGround === 'grass' ? [[0, 0], ...CARDINAL].filter(([ox, oz]) => {

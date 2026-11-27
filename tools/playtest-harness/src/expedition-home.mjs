@@ -136,9 +136,10 @@ async function stepOut(action, player, visited, destination, preferredGround, re
     pos = (await chooseRoute(player, routes, destination)).pos;
   }
   const result = await action('go_to', { pos, stopDistance: 0.3, maxTicks: 90 });
-  const moved = result?.arrived || Math.hypot(result?.position?.[0] - player.position.x,
+  const wrongHeight = result?.arrived && Math.abs(result.position?.[1] - pos[1]) >= 0.9;
+  const moved = (result?.arrived && !wrongHeight) || Math.hypot(result?.position?.[0] - player.position.x,
     result?.position?.[2] - player.position.z) >= 0.6;
-  if (!moved && result?.reason) rejectedSteps.add(dryStepKey(center, pos));
+  if (wrongHeight || (!moved && result?.reason)) rejectedSteps.add(dryStepKey(center, pos));
   return moved;
 }
 
@@ -694,6 +695,7 @@ async function openCampTable(action, table, visited) {
 export async function recoverDroppedLoadout(action, destination) {
   const visited = [];
   const rejectedSteps = new Set();
+  let stalled = 0;
   for (let attempt = 0; attempt < 100; attempt++) {
     const player = await action('observe');
     assert.ok(player?.inWorld && !player.dead && player.health >= 10, 'The return to the dropped gear became unsafe');
@@ -709,7 +711,8 @@ export async function recoverDroppedLoadout(action, destination) {
       if (count(await action('get_inventory'), FIELD_GUIDE)) return;
     }
     visited.push(here);
-    if (!await stepOut(action, player, visited, destination, false, rejectedSteps)) break;
+    stalled = await stepOut(action, player, visited, destination, false, rejectedSteps) ? 0 : stalled + 1;
+    if (stalled >= 3) break;
   }
   throw new Error('Could not recover the original guide from the place where the player died');
 }
