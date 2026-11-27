@@ -100,7 +100,8 @@ function safeSleep(pup, spot) {
 }
 
 function update(pup, state, day, time, now) {
-  if (pup.getProperty(FLIGHT_MODE) !== "ground" || pup.getProperty(WALKING_AFTER_STAY)) {
+  if (pup.getProperty(FLIGHT_MODE) !== "ground" || pup.getProperty(WALKING_AFTER_STAY)
+    || pup.getProperty(storage("home_goal")) === "camp") {
     state.name = undefined;
     return;
   }

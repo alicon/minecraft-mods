@@ -15,6 +15,7 @@ function canFollowByAir(pup, owner) {
     && !pup.getProperty(storage("ordered_sit"))
     && !pup.getProperty(WALKING_AFTER_STAY)
     && pup.getProperty(storage("home_goal")) !== "sleep"
+    && pup.getProperty(storage("home_goal")) !== "camp"
     && !pup.getComponent("minecraft:leashable")?.isLeashed
     && !pup.getComponent("minecraft:riding")
     && distanceSquared(pup.location, owner.location) <= FOLLOW_RANGE_SQUARED;

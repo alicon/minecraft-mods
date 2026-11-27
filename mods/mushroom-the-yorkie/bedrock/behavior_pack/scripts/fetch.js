@@ -40,6 +40,7 @@ function canPlay(pup, owner) {
   return owner?.isValid && owner.dimension.id === pup.dimension.id
     && owner.getGameMode() !== GameMode.Spectator
     && pup.getProperty(FLIGHT_MODE) === "ground"
+    && pup.getProperty(storage("home_goal")) !== "camp"
     && distanceSquared(pup.location, owner.location) <= OWNER_RANGE_SQUARED
     && !pup.getProperty(storage("ordered_sit"))
     && !pup.getProperty(WALKING_AFTER_STAY)

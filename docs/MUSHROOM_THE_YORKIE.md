@@ -19,11 +19,13 @@ your shelter with Mushroom nearby. In Java, use the placed mat with an empty
 hand. In Bedrock, placing the mat marks the camp. He remembers one camp at a
 time, even when you quit or travel.
 
-In Java, when he retreats, he looks for a safe path to the marked mat. If the mat has
+When he retreats, he looks for a safe path to the marked mat. If the mat has
 been moved or the path is unsafe, he tries to stop on safe ground. He waits for
-you to come back. Use an empty hand on him to recall him from a few steps away.
+you to come back. In Bedrock, build his retreat path on one level. Return to
+within two blocks to call him back when it is safe. In Java, you can also use
+an empty hand to recall him from a few steps away.
 
-On foot, he barks at crossings with a drop on both sides. Widen the bridge or
+In Java, he barks at crossings with a drop on both sides. Widen the bridge or
 take a safer route. He can warn the player holding his lead as well.
 
 ## Field Guide and Leave it

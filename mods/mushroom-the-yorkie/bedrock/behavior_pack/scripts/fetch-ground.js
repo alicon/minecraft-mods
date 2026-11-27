@@ -35,7 +35,7 @@ export function dryDropSpot(dimension, location) {
   return safeFeet(dimension, location, false);
 }
 
-export function nudgeToward(pup, destination, allowWater = true) {
+export function nudgeToward(pup, destination, allowWater = true, canStep) {
   const { location, dimension } = pup;
   if (Math.abs(location.y - destination.y) > 1.25 || (!pup.isOnGround && !(allowWater && pup.isInWater))) {
     return false;
@@ -43,11 +43,12 @@ export function nudgeToward(pup, destination, allowWater = true) {
   const bearing = Math.atan2(destination.z - location.z, destination.x - location.x);
   const distance = distanceSquared(location, destination);
   const step = Math.min(LOOK_AHEAD, Math.hypot(destination.x - location.x, destination.z - location.z));
-  for (const offset of CANDIDATE_ANGLES) {
+  for (const offset of canStep ? [0] : CANDIDATE_ANGLES) {
     const x = Math.cos(bearing + offset);
     const z = Math.sin(bearing + offset);
     const next = { x: location.x + x * step, y: location.y, z: location.z + z * step };
-    if (distanceSquared(next, destination) >= distance || !safeFeet(dimension, next, allowWater)) {
+    if (distanceSquared(next, destination) >= distance
+        || !(canStep ? canStep(location, next) : safeFeet(dimension, next, allowWater))) {
       continue;
     }
     const blocked = dimension.getBlockFromRay(

@@ -41,7 +41,8 @@
             "water",
             "house",
             "bed",
-            "sleep"
+            "sleep",
+            "camp"
           ],
           "default": "idle",
           "client_sync": true
@@ -596,6 +597,12 @@
                   "operator": "!="
                 },
                 {
+                  "test": "enum_property",
+                  "domain": "mushroom_yorkie:home_goal",
+                  "value": "camp",
+                  "operator": "!="
+                },
+                {
                   "test": "has_component",
                   "value": "minecraft:behavior.random_stroll",
                   "operator": "!="
@@ -855,6 +862,20 @@
         },
         "set_property": {
           "mushroom_yorkie:woodland_chase": true
+        }
+      },
+      "mushroom_yorkie:home_camp": {
+        "remove": {
+          "component_groups": [
+            "mushroom_yorkie:awake",
+            "mushroom_yorkie:seek_food",
+            "mushroom_yorkie:seek_water",
+            "mushroom_yorkie:seek_house",
+            "mushroom_yorkie:seek_bed"
+          ]
+        },
+        "set_property": {
+          "mushroom_yorkie:home_goal": "camp"
         }
       },
       "mushroom_yorkie:woodland_cue_none": {

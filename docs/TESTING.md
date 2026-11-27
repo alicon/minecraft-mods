@@ -48,14 +48,16 @@ Bedrock Dedicated Server archive.
 ```shell
 python3 scripts/build-bedrock-addon.py mushroom-the-yorkie
 python3 scripts/smoke-mushroom-bedrock.py SERVER.zip ADDON.mcaddon \
-  --verify-expedition-travel --verify-expedition-vest
+  --verify-expedition-travel --verify-expedition-vest --verify-expedition-camp
 ```
 
 The travel fixture stages safe Nether and End crossings and checks the original
 dog's identity. It also covers an ordered sit, an unsafe landing, a remote End
 arrival and a lead already held by a guest. A second fixture walks a Survival
 simulated player through a native Nether portal. The vest fixture checks same-tick
-owner and guest inputs, damage, repair, plates, removal and saved wear.
+owner and guest inputs, damage, repair, plates, removal and saved wear. The camp
+fixture exercises native placement, ownership, a safe route around a wall, recall,
+and a missing mat. A restart checks the same dog's mark and safety hold.
 
 ### Mushroom fresh-world Survival adoption
 

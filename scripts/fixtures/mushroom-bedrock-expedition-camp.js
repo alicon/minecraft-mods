@@ -1,14 +1,16 @@
-import { BlockVolume, Direction, GameMode, ItemStack, system, world } from "@minecraft/server";
+import { BlockVolume, Direction, EntityDamageCause, GameMode, ItemStack, system, world } from "@minecraft/server";
 import { spawnSimulatedPlayer } from "@minecraft/server-gametest";
 
 const YORKIE = "mushroom_yorkie:mushroom_yorkie";
 const MAT = "mushroom_yorkie:camp_mat";
 const CAMP = "mushroom_yorkie:expedition_camp";
+const HOME = "mushroom_yorkie:home_goal";
 const SAVED_DOG = "camp_fixture_dog";
 const SAVED_CAMP = "camp_fixture_position";
 const FIRST = { x: 9, y: 231, z: 8 };
 const SECOND = { x: 12, y: 231, z: 8 };
 const UNSAFE = { x: 9, y: 231, z: 11 };
+const RETREAT_START = { x: 4.5, y: 231, z: 8.5 };
 let matPlacement;
 let matUse;
 
@@ -19,8 +21,8 @@ world.afterEvents.playerInteractWithBlock.subscribe(({ player, block, beforeItem
   if (beforeItemStack?.typeId === MAT) matUse = { actor: player.id, at: block.location };
 });
 
-async function waitFor(ok, message) {
-  for (let i = 0; i < 40; i++) {
+async function waitFor(ok, message, ticks = 80) {
+  for (let i = 0; i < ticks; i += 2) {
     if (ok()) return;
     await system.waitTicks(2);
   }
@@ -52,6 +54,56 @@ async function placeMat(player, position) {
   await system.waitTicks(2);
 }
 
+function distance(from, to) {
+  return Math.hypot(from.x - to.x, from.y - to.y, from.z - to.z);
+}
+
+async function exerciseRetreat(dimension, dog, owner, guest) {
+  const camp = { x: SECOND.x + 0.5, y: SECOND.y, z: SECOND.z + 0.5 };
+  const magma = { x: 8, y: 230, z: 6 };
+  dimension.fillBlocks(new BlockVolume({ x: 8, y: 231, z: 7 }, { x: 8, y: 232, z: 9 }), "minecraft:stone");
+  dimension.setBlockType(magma, "minecraft:magma");
+  owner.teleport({ x: 14.5, y: 231, z: 12.5 });
+  guest.teleport({ x: 14.5, y: 231, z: 5.5 });
+  dog.teleport(RETREAT_START);
+  await system.waitTicks(2);
+  const health = dog.getComponent("minecraft:health");
+  const before = health.currentValue;
+  if (!dog.applyDamage(2, { cause: EntityDamageCause.magic }) || health.currentValue >= before) {
+    throw new Error("The staged hit did not damage the dog");
+  }
+  await waitFor(() => dog.getProperty(HOME) === "camp", "Mushroom did not retreat after damage with a camp marked");
+  await waitFor(() => {
+    const foot = { x: Math.floor(dog.location.x), y: 230, z: Math.floor(dog.location.z) };
+    if (dog.location.y < 230.75 || (foot.x === magma.x && foot.z === magma.z)) {
+      throw new Error("Mushroom used the unsafe floor during retreat");
+    }
+    return distance(dog.location, camp) < 0.7;
+  }, () => "Mushroom did not walk around the wall to his marked mat: " + JSON.stringify({
+    dog: dog.location, home: dog.getProperty(HOME), health: health.currentValue,
+  }), 320);
+  guest.teleport({ ...camp, z: camp.z + 1.3 });
+  await system.waitTicks(50);
+  if (distance(dog.location, camp) > 0.8 || dog.getProperty(HOME) !== "camp") {
+    throw new Error("A nearby guest ended the owner's camp stay");
+  }
+  owner.teleport({ ...camp, z: camp.z - 1.5 });
+  await waitFor(() => dog.getProperty(HOME) === "idle", "The returning owner could not recall Mushroom");
+  owner.teleport({ x: 14.5, y: 231, z: 12.5 });
+  guest.teleport({ x: 14.5, y: 231, z: 5.5 });
+  dimension.setBlockType(SECOND, "minecraft:air");
+  dog.teleport(RETREAT_START);
+  health.setCurrentValue(health.effectiveMax);
+  await system.waitTicks(3);
+  if (!dog.applyDamage(2, { cause: EntityDamageCause.magic })) throw new Error("The second staged hit was ignored");
+  await waitFor(() => dog.getProperty(HOME) === "camp", "The dog failed to hold safely when its mat was gone");
+  await system.waitTicks(60);
+  if (distance(dog.location, RETREAT_START) > 0.8 || dog.getProperty(HOME) !== "camp") {
+    throw new Error("Mushroom left safe ground for a missing or unassigned mat");
+  }
+  console.warn("MUSHROOM_EXPEDITION_CAMP_RETREAT " + dog.id);
+}
+
 world.afterEvents.worldLoad.subscribe(async () => {
   try {
     const dimension = world.getDimension("overworld");
@@ -60,8 +112,11 @@ world.afterEvents.worldLoad.subscribe(async () => {
     await world.tickingAreaManager.createTickingArea("mushroom_camp_fixture", { dimension, from, to });
     const savedDog = world.getDynamicProperty(SAVED_DOG);
     if (typeof savedDog === "string") {
-      await waitFor(() => world.getEntity(savedDog)?.getDynamicProperty(CAMP) === world.getDynamicProperty(SAVED_CAMP),
-        "The same dog did not keep the marked mat across restart");
+      await waitFor(() => {
+        const dog = world.getEntity(savedDog);
+        return dog?.getDynamicProperty(CAMP) === world.getDynamicProperty(SAVED_CAMP)
+          && dog.getProperty(HOME) === "camp";
+      }, "The same dog did not keep the marked mat and safety hold across restart");
       console.warn("MUSHROOM_EXPEDITION_CAMP_REOPENED " + savedDog);
       return;
     }
@@ -91,6 +146,7 @@ world.afterEvents.worldLoad.subscribe(async () => {
     dimension.setBlockType(SECOND, "minecraft:air");
     await placeMat(owner, SECOND);
     await waitFor(() => dog.getDynamicProperty(CAMP) === expected(SECOND), "The owner could not replace his camp");
+    await exerciseRetreat(dimension, dog, owner, guest);
 
     world.setDynamicProperty(SAVED_DOG, dog.id);
     world.setDynamicProperty(SAVED_CAMP, expected(SECOND));
