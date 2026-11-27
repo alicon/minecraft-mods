@@ -3,7 +3,9 @@ import { createHash } from 'node:crypto';
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
-import { adoptAtNight, earnIronKit, earnStoneKit, prepareAdoptionCamp, WOOD_LOGS } from './expedition-home.mjs';
+import {
+  adoptAtNight, earnIronKit, earnStoneKit, prepareAdoptionCamp, recoverDroppedLoadout, WOOD_LOGS,
+} from './expedition-home.mjs';
 import { hasDrySupport } from './expedition-navigation.mjs';
 import { expeditionPolicy } from './expedition-policy.mjs';
 
@@ -144,10 +146,21 @@ try {
       || (Array.isArray(checkpoint.quarry) && checkpoint.quarry.length <= 44 && checkpoint.quarry.every(blockPosition)),
     'Invalid recorded quarry path');
     assert.ok(checkpoint.quarryLanding === undefined || blockPosition(checkpoint.quarryLanding), 'Invalid recorded landing');
-    if (checkpoint.phase !== 'adoption') {
-      assert.ok(inventory.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide'), 'The adopted owner did not reattach');
-    }
     await action('stop', { closeScreen: true });
+    if (checkpoint.phase !== 'adoption' && !inventory.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide')) {
+      const death = await readFile(join(dirname(statusFile), 'last-owner-death'), 'utf8').catch(() => '');
+      const [dimension, x, y, z, tick] = death.trim().split(' ');
+      const destination = [x, y, z].map(Number);
+      assert.ok(dimension === start.dimension && blockPosition(destination)
+        && Number(tick) > checkpoint.gameTime && Number(tick) <= start.gameTime,
+      'Cannot confirm the adopted owner or the recorded place where they died');
+      console.log(JSON.stringify({ at: new Date().toISOString(), action: 'recover_dropped_loadout', destination }));
+      await recoverDroppedLoadout(action, destination);
+      delete checkpoint.quarry;
+      delete checkpoint.quarryLanding;
+      delete checkpoint.reenterQuarry;
+      await writeCheckpoint(checkpoint);
+    }
     await reportStatus('ready');
     console.log(JSON.stringify({ at: new Date().toISOString(), action: 'controller_reattached', phase: checkpoint.phase }));
   } else {

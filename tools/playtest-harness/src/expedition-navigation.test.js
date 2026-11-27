@@ -5,6 +5,37 @@ function cell(x, y, z, type = 'grass_block') {
   return { x, y, z, b: `minecraft:${type}` };
 }
 
+test('the respawn route picks up the original dropped guide before the remaining gear', async () => {
+  const { recoverDroppedLoadout } = await import('./expedition-home.mjs');
+  const guide = 'mushroom_yorkie:field_guide';
+  const picked = [];
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe': return { inWorld: true, health: 20, position: { x: 11.5, y: 64, z: 10.5 } };
+      case 'get_entities': return { entities: [
+        { id: 10, item: { id: 'minecraft:stone_pickaxe' }, pos: [10.2, 64, 10] },
+        { id: 11, item: { id: guide }, pos: [10.8, 64, 10] },
+        { id: 12, item: { id: 'minecraft:coal' }, pos: [11, 61, 11] },
+      ] };
+      case 'go_to':
+        picked.push(args.entityId);
+        return { arrived: true };
+      case 'get_inventory': return { slots: picked.includes(11) ? [{ id: guide, count: 1 }] : [] };
+      default: throw new Error(`Unexpected action: ${name}`);
+    }
+  };
+  await recoverDroppedLoadout(action, [10, 64, 10]);
+  assert.deepEqual(picked, [11, 10]);
+});
+
+test('a gear recovery with low health stops before approaching the old death location', async () => {
+  const { recoverDroppedLoadout } = await import('./expedition-home.mjs');
+  await assert.rejects(recoverDroppedLoadout(async name => {
+    assert.equal(name, 'observe');
+    return { inWorld: true, health: 5, position: { x: 11.5, y: 64, z: 10.5 } };
+  }, [10, 64, 10]), /return to the dropped gear became unsafe/);
+});
+
 test('forest-floor litter can be cleared for a bed with two dry supports', async () => {
   const { bedSpotsWithGroundCover, nearbyBuildingSpots } = await import('./expedition-navigation.mjs');
   const position = { x: 0.15, y: 1, z: 0.5 };

@@ -9,6 +9,7 @@ export const WOOD_LOGS = ['oak', 'birch', 'spruce', 'acacia', 'dark_oak', 'jungl
   .map(wood => `${wood}_log`);
 const WOOL = /^minecraft:(.+)_wool$/;
 const MUTTON = 'minecraft:mutton';
+const FIELD_GUIDE = 'mushroom_yorkie:field_guide';
 const DOG = 'mushroom_yorkie:mushroom_yorkie';
 const PICKAXE = 'minecraft:wooden_pickaxe';
 const STONE_PICKAXE = 'minecraft:stone_pickaxe';
@@ -28,6 +29,7 @@ const BACKUP_MEAT = {
   'minecraft:pig': 'minecraft:porkchop',
 };
 const BACKUP_FOOD = [...Object.values(BACKUP_MEAT), 'minecraft:apple'];
+const COOKED_FOOD = ['minecraft:cooked_mutton', 'minecraft:cooked_beef', 'minecraft:cooked_porkchop'];
 
 function count({ slots }, item) {
   return slots.reduce((total, stack) => total + (stack.id === item ? stack.count : 0), 0);
@@ -577,6 +579,29 @@ async function openCampTable(action, table, visited) {
   throw new Error('Could not walk back to the crafting table after quarrying');
 }
 
+export async function recoverDroppedLoadout(action, destination) {
+  const visited = [];
+  const rejectedSteps = new Set();
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const player = await action('observe');
+    assert.ok(player?.inWorld && !player.dead && player.health >= 10, 'The return to the dropped gear became unsafe');
+    const here = feet(player);
+    if (Math.hypot(...destination.map((coordinate, axis) => coordinate - here[axis])) <= 5) {
+      const { entities } = await action('get_entities', { type: 'item', radius: 8 });
+      // Walk to the guide first so the next controller can recognize the returning owner.
+      const guide = entities.find(entity => entity.item?.id === FIELD_GUIDE);
+      for (const drop of [guide, ...entities.filter(entity => entity !== guide)].filter(Boolean)) {
+        if (Math.abs(drop.pos[1] - player.position.y) > 1.5) continue;
+        await action('go_to', { entityId: drop.id, stopDistance: 0.25, maxTicks: 40 });
+      }
+      if (count(await action('get_inventory'), FIELD_GUIDE)) return;
+    }
+    visited.push(here);
+    if (!await stepOut(action, player, visited, destination, false, rejectedSteps)) break;
+  }
+  throw new Error('Could not recover the original guide from the place where the player died');
+}
+
 export async function earnStoneKit(action, craft, { table, bed },
     { beforeNight = false, chooseWork, chooseEscape, waitForCoaching } = {}) {
   const initial = await action('get_inventory');
@@ -681,6 +706,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   let misses = 0;
   let quarries = 0;
   let madeBackup = false;
+  const triedFoodSources = new Set();
   for (let attempt = 0; attempt < 190; attempt++) {
     const inventory = await action('get_inventory');
     const wanted = new Set();
@@ -696,20 +722,39 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       await hold(action, STONE_PICKAXE);
     }
     const player = await action('observe');
-    const meal = count(inventory, 'minecraft:cooked_mutton') ? 'minecraft:cooked_mutton'
-      : count(inventory, MUTTON) > 1 ? MUTTON : undefined;
-    if (player.food <= 16 && meal) {
+    const meal = [...COOKED_FOOD, ...BACKUP_FOOD].find(item => count(inventory, item))
+      ?? (count(inventory, MUTTON) > (player.health < 14 || player.food <= 12 ? 0 : 1) ? MUTTON : undefined);
+    if (player.food < 20 && (player.food <= 16 || player.health < 14) && meal) {
       await hold(action, meal);
       await action('use_item', { ticks: 36 });
-      if (usable) await hold(action, STONE_PICKAXE);
+      continue;
+    }
+    if (!meal && player.food < 18 && (player.health < 14 || player.food <= 12)) {
+      if (stairs.length) {
+        await leaveQuarry(action, stairs, policy);
+        stairs.length = 0;
+        await policy.saveQuarry?.([]);
+        continue;
+      }
+      const nearby = await action('get_entities', { radius: 24, max: 48 });
+      const animal = nearby?.entities.find(entity => (BACKUP_MEAT[entity.type] || entity.type === 'minecraft:sheep')
+        && !triedFoodSources.has(entity.id) && Math.abs(entity.pos[1] - player.position.y) < 3);
+      if (animal?.distance <= 6) {
+        triedFoodSources.add(animal.id);
+        await hunt(action, animal, item => item === (BACKUP_MEAT[animal.type] ?? MUTTON));
+      } else {
+        visited.push(feet(player));
+        await stepOut(action, player, visited, animal?.pos, 'grass', rejectedSteps);
+      }
+      continue;
     }
     if (usable && await mineVisible(action, bed, mined, wanted, drops, protectedGround)) {
       misses = 0;
       continue;
     }
     misses++;
-    if (!stairs.length && !madeBackup && misses >= 8 && picks.length < 2 && count(inventory, COBBLESTONE) >= 3
-        && picks.every(pick => durability(pick) < 90)) {
+    const needsTool = !usable || (!madeBackup && picks.length < 2 && picks.every(pick => durability(pick) < 90));
+    if (!stairs.length && needsTool && (misses >= 8 || !usable) && count(inventory, COBBLESTONE) >= 3) {
       await ensurePlanks(action, craft, 6);
       await craft('minecraft:crafting_table', 1);
       if (count(await action('get_inventory'), 'minecraft:stick') < 2) await craft('minecraft:stick', 4);

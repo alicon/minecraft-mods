@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldSave;
+import net.minecraft.client.gui.screens.DeathScreen;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.gamerules.GameRules;
@@ -31,6 +32,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 			throw new AssertionError("Set MUSHROOM_EXPEDITION_STATUS to a new absolute run status path");
 		}
 		Path status = Path.of(statusPath);
+		boolean live = "1".equals(System.getenv("MUSHROOM_EXPEDITION_LIVE"));
 		String seed = System.getenv("MUSHROOM_EXPEDITION_SEED");
 		String spawnRadius = System.getenv("MUSHROOM_EXPEDITION_SPAWN_RADIUS");
 		String requestedStage = System.getenv("MUSHROOM_EXPEDITION_STAGE");
@@ -78,10 +80,33 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 						throw new AssertionError("The Survival controller reported a failure. See its action trace.");
 					}
 					boolean finished = "finished".equals(result);
+					if (live && !finished && context.computeOnClient(client -> client.screen instanceof DeathScreen)) {
+						var death = server.computeOnServer(minecraft -> {
+							var owner = minecraft.getPlayerList().getPlayer(ownerId);
+							var position = owner.blockPosition();
+							return String.format("%s %d %d %d %d", owner.level().dimension().identifier(),
+									position.getX(), position.getY(), position.getZ(), minecraft.overworld().getGameTime());
+						});
+						context.takeScreenshot("expedition-survival-owner-death-" + elapsed);
+						System.out.println("Expedition Survival owner died: " + death);
+						context.waitTicks(21);
+						if (context.computeOnClient(client -> client.screen instanceof DeathScreen)) {
+							context.clickScreenButton("deathScreen.respawn");
+						}
+						context.waitFor(client -> client.player != null && client.player.isAlive()
+								&& !(client.screen instanceof DeathScreen));
+						Files.writeString(status.resolveSibling("last-owner-death"), death);
+						System.out.println("Expedition Survival owner respawned in the same save");
+						continue;
+					}
 					String dogEvidence = server.computeOnServer(minecraft -> {
 						var owner = minecraft.getPlayerList().getPlayer(ownerId);
-						if (owner == null || !owner.isAlive()) {
-							throw new AssertionError("The Survival player is missing or dead");
+						if (owner == null) {
+							throw new AssertionError("The Survival player is missing");
+						}
+						if (!owner.isAlive()) {
+							if (live && !finished) return null;
+							throw new AssertionError("The Survival player is dead");
 						}
 						boolean hasGuide = owner.getInventory().contains(stack -> stack.is(ModItems.FIELD_GUIDE));
 						if (!finished && !hasGuide) {

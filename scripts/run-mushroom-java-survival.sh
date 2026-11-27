@@ -43,6 +43,29 @@ expedition_controller=0
 if [ -f "$MUSHROOM_EXPEDITION_STATUS" ]; then
   "$expedition_node" tools/playtest-harness/src/expedition-supplies.mjs \
     > "$expedition_report/actions.jsonl" 2> "$expedition_report/controller.log" || expedition_controller=$?
+  expedition_last_death=
+  while [ "$expedition_controller" -ne 0 ] && [ "${MUSHROOM_EXPEDITION_LIVE:-0}" = 1 ] \
+    && [ "$(cat "$MUSHROOM_EXPEDITION_STATUS")" = held ] \
+    && [ -f "$expedition_report/controller-checkpoint.json" ]; do
+    # The client may still be waiting for the native Respawn button to enable.
+    expedition_death=
+    for expedition_check in 1 2 3 4 5; do
+      if [ -f "$expedition_report/last-owner-death" ]; then
+        expedition_death=$(cat "$expedition_report/last-owner-death")
+        if [ -n "$expedition_death" ] && [ "$expedition_death" != "$expedition_last_death" ]; then
+          break
+        fi
+      fi
+      sleep 1
+    done
+    if [ -z "$expedition_death" ] || [ "$expedition_death" = "$expedition_last_death" ]; then
+      break
+    fi
+    expedition_last_death=$expedition_death
+    expedition_controller=0
+    MUSHROOM_EXPEDITION_RESUME=1 "$expedition_node" tools/playtest-harness/src/expedition-supplies.mjs \
+      >> "$expedition_report/actions.jsonl" 2>> "$expedition_report/controller.log" || expedition_controller=$?
+  done
   if [ "$expedition_controller" -ne 0 ] && [ "$(cat "$MUSHROOM_EXPEDITION_STATUS")" = ready ]; then
     # A startup error can happen before the controller begins reporting results.
     printf 'failed' > "$expedition_report/controller-failed"

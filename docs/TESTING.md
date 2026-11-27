@@ -131,6 +131,13 @@ inspection. If the controller has tried its quarry exit options and waits for
 coaching, replacing the note resumes its recovery attempt in the same world.
 The standard QA invocation still exits after a controller failure.
 
+If the owner dies in live mode, the runner records the death location and
+screen, then uses Minecraft's Respawn button in the same save. If the
+controller stopped and has a saved phase, the runner reattaches it once for
+that death. The controller can follow a dry route to the recorded location
+and recover the dropped guide and gear. The trace retains the death and
+reacquisition.
+
 If a live controller has exited and its status is `held`, restart the external
 controller from its last saved phase with the same client still open. Use the
 same stage and policy and point to that run's status file. The client connection
