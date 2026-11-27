@@ -393,6 +393,11 @@ async function feedAdoptedDog(action, id, bed) {
       visited.push(tile);
       const nearCamp = dog && Math.hypot(...dog.pos.map((axis, index) => axis - bed[index])) <= FEEDING_SEARCH_RADIUS;
       if (nearCamp && Math.abs(dog.pos[1] - player.position.y) <= 4 && fromCamp < FEEDING_SEARCH_RADIUS) {
+        // Track the moving dog on level ground before falling back to dry waypoints.
+        if (dog.distance <= 12 && Math.abs(dog.pos[1] - player.position.y) <= 1.25) {
+          const approach = await action('go_to', { entityId: id, stopDistance: 2.2, maxTicks: 45 });
+          if (approach?.arrived) continue;
+        }
         await stepOut(action, player, visited, dog.pos, false, rejectedSteps);
       } else if (fromCamp > 3) {
         await stepOut(action, player, visited, bed, false, rejectedSteps);
