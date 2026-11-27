@@ -4,6 +4,7 @@ import { isAbsolute } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import { adoptAtNight, earnIronKit, earnStoneKit, WOOD_LOGS } from './expedition-home.mjs';
 import { hasDrySupport } from './expedition-navigation.mjs';
+import { expeditionScoutPolicy } from './expedition-policy.mjs';
 
 const configFile = new URL(
   '../../../mods/mushroom-the-yorkie/build/run/clientGameTest/config/mcagent.json',
@@ -120,8 +121,9 @@ try {
   const inventory = await action('get_inventory');
   assert.equal(inventory.slots.length, 0, 'Expected an empty expedition inventory');
   const stage = process.env.MUSHROOM_EXPEDITION_STAGE ?? 'adoption';
+  const chooseRoute = expeditionScoutPolicy(process.env.MUSHROOM_EXPEDITION_POLICY ?? 'rules');
   await gatherStarterTools(start);
-  const camp = await adoptAtNight(action, craft, descendFromCanopy, stage !== 'adoption');
+  const camp = await adoptAtNight(action, craft, descendFromCanopy, { prepareStone: stage !== 'adoption', chooseRoute });
   if (stage === 'stone' || stage === 'iron') {
     await earnStoneKit(action, craft, camp);
   }

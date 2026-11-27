@@ -96,15 +96,30 @@ async function hunt(action, animal, dropMatches) {
   return false;
 }
 
-async function stepOut(action, player, visited, destination, seekPasture = false, rejectedSteps = new Set()) {
+async function stepOut(action, player, visited, destination, seekPasture = false, rejectedSteps = new Set(), chooseRoute) {
   const center = feet(player);
   const volume = await action('get_blocks', { center, size: [17, 9, 17], format: 'json' });
-  const pos = dryWaypoint(volume.cells, center, visited, destination, seekPasture, rejectedSteps);
+  let pos = dryWaypoint(volume.cells, center, visited, destination, seekPasture, rejectedSteps);
   const repeated = visited.filter(tile => tile.every((coordinate, axis) => coordinate === center[axis])).length > 2;
   if (!pos || repeated) {
     const leaf = leavesBlockingExit(volume.cells, center);
     if (leaf && (await action('break_block', { pos: leaf, maxTicks: 30 }))?.broken) return true;
     if (!pos) return false;
+  }
+  if (chooseRoute) {
+    const exits = new Set(rejectedSteps);
+    const routes = [];
+    for (let route = pos; route && routes.length < 3;) {
+      const [x, y, z] = route;
+      routes.push({
+        pos: route,
+        revisits: visited.filter(([vx, , vz]) => vx === x && vz === z).length,
+        surface: volume.cells.find(cell => cell.x === x && cell.y === y - 1 && cell.z === z)?.b,
+      });
+      exits.add(dryStepKey(center, route));
+      route = dryWaypoint(volume.cells, center, visited, destination, seekPasture, exits);
+    }
+    pos = (await chooseRoute(player, routes, destination)).pos;
   }
   const result = await action('go_to', { pos, stopDistance: 0.3, maxTicks: 90 });
   const moved = result?.arrived || Math.hypot(result?.position?.[0] - player.position.x,
@@ -113,7 +128,7 @@ async function stepOut(action, player, visited, destination, seekPasture = false
   return moved;
 }
 
-async function gatherWool(action, descendFromCanopy) {
+async function gatherWool(action, descendFromCanopy, chooseRoute) {
   const visited = [];
   const rejectedSteps = new Set();
   const triedAnimals = new Map();
@@ -149,7 +164,7 @@ async function gatherWool(action, descendFromCanopy) {
     }
     const here = await action('observe');
     visited.push(feet(here));
-    if (await stepOut(action, here, visited, sheep?.pos, !sheep, rejectedSteps) || await descendFromCanopy(here)) {
+    if (await stepOut(action, here, visited, sheep?.pos, !sheep, rejectedSteps, chooseRoute) || await descendFromCanopy(here)) {
       stalls = 0;
     } else {
       stalls++;
@@ -279,33 +294,35 @@ async function prepareCamp(action, craft, table, bed) {
 async function feedAdoptedDog(action, id, bed, mealCount) {
   const visited = [];
   const rejectedSteps = new Set();
-  for (let attempt = 0; attempt < 30; attempt++) {
-    if (await visible(action, id)) {
+  for (let attempt = 0; attempt < 120; attempt++) {
+    const player = await action('observe');
+    const observed = await action('get_entities', { type: DOG, radius: 16 });
+    const dog = observed?.entities.find(entity => entity.id === id);
+    if (dog?.distance <= 4.4 && await visible(action, id)) {
       await action('interact_entity', { entityId: id });
       await setTimeout(350);
       const remaining = count(await action('get_inventory'), MUTTON);
       if (remaining === mealCount - 1) return;
       assert.equal(remaining, mealCount, 'A single feeding consumed more than one meal');
     }
-    if (attempt % 3 === 2) {
-      const player = await action('observe');
-      const dog = (await action('get_entities', { type: DOG, radius: 16 })).entities.find(entity => entity.id === id);
-      if (dog?.distance > 3 && attempt >= 5) {
-        visited.push(feet(player));
+    if (player && attempt % 4 === 3) {
+      const tile = feet(player);
+      const fromCamp = Math.hypot(tile[0] - bed[0], tile[1] - bed[1], tile[2] - bed[2]);
+      visited.push(tile);
+      // Give a dog below a steep bank time to come back through a safe route.
+      if (dog?.distance <= 8 && Math.abs(dog.pos[1] - player.position.y) <= 2 && fromCamp < 6) {
         await stepOut(action, player, visited, dog.pos, false, rejectedSteps);
-      } else if (dog && attempt >= 8) {
-        await action('go_to', { entityId: id, stopDistance: 2, maxTicks: 20 });
-      } else if (!dog && attempt >= 5) {
-        await action('go_to', { pos: bed, stopDistance: 2, maxTicks: 55 });
+      } else if (fromCamp > 3) {
+        await stepOut(action, player, visited, bed, false, rejectedSteps);
       }
     }
-    await setTimeout(150);
+    await setTimeout(550);
   }
   throw new Error('Could not feed the adopted dog after checking reach and the native crosshair');
 }
 
-export async function adoptAtNight(action, craft, descendFromCanopy, prepareStone = false) {
-  const color = await gatherWool(action, descendFromCanopy);
+export async function adoptAtNight(action, craft, descendFromCanopy, { prepareStone = false, chooseRoute } = {}) {
+  const color = await gatherWool(action, descendFromCanopy, chooseRoute);
   await ensurePlanks(action, craft, 3);
   // Bring the first table to the flock so sleeping doesn't depend on retracing the route.
   const table = await placeBeside(action, 'minecraft:crafting_table');

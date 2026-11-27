@@ -109,11 +109,20 @@ controller uses a local view of the loaded world and checks the actual crosshair
 before attacking or feeding. The integrated server verifies the next morning,
 one living owned Mushroom, and the Field Guide in the player's inventory.
 Allow roughly one full Minecraft day for setup. The game test captures the final
-view or, on controller failure, the view at failure. It uses local rules and
-bills zero model tokens. Use the seed and spawn-radius settings above to replay
+view or, on controller failure, the view at failure. After a pass it saves and
+reopens the world to check that the same living dog still belongs to the
+original player. Use the seed and spawn-radius settings above to replay
 the starting area, including the possible canopy spawn.
 
-Set `MUSHROOM_EXPEDITION_STAGE=stone` to continue after breakfast. The player
+The default policy uses local rules. Set `MUSHROOM_EXPEDITION_POLICY=jev` to
+let TypeSafe Jev choose among dry routes while scouting for wool. The runner
+uses `OPENROUTER_API_KEY` or the Mac Keychain entry `mushroom-qa-openrouter`.
+The trial makes at most 48 requests, logs the model's choices, latency and
+reported input cost in `actions.jsonl`, and uses the local route if a call fails.
+The ordinary Survival actions and assertions are identical in both modes.
+
+Set `MUSHROOM_EXPEDITION_STAGE=stone` to earn the stone kit. The player can
+use the daylight before adoption and finish any remaining work after breakfast. It
 scouts for reachable stone, mines cobblestone in view, and returns to the
 crafting table. If the surface has no exposed stone, it cuts and retraces a
 short staircase with dry footing away from camp. The integrated server also checks the earned stone pickaxe,
