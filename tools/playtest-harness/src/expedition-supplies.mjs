@@ -42,6 +42,8 @@ async function rpc(method, params) {
 }
 
 async function action(name, args = {}) {
+  // Native walking adjusts yaw and preserves pitch from the previous input.
+  if (name === 'go_to') await action('look', { pitch: 4 });
   const result = await rpc('tools/call', { name, arguments: args });
   const observation = result.structuredContent ?? result.content;
   console.log(JSON.stringify({ at: new Date().toISOString(), action: name, args, observation, ok: !result.isError }));
@@ -50,7 +52,6 @@ async function action(name, args = {}) {
 
 async function walk(pos, stopDistance) {
   for (let attempt = 0; attempt < 4; attempt++) {
-    await action('look', { pitch: 4 });
     const outcome = await action('go_to', { pos, stopDistance, maxTicks: 125 });
     if (outcome?.arrived) return;
     const obstruction = outcome?.reason?.match(/blocked by minecraft:[\w]+_leaves at (-?\d+),(-?\d+),(-?\d+)/);

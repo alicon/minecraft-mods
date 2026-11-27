@@ -106,8 +106,6 @@ async function stepOut(action, player, visited, destination, seekPasture = false
     if (leaf && (await action('break_block', { pos: leaf, maxTicks: 30 }))?.broken) return true;
     if (!pos) return false;
   }
-  // The native walker turns toward its destination but keeps the previous pitch.
-  await action('look', { pitch: 4 });
   const result = await action('go_to', { pos, stopDistance: 0.3, maxTicks: 90 });
   const moved = result?.arrived || Math.hypot(result?.position?.[0] - player.position.x,
     result?.position?.[2] - player.position.z) >= 0.6;
@@ -441,7 +439,6 @@ export async function earnStoneKit(action, craft, { table, bed }, beforeNight = 
     await stepOut(action, player, visited, returnToCamp ? table : undefined, false, rejectedSteps);
   }
   for (const pos of stairs.reverse()) {
-    await action('look', { pitch: 4 });
     const step = await action('go_to', { pos, stopDistance: 0.4, maxTicks: 65 });
     assert.ok(step?.arrived, 'Could not walk back up the quarry stairs');
   }
