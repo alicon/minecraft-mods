@@ -85,7 +85,9 @@ export function expeditionPolicy(mode, coachingFile) {
     if (progress.beforeNight && player.timeOfDay >= 9700) {
       options.camp = 'Return to the bed and continue mining after sleeping.';
     }
-    return ask(player, 'prepare_gear', { goal: `Find ${mineral} to make the Survival gear.`, ...progress },
+    return ask(player, 'prepare_gear', {
+      goal: `Find ${mineral} to make the Survival gear.`, elevation: Math.floor(player.position.y), ...progress,
+    },
       'Choose a useful change of plan. Consider repeated misses, the daylight left, and the coaching note.', options, fallback);
   }
 

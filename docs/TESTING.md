@@ -133,7 +133,8 @@ The standard QA invocation still exits after a controller failure.
 If a live controller has exited and its status is `held`, restart the external
 controller from its last saved phase with the same client still open. Use the
 same stage and policy and point to that run's status file. The client connection
-and owner must match the recorded checkpoint.
+and owner must match the recorded checkpoint. An interrupted iron quarry
+retains the last grounded staircase so a resumed controller can climb out.
 
 ```shell
 MUSHROOM_EXPEDITION_STATUS="$RUN_DIRECTORY/status" MUSHROOM_EXPEDITION_RESUME=1 \
@@ -167,7 +168,8 @@ the furnace, and the original adopted dog's identity.
 
 Set `MUSHROOM_EXPEDITION_STAGE=iron` to continue from the stone kit. The
 controller looks for exposed iron and coal, verifies the actual mining
-crosshair, and waits for the native furnace to smelt the ore. The server
+crosshair, and waits for the native furnace to smelt the ore. It can make
+charcoal from local wood when fuel is scarce. The server
 checks the earned iron pickaxe, bucket, shield, and original dog.
 
 ### Playtest bridge and server GameTests

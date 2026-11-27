@@ -1,6 +1,30 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
+test('the player can earn charcoal from a log and one plank through the native furnace menu', async () => {
+  const { makeExpeditionCharcoal } = await import('./expedition-furnace.mjs');
+  const clicks = [];
+  let reads = 0;
+  let result;
+  await makeExpeditionCharcoal(async (name, args) => {
+    if (name === 'click_slot') clicks.push(args);
+    if (name === 'transfer_items') {
+      result = args;
+      return { moved: 1 };
+    }
+    if (name === 'get_container') return {
+      type: 'minecraft:furnace',
+      containerId: 3,
+      slots: reads++ === 0 ? [
+        { id: 'minecraft:oak_log', section: 'player', slot: 9, count: 1 },
+        { id: 'minecraft:oak_planks', section: 'player', slot: 10, count: 8 },
+      ] : [{ id: 'minecraft:charcoal', section: 'result', count: 1 }],
+    };
+  });
+  assert.deepEqual(clicks.filter(click => click.action === 'right').map(click => click.slot), [0, 1]);
+  assert.deepEqual(result, { to: 'player', item: 'minecraft:charcoal', count: 1 });
+});
+
 test('the iron stage credits ingots taken from the native output slot', async () => {
   const { smeltExpeditionIron } = await import('./expedition-furnace.mjs');
   const raw = 'minecraft:raw_iron';

@@ -3,7 +3,7 @@ import { setTimeout } from 'node:timers/promises';
 import {
   bedSpotsWithGroundCover, dryStepKey, dryWaypoint, hasPlacedBed, leavesBlockingExit, nearbyBuildingSpots, quarryStep,
 } from './expedition-navigation.mjs';
-import { cookExpeditionMutton, smeltExpeditionIron } from './expedition-furnace.mjs';
+import { cookExpeditionMutton, makeExpeditionCharcoal, smeltExpeditionIron } from './expedition-furnace.mjs';
 
 export const WOOD_LOGS = ['oak', 'birch', 'spruce', 'acacia', 'dark_oak', 'jungle', 'cherry', 'pale_oak', 'mangrove']
   .map(wood => `${wood}_log`);
@@ -17,6 +17,7 @@ const FURNACE = 'minecraft:furnace';
 const RAW_IRON = 'minecraft:raw_iron';
 const IRON_INGOT = 'minecraft:iron_ingot';
 const COAL = 'minecraft:coal';
+const CHARCOAL = 'minecraft:charcoal';
 const IRON_RECIPES = [
   ['minecraft:iron_pickaxe', 3], ['minecraft:bucket', 3], ['minecraft:shield', 1],
 ];
@@ -525,7 +526,7 @@ async function climbQuarry(action, pos, chooseEscape) {
 
 async function leaveQuarry(action, stairs, { chooseEscape, waitForCoaching }) {
   const entry = stairs[0];
-  for (const pos of stairs.reverse()) {
+  for (const pos of [...stairs].reverse()) {
     if (await climbQuarry(action, pos, chooseEscape)) continue;
     const player = await action('observe');
     if (player?.onGround && player.position.y >= entry[1]) return;
@@ -616,6 +617,10 @@ export async function earnStoneKit(action, craft, { table, bed },
 }
 
 export async function earnIronKit(action, craft, { bed }, policy = {}) {
+  if (policy.resumeQuarry?.length) {
+    await leaveQuarry(action, policy.resumeQuarry, policy);
+    await policy.saveQuarry?.([]);
+  }
   const startingStock = await action('get_inventory');
   const recipes = IRON_RECIPES.filter(([item]) => !count(startingStock, item));
   if (!recipes.length) return;
@@ -637,7 +642,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       wanted.add('minecraft:iron_ore');
       wanted.add('minecraft:deepslate_iron_ore');
     }
-    if (requiredOre && !count(inventory, COAL)) wanted.add('minecraft:coal_ore');
+    if (wanted.size && !count(inventory, COAL) && !count(inventory, CHARCOAL)) wanted.add('minecraft:coal_ore');
     if (!wanted.size) break;
     const picks = inventory.slots.filter(stack => stack.id === STONE_PICKAXE);
     const usable = picks.some(pick => durability(pick) > 8);
@@ -676,14 +681,18 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
         rawIron: count(inventory, RAW_IRON), needed: requiredOre, hasCoal: count(inventory, COAL) > 0 }, fallback)
       : fallback;
     let openedBlockedQuarry = false;
-    if (usable && stairs.length < 26 && (stairs.length || work === 'quarry')) {
+    if (usable && stairs.length < 44 && player.position.y > 20 && (stairs.length || work === 'quarry')) {
       const descent = await descendQuarry(action, player, bed, stairs, protectedGround);
-      if (descent === 'landed') continue;
+      if (descent === 'landed') {
+        await policy.saveQuarry?.(stairs);
+        continue;
+      }
       openedBlockedQuarry = descent === 'blocked';
     }
     if (stairs.length || openedBlockedQuarry) {
       await leaveQuarry(action, stairs, policy);
       stairs.length = 0;
+      await policy.saveQuarry?.([]);
       quarries++;
       if (quarries >= 3) break;
       misses = 0;
@@ -693,22 +702,28 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
     await stepOut(action, scout, visited, undefined, 'stone', rejectedSteps);
   }
   await leaveQuarry(action, stairs, policy);
+  await policy.saveQuarry?.([]);
   const materials = await action('get_inventory');
-  assert.ok(!requiredOre || (count(materials, RAW_IRON) >= requiredOre && count(materials, COAL) > 0),
-    'Could not earn enough reachable iron ore and coal for the expedition kit');
-  const planks = recipes.some(([item]) => item === 'minecraft:shield') ? 10 : 4;
+  assert.ok(count(materials, RAW_IRON) >= requiredOre, 'Could not earn enough reachable iron ore for the expedition kit');
+  const fuel = count(materials, COAL) ? COAL : CHARCOAL;
+  const needsCharcoal = requiredOre > 0 && !count(materials, fuel);
+  const planks = (recipes.some(([item]) => item === 'minecraft:shield') ? 10 : 4) + Number(needsCharcoal);
   await ensurePlanks(action, craft, planks);
   if (recipes.some(([item]) => item === 'minecraft:iron_pickaxe')
       && count(await action('get_inventory'), 'minecraft:stick') < 2) {
     await ensurePlanks(action, craft, planks + 2);
     await craft('minecraft:stick', 4);
   }
+  if (needsCharcoal && !(await action('get_inventory')).slots.some(stack => stack.id.endsWith('_log'))) {
+    await harvestReachableLog(action);
+  }
   await craft('minecraft:crafting_table', 1);
   const table = await placeBeside(action, 'minecraft:crafting_table');
   if (requiredOre) {
     const furnace = await placeBeside(action, FURNACE);
     await action('interact_block', { pos: furnace });
-    await smeltExpeditionIron(action, requiredOre);
+    if (needsCharcoal) await makeExpeditionCharcoal(action);
+    await smeltExpeditionIron(action, requiredOre, fuel);
     await action('stop', { closeScreen: true });
   }
   await openCampTable(action, table, visited);

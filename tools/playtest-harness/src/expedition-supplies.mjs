@@ -23,6 +23,7 @@ assert.equal(await readFile(statusFile, 'utf8'), resume ? 'held' : 'ready', 'The
 const coachingFile = join(dirname(statusFile), 'coach.txt');
 const checkpointFile = join(dirname(statusFile), 'controller-checkpoint.json');
 const live = process.env.MUSHROOM_EXPEDITION_LIVE === '1';
+const blockPosition = pos => Array.isArray(pos) && pos.length === 3 && pos.every(Number.isInteger);
 
 const url = `http://127.0.0.1:${config.port}/mcp`;
 let session;
@@ -137,8 +138,11 @@ try {
     assert.ok(Number.isFinite(checkpoint.gameTime) && checkpoint.gameTime <= start.gameTime);
     assert.ok(['adoption', 'stone', 'iron'].includes(checkpoint.phase));
     for (const pos of [checkpoint.camp?.bed, checkpoint.camp?.table]) {
-      assert.ok(Array.isArray(pos) && pos.length === 3 && pos.every(Number.isInteger), 'Invalid recorded camp');
+      assert.ok(blockPosition(pos), 'Invalid recorded camp');
     }
+    assert.ok(checkpoint.quarry === undefined
+      || (Array.isArray(checkpoint.quarry) && checkpoint.quarry.length <= 44 && checkpoint.quarry.every(blockPosition)),
+    'Invalid recorded quarry path');
     if (checkpoint.phase !== 'adoption') {
       assert.ok(inventory.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide'), 'The adopted owner did not reattach');
     }
@@ -162,7 +166,16 @@ try {
     checkpoint.phase = 'iron';
     if (live && stage === 'iron') await writeCheckpoint(checkpoint);
   }
-  if (stage === 'iron') await earnIronKit(action, craft, checkpoint.camp, policy);
+  if (stage === 'iron') {
+    if (live) {
+      policy.resumeQuarry = checkpoint.quarry;
+      policy.saveQuarry = async stairs => {
+        checkpoint.quarry = stairs;
+        await writeCheckpoint(checkpoint);
+      };
+    }
+    await earnIronKit(action, craft, checkpoint.camp, policy);
+  }
   await reportStatus('finished');
 } catch (error) {
   await reportStatus(live ? 'held' : 'failed');
