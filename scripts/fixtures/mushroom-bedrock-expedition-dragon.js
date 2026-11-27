@@ -22,11 +22,18 @@ world.afterEvents.worldLoad.subscribe(async () => {
     await system.waitTicks(5);
     if (!dog.getComponent("minecraft:tameable")?.tame(owner)) throw new Error("The probe dog did not tame");
     owner.addEffect("resistance", 2200, { amplifier: 4, showParticles: false });
-    let projectileCount = 0;
-    world.afterEvents.projectileHitBlock.subscribe(({ projectile }) => {
+    const existingClouds = new Set(end.getEntities({ type: "minecraft:area_effect_cloud" }).map(cloud => cloud.id));
+    let fireballs = 0;
+    let impacts = 0;
+    const countFireballImpact = ({ projectile }) => {
       if (projectile.typeId !== "minecraft:dragon_fireball") return;
-      projectileCount++;
-      console.warn("MUSHROOM_NATIVE_DRAGON_IMPACT " + projectileCount);
+      impacts++;
+      console.warn("MUSHROOM_NATIVE_DRAGON_IMPACT " + impacts);
+    };
+    world.afterEvents.projectileHitBlock.subscribe(countFireballImpact);
+    world.afterEvents.projectileHitEntity.subscribe(countFireballImpact);
+    world.afterEvents.entitySpawn.subscribe(({ entity }) => {
+      if (entity.typeId === "minecraft:dragon_fireball" && entity.dimension.id === end.id) fireballs++;
     });
     for (let tick = 0; tick < 1800; tick += 5) {
       await system.waitTicks(5);
@@ -37,12 +44,16 @@ world.afterEvents.worldLoad.subscribe(async () => {
           console.warn("MUSHROOM_NATIVE_DRAGON_SPAWN " + String(error));
         }
       }
-      const clouds = end.getEntities({ type: "minecraft:area_effect_cloud", location: ORIGIN, maxDistance: 64 });
+      const clouds = end.getEntities({ type: "minecraft:area_effect_cloud", location: ORIGIN, maxDistance: 64 })
+        .filter(cloud => !existingClouds.has(cloud.id));
       if (tick % 100 === 0) console.warn("MUSHROOM_NATIVE_DRAGON_OBSERVED " + JSON.stringify({
         dragons: end.getEntities({ type: DRAGON }).map(dragon => dragon.location), clouds: clouds.map(cloud => cloud.location),
-        owner: owner.location, dog: dog.isValid ? dog.location : null, projectileCount,
+        owner: owner.location, dog: dog.isValid ? dog.location : null, fireballs, impacts,
       }));
-      if (projectileCount > 0 && clouds.length) {
+      // In a reused world an old cloud can still be loaded. The arena owner
+      // never throws a potion, so a newly created cloud after the dragon's
+      // projectile is its native breath even when only one hit event fires.
+      if ((fireballs > 0 || impacts > 0) && clouds.length) {
         console.warn("MUSHROOM_EXPEDITION_DRAGON_CLOUD_OBSERVED " + JSON.stringify(clouds.map(cloud => [cloud.id, cloud.location])));
         const cloud = clouds[0].location;
         const y = Math.floor(cloud.y);
@@ -73,7 +84,7 @@ world.afterEvents.worldLoad.subscribe(async () => {
         }));
       }
     }
-    throw new Error("No vanilla End cloud observed. Dragon fireball impacts: " + projectileCount);
+    throw new Error(`No vanilla End cloud observed. Dragon fireballs: ${fireballs}, impacts: ${impacts}`);
   } catch (error) {
     console.warn("MUSHROOM_TEST_FAIL " + String(error) + "\n" + (error.stack ?? ""));
   }
