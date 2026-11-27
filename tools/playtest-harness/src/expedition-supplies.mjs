@@ -30,6 +30,7 @@ const blockPosition = pos => Array.isArray(pos) && pos.length === 3 && pos.every
 const url = `http://127.0.0.1:${config.port}/mcp`;
 let session;
 let id = 0;
+let lastPlayer;
 
 async function rpc(method, params) {
   const headers = {
@@ -53,10 +54,17 @@ async function rpc(method, params) {
 
 async function action(name, args = {}) {
   // Native walking adjusts yaw and preserves pitch from the previous input.
-  if (name === 'go_to') await action('look', { pitch: 4 });
+  if (name === 'go_to') {
+    const night = lastPlayer?.timeOfDay >= 12_542 && lastPlayer.timeOfDay < 23_460;
+    const endermen = night || lastPlayer?.dimension === 'minecraft:the_end'
+      ? await action('get_entities', { type: 'enderman', radius: 18, max: 8 })
+      : null;
+    await action('look', { pitch: endermen?.entities?.length ? 26 : 4 });
+  }
   const result = await rpc('tools/call', { name, arguments: args });
   const observation = result.structuredContent ?? result.content;
   console.log(JSON.stringify({ at: new Date().toISOString(), action: name, args, observation, ok: !result.isError }));
+  if (name === 'observe' && !result.isError) lastPlayer = observation;
   return result.isError ? null : observation;
 }
 
