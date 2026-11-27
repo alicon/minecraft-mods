@@ -202,6 +202,7 @@ async function gatherStarterTools(start) {
     const opened = await action('interact_block', { pos });
     assert.equal(opened?.screenOpened, 'CraftingScreen');
     await craft('wooden_pickaxe', 1);
+    await craft('wooden_sword', 1);
     await action('stop', { closeScreen: true });
     assert.ok((await action('break_block', { pos, maxTicks: 100 }))?.broken, 'Could not pack up the crafting table');
     await walk(pos, 0.3);

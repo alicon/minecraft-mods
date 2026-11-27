@@ -6,6 +6,7 @@ const WOOL = /^minecraft:(.+)_wool$/;
 const MUTTON = 'minecraft:mutton';
 const DOG = 'mushroom_yorkie:mushroom_yorkie';
 const PICKAXE = 'minecraft:wooden_pickaxe';
+const SWORDS = ['minecraft:stone_sword', 'minecraft:wooden_sword'];
 const CAMP_WORK_END = 11_900;
 const BACKUP_MEAT = {
   'minecraft:cow': 'minecraft:beef',
@@ -49,8 +50,21 @@ async function visible(action, entityId) {
 }
 
 async function hunt(action, animal, dropMatches) {
-  await hold(action, PICKAXE);
-  for (let hit = 0; hit < 5; hit++) {
+  const inventory = await action('get_inventory');
+  const sword = SWORDS.find(item => count(inventory, item) > 0);
+  // Mining tools lose extra durability in combat. Keep the pickaxe for
+  // daylight construction even if the player has to finish by hand.
+  if (sword) {
+    await hold(action, sword);
+  } else if (inventory.mainHand?.id === PICKAXE) {
+    const empty = Array.from({ length: 9 }, (_, slot) => slot)
+      .find(slot => !inventory.slots.some(stack => stack.slot === slot));
+    const alternate = inventory.slots.find(stack => stack.slot < 9 && stack.id !== PICKAXE);
+    if (empty !== undefined || alternate) {
+      await action('select_slot', { slot: empty ?? alternate.slot });
+    }
+  }
+  for (let hit = 0; hit < 12; hit++) {
     const present = (await action('get_entities', { type: animal.type, radius: 8 })).entities
       .some(entity => entity.id === animal.id);
     if (!present) return false;
@@ -90,7 +104,8 @@ async function gatherWool(action, descendFromCanopy) {
   const visited = [];
   const triedAnimals = new Map();
   let stalls = 0;
-  for (let round = 0; round < 200; round++) {
+  // The first flock can come into range after several minutes of safe scouting.
+  for (let round = 0; round < 400; round++) {
     const inventory = await action('get_inventory');
     const color = woolColor(inventory);
     if (color && count(inventory, MUTTON) > 0) return color;

@@ -58,7 +58,7 @@ The runner prints a new directory under `build/playtest-reports/` containing
 the action trace, client and controller logs, and screenshots.
 
 The client starts in a fresh Normal Survival world with an empty inventory and
-commands disabled. The player gathers wood, crafts the wooden pickaxe, packs
+commands disabled. The player gathers wood, crafts a wooden pickaxe and sword, packs
 the crafting table, collects matching wool and mutton from sheep, and crafts
 a bed. It uses remaining daylight to gather reachable supplies close to the
 bed and then sleeps at normal sunset and feeds the adopted dog. The
