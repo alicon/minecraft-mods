@@ -30,6 +30,7 @@ const BACKUP_MEAT = {
 };
 const BACKUP_FOOD = [...Object.values(BACKUP_MEAT), 'minecraft:apple'];
 const COOKED_FOOD = ['minecraft:cooked_mutton', 'minecraft:cooked_beef', 'minecraft:cooked_porkchop'];
+const FEEDING_SEARCH_RADIUS = 24;
 
 function count({ slots }, item) {
   return slots.reduce((total, stack) => total + (stack.id === item ? stack.count : 0), 0);
@@ -371,7 +372,7 @@ async function feedAdoptedDog(action, id, bed) {
   const rejectedSteps = new Set();
   for (let attempt = 0; attempt < 120; attempt++) {
     const player = await action('observe');
-    const observed = await action('get_entities', { type: DOG, radius: 16 });
+    const observed = await action('get_entities', { type: DOG, radius: FEEDING_SEARCH_RADIUS });
     const dog = observed?.entities.find(entity => entity.id === id);
     if (dog?.distance <= 4.4) {
       const inventory = await action('get_inventory');
@@ -386,12 +387,12 @@ async function feedAdoptedDog(action, id, bed) {
         assert.equal(remaining, mealCount, 'A single feeding changed the raw meal count unexpectedly');
       }
     }
-    if (player && attempt % 4 === 3) {
+    if (player && attempt % 2 === 1) {
       const tile = feet(player);
       const fromCamp = Math.hypot(tile[0] - bed[0], tile[1] - bed[1], tile[2] - bed[2]);
       visited.push(tile);
-      const nearCamp = dog && Math.hypot(...dog.pos.map((axis, index) => axis - bed[index])) <= 14;
-      if (nearCamp && Math.abs(dog.pos[1] - player.position.y) <= 4 && fromCamp < 16) {
+      const nearCamp = dog && Math.hypot(...dog.pos.map((axis, index) => axis - bed[index])) <= FEEDING_SEARCH_RADIUS;
+      if (nearCamp && Math.abs(dog.pos[1] - player.position.y) <= 4 && fromCamp < FEEDING_SEARCH_RADIUS) {
         await stepOut(action, player, visited, dog.pos, false, rejectedSteps);
       } else if (fromCamp > 3) {
         await stepOut(action, player, visited, bed, false, rejectedSteps);
@@ -429,7 +430,7 @@ export async function adoptAtNight(action, { bed }, craft) {
       continue;
     }
     assert.ok(player.inWorld && !player.dead && player.health > 4, 'Lost a safe position beside the bed');
-    const dogs = await action('get_entities', { type: DOG, radius: 16 });
+    const dogs = await action('get_entities', { type: DOG, radius: FEEDING_SEARCH_RADIUS });
     const pup = dogs?.entities.find(entity => entity.name === 'Mushroom');
     const inventory = pup && !player.screen ? await action('get_inventory') : null;
     if (inventory?.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide')) {
