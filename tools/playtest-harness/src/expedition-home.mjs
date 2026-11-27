@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
 import {
-  bedSpotsWithGroundCover, dryWaypoint, hasPlacedBed, leavesBlockingExit, nearbyBuildingSpots, quarryStep,
+  bedSpotsWithGroundCover, dryStepKey, dryWaypoint, hasPlacedBed, leavesBlockingExit, nearbyBuildingSpots, quarryStep,
 } from './expedition-navigation.mjs';
 import { smeltExpeditionIron } from './expedition-furnace.mjs';
 
@@ -96,10 +96,10 @@ async function hunt(action, animal, dropMatches) {
   return false;
 }
 
-async function stepOut(action, player, visited, destination, seekPasture = false) {
+async function stepOut(action, player, visited, destination, seekPasture = false, rejectedSteps = new Set()) {
   const center = feet(player);
   const volume = await action('get_blocks', { center, size: [17, 9, 17], format: 'json' });
-  const pos = dryWaypoint(volume.cells, center, visited, destination, seekPasture);
+  const pos = dryWaypoint(volume.cells, center, visited, destination, seekPasture, rejectedSteps);
   const repeated = visited.filter(tile => tile.every((coordinate, axis) => coordinate === center[axis])).length > 2;
   if (!pos || repeated) {
     const leaf = leavesBlockingExit(volume.cells, center);
@@ -107,12 +107,15 @@ async function stepOut(action, player, visited, destination, seekPasture = false
     if (!pos) return false;
   }
   const result = await action('go_to', { pos, stopDistance: 0.3, maxTicks: 90 });
-  return result?.arrived || Math.hypot(result?.position?.[0] - player.position.x,
+  const moved = result?.arrived || Math.hypot(result?.position?.[0] - player.position.x,
     result?.position?.[2] - player.position.z) >= 0.6;
+  if (!moved && result?.reason) rejectedSteps.add(dryStepKey(center, pos));
+  return moved;
 }
 
 async function gatherWool(action, descendFromCanopy) {
   const visited = [];
+  const rejectedSteps = new Set();
   const triedAnimals = new Map();
   let stalls = 0;
   // The first flock can come into range after several minutes of safe scouting.
@@ -146,7 +149,7 @@ async function gatherWool(action, descendFromCanopy) {
     }
     const here = await action('observe');
     visited.push(feet(here));
-    if (await stepOut(action, here, visited, sheep?.pos, !sheep) || await descendFromCanopy(here)) {
+    if (await stepOut(action, here, visited, sheep?.pos, !sheep, rejectedSteps) || await descendFromCanopy(here)) {
       stalls = 0;
     } else {
       stalls++;

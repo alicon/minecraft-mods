@@ -90,6 +90,19 @@ test('repeated backtracking toward inaccessible sheep gives way to exploring the
   assert.deepEqual(dryWaypoint(blocks, start, Array(4).fill([1, 1, 0]), sheep), [0, 1, 1]);
 });
 
+test('a step rejected by the native movement guard is excluded from the next approach', async () => {
+  const { dryStepKey, dryWaypoint } = await import('./expedition-navigation.mjs');
+  const start = [0, 1, 0];
+  const blocks = [
+    cell(0, 0, 0), cell(1, 1, 0, 'oak_leaves'), cell(2, 1, 0, 'oak_leaves'),
+    cell(0, 0, 1), cell(1, 0, 1), cell(2, 0, 1),
+  ];
+  const sheep = [7, 2, 0];
+  assert.deepEqual(dryWaypoint(blocks, start, [], sheep), [2, 2, 0]);
+  const rejected = new Set([dryStepKey(start, [2, 2, 0])]);
+  assert.deepEqual(dryWaypoint(blocks, start, [], sheep, false, rejected), [0, 1, 1]);
+});
+
 test('a sheep scout prefers observed open turf over equally reachable covered ground', async () => {
   const { dryWaypoint } = await import('./expedition-navigation.mjs');
   const blocks = [

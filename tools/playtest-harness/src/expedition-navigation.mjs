@@ -111,7 +111,13 @@ export function quarryStep(cells, [x, y, z], bed, walked) {
 
 // Each edge fits a standing player through two adjacent columns, including the lift for a step up.
 // Use the native movement controller for the resulting straight segment.
-export function dryWaypoint(cells, start, visited, destination, seekPasture = false) {
+export function dryStepKey(from, to) {
+  const dx = Math.sign(to[0] - from[0]);
+  const dz = Math.sign(to[2] - from[2]);
+  return `${from.join(',')}>${from[0] + dx},${from[2] + dz}`;
+}
+
+export function dryWaypoint(cells, start, visited, destination, seekPasture = false, rejectedSteps = new Set()) {
   const blocks = new Map(cells.map(({ x, y, z, b }) => [`${x},${y},${z}`, b]));
   const block = (x, y, z) => blocks.get(`${x},${y},${z}`);
   const visits = new Map();
@@ -132,7 +138,7 @@ export function dryWaypoint(cells, start, visited, destination, seekPasture = fa
       for (const ty of [y, y + 1, y - 1]) {
         const step = [tx, ty, tz];
         const key = step.join(',');
-        if (seen.has(key) || !hasDrySupport(block(tx, ty - 1, tz))
+        if (seen.has(key) || rejectedSteps.has(dryStepKey(pos, step)) || !hasDrySupport(block(tx, ty - 1, tz))
             || !gap(block(tx, ty, tz)) || !gap(block(tx, ty + 1, tz))
             || (ty > y && !gap(block(x, ty + 1, z)))
             || (ty < y && !gap(block(tx, y + 1, tz)))) continue;
