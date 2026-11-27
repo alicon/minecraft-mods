@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
-import { dryWaypoint, hasPlacedBed, leavesBlockingExit, nearbyBuildingSpots, quarryStep } from './expedition-navigation.mjs';
+import {
+  bedSpotsWithGroundCover, dryWaypoint, hasPlacedBed, leavesBlockingExit, nearbyBuildingSpots, quarryStep,
+} from './expedition-navigation.mjs';
 import { smeltExpeditionIron } from './expedition-furnace.mjs';
 
 export const WOOD_LOGS = ['oak', 'birch', 'spruce', 'acacia', 'dark_oak', 'jungle', 'cherry', 'pale_oak', 'mangrove']
@@ -159,7 +161,10 @@ async function placeBeside(action, item) {
   const player = await action('observe');
   const { cells } = await action('get_blocks', { center: feet(player), size: [11, 5, 11], format: 'json' });
   const bed = item.endsWith('_bed');
-  for (const pos of nearbyBuildingSpots(cells, player.position, bed)) {
+  const spots = nearbyBuildingSpots(cells, player.position, bed).map(pos => ({ pos, clear: [] }));
+  if (bed) spots.push(...bedSpotsWithGroundCover(cells, player.position));
+  for (const { pos, clear } of spots) {
+    for (const cover of clear) await action('break_block', { pos: cover, maxTicks: 25 });
     const result = await action('place_block', { pos });
     if (!result?.placed || result.blockAtPos !== item) continue;
     if (!bed) return pos;

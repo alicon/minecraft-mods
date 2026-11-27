@@ -5,6 +5,17 @@ function cell(x, y, z, type = 'grass_block') {
   return { x, y, z, b: `minecraft:${type}` };
 }
 
+test('forest-floor litter can be cleared for a bed with two dry supports', async () => {
+  const { bedSpotsWithGroundCover, nearbyBuildingSpots } = await import('./expedition-navigation.mjs');
+  const position = { x: 0.15, y: 1, z: 0.5 };
+  const blocks = [cell(1, 0, 0), cell(2, 0, 0), cell(1, 1, 0, 'leaf_litter'),
+    cell(2, 1, 0, 'short_grass'), cell(1, 0, 1), cell(1, 1, 1, 'water')];
+  assert.deepEqual(nearbyBuildingSpots(blocks, position, true), []);
+  assert.deepEqual(bedSpotsWithGroundCover(blocks, position), [
+    { pos: [1, 1, 0], clear: [[1, 1, 0], [2, 1, 0]] },
+  ]);
+});
+
 test('a soil-covered quarry has a dry descending step without undermining camp', async () => {
   const { quarryStep } = await import('./expedition-navigation.mjs');
   const start = [0, 5, 0];
