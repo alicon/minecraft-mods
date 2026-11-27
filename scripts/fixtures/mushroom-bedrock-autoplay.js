@@ -46,18 +46,37 @@ async function interact(actor, pet, item, count = 1, raycast = false) {
   const originalHolder = holderOf(pet);
   let firstHit;
   let missed = 0;
+  let sideSteps = 0;
   for (let tick = 0; tick < 40; tick++) {
     const target = pet.location;
     actor.lookAtLocation({ ...target, y: target.y + 0.23 });
     await pause(1);
     const [hit] = actor.getEntitiesFromViewDirection({ maxDistance: 4 });
     firstHit = hit?.entity;
-    if (firstHit?.id !== pet.id) continue;
+    if (firstHit?.id !== pet.id) {
+      if (firstHit && sideSteps < 3 && tick % 6 === 5) {
+        // A guest's own dog can follow them into the lane. Move off the
+        // blocked sightline before issuing any native interaction.
+        const from = actor.location;
+        const dx = target.x - from.x;
+        const dz = target.z - from.z;
+        const length = Math.hypot(dx, dz);
+        if (length > 0.25) {
+          const offset = sideSteps++ === 1 ? -2 : 1.4;
+          actor.moveToLocation({ x: from.x - dz * offset / length, y: from.y, z: from.z + dx * offset / length });
+          await pause(12);
+          actor.stopMoving();
+        }
+      }
+      continue;
+    }
     const accepted = actor.interact();
     await pause(1);
     actor.stopInteracting();
     if (accepted || holderOf(pet) !== originalHolder || (item && itemCount(actor, item) !== count)) {
-      if (missed) console.warn("MUSHROOM_PLAY_INPUT_RETRY " + JSON.stringify({ tick: system.currentTick, missed }));
+      if (missed || sideSteps) {
+        console.warn("MUSHROOM_PLAY_INPUT_RETRY " + JSON.stringify({ tick: system.currentTick, missed, sideSteps }));
+      }
       return accepted;
     }
     // A rejected simulator input can be retried only when it had no effect.
@@ -67,7 +86,8 @@ async function interact(actor, pet, item, count = 1, raycast = false) {
   throw new Error("input: could not interact at the crosshair " + JSON.stringify({
     action: item ?? "release", eye: actor.getHeadLocation(), dog: pet.location,
     direction: actor.getViewDirection(), headRotation: actor.headRotation, velocity: pet.getVelocity(),
-    hit: firstHit?.typeId, goal: prop(pet, "home_goal"), rejectedInputs: missed,
+    targetId: pet.id, hit: firstHit?.typeId, hitId: firstHit?.id, goal: prop(pet, "home_goal"),
+    rejectedInputs: missed, sideSteps,
   }));
 }
 
