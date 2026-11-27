@@ -18,6 +18,14 @@ function inventory(player) {
   return player.getComponent("minecraft:inventory").container;
 }
 
+function lookAtDog(player, dog) {
+  player.lookAtLocation({ ...dog.location, y: dog.location.y + 0.23 });
+}
+
+function seesDog(player, dog) {
+  return player.getEntitiesFromViewDirection({ maxDistance: 3 })[0]?.entity.id === dog.id;
+}
+
 async function aim(player, dog, item) {
   player.stopInteracting();
   const offset = player.name === "VestOwner" ? -1.5 : 1.5;
@@ -26,9 +34,9 @@ async function aim(player, dog, item) {
   inventory(player).setItem(0, typeof item === "string" ? new ItemStack(item) : item);
   await system.waitTicks(3);
   for (let attempt = 0; attempt < 8; attempt++) {
-    player.lookAtLocation({ ...dog.location, y: dog.location.y + 0.23 });
+    lookAtDog(player, dog);
     await system.waitTicks(1);
-    if (player.getEntitiesFromViewDirection({ maxDistance: 3 })[0]?.entity.id === dog.id) return;
+    if (seesDog(player, dog)) return;
   }
   throw new Error("The player's crosshair missed the dog: " + JSON.stringify({
     actor: player.location, dog: dog.location,
@@ -117,13 +125,22 @@ world.afterEvents.worldLoad.subscribe(async () => {
       "The guest equipped the owner's dog");
     await aim(owner, dog, PADDED);
     await aim(guest, dog, PADDED);
-    guest.interact();
-    owner.interact();
+    // Aiming the second player takes several ticks, during which the dog can move.
+    lookAtDog(owner, dog);
+    lookAtDog(guest, dog);
+    expect(seesDog(owner, dog) && seesDog(guest, dog), "Both crosshairs must reach the dog in the same tick");
+    const tick = system.currentTick;
+    const guestUsed = guest.interact();
+    const ownerUsed = owner.interact();
     await system.waitTicks(6);
     owner.stopInteracting();
     guest.stopInteracting();
-    expect(!inventory(owner).getItem(0) && inventory(guest).getItem(0)?.typeId === PADDED
-      && dog.getProperty(KIND) === "padded", "Same-tick attempts should equip only the owner's vest");
+    const ownerHeld = inventory(owner).getItem(0)?.typeId;
+    const guestHeld = inventory(guest).getItem(0)?.typeId;
+    const vest = dog.getProperty(KIND);
+    expect(!ownerHeld && guestHeld === PADDED && vest === "padded",
+      "Same-tick attempts should equip only the owner's vest: "
+      + JSON.stringify({ tick, guestUsed, ownerUsed, ownerHeld, guestHeld, vest }));
     await damage(dog, 10, EntityDamageCause.entityAttack, 7);
     await damage(dog, 5, EntityDamageCause.lava, 5);
     await use(owner, dog, "minecraft:leather");
