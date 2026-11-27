@@ -10,6 +10,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldSave;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.gamerules.GameRules;
@@ -40,6 +41,9 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 			case "iron" -> IRON_WINDOW_TICKS;
 			default -> throw new AssertionError("Unknown expedition stage " + stage);
 		};
+		TestWorldSave save;
+		UUID ownerId;
+		var originalDog = new AtomicReference<UUID>();
 		try (var world = context.worldBuilder().setUseConsistentSettings(false).adjustSettings(settings -> {
 			settings.setName("Codex Expedition Survival");
 			settings.setDifficulty(Difficulty.NORMAL);
@@ -52,7 +56,8 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 			}
 		}).create()) {
 			world.getClientWorld().waitForChunksRender();
-			var ownerId = context.computeOnClient(client -> client.player.getUUID());
+			save = world.getWorldSave();
+			ownerId = context.computeOnClient(client -> client.player.getUUID());
 			var server = world.getServer();
 			server.runOnServer(minecraft -> {
 				var owner = minecraft.getPlayerList().getPlayer(ownerId);
@@ -65,8 +70,8 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 						minecraft.overworld().getSeed(), minecraft.getWorldData().getLevelName(), ownerId);
 			});
 			try {
-				var originalDog = new AtomicReference<UUID>();
 				Files.writeString(status, "ready", StandardOpenOption.CREATE_NEW);
+				boolean passed = false;
 				for (int elapsed = 0; elapsed < windowTicks; elapsed += 10) {
 					String result = Files.readString(status);
 					if ("failed".equals(result)) {
@@ -113,16 +118,41 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 						System.out.printf("Expedition Survival %s passed: dog=%s owner=%s ticks=%s%n",
 								stage, dogEvidence, ownerId, elapsed);
 						context.takeScreenshot("expedition-survival-" + stage);
-						return;
+						passed = true;
+						break;
 					}
 					context.waitTicks(10);
 				}
-				throw new AssertionError("The Survival controller did not finish the selected stage within its window");
+				if (!passed) {
+					throw new AssertionError("The Survival controller did not finish the selected stage within its window");
+				}
 			} catch (AssertionError failure) {
 				context.takeScreenshot("expedition-survival-failure");
 				throw failure;
 			} catch (IOException io) {
 				throw new UncheckedIOException(io);
+			}
+		}
+		try (var reopened = save.open()) {
+			reopened.getClientWorld().waitForChunksRender();
+			try {
+				reopened.getServer().runOnServer(minecraft -> {
+					var owner = minecraft.getPlayerList().getPlayer(ownerId);
+					if (owner == null || !owner.isAlive()
+							|| !owner.getInventory().contains(stack -> stack.is(ModItems.FIELD_GUIDE))) {
+						throw new AssertionError("The original Survival owner and expedition guide did not reload");
+					}
+					var dogs = minecraft.overworld().getEntities(EntityTypeTest.forClass(MushroomYorkieEntity.class),
+							dog -> dog.isAlive() && dog.belongsTo(owner));
+					if (dogs.size() != 1 || !dogs.getFirst().getUUID().equals(originalDog.get())) {
+						throw new AssertionError("Expected the original living dog after reopening the earned Survival save");
+					}
+				});
+				System.out.printf("Expedition Survival %s reopened: dog=%s owner=%s%n", stage, originalDog.get(), ownerId);
+				context.takeScreenshot("expedition-survival-" + stage + "-reopened");
+			} catch (AssertionError failure) {
+				context.takeScreenshot("expedition-survival-reopen-failure");
+				throw failure;
 			}
 		}
 	}
