@@ -712,6 +712,8 @@ async function runExpedition(start, stage) {
     await gatherStarterTools(start);
     const { x, y, z } = (await action('observe')).position;
     checkpoint.timberSite = [x, y, z].map(Math.floor);
+    // Take the bed materials before leaving the timber area for sheep.
+    await ensurePlanks(action, craft, 3, checkpoint.timberSite);
     checkpoint.phase = 'provision';
     if (live) await writeCheckpoint(checkpoint);
   }
