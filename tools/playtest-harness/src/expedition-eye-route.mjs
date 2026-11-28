@@ -133,6 +133,18 @@ async function travelToward(action, target, arrived, maxSteps, travel) {
       }
     }
     const remaining = horizontalDistance(player.position, target);
+    if (target === travel.camp && remaining <= 24 && Math.abs(player.position.y - target.y) <= 8) {
+      // A narrow view can point at a disconnected clearing. Use the loaded
+      // terrain between the player and the bed to check the whole approach.
+      const [x, y, z] = feet(player);
+      const center = [Math.floor((target.x + x) / 2), Math.floor((target.y + y) / 2), Math.floor((target.z + z) / 2)];
+      const volume = await action('get_blocks', { center, size: [35, 15, 35], format: 'json' });
+      if (volume && await stepOut(action, player, travel.visited, undefined, 'elevation', travel.rejected,
+        undefined, undefined, travel.careReturn ? 40 : 90, { volume, exactTargets: travel.campTiles })) {
+        blockedSteps = 0;
+        continue;
+      }
+    }
     const progress = travel.returning && Number.isFinite(target.y)
       ? Math.hypot(remaining, player.position.y - target.y) : remaining;
     if (progress < closest - 1) {
@@ -285,8 +297,16 @@ export async function returnToCampWithCompanion(action, uuid, bed, trail = [], {
   }
   const camp = { x: bed[0] + 0.5, y: bed[1], z: bed[2] + 0.5 };
   const atCamp = pos => horizontalDistance(pos, camp) <= 4 && Math.abs(pos.y - bed[1]) <= 2;
+  const campTiles = [];
+  for (let x = bed[0] - 4; x <= bed[0] + 4; x++) {
+    for (let z = bed[2] - 4; z <= bed[2] + 4; z++) {
+      for (let y = bed[1] - 2; y <= bed[1] + 2; y++) {
+        if (atCamp({ x: x + 0.5, y, z: z + 0.5 })) campTiles.push([x, y, z]);
+      }
+    }
+  }
   const travel = { visited: [], rejected: new Set(), uuid, nextCareCheck: 0, returning: true, nextOwnerMeal: 0,
-    careReturn: Boolean(report), protectCompanion, report, rejectedClimbs: new Set() };
+    camp, campTiles, careReturn: Boolean(report), protectCompanion, report, rejectedClimbs: new Set() };
   const nearby = trail.map(([x, y, z], index) => ({ index,
     range: Math.hypot(start.position.x - x - 0.5, start.position.y - y, start.position.z - z - 0.5) }))
     .filter(point => point.range <= 14).sort((a, b) => a.range - b.range)[0];

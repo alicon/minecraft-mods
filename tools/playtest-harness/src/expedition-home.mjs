@@ -240,17 +240,18 @@ export async function hunt(action, animal, dropMatches, canContinue) {
   return false;
 }
 
-export async function stepOut(action, player, visited, destination, preferredGround, rejectedSteps = new Set(), chooseRoute, avoid, maxTicks = 90) {
+export async function stepOut(action, player, visited, destination, preferredGround, rejectedSteps = new Set(),
+  chooseRoute, avoid, maxTicks = 90, { volume: observed, exactTargets } = {}) {
   const center = feet(player);
   if (preferredGround === 'stronghold' && player.onGround) center[1] = Math.ceil(player.position.y);
   const width = preferredGround || chooseRoute ? 23 : 17;
   const height = ['surface', 'elevation', 'uphill', 'cave', 'iron', 'downhill'].includes(preferredGround) ? 15 : 9;
-  const volume = await action('get_blocks', { center, size: [width, height, width], format: 'json' });
+  const volume = observed ?? await action('get_blocks', { center, size: [width, height, width], format: 'json' });
   if (!volume) return false;
-  let pos = dryWaypoint(volume.cells, center, visited, destination, preferredGround, rejectedSteps, avoid);
-  if (avoid && !pos) return false;
+  let pos = dryWaypoint(volume.cells, center, visited, destination, preferredGround, rejectedSteps, avoid, exactTargets);
+  if ((avoid || exactTargets) && !pos) return false;
   const repeated = visited.filter(tile => tile.every((coordinate, axis) => coordinate === center[axis])).length > 2;
-  if (!pos || repeated) {
+  if (!exactTargets && (!pos || repeated)) {
     const obstruction = exitObstruction(volume.cells, center, preferredGround === 'surface' ? destination : undefined);
     if (obstruction) {
       const [x, y, z] = obstruction;

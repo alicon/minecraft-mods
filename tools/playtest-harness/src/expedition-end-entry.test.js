@@ -165,6 +165,38 @@ test('the return to an expedition bed verifies the original living dog nearby', 
   assert.ok(Math.abs(returned.owner.position.x - 0.5) <= 4);
 });
 
+test('a nearby expedition bed can be reached by taking the connected route around a dead end', async () => {
+  const { returnToCampWithCompanion } = await import('./expedition-eye-route.mjs');
+  const bed = [0, 64, 18];
+  const floor = [
+    ...Array.from({ length: 14 }, (_, x) => cell(x, 63, 0, 'grass_block')),
+    ...Array.from({ length: 3 }, (_, z) => cell(0, 63, z + 1, 'grass_block')),
+    ...Array.from({ length: 17 }, (_, z) => cell(13, 63, z + 1, 'grass_block')),
+    ...Array.from({ length: 14 }, (_, x) => cell(x, 63, 18, 'grass_block')),
+  ];
+  let position = { x: 0.5, y: 64, z: 0.5 };
+  const walked = [];
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe': return { inWorld: true, dimension: 'minecraft:overworld', onGround: true,
+        health: 20, food: 20, gameTime: 100, position };
+      case 'get_entities': return { entities: [{ uuid: 'original', health: 12, distance: 1,
+        pos: [position.x, 64, position.z - 1] }] };
+      case 'get_blocks': return { cells: floor.filter(({ x, y, z }) => [x, y, z].every((axis, i) =>
+        Math.abs(axis - args.center[i]) <= Math.floor(args.size[i] / 2))) };
+      case 'go_to':
+        if (!walked.length) assert.ok(args.pos[0] > 0, 'The first walk went into the disconnected strip');
+        walked.push(args.pos);
+        position = { x: args.pos[0] + 0.5, y: args.pos[1], z: args.pos[2] + 0.5 };
+        return { arrived: true, position: Object.values(position) };
+      default: assert.fail(name);
+    }
+  };
+  const result = await returnToCampWithCompanion(action, 'original', bed);
+  assert.equal(result.dog.uuid, 'original');
+  assert.ok(walked.length <= 6);
+});
+
 test('a hungry player returning with iron eats a carried meal and keeps one for Mushroom', async t => {
   const { returnToCampWithCompanion } = await import('./expedition-eye-route.mjs');
   for (const portions of [1, 2]) {
