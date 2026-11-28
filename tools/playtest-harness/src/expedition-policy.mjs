@@ -3,7 +3,7 @@ import { readFile, rename, writeFile } from 'node:fs/promises';
 import { userInfo } from 'node:os';
 import { dirname, join } from 'node:path';
 
-export async function expeditionPolicy(mode, coachingFile) {
+export async function expeditionPolicy(mode, coachingFile, narrate) {
   if (mode === 'rules') return {};
   if (mode !== 'jev') throw new Error(`Unknown expedition policy ${mode}`);
   const key = process.env.OPENROUTER_API_KEY || spawnSync('/usr/bin/security', [
@@ -67,6 +67,11 @@ export async function expeditionPolicy(mode, coachingFile) {
     } finally {
       trace.latencyMs = Math.round(performance.now() - start);
       console.log(JSON.stringify(trace));
+      const description = stage === 'scout_for_wool'
+        ? `Take route ${trace.chosen ?? fallback} toward ${state.sheepOffset ? 'the visible sheep' : 'fresh terrain'}.`
+        : criteria[trace.chosen ?? fallback];
+      await narrate?.('Decision', trace.chosen ? `Jev selected the next action. ${description}`
+        : `Using the local choice after ${trace.fallback}. ${description}`, 15_000);
     }
     return fallback;
   }

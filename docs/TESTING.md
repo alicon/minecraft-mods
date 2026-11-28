@@ -99,7 +99,10 @@ MUSHROOM_EXPEDITION_SEED=1 MUSHROOM_EXPEDITION_SPAWN_RADIUS=0 \
 ```
 
 The runner prints a new directory under `build/playtest-reports/` containing
-the action trace, client and controller logs, and screenshots.
+the action trace, client and controller logs, and screenshots. Follow
+`tail -f "$RUN_DIRECTORY/playtest.log"` for the current objective, status,
+observations that changed the plan, and actions such as crafting. With Jev
+enabled, the log also names its selected action or the local fallback.
 
 The client starts in a fresh Normal Survival world with an empty inventory and
 commands disabled. The player gathers wood, crafts a wooden pickaxe and sword, packs

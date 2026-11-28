@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFile, rename, writeFile } from 'node:fs/promises';
+import { appendFile, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import {
@@ -30,6 +30,7 @@ assert.equal(await readFile(statusFile, 'utf8'), resume ? 'held' : 'ready', 'The
 const coachingFile = join(dirname(statusFile), 'coach.txt');
 const checkpointFile = join(dirname(statusFile), 'controller-checkpoint.json');
 const deathFile = join(dirname(statusFile), 'last-owner-death');
+const playtestLog = join(dirname(statusFile), 'playtest.log');
 const live = process.env.MUSHROOM_EXPEDITION_LIVE === '1';
 const deathAtStart = live ? await readFile(deathFile, 'utf8').catch(() => '') : '';
 const blockPosition = pos => Array.isArray(pos) && pos.length === 3 && pos.every(Number.isInteger);
@@ -42,6 +43,22 @@ let companion;
 let checkedCompanionAt = -Infinity;
 let companionEmergency = false;
 const interruptibleWork = new Set(['go_to', 'move', 'break_block', 'interact_block', 'use_item']);
+const lastReport = new Map();
+
+async function narrate(kind, message, interval = 0) {
+  const now = Date.now();
+  if (now - (lastReport.get(kind) ?? -Infinity) < interval) return;
+  lastReport.set(kind, now);
+  await appendFile(playtestLog, `[${new Date(now).toISOString()}] ${kind} | ${message.replace(/\s+/g, ' ')}\n`);
+}
+
+const milestoneObjectives = {
+  defense: 'Protect Mushroom before continuing the errand.',
+  portal: 'Find supplies, repair the Nether portal, and come home with Mushroom.',
+  shelter: 'Enter the furnished house and sleep with the door closed.',
+  equipment: 'Craft the harness, padded vest, and mat. Fit Mushroom’s gear and mark camp.',
+  'end-entry': 'Craft Eyes of Ender and bring Mushroom through the active portal.',
+};
 
 async function rpc(method, params) {
   const headers = {
@@ -76,6 +93,7 @@ async function checkCompanion(player) {
   checkedCompanionAt = player.gameTime;
   companionEmergency = await defendCompanion(playerAction, player, companion);
   if (companionEmergency) {
+    await narrate('Decision', 'Interrupted the current task to protect Mushroom from a nearby threat.', 10_000);
     console.log(JSON.stringify({ at: new Date().toISOString(), action: 'companion_emergency', dog: companion }));
   }
   return companionEmergency;
@@ -98,6 +116,13 @@ async function playerAction(name, args = {}) {
     if (observation?.dead || (live && await readFile(deathFile, 'utf8').catch(() => '') !== deathAtStart)) {
       throw new Error('The Survival player died and needs to recover before continuing');
     }
+    if (observation?.inWorld) {
+      const { x, y, z } = observation.position;
+      const threat = observation.threats?.[0];
+      const health = Math.round(observation.health * 10) / 10;
+      await narrate('Status', `At ${Math.floor(x)}, ${Math.floor(y)}, ${Math.floor(z)}. Health ${health}/20, food ${observation.food}/20.`
+        + (threat ? ` Nearby: ${threat.type.split(':').at(-1).replaceAll('_', ' ')} at ${Math.round(threat.distance)} blocks.` : ''), 20_000);
+    }
   }
   return result.isError ? null : observation;
 }
@@ -119,6 +144,7 @@ async function walk(pos, stopDistance) {
 async function craft(item, count) {
   const result = await action('craft', { item, count });
   assert.ok(result?.success, `Could not make ${item}`);
+  await narrate('Action', `Crafted ${result.crafted} × ${item.split(':').at(-1).replaceAll('_', ' ')}.`);
 }
 
 async function descendFromCanopy(player) {
@@ -168,9 +194,12 @@ await rpc('initialize', {
 });
 try {
   const stage = process.env.MUSHROOM_EXPEDITION_STAGE ?? 'adoption';
+  const policy = process.env.MUSHROOM_EXPEDITION_POLICY ?? 'rules';
+  await narrate('Run', `${resume ? 'Reattached to the same save' : 'Started the Survival controller'}. Stage ${stage}, policy ${policy}.`);
   const start = await action('observe');
   assert.ok(start?.inWorld && !start.dead && (start.dimension === OVERWORLD
     || (resume && stage === 'nether' && start.dimension === NETHER)));
+  if (milestoneObjectives[stage]) await narrate('Objective', milestoneObjectives[stage]);
   if (stage === 'defense') await runCompanionDrill();
   else if (stage === 'portal') {
     companion = (await readFile(join(dirname(statusFile), 'portal-companion'), 'utf8')).trim();
@@ -192,8 +221,10 @@ try {
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
     await crossEndPortal(action, craft, companion);
   } else await runExpedition(start, stage);
+  await narrate('Result', 'The controller finished its stage. The game test is checking the outcome.');
   await reportStatus('finished');
 } catch (error) {
+  await narrate('Result', `Run ${live ? 'held' : 'stopped'}. ${error.message.split('\n')[0]}`);
   await reportStatus(live ? 'held' : 'failed');
   throw error;
 }
@@ -216,7 +247,8 @@ async function runCompanionDrill() {
 
 async function runExpedition(start, stage) {
   const inventory = await action('get_inventory');
-  const policy = await expeditionPolicy(process.env.MUSHROOM_EXPEDITION_POLICY ?? 'rules', coachingFile);
+  const policy = await expeditionPolicy(process.env.MUSHROOM_EXPEDITION_POLICY ?? 'rules', coachingFile, narrate);
+  policy.reportScouting = message => narrate('Scouting', message, 20_000);
   if (live) policy.waitForCoaching = waitForCoaching;
   let checkpoint;
   if (resume) {
@@ -227,18 +259,16 @@ async function runExpedition(start, stage) {
     assert.ok(Number.isFinite(checkpoint.gameTime) && checkpoint.gameTime <= start.gameTime);
     assert.ok(['starter', 'provision', 'camp', 'adoption', 'stone', 'iron', 'nether'].includes(checkpoint.phase));
     assert.ok(start.dimension === OVERWORLD || checkpoint.phase === 'nether', 'Unexpected dimension before the Nether phase');
-    if (checkpoint.phase === 'provision' && inventory.slots.length === 0) {
+    const starterItems = ['crafting_table', 'wooden_sword', 'wooden_pickaxe'];
+    if (checkpoint.phase === 'provision'
+      && starterItems.some(item => !inventory.slots.some(stack => stack.id === `minecraft:${item}`))) {
       verifiedDeathSite(start, checkpoint);
       checkpoint.phase = 'starter';
       checkpoint.gameTime = start.gameTime;
       await writeCheckpoint(checkpoint);
       console.log(JSON.stringify({ at: new Date().toISOString(), action: 'rebuild_after_early_respawn' }));
     }
-    if (checkpoint.phase === 'provision') {
-      for (const item of ['crafting_table', 'wooden_sword', 'wooden_pickaxe']) {
-        assert.ok(inventory.slots.some(stack => stack.id === `minecraft:${item}`), `The earned ${item} is missing`);
-      }
-    } else if (checkpoint.phase !== 'starter') {
+    if (checkpoint.phase !== 'starter' && checkpoint.phase !== 'provision') {
       const camp = checkpoint.camp;
       const site = camp?.door ? [camp.bed, camp.door, camp.entrance] : [camp?.bed, camp?.table];
       for (const pos of site) {
@@ -258,6 +288,7 @@ async function runExpedition(start, stage) {
     if (['stone', 'iron', 'nether'].includes(checkpoint.phase)
         && !inventory.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide')) {
       const destination = verifiedDeathSite(start, checkpoint);
+      await narrate('Objective', 'Return to the recorded death site and collect the dropped gear.');
       console.log(JSON.stringify({ at: new Date().toISOString(), action: 'recover_dropped_loadout', destination }));
       await recoverDroppedLoadout(action, destination);
       delete checkpoint.quarry;
@@ -273,23 +304,27 @@ async function runExpedition(start, stage) {
   }
   await action('set_reflexes', { chargeRanged: false });
   if (checkpoint.phase === 'starter') {
+    await narrate('Objective', 'Collect wood and make the starter tools.');
     await gatherStarterTools(start);
     checkpoint.phase = 'provision';
     if (live) await writeCheckpoint(checkpoint);
   }
   if (checkpoint.phase === 'provision') {
+    await narrate('Objective', 'Find a sheltered bed, or gather wool to make one.');
     checkpoint.camp = await prepareAdoptionCamp(action, craft, descendFromCanopy, policy);
     checkpoint.phase = 'camp';
     if (live) await writeCheckpoint(checkpoint);
   }
   if (checkpoint.phase === 'camp') {
     if (stage !== 'adoption' && !checkpoint.camp.door) {
+      await narrate('Objective', 'Use the daylight before bedtime to make stone tools.');
       await earnStoneKit(action, craft, checkpoint.camp, { ...policy, beforeNight: true });
     }
     checkpoint.phase = 'adoption';
     if (live) await writeCheckpoint(checkpoint);
   }
   if (checkpoint.phase === 'adoption') {
+    await narrate('Objective', 'Sleep at camp, meet Mushroom, and feed him.');
     checkpoint.dog = await adoptAtNight(action, checkpoint.camp, craft);
     companion = checkpoint.dog;
     checkpoint.fedDog = await feedAdoptedDog(action, checkpoint.dog, checkpoint.camp.bed, stage === 'adoption' ? 120 : 24);
@@ -301,6 +336,7 @@ async function runExpedition(start, stage) {
     }
   }
   if (stage !== 'adoption' && checkpoint.phase === 'stone') {
+    await narrate('Objective', 'Make a stone pickaxe and furnace near camp.');
     if (!checkpoint.camp.table) {
       checkpoint.camp.table = await placeBeside(action, 'minecraft:crafting_table');
       if (live) await writeCheckpoint(checkpoint);
@@ -310,6 +346,7 @@ async function runExpedition(start, stage) {
     if (live && ['iron', 'nether'].includes(stage)) await writeCheckpoint(checkpoint);
   }
   if (['iron', 'nether'].includes(stage) && checkpoint.phase === 'iron') {
+    await narrate('Objective', 'Mine and smelt iron for a pickaxe, bucket, and shield.');
     if (live) {
       policy.resumeQuarry = checkpoint.quarry;
       policy.resumeQuarryLanding = checkpoint.quarryLanding;
@@ -324,6 +361,7 @@ async function runExpedition(start, stage) {
     await earnIronKit(action, craft, checkpoint.camp, { ...policy, reserveIgnitionIron: stage === 'nether' });
   }
   if (checkpoint.fedDog === false) {
+    await narrate('Objective', 'Find a meal for the original Mushroom.');
     assert.ok(await forageExpeditionMeal(action), 'Could not earn a meal for the original dog');
     const player = await action('observe');
     const position = [player.position.x, player.position.y, player.position.z].map(Math.floor);
@@ -333,6 +371,7 @@ async function runExpedition(start, stage) {
   }
   if (stage === 'nether') {
     if (checkpoint.phase !== 'nether') {
+      await narrate('Objective', 'Equip Mushroom and pack the camp mat before travelling.');
       checkpoint.equipment ??= [];
       await prepareCompanionGear(action, craft, checkpoint.dog, checkpoint.equipment, async item => {
         checkpoint.equipment.push(item);
@@ -342,6 +381,7 @@ async function runExpedition(start, stage) {
     }
     checkpoint.phase = 'nether';
     if (live) await writeCheckpoint(checkpoint);
+    await narrate('Objective', 'Make a dry Nether round trip with Mushroom.');
     await netherRoundTrip(action, checkpoint.dog, hold, () => prepareNetherPortal(action, craft, checkpoint.camp), start.dimension);
   }
 }
@@ -372,6 +412,7 @@ async function replaceFile(path, content) {
 async function waitForCoaching(context) {
   const prior = await readFile(coachingFile, 'utf8').catch(() => '');
   console.log(JSON.stringify({ at: new Date().toISOString(), action: 'awaiting_coaching', ...context }));
+  await narrate('Decision', 'The quarry exit is still blocked. Waiting for a different route in coach.txt.');
   await reportStatus('awaiting-coaching');
   for (let second = 0; second < 180; second++) {
     await setTimeout(1000);
@@ -455,9 +496,7 @@ async function gatherStarterTools(start) {
     if (!lower) break;
     player = lower;
   }
-  const table = (await action('get_inventory')).slots.find(stack => stack.id === 'minecraft:crafting_table');
-  assert.ok(table && table.slot < 9, 'Expected a crafting table on the hotbar');
-  await action('select_slot', { slot: table.slot });
+  await hold(action, 'minecraft:crafting_table');
 
   const { position } = await action('observe');
   const { x, y, z } = position;

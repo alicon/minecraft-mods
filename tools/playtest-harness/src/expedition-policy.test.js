@@ -27,8 +27,10 @@ test('reattaching the controller cannot refill its Jev request budget', async t 
   const player = { gameTime: 100, position: { x: 0, y: 3, z: 0 } };
   const routes = [{ pos: [1, 3, 0] }, { pos: [0, 3, 1] }];
 
-  const initial = await expeditionPolicy('jev', coaching);
+  const reports = [];
+  const initial = await expeditionPolicy('jev', coaching, (kind, message) => reports.push({ kind, message }));
   assert.equal(await initial.chooseRoute(player, routes), routes[1]);
+  assert.deepEqual(reports, [{ kind: 'Decision', message: 'Jev selected the next action. Take route b toward fresh terrain.' }]);
   const reattached = await expeditionPolicy('jev', coaching);
   assert.equal(await reattached.chooseRoute({ ...player, gameTime: 200 }, routes), routes[0]);
   assert.equal(request.mock.callCount(), 1);

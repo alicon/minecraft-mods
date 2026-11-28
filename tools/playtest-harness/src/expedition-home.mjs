@@ -227,7 +227,7 @@ export async function retreatFromNearbyMob(action, player, visited, rejectedStep
   return true;
 }
 
-export async function gatherWool(action, descendFromCanopy, chooseRoute, craft) {
+export async function gatherWool(action, descendFromCanopy, chooseRoute, craft, reportScouting) {
   const visited = [];
   const rejectedSteps = new Set();
   const triedAnimals = new Map();
@@ -258,6 +258,7 @@ export async function gatherWool(action, descendFromCanopy, chooseRoute, craft) 
       shelterSteps = 0;
     }
     if (shelter && player.food > 10) {
+      await reportScouting?.('Found a sheltered bed. Looking for a dry approach to the door.');
       const here = feet(player);
       if (here.join(',') === shelter.entrance.join(',')) {
         if (await enterShelter(action, shelter)) return shelter;
@@ -295,6 +296,11 @@ export async function gatherWool(action, descendFromCanopy, chooseRoute, craft) 
       }
     }
     const here = await action('observe');
+    const next = target === sheep ? 'No sheep nearby. Looking for open grassland.'
+      : flower === target ? 'Looking for dye to make the wool match.'
+        : 'Looking for food before continuing the wool search.';
+    await reportScouting?.(sheep && target === sheep
+      ? `Saw a sheep about ${Math.round(sheep.distance)} blocks away. Following dry ground toward it.` : next);
     visited.push(feet(here));
     if (await stepOut(action, here, visited, target?.pos, target ? undefined : 'grass', rejectedSteps,
       target === sheep ? chooseRoute : undefined)
@@ -558,8 +564,8 @@ export async function forageExpeditionMeal(action) {
   return false;
 }
 
-export async function prepareAdoptionCamp(action, craft, descendFromCanopy, { chooseRoute } = {}) {
-  const bedding = await gatherWool(action, descendFromCanopy, chooseRoute, craft);
+export async function prepareAdoptionCamp(action, craft, descendFromCanopy, { chooseRoute, reportScouting } = {}) {
+  const bedding = await gatherWool(action, descendFromCanopy, chooseRoute, craft, reportScouting);
   if (typeof bedding !== 'string') {
     return { bed: bedding.bed, door: bedding.door, entrance: bedding.entrance };
   }
