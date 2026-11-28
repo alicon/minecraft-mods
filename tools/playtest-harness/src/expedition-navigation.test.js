@@ -1232,19 +1232,12 @@ test('iron work returns to camp after feeding the injured companion before spend
   let x = 0;
   let gameTime = 0;
   const atCamp = new Error('The companion was checked again at camp');
-  const action = async (name, args) => {
+  const action = async name => {
     switch (name) {
       case 'get_inventory': return { slots: [] };
       case 'observe':
         gameTime += 50;
         return { inWorld: true, position: { x: x + 0.5, y: 1, z: 0.5 }, health: 20, food: 20, gameTime };
-      case 'get_blocks':
-        assert.ok(caredFor);
-        return { cells: Array.from({ length: 9 }, (_, tile) => cell(tile, 0, 0)) };
-      case 'go_to':
-        assert.equal(args.pos[0], 8);
-        x = args.pos[0];
-        return { arrived: true, position: args.pos };
       default: assert.fail(`Unexpected action: ${name}`);
     }
   };
@@ -1260,11 +1253,16 @@ test('iron work returns to camp after feeding the injured companion before spend
       caredFor = true;
       return true;
     },
+    returnAfterCare: async () => {
+      assert.ok(caredFor);
+      assert.equal(x, 0);
+      x = 8;
+    },
   };
   await assert.rejects(earnIronKit(action, () => assert.fail('No recipe has ingredients'), {
     bed: [8, 1, 0],
   }, policy), error => error === atCamp);
-  assert.deepEqual(checkedAt, [0, 0, 8]);
+  assert.deepEqual(checkedAt, [0, 8]);
 });
 
 test('companion meals do not erase the iron search history', async () => {

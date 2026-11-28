@@ -208,12 +208,13 @@ without enough ore records its entrance and the observed blocks at the last
 landing. If the same footing remains after reattachment, the controller
 scouts another opening. On the surface it offers Mushroom an earned portion
 if his first meal is still pending. A decision to return after a meal
-survives a handoff. When far from camp and clear of immediate threats, the
-player can place a carried bed and sleep until daylight. The first mined
-iron goes back to the camp bed before smelting. When the outbound path is in the local action
-trace, the controller retraces grounded positions it observed before the
-first ore pickup. The trace records the original living dog, the raw ore
-still in inventory and their positions at the bed.
+survives a handoff and takes priority over mining until both the player and
+the original living dog reach the bed. For a long return near nightfall, the
+player looks for shelter and can sleep until daylight in a carried bed.
+The first mined iron goes back to the camp bed before smelting. Both trips
+can retrace grounded positions recorded on the outbound path. The iron trip
+uses positions from before the first ore pickup. The trace records the
+original dog, the player's position at the bed, and any raw iron brought back.
 
 ```shell
 MUSHROOM_EXPEDITION_STATUS="$RUN_DIRECTORY/status" MUSHROOM_EXPEDITION_RESUME=1 \

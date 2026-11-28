@@ -1573,6 +1573,12 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       await policy.saveQuarry?.([]);
     }
   }
+  if (policy.returningAfterCare) {
+    await leaveQuarry(action, stairs, policy);
+    stairs.length = 0;
+    await policy.saveQuarry?.([]);
+    await policy.returnAfterCare();
+  }
   const startingStock = await action('get_inventory');
   const resumedWithIron = stairs.length > 0
     && (count(startingStock, IRON_INGOT) > 0 || count(startingStock, RAW_IRON) > 0);
@@ -1596,9 +1602,6 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   let blockedCaveSteps = 0;
   let highlandSearch = 0;
   let movingToFreshGround = policy.scoutNewGround ? 8 : 0;
-  let returningAfterCare = policy.returningAfterCare === true;
-  let nextReturnCoverCheck = 0;
-  let returningUnderCover = false;
   const triedFoodSources = new Set();
   let exhaustedQuarries = policy.exhaustedQuarries ?? [];
   let bringFirstIronHome = policy.bringFirstIronHome;
@@ -1639,45 +1642,13 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       nextCompanionCheck = player.gameTime + 40;
       const dogStatus = await policy.checkCompanion(player, !stairs.length);
       if (dogStatus === 'regrouped') continue;
-      if (dogStatus === 'care' && !returningAfterCare) {
+      if (dogStatus === 'care') {
         if (stairs.length) {
           await leaveQuarry(action, stairs, policy);
           stairs.length = 0;
           await policy.saveQuarry?.([]);
         }
-        returningAfterCare = await policy.tendCompanion();
-        continue;
-      }
-    }
-    if (returningAfterCare) {
-      const here = feet(player);
-      returningAfterCare = Math.hypot(...here.map((coordinate, axis) => coordinate - bed[axis])) > 6;
-      if (!returningAfterCare) await policy.finishCareReturn?.();
-      if (returningAfterCare) {
-        const cautiousReturn = careReturnNeedsCover(player, bed);
-        if (cautiousReturn && isBedtime(player) && player.gameTime >= nextReturnCoverCheck) {
-          nextReturnCoverCheck = player.gameTime + 240;
-          if (await sleepNearby(action, player)) continue;
-          if (await takeCover(action)) {
-            returningUnderCover = true;
-            await policy.reportScouting?.('Waiting in nearby cover for daylight before returning to camp.');
-            continue;
-          }
-        }
-        if (cautiousReturn && player.threats?.some(threat => threat.distance <= 16)) {
-          returningUnderCover = false;
-          if (await retreatFromNearbyMob(action, player, visited, rejectedSteps, 16, 18)) continue;
-          await action('stop');
-          throw new Error('Mushroom’s return to camp needs a route clear of the nighttime mobs');
-        }
-        if (returningUnderCover && cautiousReturn) {
-          await setTimeout(1_500);
-          continue;
-        }
-        returningUnderCover = false;
-        visited.push(here);
-        await stepOut(action, player, visited, bed, 'surface', rejectedSteps, undefined, undefined,
-          cautiousReturn ? 16 : 90);
+        if (await policy.tendCompanion()) await policy.returnAfterCare();
         continue;
       }
     }

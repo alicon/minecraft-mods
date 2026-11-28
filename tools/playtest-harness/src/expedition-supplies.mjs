@@ -20,7 +20,7 @@ import { prepareEndCombatKit } from './expedition-end-kit.mjs';
 import { craftEyes, crossEndPortal, descendToStronghold, enderEyeCount, findStrongholdPortalRoom } from './expedition-end-entry.mjs';
 import { earnEnderPearls } from './expedition-pearls.mjs';
 import {
-  companionRegroupTrail, firstIronOutboundTrail, navigateToStronghold, returnToCampWithCompanion, scoutByEye,
+  campOutboundTrail, companionRegroupTrail, navigateToStronghold, returnToCampWithCompanion, scoutByEye,
 } from './expedition-eye-route.mjs';
 import { COMPANION_WEARABLES, markExpeditionCamp, practiceStayAndRecall, prepareCompanionGear } from './expedition-gear.mjs';
 import { expeditionPolicy } from './expedition-policy.mjs';
@@ -727,6 +727,10 @@ async function runExpedition(start, stage) {
     if (live && needsIron) await writeCheckpoint(checkpoint);
   }
   if (needsIron && checkpoint.phase === 'iron') {
+    const recentActions = () => readFile(join(dirname(statusFile), 'actions.jsonl'), 'utf8').catch(error => {
+      if (error.code !== 'ENOENT') throw error;
+      return '';
+    });
     if (checkpoint.fedDog === false && !checkpoint.quarry?.length) {
       const player = await action('observe');
       if (player?.onGround && !player.inWater) {
@@ -745,11 +749,7 @@ async function runExpedition(start, stage) {
     policy.scoutNewGround = resume && !checkpoint.quarry?.length;
     let lastCompanionPosition;
     const regroup = async () => {
-      const trace = await readFile(join(dirname(statusFile), 'actions.jsonl'), 'utf8').catch(error => {
-        if (error.code !== 'ENOENT') throw error;
-        return '';
-      });
-      const trail = companionRegroupTrail(trace, checkpoint.dog);
+      const trail = companionRegroupTrail(await recentActions(), checkpoint.dog);
       const together = await regroupExpeditionCompanion(action, checkpoint.dog, lastCompanionPosition, trail);
       lastCompanionPosition = together.pos;
       console.log(JSON.stringify({ at: new Date().toISOString(), action: 'companion_regrouped',
@@ -799,16 +799,23 @@ async function runExpedition(start, stage) {
         + (returnToCamp ? ' Returning to camp.' : ' Continuing from here.'));
       return returnToCamp;
     };
+    policy.returnAfterCare = async () => {
+      const bed = checkpoint.camp.bed;
+      const trail = campOutboundTrail(await recentActions(), bed);
+      await narrate('Objective', 'Get the original Mushroom safely back to camp before looking for more iron.');
+      const { owner, dog } = await returnToCampWithCompanion(action, checkpoint.dog, bed, trail,
+        message => narrate('Decision', message, 15_000));
+      delete checkpoint.returningAfterCare;
+      if (live) await writeCheckpoint(checkpoint);
+      console.log(JSON.stringify({ at: new Date().toISOString(), action: 'companion_care_return',
+        dog: dog.uuid, dogHealth: dog.health, dogPosition: dog.pos, player: owner.position, camp: bed }));
+      await narrate('Result', 'The player and the original living Mushroom reached the camp bed.');
+    };
     if (live) {
       policy.resumeQuarry = checkpoint.quarry;
       policy.resumeQuarryLanding = checkpoint.quarryLanding;
       policy.reenterQuarry = checkpoint.reenterQuarry === true;
       policy.exhaustedQuarries = checkpoint.exhaustedQuarries;
-      policy.returningAfterCare = checkpoint.returningAfterCare;
-      policy.finishCareReturn = async () => {
-        delete checkpoint.returningAfterCare;
-        await writeCheckpoint(checkpoint);
-      };
       policy.saveExhaustedQuarries = async attempts => {
         checkpoint.exhaustedQuarries = attempts;
         await writeCheckpoint(checkpoint);
@@ -823,11 +830,7 @@ async function runExpedition(start, stage) {
     if (!checkpoint.firstIronHome) {
       policy.bringFirstIronHome = async () => {
         await narrate('Objective', 'Bring the first mined iron back to camp with Mushroom.');
-        const trace = await readFile(join(dirname(statusFile), 'actions.jsonl'), 'utf8').catch(error => {
-          if (error.code !== 'ENOENT') throw error;
-          return '';
-        });
-        const trail = firstIronOutboundTrail(trace, checkpoint.camp.bed);
+        const trail = campOutboundTrail(await recentActions(), checkpoint.camp.bed, { beforeIron: true });
         const { owner, dog } = await returnToCampWithCompanion(action, checkpoint.dog, checkpoint.camp.bed, trail);
         const stock = await action('get_inventory');
         const rawIron = stock.slots.filter(stack => stack.id === 'minecraft:raw_iron')
@@ -844,8 +847,8 @@ async function runExpedition(start, stage) {
     const restoreAutoEat = (await action('set_reflexes'))?.autoEat;
     if (restoreAutoEat) await action('set_reflexes', { autoEat: false });
     try {
-      if (!checkpoint.quarry?.length) await policy.checkCompanion(await action('observe'), true);
-      if (!checkpoint.quarry?.length) {
+      if (!checkpoint.returningAfterCare && !checkpoint.quarry?.length) {
+        await policy.checkCompanion(await action('observe'), true);
         const miner = await action('observe');
         const minimum = miner.health >= 16 && miner.food >= 18 ? 1 : 2;
         if (dogMealCount(await action('get_inventory')) < minimum) {
@@ -864,10 +867,13 @@ async function runExpedition(start, stage) {
         }
       }
       if (!checkpoint.quarry?.length && checkpoint.fedDog === false) await policy.tendCompanion();
-      if (policy.scoutNewGround) await policy.reportScouting('Leaving the previous quarry area to look for exposed iron.');
-      await narrate('Objective', 'Mine and smelt iron for a pickaxe, bucket, and shield.');
+      if (!checkpoint.returningAfterCare) {
+        if (policy.scoutNewGround) await policy.reportScouting('Leaving the previous quarry area to look for exposed iron.');
+        await narrate('Objective', 'Mine and smelt iron for a pickaxe, bucket, and shield.');
+      }
       await earnIronKit(action, craft, checkpoint.camp,
-        { ...policy, reserveIgnitionIron: visitNether, makeIronSword: huntBlazes, extraEndBucket: findStronghold });
+        { ...policy, returningAfterCare: checkpoint.returningAfterCare, reserveIgnitionIron: visitNether,
+          makeIronSword: huntBlazes, extraEndBucket: findStronghold });
     } finally {
       if (restoreAutoEat) {
         try {
