@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldSave;
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.minecraft.client.gui.screens.DeathScreen;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.item.Items;
@@ -46,6 +47,12 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 		TestWorldSave save;
 		UUID ownerId;
 		var originalDog = new AtomicReference<UUID>();
+		var companionDeath = new AtomicReference<String>();
+		ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
+			if (entity instanceof MushroomYorkieEntity dog && dog.getUUID().equals(originalDog.get())) {
+				companionDeath.set(source.getLocalizedDeathMessage(dog).getString());
+			}
+		});
 		try (var world = context.worldBuilder().setUseConsistentSettings(false).adjustSettings(settings -> {
 			settings.setName("Codex Expedition Survival");
 			settings.setDifficulty(Difficulty.NORMAL);
@@ -75,6 +82,10 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 				Files.writeString(status, "ready", StandardOpenOption.CREATE_NEW);
 				boolean passed = false;
 				for (int elapsed = 0; elapsed < windowTicks; elapsed += 10) {
+					String dogLoss = companionDeath.get();
+					if (dogLoss != null) {
+						throw new AssertionError("Expedition lost the original companion: " + dogLoss);
+					}
 					String result = Files.readString(status);
 					if ("failed".equals(result)) {
 						throw new AssertionError("The Survival controller reported a failure. See its action trace.");

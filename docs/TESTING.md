@@ -168,11 +168,14 @@ duration and the fixture emits its final pass marker.
 Keep assisted runs out of unattended policy comparisons. Charge reported
 inference spend from failed attempts to the policy that made them.
 
-For the smoother spectator camera, apply the tracked patch to the isolated
-bridge checkout before rebuilding the bridge JAR. Use a separate JAR for each
-running client so a build can finish while a playtest is still active.
+Apply the companion patch to the isolated bridge checkout before rebuilding the
+JAR. It exposes the original dog's stable identity and hurt animation alongside
+the client-observed health. The controller can interrupt work for nearby danger,
+and the native game test fails if that dog dies. For a smoother spectator camera,
+also apply the camera patch. Use separate JARs for concurrent clients.
 
 ```shell
+git -C "$BRIDGE_CHECKOUT" apply --unidiff-zero "$PWD/tools/playtest-harness/patches/mc-agent-mcp-companion.patch"
 git -C "$BRIDGE_CHECKOUT" apply --unidiff-zero "$PWD/tools/playtest-harness/patches/mc-agent-mcp-smooth-camera.patch"
 ```
 

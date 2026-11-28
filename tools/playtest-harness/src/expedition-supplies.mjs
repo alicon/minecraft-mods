@@ -8,6 +8,7 @@ import {
   recoverDroppedLoadout, WOOD_LOGS,
 } from './expedition-home.mjs';
 import { hasDrySupport } from './expedition-navigation.mjs';
+import { defendCompanion } from './expedition-companion.mjs';
 import { expeditionPolicy } from './expedition-policy.mjs';
 
 const configFile = new URL(
@@ -34,6 +35,10 @@ const url = `http://127.0.0.1:${config.port}/mcp`;
 let session;
 let id = 0;
 let lastPlayer;
+let companion;
+let checkedCompanionAt = -Infinity;
+let companionEmergency = false;
+const interruptibleWork = new Set(['go_to', 'break_block', 'interact_block', 'use_item']);
 
 async function rpc(method, params) {
   const headers = {
@@ -56,13 +61,31 @@ async function rpc(method, params) {
 }
 
 async function action(name, args = {}) {
+  if (companion && interruptibleWork.has(name) && await checkCompanion(lastPlayer)) return null;
+  const result = await playerAction(name, args);
+  if (name === 'observe' && companion && await checkCompanion(result)) return playerAction('observe');
+  return result;
+}
+
+async function checkCompanion(player) {
+  if (!player?.inWorld || !Number.isFinite(player.gameTime)) return false;
+  if (player.gameTime - checkedCompanionAt < 6) return companionEmergency;
+  checkedCompanionAt = player.gameTime;
+  companionEmergency = await defendCompanion(playerAction, player, companion);
+  if (companionEmergency) {
+    console.log(JSON.stringify({ at: new Date().toISOString(), action: 'companion_emergency', dog: companion }));
+  }
+  return companionEmergency;
+}
+
+async function playerAction(name, args = {}) {
   // Native walking adjusts yaw and preserves pitch from the previous input.
   if (name === 'go_to') {
     const night = lastPlayer?.timeOfDay >= 12_542 && lastPlayer.timeOfDay < 23_460;
     const endermen = night || lastPlayer?.dimension === 'minecraft:the_end'
-      ? await action('get_entities', { type: 'enderman', radius: 18, max: 8 })
+      ? await playerAction('get_entities', { type: 'enderman', radius: 18, max: 8 })
       : null;
-    await action('look', { pitch: endermen?.entities?.length ? 26 : 4 });
+    await playerAction('look', { pitch: endermen?.entities?.length ? 26 : 4 });
   }
   const result = await rpc('tools/call', { name, arguments: args });
   const observation = result.structuredContent ?? result.content;
@@ -162,7 +185,8 @@ try {
       || (Array.isArray(checkpoint.quarry) && checkpoint.quarry.length <= 44 && checkpoint.quarry.every(blockPosition)),
     'Invalid recorded quarry path');
     assert.ok(checkpoint.quarryLanding === undefined || blockPosition(checkpoint.quarryLanding), 'Invalid recorded landing');
-    assert.ok(checkpoint.dog === undefined || Number.isInteger(checkpoint.dog), 'Invalid recorded dog');
+    assert.ok(checkpoint.dog === undefined || /^[\da-f-]{36}$/i.test(String(checkpoint.dog)), 'Invalid recorded dog UUID');
+    companion = checkpoint.dog;
     await action('stop', { closeScreen: true });
     if (['stone', 'iron'].includes(checkpoint.phase)
         && !inventory.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide')) {
@@ -194,6 +218,7 @@ try {
   }
   if (checkpoint.phase === 'adoption') {
     checkpoint.dog = await adoptAtNight(action, checkpoint.camp, craft);
+    companion = checkpoint.dog;
     checkpoint.fedDog = await feedAdoptedDog(action, checkpoint.dog, checkpoint.camp.bed, stage === 'adoption' ? 120 : 24);
     checkpoint.phase = 'stone';
     if (live && stage !== 'adoption') await writeCheckpoint(checkpoint);

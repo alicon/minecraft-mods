@@ -10,12 +10,15 @@ test('after adoption the player can sleep in a nearby vanilla bed at night', asy
   const player = { inWorld: true, dimension: 'minecraft:overworld', timeOfDay: 15_000,
     position: { x: 0.5, y: 1, z: 0.5 } };
   const interactions = [];
+  let wakeObservations = 0;
   const action = async (name, args) => {
     switch (name) {
       case 'get_blocks': return { cells: [
         { x: 1, y: 1, z: 0, b: 'mushroom_yorkie:dog_bed' }, cell(2, 1, 0, 'white_bed'),
       ] };
-      case 'observe': return interactions.length ? { ...player, timeOfDay: 12 } : player;
+      case 'observe':
+        if (!interactions.length) return player;
+        return { ...player, timeOfDay: ++wakeObservations === 1 ? 21_549 : 12 };
       case 'interact_block':
         interactions.push(args.pos);
         return { screenOpened: 'InBedChatScreen' };
@@ -23,6 +26,7 @@ test('after adoption the player can sleep in a nearby vanilla bed at night', asy
     }
   };
   assert.equal(await sleepNearby(action, player), true);
+  assert.equal(wakeObservations, 2);
   assert.deepEqual(interactions, [[2, 1, 0]]);
   assert.equal(await sleepNearby(async () => assert.fail('Daylight started a sleep action'),
     { ...player, timeOfDay: 2_000 }), false);
@@ -142,11 +146,12 @@ test('feeding only succeeds when the original dog is reached and consumes one me
   const { feedAdoptedDog } = await import('./expedition-home.mjs');
   for (const hit of [19, 22]) {
     let count = 2;
-    const dog = { id: 22, distance: 2, pos: [2, 64, 0] };
+    const dog = { id: 22, uuid: 'original', distance: 2, pos: [2, 64, 0] };
+    const decoy = { ...dog, id: 19, uuid: 'other' };
     const action = async (name, args) => {
       switch (name) {
         case 'observe': return { position: { x: 0, y: 64, z: 0 }, crosshair: { id: hit } };
-        case 'get_entities': return { entities: [dog] };
+        case 'get_entities': return { entities: [decoy, dog] };
         case 'get_inventory': return { mainHand: { id: 'minecraft:mutton' }, slots: [{ id: 'minecraft:mutton', count }] };
         case 'look':
           assert.equal(args.entityId, dog.id);
@@ -158,7 +163,7 @@ test('feeding only succeeds when the original dog is reached and consumes one me
         default: throw new Error(`Unexpected action: ${name}`);
       }
     };
-    assert.equal(await feedAdoptedDog(action, dog.id, [0, 64, 0], 1), hit === dog.id);
+    assert.equal(await feedAdoptedDog(action, dog.uuid, [0, 64, 0], 1), hit === dog.id);
     assert.equal(count, hit === dog.id ? 1 : 2);
   }
 });

@@ -374,7 +374,7 @@ async function provisionCampBeforeSleep(action, craft, bed) {
   throw new Error('Could not walk back to the bed after collecting camp supplies');
 }
 
-export async function feedAdoptedDog(action, id, bed, attempts = 120) {
+export async function feedAdoptedDog(action, uuid, bed, attempts = 120) {
   const startingStock = await action('get_inventory');
   if (!DOG_FOOD.some(item => count(startingStock, item))) return false;
   const visited = [];
@@ -382,15 +382,15 @@ export async function feedAdoptedDog(action, id, bed, attempts = 120) {
   for (let attempt = 0; attempt < attempts; attempt++) {
     const player = await action('observe');
     const observed = await action('get_entities', { type: DOG, radius: FEEDING_SEARCH_RADIUS });
-    const dog = observed?.entities.find(entity => entity.id === id);
+    const dog = observed?.entities.find(entity => entity.uuid === uuid);
     if (dog?.distance <= 4.4) {
       const inventory = await action('get_inventory');
       const meal = DOG_FOOD.find(item => count(inventory, item));
       if (!meal) return false;
       const mealCount = count(inventory, meal);
       if (inventory.mainHand?.id !== meal) await hold(action, meal);
-      if (await visible(action, id)) {
-        await action('interact_entity', { entityId: id });
+      if (await visible(action, dog.id)) {
+        await action('interact_entity', { entityId: dog.id });
         await setTimeout(350);
         const remaining = count(await action('get_inventory'), meal);
         if (remaining === mealCount - 1) return true;
@@ -405,7 +405,7 @@ export async function feedAdoptedDog(action, id, bed, attempts = 120) {
       if (nearCamp && Math.abs(dog.pos[1] - player.position.y) <= 4 && fromCamp < FEEDING_SEARCH_RADIUS) {
         // Track the moving dog on level ground before falling back to dry waypoints.
         if (dog.distance <= 12 && Math.abs(dog.pos[1] - player.position.y) <= 1.25) {
-          const approach = await action('go_to', { entityId: id, stopDistance: 2.2, maxTicks: 45 });
+          const approach = await action('go_to', { entityId: dog.id, stopDistance: 2.2, maxTicks: 45 });
           if (approach?.arrived) continue;
         }
         await stepOut(action, player, visited, dog.pos, false, rejectedSteps);
@@ -475,7 +475,8 @@ export async function adoptAtNight(action, { bed }, craft) {
     const pup = dogs?.entities.find(entity => entity.name === 'Mushroom');
     const inventory = pup && !player.screen ? await action('get_inventory') : null;
     if (inventory?.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide')) {
-      return pup.id;
+      assert.ok(pup.uuid, 'Rebuild the expedition bridge with companion identity support');
+      return pup.uuid;
     }
     if (!player.screen && player.timeOfDay >= 12_542 && player.timeOfDay < 23_460) {
       await action('interact_block', { pos: bed, face: 'up' });
@@ -739,7 +740,7 @@ export async function sleepNearby(action, player) {
       for (let check = 0; check < 24; check++) {
         await setTimeout(500);
         const woke = await action('observe');
-        if (woke?.inWorld && !woke.screen) return woke.timeOfDay <= 1_200;
+        if (woke?.inWorld && !woke.screen && woke.timeOfDay <= 1_200) return true;
       }
       return false;
     }
@@ -955,7 +956,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       await action('use_item', { ticks: 36 });
       continue;
     }
-    if (!meal && player.food < 18 && (player.health < 14 || player.food <= 12)) {
+    if (!meal && (player.food <= 16 || (player.food < 18 && player.health < 14))) {
       if (stairs.length) {
         await leaveQuarry(action, stairs, policy);
         stairs.length = 0;

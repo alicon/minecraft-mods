@@ -1,0 +1,55 @@
+import { setTimeout } from 'node:timers/promises';
+import { dryWaypoint } from './expedition-navigation.mjs';
+
+const DOG = 'mushroom_yorkie:mushroom_yorkie';
+const SWORDS = ['minecraft:iron_sword', 'minecraft:stone_sword', 'minecraft:wooden_sword'];
+const distance = (from, to) => Math.hypot(...from.map((axis, index) => axis - to[index]));
+
+export async function defendCompanion(action, player, dogUuid) {
+  const snapshot = await action('get_entities', { radius: 24, max: 128 });
+  const dog = snapshot?.entities.find(entity => entity.type === DOG && entity.uuid === dogUuid);
+  if (!dog) return false;
+  const threats = snapshot.entities.filter(entity => entity.hostile && distance(entity.pos, dog.pos) <= 3);
+  const creeper = threats.find(entity => entity.type === 'minecraft:creeper');
+  const attacker = threats.sort((a, b) => distance(a.pos, dog.pos) - distance(b.pos, dog.pos))[0];
+  if (!creeper && (!attacker || (!dog.recentlyHurt && dog.health > 8))) return false;
+
+  await action('stop', { closeScreen: Boolean(player.screen) });
+  if (creeper || player.health < 7) {
+    if (dog.distance <= 4) await retreat(action, player, creeper ?? attacker);
+    else if (dog.distance <= 9 && creeper?.distance > 5) await approach(action, dog.id);
+    return true;
+  }
+
+  if (attacker.distance > 4.25) {
+    if (attacker.distance <= 10) await approach(action, attacker.id);
+    return true;
+  }
+  const inventory = await action('get_inventory');
+  const sword = SWORDS.map(id => inventory?.slots.find(stack => stack.id === id && stack.slot < 9)).find(Boolean);
+  if (sword && sword.slot !== inventory.selectedSlot) await action('select_slot', { slot: sword.slot });
+  if (await action('look', { entityId: attacker.id })) {
+    await setTimeout(110);
+    const aimed = await action('observe');
+    if (aimed?.crosshair?.id === attacker.id && aimed.attackStrength >= 0.88) {
+      await action('attack_entity', { entityId: attacker.id });
+    }
+  }
+  return true;
+}
+
+async function approach(action, entityId) {
+  await action('go_to', { entityId, stopDistance: 2.3, maxTicks: 24 });
+}
+
+async function retreat(action, player, threat) {
+  const { x, y, z } = player.position;
+  const start = [x, y, z].map(Math.floor);
+  const [dx, , dz] = [x, y, z].map((axis, index) => axis - threat.pos[index]);
+  const goal = [start[0] + Math.sign(dx) * 6, start[1], start[2] + Math.sign(dz) * 6];
+  const local = await action('get_blocks', { center: start, size: [15, 7, 15], format: 'json' });
+  const waypoint = local && dryWaypoint(local.cells, start, [start], goal);
+  if (waypoint && distance(waypoint, threat.pos) > distance(start, threat.pos)) {
+    await action('go_to', { pos: waypoint, stopDistance: 0.7, maxTicks: 24 });
+  }
+}

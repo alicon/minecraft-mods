@@ -1,0 +1,8 @@
+diff --git a/src/client/java/com/mcagent/mcp/client/tools/GetEntitiesTool.java b/src/client/java/com/mcagent/mcp/client/tools/GetEntitiesTool.java
+index 2b03ac7..cc85214 100644
+--- a/src/client/java/com/mcagent/mcp/client/tools/GetEntitiesTool.java
++++ b/src/client/java/com/mcagent/mcp/client/tools/GetEntitiesTool.java
+@@ -75,0 +76 @@ public final class GetEntitiesTool implements McpTool {
++				o.addProperty("uuid", e.getUUID().toString());
+@@ -83,0 +85 @@ public final class GetEntitiesTool implements McpTool {
++					o.addProperty("recentlyHurt", le.hurtTime > 0);
