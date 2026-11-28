@@ -114,7 +114,7 @@ public final class FetchPersistenceGameTests {
 		ExpeditionCampScenarios.narrowCrossing(helper);
 	}
 
-	@GameTest(structure = "mushroom_yorkie_gametest:cliff_arena", maxTicks = 180)
+	@GameTest(structure = "mushroom_yorkie_gametest:cliff_arena", maxTicks = 260)
 	public void expeditionFollowsCliffBend(GameTestHelper helper) {
 		ExpeditionCampScenarios.followsCliffBend(helper);
 	}

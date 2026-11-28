@@ -112,7 +112,7 @@ public final class FetchPersistenceGameTests {
 		ExpeditionCampScenarios.narrowCrossing(helper);
 	}
 
-	@GameTest(template = "mushroom_yorkie_gametest:cliff_arena", timeoutTicks = 180)
+	@GameTest(template = "mushroom_yorkie_gametest:cliff_arena", timeoutTicks = 260)
 	public void expeditionFollowsCliffBend(GameTestHelper helper) {
 		ExpeditionCampScenarios.followsCliffBend(helper);
 	}

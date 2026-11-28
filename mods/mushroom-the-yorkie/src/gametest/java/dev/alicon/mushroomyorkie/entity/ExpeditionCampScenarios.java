@@ -167,15 +167,31 @@ final class ExpeditionCampScenarios {
 			Vec3 position = helper.absoluteVec(positions[index]);
 			helper.runAfterDelay(ticks[index], () -> owner.setPos(position));
 		}
-		var minimumY = helper.absoluteVec(new Vec3(0, 7, 0)).y;
-		helper.startSequence().thenExecuteFor(160, () ->
-				helper.assertTrue(dog.isAlive() && dog.getY() >= minimumY,
+		// The lowest supported shelf has a floor at Y=5. The ravine floor is at Y=0.
+		var minimumY = helper.absoluteVec(new Vec3(0, 6, 0)).y;
+		Runnable checkFooting = () ->
+				helper.assertTrue(dog.isAlive() && dog.getHealth() == 1.0F && dog.getY() >= minimumY,
 						"Mushroom lost safe footing at " + dog.position() + ", minimum Y=" + minimumY
-								+ ", health=" + dog.getHealth() + ", damage=" + dog.getLastDamageSource()))
+								+ ", health=" + dog.getHealth() + ", damage=" + dog.getLastDamageSource());
+		helper.startSequence().thenExecuteFor(160, checkFooting)
 				.thenExecute(() -> {
-					helper.assertTrue(dog.distanceToSqr(owner) <= 4 || dog.lastWarnedTrailStep != null,
+					// Connect the lower shelf to the owner's route with two supported steps.
+					for (int y = 1; y <= 6; y++) {
+						helper.setBlock(6, y, 4, Blocks.STONE);
+						helper.setBlock(6, y, 5, Blocks.STONE);
+					}
+					helper.setBlock(6, 7, 5, Blocks.STONE);
+				})
+				.thenWaitUntil(() -> {
+					checkFooting.run();
+					var separation = dog.position().subtract(owner.position());
+					helper.assertTrue((separation.horizontalDistanceSqr() <= 4 && Math.abs(separation.y) <= 2)
+							|| dog.lastWarnedTrailStep != null,
 							"Mushroom neither followed the owner nor warned at the bend; dog=" + dog.position()
 									+ ", owner=" + owner.position());
+				})
+				.thenExecuteFor(25, checkFooting)
+				.thenExecute(() -> {
 					dog.discard();
 					helper.getLevel().getServer().getPlayerList().remove(owner);
 					helper.succeed();
