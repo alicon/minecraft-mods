@@ -889,7 +889,7 @@ async function runExpedition(start, stage) {
           + Number(companionStatus === 'care');
         if (dogMealCount(await action('get_inventory')) < minimum) {
           await narrate('Objective', 'Gather food for the quarry and reserve a portion for Mushroom.');
-          assert.ok(await forageExpeditionMeal(action, { toward: checkpoint.camp.bed, minimum }),
+          assert.ok(await forageExpeditionMeal(action, { toward: checkpoint.camp.bed, minimum, regroup: regroupForCare }),
             'Could not stock provisions before mining');
         }
         const stoneKit = await action('get_inventory');

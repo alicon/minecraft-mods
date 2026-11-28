@@ -940,25 +940,25 @@ async function seekExpeditionFood(action, player, visited, rejectedSteps, tried,
     if ((await action('go_to', { entityId: drop.id, stopDistance: 0.3, maxTicks: 50 }))?.arrived) return;
   }
   const hostiles = (nearby?.entities ?? []).filter(entity => entity.hostile);
-  const available = entity => (BACKUP_MEAT[entity.type] || entity.type === 'minecraft:sheep')
-    && !tried.has(entity.id) && Math.abs(entity.pos[1] - player.position.y) <= 9
-    && !hostiles.some(threat => Math.hypot(...threat.pos.map((axis, index) => axis - entity.pos[index])) < 8);
-  const animal = nearby?.entities.find(available);
+  const heightGap = animal => animal.pos[1] - player.position.y;
+  const reachableAnimal = entities => entities?.filter(entity =>
+    (BACKUP_MEAT[entity.type] || entity.type === 'minecraft:sheep') && !tried.has(entity.id)
+    && heightGap(entity) >= -22 && heightGap(entity) <= 9
+    && !hostiles.some(threat => Math.hypot(...threat.pos.map((axis, index) => axis - entity.pos[index])) < 8))
+    .sort((a, b) => a.distance - b.distance + 2 * (Math.abs(heightGap(a)) - Math.abs(heightGap(b))))[0];
+  let animal = reachableAnimal(nearby?.entities);
+  if (!animal && !toward && visited.length % 4 === 0) {
+    const scouting = await action('get_entities', { radius: 64, max: 128 });
+    animal = reachableAnimal(scouting?.entities);
+  }
   if (animal?.distance <= 6 && Math.abs(animal.pos[1] - player.position.y) < 3) {
     tried.add(animal.id);
     await hunt(action, animal, item => item === (BACKUP_MEAT[animal.type] ?? MUTTON));
   } else {
-    let destination = animal?.pos ?? toward;
-    if (!destination && visited.length % 4 === 0) {
-      const scouting = await action('get_entities', { radius: 64, max: 128 });
-      const levelApproach = scouting?.entities.filter(available)
-        .sort((a, b) => a.distance - b.distance
-          + 4 * (Math.abs(a.pos[1] - player.position.y) - Math.abs(b.pos[1] - player.position.y)))[0];
-      destination = levelApproach?.pos;
-    }
+    const destination = animal?.pos ?? toward;
     visited.push(feet(player));
-    let ground = animal || !destination ? 'grass' : 'surface';
-    if (destination && destination[1] - player.position.y > 2) ground = 'elevation';
+    let ground = destination ? 'surface' : player.position.y >= 96 ? 'downhill' : 'grass';
+    if (destination && Math.abs(destination[1] - player.position.y) > 2) ground = 'elevation';
     await stepOut(action, player, visited, destination, ground, rejectedSteps);
   }
 }

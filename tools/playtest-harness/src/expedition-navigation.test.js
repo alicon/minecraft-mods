@@ -1208,6 +1208,35 @@ test('a recovery forage keeps the chicken collected through ordinary play', asyn
   assert.ok(hunted && collected);
 });
 
+test('foraging from a ridge follows dry steps toward livestock in the valley', async () => {
+  const { forageExpeditionMeal } = await import('./expedition-home.mjs');
+  const sheep = { id: 11, type: 'minecraft:sheep', distance: 14, pos: [7, 112, 0] };
+  const drop = { id: 12, item: { id: 'minecraft:mutton' }, distance: 2, pos: [5, 118, 0] };
+  const ground = [cell(0, 123, 0), ...Array.from({ length: 10 }, (_, x) => cell(-x - 1, 123, 0)),
+    ...Array.from({ length: 6 }, (_, x) => cell(x + 1, 122 - x, 0))];
+  let moved = false;
+  let collected = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe': return { inWorld: true, onGround: true, health: 20,
+        position: moved ? { x: 4.5, y: 120, z: 0.5 } : { x: 0.5, y: 124, z: 0.5 } };
+      case 'get_inventory': return { slots: collected ? [{ id: drop.item.id, count: 1 }] : [] };
+      case 'get_entities': return { entities: moved ? [drop] : [sheep] };
+      case 'get_blocks': return { cells: ground };
+      case 'go_to':
+        if (args.entityId === drop.id) collected = true;
+        else {
+          assert.ok(args.pos[0] > 0 && args.pos[1] < 124, 'Take the dry staircase toward observed sheep');
+          moved = true;
+        }
+        return { arrived: true, position: args.pos };
+      default: assert.fail(name);
+    }
+  };
+  assert.equal(await forageExpeditionMeal(action), true);
+  assert.ok(moved && collected);
+});
+
 test('regrouping on a known trail takes short steps before a distant creeper can close', async () => {
   const { regroupExpeditionCompanion } = await import('./expedition-home.mjs');
   const dog = { uuid: 'original', pos: [10.5, 64, 0.5], health: 12 };
