@@ -1633,19 +1633,24 @@ export async function repeatedQuarryEntrance(action, here, attempts) {
 export async function earnIronKit(action, craft, { bed }, policy = {}) {
   const stairs = [];
   const protectedGround = new Set();
+  let quarryLanding;
+  const reopenQuarry = async (route, landing) => {
+    stairs.push(...await reenterQuarry(action, route, landing));
+    quarryLanding = stairs.length ? feet(await action('observe')) : undefined;
+    if (quarryLanding) {
+      for (const [x, y, z] of [...stairs, quarryLanding]) protectedGround.add(`${x},${y - 1},${z}`);
+    }
+    await policy.saveQuarry?.(stairs, quarryLanding);
+  };
   if (policy.resumeQuarry?.length) {
     const player = await action('observe');
     const landing = policy.resumeQuarryLanding;
     if (landing && player?.onGround && player.health >= 14 && feet(player).join(',') === landing.join(',')) {
       stairs.push(...policy.resumeQuarry);
+      quarryLanding = landing;
       for (const [x, y, z] of [...stairs, landing]) protectedGround.add(`${x},${y - 1},${z}`);
     } else if (policy.reenterQuarry && landing) {
-      stairs.push(...await reenterQuarry(action, policy.resumeQuarry, landing));
-      const arrived = stairs.length ? feet(await action('observe')) : undefined;
-      if (arrived) {
-        for (const [x, y, z] of [...stairs, arrived]) protectedGround.add(`${x},${y - 1},${z}`);
-      }
-      await policy.saveQuarry?.(stairs, arrived);
+      await reopenQuarry(policy.resumeQuarry, landing);
     } else {
       await leaveQuarry(action, policy.resumeQuarry, policy);
       await policy.saveQuarry?.([]);
@@ -1721,12 +1726,19 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       const dogStatus = await policy.checkCompanion(player, !stairs.length);
       if (dogStatus === 'regrouped') continue;
       if (dogStatus === 'care') {
+        const paused = stairs.length && quarryLanding ? { stairs: [...stairs], landing: quarryLanding } : undefined;
         if (stairs.length) {
           await leaveQuarry(action, stairs, policy);
           stairs.length = 0;
           await policy.saveQuarry?.([]);
         }
-        if (await policy.tendCompanion()) await policy.returnAfterCare();
+        if (await policy.tendCompanion()) {
+          await policy.returnAfterCare();
+        } else if (paused) {
+          await policy.reportScouting?.('Mushroom ate and it is safe to continue. Returning to the known quarry stairs.');
+          await policy.saveQuarry?.(paused.stairs, paused.landing, true);
+          await reopenQuarry(paused.stairs, paused.landing);
+        }
         continue;
       }
     }
@@ -1829,7 +1841,8 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       const descent = await descendQuarry(action, player, bed, stairs, protectedGround);
       if (Array.isArray(descent)) {
         if (opening) await policy.reportScouting?.('Started a supported staircase after scouting for exposed iron.');
-        await policy.saveQuarry?.(stairs, descent);
+        quarryLanding = descent;
+        await policy.saveQuarry?.(stairs, quarryLanding);
         continue;
       }
       openedBlockedQuarry = descent === 'blocked';

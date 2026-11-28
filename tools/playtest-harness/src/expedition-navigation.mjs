@@ -1,6 +1,6 @@
 const CARDINAL = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 const HEADROOM = /:(?:air|cave_air|void_air|short_grass|tall_grass|fern|large_fern|dead_bush|dandelion|poppy|leaf_litter|wildflowers|\w+_button|torch|wall_torch)$/;
-const SUPPORT = /:(?:grass_block|dirt|dirt_path|coarse_dirt|podzol|stone|cobblestone|(?:mossy_|cracked_)?stone_bricks|end_stone|end_stone_bricks|obsidian|bedrock|netherrack|blackstone|basalt|smooth_basalt|soul_soil|soul_sand|crimson_nylium|warped_nylium|nether_bricks|sandstone|terracotta|sand|gravel|snow_block|\w+_leaves|\w+_log|\w+_planks)$/;
+const SUPPORT = /:(?:grass_block|dirt|dirt_path|coarse_dirt|podzol|stone|granite|andesite|diorite|deepslate|tuff|(?:deepslate_)?(?:coal|iron|copper)_ore|cobblestone|(?:mossy_|cracked_)?stone_bricks|end_stone|end_stone_bricks|obsidian|bedrock|netherrack|blackstone|basalt|smooth_basalt|soul_soil|soul_sand|crimson_nylium|warped_nylium|nether_bricks|sandstone|terracotta|sand|gravel|snow_block|\w+_leaves|\w+_log|\w+_planks)$/;
 const LEAVES = /_leaves$/;
 const QUARRY_BLOCK = /^minecraft:(?:grass_block|dirt|coarse_dirt|podzol|stone|andesite|diorite|granite|deepslate|(?:deepslate_)?(?:coal|iron)_ore)$/;
 const QUARRY_HAZARD = /^minecraft:(?:water|lava|powder_snow|.*sand|gravel)$/;

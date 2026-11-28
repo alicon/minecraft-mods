@@ -829,10 +829,11 @@ async function runExpedition(start, stage) {
         checkpoint.exhaustedQuarries = attempts;
         await writeCheckpoint(checkpoint);
       };
-      policy.saveQuarry = async (stairs, landing) => {
+      policy.saveQuarry = async (stairs, landing, reenter = false) => {
         checkpoint.quarry = stairs;
         checkpoint.quarryLanding = landing;
-        delete checkpoint.reenterQuarry;
+        if (reenter) checkpoint.reenterQuarry = true;
+        else delete checkpoint.reenterQuarry;
         await writeCheckpoint(checkpoint);
       };
     }

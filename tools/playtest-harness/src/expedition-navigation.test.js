@@ -45,6 +45,28 @@ test('a quarry stair skips leaf litter above headroom and still removes the soli
     { landing: [318, 68, 288], clear: [[318, 69, 288], [318, 68, 288]] });
 });
 
+test('a grounded granite quarry landing can continue to the next dry stair', async () => {
+  const { descendQuarry } = await import('./expedition-home.mjs');
+  const here = [-49, 56, -74];
+  const landing = [-48, 55, -74];
+  const volume = [cell(-49, 55, -74, 'granite'), cell(-48, 54, -74, 'granite')];
+  const at = ([x, y, z]) => ({ inWorld: true, onGround: true, health: 20, position: { x: x + 0.5, y, z: z + 0.5 } });
+  const action = async (name, args) => {
+    if (name === 'get_blocks') return { cells: volume };
+    if (name === 'go_to') {
+      assert.deepEqual(args.pos, landing);
+      return { arrived: true };
+    }
+    if (name === 'observe') return at(landing);
+    assert.fail(name);
+  };
+  const stairs = [];
+  assert.deepEqual(await descendQuarry(action, at(here), [0, 64, 0], stairs, new Set()), landing);
+  assert.deepEqual(stairs, [here]);
+  volume[0] = cell(-49, 55, -74, 'water');
+  assert.equal(await descendQuarry(action, at(here), [0, 64, 0], [], new Set()), 'unavailable');
+});
+
 test('a one-way scouting ledge can be cut into a dry one-block step', async () => {
   const { uphillScoutingStep } = await import('./expedition-navigation.mjs');
   const here = [-168, 65, -32];
@@ -1389,6 +1411,54 @@ test('companion meals do not erase the iron search history', async () => {
     },
   }), error => error === digging);
   assert.ok(meals >= 2);
+});
+
+test('daylight feeding reuses the quarry while a care trip home takes priority', async () => {
+  const { earnIronKit } = await import('./expedition-home.mjs');
+  const entry = [0, 64, 0];
+  const landing = [1, 63, 0];
+  const pickaxe = { id: 'minecraft:stone_pickaxe', slot: 0, count: 1, maxDamage: 131 };
+  for (const returnHome of [false, true]) {
+    const endpoint = new Error('Reached the next care decision');
+    const walks = [];
+    const saves = [];
+    let position = landing;
+    let cared = false;
+    let gameTime = 0;
+    const action = async (name, args) => {
+      if (name === 'observe') {
+        const [x, y, z] = position;
+        return { inWorld: true, onGround: true, health: 20, food: 20, gameTime: gameTime += 50,
+          position: { x: x + 0.5, y, z: z + 0.5 } };
+      }
+      if (name === 'get_inventory') return { slots: [pickaxe], mainHand: pickaxe };
+      if (name === 'get_blocks') return { cells: [cell(0, 63, 0, 'stone'), cell(1, 62, 0, 'granite')] };
+      if (name === 'go_to') {
+        position = args.pos;
+        walks.push(position);
+        return { arrived: true, position };
+      }
+      assert.fail(name);
+    };
+    await assert.rejects(earnIronKit(action, () => assert.fail('No ore to smelt'), { bed: [-20, 64, 0] }, {
+      resumeQuarry: [entry],
+      resumeQuarryLanding: landing,
+      checkCompanion: async () => {
+        if (cared) throw endpoint;
+        return 'care';
+      },
+      tendCompanion: async () => {
+        assert.deepEqual(position, entry);
+        cared = true;
+        return returnHome;
+      },
+      returnAfterCare: async () => { assert.ok(returnHome); throw endpoint; },
+      saveQuarry: async (stairs, at, reenter) => saves.push([[...stairs], at, Boolean(reenter)]),
+    }), error => error === endpoint);
+    assert.deepEqual(walks, returnHome ? [entry] : [entry, landing]);
+    assert.deepEqual(saves, returnHome ? [[[], undefined, false]]
+      : [[[], undefined, false], [[entry], landing, true], [[entry], landing, false]]);
+  }
 });
 
 test('the iron kit brings carried ore home before smelting it', async () => {
