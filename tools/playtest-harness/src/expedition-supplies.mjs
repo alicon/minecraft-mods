@@ -12,7 +12,7 @@ import {
 import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
 import { blazePowderCount, craftBlazePowder, earnBlazeRods } from './expedition-blaze-rods.mjs';
-import { clearGeneratedCrystals, shootEndCrystal } from './expedition-end-crystals.mjs';
+import { clearGeneratedCrystals, readCrystalProgress, shootEndCrystal } from './expedition-end-crystals.mjs';
 import { fightEndDragon } from './expedition-dragon-fight.mjs';
 import { craftEyes, crossEndPortal, enderEyeCount, findStrongholdPortalRoom } from './expedition-end-entry.mjs';
 import { earnEnderPearls } from './expedition-pearls.mjs';
@@ -287,11 +287,12 @@ try {
   } else if (stage === 'end-crystal' || stage === 'generated-end-crystals') {
     companion = (await readFile(join(dirname(statusFile), 'end-crystal-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
-    const duelFile = join(dirname(statusFile), 'duel-checkpoint.json');
+    const generated = stage === 'generated-end-crystals';
+    const endFile = join(dirname(statusFile), duel ? 'duel-checkpoint.json' : 'crystal-checkpoint.json');
     let camp;
     let progress;
-    if (duel && resume) {
-      progress = JSON.parse(await readFile(duelFile, 'utf8'));
+    if (generated && resume) {
+      progress = JSON.parse(await readFile(endFile, 'utf8'));
       assert.equal(progress.bridgeFingerprint, bridgeFingerprint);
       assert.equal(progress.owner, start.name);
       assert.equal(progress.dog, companion);
@@ -306,7 +307,7 @@ try {
     } else {
       camp = await markExpeditionCamp(action);
       progress = { bridgeFingerprint, owner: start.name, dog: companion, camp, hits: 0 };
-      if (duel) await writeFile(duelFile, JSON.stringify(progress));
+      if (generated) await writeFile(endFile, JSON.stringify(progress));
     }
     if (duel) {
       await action('set_reflexes', { autoDefend: false });
@@ -315,22 +316,27 @@ try {
         console.log(JSON.stringify({ at: new Date().toISOString(), action: `dragon_${kind}`, observation, camp, dog: companion }));
         if (kind === 'strike') {
           Object.assign(progress, { dragon: observation.dragon, hits: observation.hits });
-          const next = `${duelFile}-${process.pid}`;
+          const next = `${endFile}-${process.pid}`;
           await writeFile(next, JSON.stringify(progress));
-          await rename(next, duelFile);
+          await rename(next, endFile);
           await narrate('Action', `Struck the perched dragon at ${observation.before} health.`, 4_000);
         }
         if (kind === 'victory') await narrate('Result', 'The native End exit is open.');
       }, progress);
-    } else if (stage === 'generated-end-crystals') {
-      await clearGeneratedCrystals(action, companion, async ({ crystal, position, destroyed, openedCage, highArc }) => {
-        console.log(JSON.stringify({ at: new Date().toISOString(), action: openedCage ? 'generated_cage_opened' : 'generated_crystal_shot',
+    } else if (generated) {
+      const observations = resume
+        ? readCrystalProgress(await readFile(join(dirname(statusFile), 'actions.jsonl'), 'utf8')) : undefined;
+      await clearGeneratedCrystals(action, companion, async ({ crystal, position, destroyed, openedCage, highArc, confirmedMissing }) => {
+        const actionType = openedCage ? 'generated_cage_opened' : confirmedMissing ? 'generated_crystal_absence' : 'generated_crystal_shot';
+        console.log(JSON.stringify({ at: new Date().toISOString(), action: actionType,
           crystal: crystal.uuid, target: crystal.pos, position, destroyed, openedCage, highArc, camp, dog: companion }));
         if (openedCage) await narrate('Result', 'Opened a crystal cage and descended to the ground.');
         if (destroyed) await narrate('Result', 'A generated End crystal broke.');
+        if (confirmedMissing) await narrate('Result', 'Confirmed the previously observed crystal is gone from its loaded tower.');
       }, {
         cageOnly: process.env.MUSHROOM_EXPEDITION_CAGE_ONLY === '1',
         tallestOnly: process.env.MUSHROOM_EXPEDITION_TALLEST_ONLY === '1',
+        progress: observations,
       });
     } else {
       let crystal;

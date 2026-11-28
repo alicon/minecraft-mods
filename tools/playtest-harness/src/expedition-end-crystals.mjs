@@ -17,9 +17,9 @@ const CRYSTAL_WINDOW_TICKS = 11_400;
 const feet = ({ position: { x, y, z } }) => [x, y, z].map(Math.floor);
 const distance = (first, second) => Math.hypot(...first.map((coordinate, axis) => coordinate - second[axis]));
 
-export async function dragonBreathThreat(action) {
-  const clouds = await action('get_entities', { type: 'minecraft:area_effect_cloud', radius: 14, max: 8 });
-  const breath = clouds?.entities.filter(entity => entity.distance < 13) ?? [];
+export async function dragonBreathThreat(action, clouds) {
+  const observed = clouds ?? (await action('get_entities', { type: 'minecraft:area_effect_cloud', radius: 14, max: 8 }))?.entities;
+  const breath = observed?.filter(entity => entity.distance < 13) ?? [];
   if (breath.some(entity => entity.distance < 8)) return breath;
   // The fireball can reach the player while a full bow draw is in progress.
   const shots = await action('get_entities', { type: 'minecraft:dragon_fireball', radius: 42, max: 8 });
@@ -118,16 +118,62 @@ export async function surveyedCrystalShot(action, player, crystal, heights, trie
   return shots.find(shot => clearBowArc(player, shot.target, pos => solid.has(String(pos)), shot.aim)) ?? null;
 }
 
-export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = false, tallestOnly = false } = {}) {
+export function readCrystalProgress(trace) {
+  const seen = new Map();
+  const broken = new Set();
+  let started;
+  for (const line of trace.split('\n')) {
+    if (!line.startsWith('{')) continue;
+    let row;
+    try {
+      row = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (row.action === 'observe' && row.observation?.dimension === END) {
+      started ??= row.observation.gameTime;
+    }
+    if (row.action === 'get_entities' && row.args?.type === CRYSTAL) {
+      for (const entity of row.observation?.entities ?? []) seen.set(entity.uuid, entity);
+    }
+    if ((row.action === 'generated_crystal_shot' && row.destroyed) || row.action === 'generated_crystal_absence') {
+      broken.add(row.crystal);
+    }
+  }
+  return { seen: [...seen.values()], broken: [...broken], started };
+}
+
+function distanceToSpike(player, crystal) {
+  return Math.hypot(player.position.x - crystal.pos[0], player.position.z - crystal.pos[2]);
+}
+
+export async function observeMissingCrystal(action, player, crystal, observations) {
+  if (distanceToSpike(player, crystal) > 24) {
+    observations.delete(crystal.uuid);
+    return false;
+  }
+  const [x, y, z] = crystal.pos.map(Math.floor);
+  const anchor = await action('get_blocks', { center: [x, y - 1, z], size: [1, 1, 1], format: 'json' });
+  if (anchor?.stats?.unloadedChunks !== 0 || !anchor.cells.some(cell => cell.b === 'minecraft:bedrock')) {
+    observations.delete(crystal.uuid);
+    return false;
+  }
+  if (observations.has(crystal.uuid)) return player.gameTime - observations.get(crystal.uuid) >= 20;
+  observations.set(crystal.uuid, player.gameTime);
+  return false;
+}
+
+export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = false, tallestOnly = false, progress } = {}) {
   // The bridge classifies neutral Endermen as enemies even before they attack.
   await action('set_reflexes', { autoDefend: false });
-  const dogs = await action('get_entities', { type: DOG, radius: 32 });
+  const dogs = await action('get_entities', { type: DOG, radius: progress ? 128 : 32 });
   const dog = dogs?.entities.find(entity => entity.uuid === uuid && entity.health > 0);
   assert.ok(dog, 'The original companion must be at the marked camp before attacking the crystals');
   const { entities } = await action('get_entities', { type: CRYSTAL, radius: 128 });
-  assert.ok(entities.length > 0, 'No generated crystals are visible from the End camp');
-  const seen = new Map(entities.map(crystal => [crystal.uuid, crystal]));
-  const broken = new Set();
+  const seen = new Map([...(progress?.seen ?? []), ...entities].map(crystal => [crystal.uuid, crystal]));
+  assert.ok(seen.size > 0, 'No generated crystals have been observed in this End');
+  const broken = new Set(progress?.broken ?? []);
+  const absenceObservations = new Map();
   const positionsTried = new Set();
   const misses = new Map();
   const cageStatus = new Map();
@@ -140,7 +186,7 @@ export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = 
   let nextCageAttempt = 0;
   let lastHealth;
   let refugeUntil = 0;
-  let started;
+  let started = progress?.started;
   const goal = cageOnly || tallestOnly ? 1 : SPIKE_COUNT;
 
   // A recovery observation is much cheaper than a shot or a cage climb.
@@ -199,12 +245,27 @@ export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = 
     const group = [Math.floor(here[0] / 6), Math.floor(here[2] / 6)].join(',');
     const view = await action('get_entities', { type: CRYSTAL, radius: 128 });
     for (const crystal of view?.entities ?? []) {
+      if (absenceObservations.delete(crystal.uuid)) broken.delete(crystal.uuid);
       seen.set(crystal.uuid, crystal);
       if (cageStatus.has(crystal.uuid)) continue;
       const terrain = await action('get_blocks', { center: crystal.pos.map(Math.floor), size: [5, 5, 5], format: 'json' });
       if (terrain && !terrain.stats?.unloadedChunks) {
         cageStatus.set(crystal.uuid, terrain.cells.some(cell => cell.b === 'minecraft:iron_bars'));
       }
+    }
+    let missing = [];
+    if (!cageOnly && !tallestOnly && Array.isArray(view?.entities)) {
+      const visible = new Set(view.entities.map(crystal => crystal.uuid));
+      for (const crystal of seen.values()) {
+        if (visible.has(crystal.uuid) || broken.has(crystal.uuid)) continue;
+        if (await observeMissingCrystal(action, player, crystal, absenceObservations)) {
+          broken.add(crystal.uuid);
+          await report({ crystal, position: here, confirmedMissing: true });
+        } else {
+          missing.push(crystal);
+        }
+      }
+      if (broken.size >= goal) break;
     }
     const tallest = tallestOnly && [...seen.values()].filter(crystal => cageStatus.get(crystal.uuid) === false)
       .sort((first, second) => second.pos[1] - first.pos[1])[0];
@@ -258,6 +319,10 @@ export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = 
     }
 
     const next = candidates[0]?.crystal;
+    if (!next && missing.some(crystal => absenceObservations.has(crystal.uuid))) {
+      await setTimeout(300);
+      continue;
+    }
     if (vantage && (misses.get(activeWindow.crystal.uuid) ?? 0) >= 10) {
       throw new Error('The prepared firing line did not reach the opened crystal');
     }
@@ -269,6 +334,9 @@ export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = 
         const angle = Math.atan2(here[2] - next.pos[2], here[0] - next.pos[0]) + Math.PI / 3;
         destination = [Math.floor(next.pos[0] + 24 * Math.cos(angle)), here[1],
           Math.floor(next.pos[2] + 24 * Math.sin(angle))];
+      } else if (missing.length) {
+        const closest = missing.sort((first, second) => distanceToSpike(player, first) - distanceToSpike(player, second))[0];
+        destination = [Math.floor(closest.pos[0]), here[1], Math.floor(closest.pos[2])];
       } else {
         // Client tracking can hide the opposite side of the island from camp.
         const surveyed = [...seen.values()];

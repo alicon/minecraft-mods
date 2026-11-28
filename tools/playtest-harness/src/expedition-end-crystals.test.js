@@ -175,6 +175,32 @@ test('the End archer eats a carried meal when too hungry to recover for a cage c
     error => error === recovered);
 });
 
+test('a vanished crystal needs two observations of its nearby loaded spike', async () => {
+  const { observeMissingCrystal, readCrystalProgress } = await import('./expedition-end-crystals.mjs');
+  const crystal = { uuid: 'incidental', pos: [8.5, 95, 0.5] };
+  const anchored = [8, 94, 0];
+  const sample = { position: { x: 0.5, y: 60, z: 0.5 }, gameTime: 100 };
+  const evidence = new Map();
+  let unloaded = true;
+  const action = async (name, args) => {
+    assert.equal(name, 'get_blocks');
+    assert.deepEqual(args.center, anchored);
+    return { stats: { unloadedChunks: unloaded ? 1 : 0 }, cells: [{ b: 'minecraft:bedrock' }] };
+  };
+  assert.equal(await observeMissingCrystal(action, sample, crystal, evidence), false);
+  unloaded = false;
+  assert.equal(await observeMissingCrystal(action, sample, crystal, evidence), false);
+  assert.equal(await observeMissingCrystal(action, { ...sample, gameTime: 114 }, crystal, evidence), false);
+  assert.equal(await observeMissingCrystal(action, { ...sample, gameTime: 125 }, crystal, evidence), true);
+  const rows = [
+    { action: 'observe', observation: { ...sample, dimension: 'minecraft:the_end' } },
+    { action: 'get_entities', args: { type: 'minecraft:end_crystal' }, observation: { entities: [crystal] } },
+    { action: 'generated_crystal_absence', crystal: crystal.uuid },
+  ];
+  assert.deepEqual(readCrystalProgress(rows.map(row => JSON.stringify(row)).join('\n') + '\n{unfinished'),
+    { seen: [crystal], broken: [crystal.uuid], started: 100 });
+});
+
 test('a crystal pillar descent checks the full water column and steers against surface drift', async () => {
   const { descendCrystalPillar } = await import('./expedition-end-cage.mjs');
   const plan = { base: [39, 61, -25], dx: 1, dz: 0 };

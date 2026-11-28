@@ -44,6 +44,20 @@ export async function strikePerchedDragon(action, player, dragon, sword) {
   return action('attack_entity', { entityId: head.id });
 }
 
+export function breathBlocksWalk(player, target, clouds) {
+  const from = [player.position.x, player.position.y, player.position.z];
+  const to = [target[0] + 0.5, target[1], target[2] + 0.5];
+  const direction = to.map((coordinate, index) => coordinate - from[index]);
+  const lengthSquared = direction.reduce((sum, value) => sum + value ** 2, 0);
+  return clouds.some(({ pos }) => {
+    const relative = pos.map((coordinate, index) => coordinate - from[index]);
+    const projection = relative.reduce((sum, value, index) => sum + value * direction[index], 0);
+    const along = lengthSquared ? Math.max(0, Math.min(1, projection / lengthSquared)) : 0;
+    const nearest = relative.map((coordinate, index) => coordinate - direction[index] * along);
+    return Math.hypot(...nearest) < 8;
+  });
+}
+
 export async function fightEndDragon(action, report, progress = {}) {
   const start = await action('observe');
   assert.equal(start?.dimension, END);
@@ -95,7 +109,8 @@ export async function fightEndDragon(action, report, progress = {}) {
       }
     }
 
-    const danger = await dragonBreathThreat(action);
+    const clouds = (await action('get_entities', { type: 'minecraft:area_effect_cloud', radius: 24, max: 12 }))?.entities ?? [];
+    const danger = await dragonBreathThreat(action, clouds);
     if (danger) {
       await retreatFromDragonThreat(action, player, danger);
       continue;
@@ -134,11 +149,17 @@ export async function fightEndDragon(action, report, progress = {}) {
       const dz = hz - fz - 0.5;
       const length = Math.hypot(dx, dz) || 1;
       const stance = [Math.floor(hx + 1.3 * dx / length), Math.floor(hy - 1.4), Math.floor(hz + 1.3 * dz / length)];
+      if (breathBlocksWalk(player, stance, clouds)) {
+        if (player.pitch < 30) await action('look', { pitch: 50 });
+        await setTimeout(350);
+        continue;
+      }
       visited.push(feet(player));
       await stepOut(action, player, visited.slice(-24), stance, 'elevation', rejected, undefined, undefined, 26);
       continue;
     }
-    if (Math.hypot(player.position.x - ready[0] - 0.5, player.position.z - ready[2] - 0.5) > 2) {
+    if (Math.hypot(player.position.x - ready[0] - 0.5, player.position.z - ready[2] - 0.5) > 2
+        && !breathBlocksWalk(player, ready, clouds)) {
       visited.push(feet(player));
       await stepOut(action, player, visited.slice(-24), ready, 'surface', rejected, undefined, undefined, 44);
       continue;

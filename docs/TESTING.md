@@ -403,6 +403,11 @@ The fixture
 supplies the blocks, pickaxe, and buckets. The server checks for the removal of all ten
 original crystals and verifies Mushroom's identity and health at camp. The
 summary reports shot attempts, observed breaks, and the native verdict.
+`MUSHROOM_EXPEDITION_RESUME=1` can take over a held crystal run in the
+same world. The replacement controller checks the marked mat and original
+dog, then reads the prior observations. It credits an already observed
+crystal as missing only after two checks near its loaded tower, and the
+server still verifies all original crystal IDs at the end.
 The fixture saves a server snapshot even when the controller fails. It
 lists loaded remaining crystals, whether their original spikes were
 guarded, and whether the dog stayed alive at his shelter.
@@ -418,7 +423,8 @@ With the dragon combat bridge patch applied, set
 clears the crystals during setup, supplies a sword and rations, and
 verifies the generated vanilla dragon starts at 200 health. The controller
 finds the exit fountain, approaches the visible head on a perch, and
-attempts strikes through the native crosshair. The server verifies the
+attempts strikes through the native crosshair. It checks for active breath
+clouds before walking back toward the fountain or the head. The server verifies the
 dragon died, the sword shows use, and the original dog remains at shelter.
 The duel keeps a separate checkpoint with the marked mat, original dog,
 client identity, and strike count. A replacement controller with

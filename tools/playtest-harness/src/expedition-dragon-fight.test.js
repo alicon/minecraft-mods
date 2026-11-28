@@ -37,3 +37,12 @@ test('a perched dragon strike uses the native head on the crosshair at full cool
   assert.equal((await strikePerchedDragon(action, player, dragon, sword)).attackStrength, 1);
   assert.deepEqual(strikes, [342]);
 });
+
+test('a still-visible breath cloud blocks a walk back in from safe ground', async () => {
+  const { breathBlocksWalk } = await import('./expedition-dragon-fight.mjs');
+  const player = { position: { x: -13.67, y: 61, z: -0.48 } };
+  const cloud = { pos: [-7.17, 61, 4.42] };
+  assert.equal(breathBlocksWalk(player, [-7, 61, -1], [cloud]), true);
+  assert.equal(breathBlocksWalk(player, [-14, 61, -8], [cloud]), false);
+  assert.equal(breathBlocksWalk(player, [-7, 61, -1], [{ pos: [-7.17, 82, 4.42] }]), false);
+});
