@@ -378,21 +378,25 @@ async function cutScoutingFoothold(action, player, detour) {
   return climbQuarry(action, step.landing);
 }
 
-export async function swimToDryGround(action, player) {
-  for (let pulse = 0; pulse < 24; pulse++) {
+export async function swimToDryGround(action, player, leaveShelf = false) {
+  const shelf = leaveShelf ? String(feet(player)) : undefined;
+  for (let pulse = 0; pulse < 48; pulse++) {
     if (!player?.inWorld || player.dead || player.health <= 0) return false;
-    if (!player.inWater && player.onGround) return true;
-    if (player.inWater) {
+    const fromShore = player.onGround && !player.inWater && String(feet(player)) === shelf;
+    if (!player.inWater && player.onGround && !fromShore) return true;
+    if (fromShore || player.inWater) {
       const center = feet(player);
-      const volume = await action('get_blocks', { center, size: [23, 13, 23], format: 'json' });
-      const route = volume && waterExitWaypoint(volume.cells, center, center[1] + 6);
+      const volume = await action('get_blocks', { center, size: [35, 13, 35], format: 'json' });
+      const route = volume && waterExitWaypoint(volume.cells, center, center[1] + 6,
+        { fromShore, requireContinuation: leaveShelf });
+      if (fromShore && !route?.waypoint) return false;
       const waypoint = route?.waypoint && player.air >= 270 && player.position.y >= route.surface - 0.6
         ? route.waypoint : null;
       if (waypoint) {
         const dx = waypoint[0] + 0.5 - player.position.x;
         const dz = waypoint[1] + 0.5 - player.position.z;
         const yaw = Math.atan2(-dx, dz) * 180 / Math.PI;
-        await action('move', { yaw, forward: true, jump: true, ticks: 14 });
+        await action('move', { yaw, forward: true, jump: !fromShore, ticks: 14 });
       } else {
         await action('move', { jump: true, ticks: 18 });
       }
@@ -401,7 +405,7 @@ export async function swimToDryGround(action, player) {
     }
     player = await action('observe');
   }
-  return Boolean(player?.inWorld && !player.dead && !player.inWater && player.onGround);
+  return Boolean(player?.inWorld && !player.dead && !player.inWater && player.onGround && String(feet(player)) !== shelf);
 }
 
 export async function gatherWool(action, descendFromCanopy, chooseRoute, craft, reportScouting, observedTrail = []) {
@@ -539,6 +543,12 @@ export async function gatherWool(action, descendFromCanopy, chooseRoute, craft, 
       stalls = 0;
     } else {
       stalls++;
+      if (stalls === 2 && here.onGround && await swimToDryGround(action, here, true)) {
+        await reportScouting?.('Swam around the cliff to a bank with a dry walking route.');
+        stalls = 0;
+        scoutingTrail.length = 0;
+        continue;
+      }
       assert.ok(stalls < 5, 'Could not find a dry way out while looking for sheep');
     }
   }

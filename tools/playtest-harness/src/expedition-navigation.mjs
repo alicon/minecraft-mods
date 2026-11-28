@@ -19,17 +19,19 @@ export function hasDrySupport(id) {
   return SUPPORT.test(id ?? '');
 }
 
-export function waterExitWaypoint(cells, [x, y, z], ceiling) {
+export function waterExitWaypoint(cells, [x, y, z], ceiling,
+  { fromShore = false, requireContinuation = fromShore } = {}) {
   const blocks = new Map(cells.map(({ x, y, z, b }) => [`${x},${y},${z}`, b]));
   const at = (a, b, c) => blocks.get(`${a},${b},${c}`);
   const water = id => /:(?:water|bubble_column|kelp(?:_plant)?|(?:tall_)?seagrass)$/.test(id ?? '');
-  let surface = [y, y - 1, y + 1].find(height => water(at(x, height, z)));
+  let surface = fromShore ? y - 1 : [y, y - 1, y + 1].find(height => water(at(x, height, z)));
   if (surface === undefined) return null;
   while (surface < ceiling && water(at(x, surface + 1, z))) surface++;
   if (surface + 2 > ceiling || !gap(at(x, surface + 1, z))) return null;
 
   const visited = new Set([`${x},${z}`]);
   const queue = [{ tile: [x, z], path: [] }];
+  let isolatedBank;
   for (const { tile: [px, pz], path } of queue) {
     for (const [dx, dz] of CARDINAL) {
       const tx = px + dx;
@@ -39,18 +41,22 @@ export function waterExitWaypoint(cells, [x, y, z], ceiling) {
       visited.add(key);
       const next = [...path, [tx, tz]];
       const support = at(tx, surface, tz);
-      if (hasDrySupport(support) && !/_(?:leaves|log)$/.test(support)
+      if ((!fromShore || path.length) && hasDrySupport(support) && !/_(?:leaves|log)$/.test(support)
           && gap(at(tx, surface + 1, tz)) && gap(at(tx, surface + 2, tz))) {
         // Recheck the route on the next swim pulse instead of cutting a corner.
         const [firstX, firstZ] = next[0];
         const turn = next.findIndex(([a, b], i) => a !== x + (i + 1) * (firstX - x) || b !== z + (i + 1) * (firstZ - z));
         const [wx, wz] = next[Math.min(3, (turn < 0 ? next.length : turn) - 1)];
-        return { surface, waypoint: [wx, wz] };
+        const waypoint = [wx, wz];
+        if (dryWaypoint(cells, [tx, surface + 1, tz], [], undefined, 'surface')) {
+          return { surface, waypoint };
+        }
+        isolatedBank ??= waypoint;
       }
       if (water(support) && gap(at(tx, surface + 1, tz))) queue.push({ tile: [tx, tz], path: next });
     }
   }
-  return { surface, waypoint: null };
+  return { surface, waypoint: requireContinuation ? null : isolatedBank ?? null };
 }
 
 export function canopyLanding(cells, [x, y, z], health) {

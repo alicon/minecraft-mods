@@ -61,6 +61,33 @@ test('a submerged wool scout rises for air before aiming and returning to dry gr
   assert.deepEqual(moves, [{ jump: true, ticks: 18 }, { yaw: -90, forward: true, jump: true, ticks: 14 }]);
 });
 
+test('a wool scout stranded on a shelf swims past isolated blocks to find a walkable bank', async () => {
+  const { swimToDryGround } = await import('./expedition-home.mjs');
+  const at = (x, y, inWater) => ({ inWorld: true, health: 10, onGround: !inWater, air: 300, inWater,
+    position: { x: x + 0.5, y, z: 0.5 } });
+  const shelf = at(0, 63, false);
+  const water = at(1, 62.8, true);
+  const bank = at(3, 63, false);
+  const cells = [cell(0, 62, 0), cell(1, 62, 0, 'water'), cell(2, 62, 0, 'water'),
+    cell(1, 62, 1), cell(3, 62, 0), cell(4, 63, 0)];
+  const moves = [];
+  const action = async (name, args) => {
+    if (name === 'get_blocks') return { cells };
+    if (name === 'move') { moves.push(args); return {}; }
+    if (name === 'observe') return moves.length === 1 ? water : bank;
+    assert.fail(name);
+  };
+  assert.equal(await swimToDryGround(action, shelf, true), true);
+  assert.deepEqual(moves, [
+    { yaw: -90, forward: true, jump: false, ticks: 14 },
+    { yaw: -90, forward: true, jump: true, ticks: 14 },
+  ]);
+  cells.pop();
+  moves.length = 0;
+  assert.equal(await swimToDryGround(action, shelf, true), false);
+  assert.deepEqual(moves, []);
+});
+
 test('a quarry stair skips leaf litter above headroom and still removes the solid face', async () => {
   const { quarryStep } = await import('./expedition-navigation.mjs');
   const start = [318, 69, 289];
