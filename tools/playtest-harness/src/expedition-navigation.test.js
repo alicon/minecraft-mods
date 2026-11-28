@@ -1010,6 +1010,24 @@ test('the sheep scout waits for its only dry descent instead of rejecting it at 
   assert.equal(rejected.size, 0);
 });
 
+test('an exhausted quarry remains skipped after reattachment until its blocked footing changes', async () => {
+  const { quarryFooting, repeatedQuarryEntrance } = await import('./expedition-home.mjs');
+  const entrance = [911, 73, 205];
+  const blockedAt = [915, 66, 208];
+  let blocks = [cell(915, 65, 208, 'stone'), cell(916, 66, 208, 'water')];
+  const action = async (name, args) => {
+    assert.equal(name, 'get_blocks');
+    assert.deepEqual(args.center, blockedAt);
+    return { cells: blocks };
+  };
+  const restored = JSON.parse(JSON.stringify([{ entrance, blockedAt, footing: await quarryFooting(action, blockedAt) }]));
+  blocks = blocks.toReversed();
+  assert.equal(await repeatedQuarryEntrance(action, [913, 73, 205], restored), true);
+  assert.equal(await repeatedQuarryEntrance(action, [919, 73, 205], restored), false);
+  blocks = blocks.filter(block => block.b !== 'minecraft:water');
+  assert.equal(await repeatedQuarryEntrance(action, entrance, restored), false);
+});
+
 test('reattaching after the iron kit was earned does not start mining again', async () => {
   const { earnIronKit } = await import('./expedition-home.mjs');
   const calls = [];

@@ -391,6 +391,10 @@ async function runExpedition(start, stage) {
       || (Array.isArray(checkpoint.quarry) && checkpoint.quarry.length <= 44 && checkpoint.quarry.every(blockPosition)),
     'Invalid recorded quarry path');
     assert.ok(checkpoint.quarryLanding === undefined || blockPosition(checkpoint.quarryLanding), 'Invalid recorded landing');
+    assert.ok(checkpoint.exhaustedQuarries === undefined || (Array.isArray(checkpoint.exhaustedQuarries)
+      && checkpoint.exhaustedQuarries.length <= 6 && checkpoint.exhaustedQuarries.every(attempt =>
+        blockPosition(attempt?.entrance) && blockPosition(attempt?.blockedAt) && /^[\da-f]{64}$/.test(attempt.footing))),
+    'Invalid recorded quarry attempts');
     assert.ok(checkpoint.recoveryDestination === undefined || blockPosition(checkpoint.recoveryDestination),
       'Invalid recorded recovery destination');
     assert.ok(checkpoint.dog === undefined || /^[\da-f-]{36}$/i.test(String(checkpoint.dog)), 'Invalid recorded dog UUID');
@@ -599,6 +603,11 @@ async function runExpedition(start, stage) {
       policy.resumeQuarry = checkpoint.quarry;
       policy.resumeQuarryLanding = checkpoint.quarryLanding;
       policy.reenterQuarry = checkpoint.reenterQuarry === true;
+      policy.exhaustedQuarries = checkpoint.exhaustedQuarries;
+      policy.saveExhaustedQuarries = async attempts => {
+        checkpoint.exhaustedQuarries = attempts;
+        await writeCheckpoint(checkpoint);
+      };
       policy.saveQuarry = async (stairs, landing) => {
         checkpoint.quarry = stairs;
         checkpoint.quarryLanding = landing;

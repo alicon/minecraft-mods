@@ -56,6 +56,8 @@ export async function shootEndCrystal(action, uuid) {
 }
 
 export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = false } = {}) {
+  // The bridge classifies neutral Endermen as enemies even before they attack.
+  await action('set_reflexes', { autoDefend: false });
   const dogs = await action('get_entities', { type: DOG, radius: 32 });
   const dog = dogs?.entities.find(entity => entity.uuid === uuid && entity.health > 0);
   assert.ok(dog, 'The original companion must be at the marked camp before attacking the crystals');

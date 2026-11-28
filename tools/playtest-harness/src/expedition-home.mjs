@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { setTimeout } from 'node:timers/promises';
 import {
   bedSpotsWithGroundCover, dryStepKey, dryWaypoint, exitObstruction, hasPlacedBed, nearbyBuildingSpots,
@@ -1335,6 +1336,22 @@ export async function earnStoneKit(action, craft, { table, bed },
   if (beforeNight) await action('go_to', { pos: bed, stopDistance: 1.6, maxTicks: 55 });
 }
 
+export async function quarryFooting(action, pos) {
+  const view = await action('get_blocks', { center: pos, size: [7, 7, 7], format: 'json' });
+  if (!view || view.stats?.unloadedChunks) return null;
+  return createHash('sha256').update(JSON.stringify(view.cells.map(({ x, y, z, b }) => [x, y, z, b].join(',')).sort()))
+    .digest('hex');
+}
+
+export async function repeatedQuarryEntrance(action, here, attempts) {
+  for (const { entrance, blockedAt, footing } of attempts) {
+    if (Math.abs(here[1] - entrance[1]) <= 2
+        && Math.hypot(here[0] - entrance[0], here[2] - entrance[2]) <= 4
+        && await quarryFooting(action, blockedAt) === footing) return true;
+  }
+  return false;
+}
+
 export async function earnIronKit(action, craft, { bed }, policy = {}) {
   const stairs = [];
   const protectedGround = new Set();
@@ -1380,6 +1397,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   let movingToFreshGround = policy.scoutNewGround ? 8 : 0;
   let returningAfterCare = false;
   const triedFoodSources = new Set();
+  let exhaustedQuarries = policy.exhaustedQuarries ?? [];
   for (let attempt = 0; attempt < 190; attempt++) {
     const inventory = await action('get_inventory');
     const wanted = new Set();
@@ -1505,7 +1523,15 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
         rawIron: count(inventory, RAW_IRON), needed: requiredOre, hasCoal: count(inventory, COAL) > 0 }, fallback)
       : fallback;
     let openedBlockedQuarry = false;
-    if (usable && stairs.length < 44 && player.position.y > 20 && (stairs.length || work === 'quarry')) {
+    const here = feet(player);
+    const rejectedEntrance = !stairs.length && work === 'quarry'
+      && await repeatedQuarryEntrance(action, here, exhaustedQuarries);
+    if (rejectedEntrance) {
+      movingToFreshGround = 8;
+      misses = 0;
+      await policy.reportScouting?.('The previous quarry footing is unchanged. Looking for a different opening.');
+    }
+    if (!rejectedEntrance && usable && stairs.length < 44 && player.position.y > 20 && (stairs.length || work === 'quarry')) {
       const opening = stairs.length === 0;
       const descent = await descendQuarry(action, player, bed, stairs, protectedGround);
       if (Array.isArray(descent)) {
@@ -1516,7 +1542,15 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       openedBlockedQuarry = descent === 'blocked';
     }
     if (stairs.length || openedBlockedQuarry) {
+      const entrance = stairs[0] ?? here;
+      const blockedAt = feet(await action('observe'));
+      const footing = await quarryFooting(action, blockedAt);
       await leaveQuarry(action, stairs, policy);
+      if (footing) {
+        exhaustedQuarries = [...exhaustedQuarries.filter(attempt => String(attempt.entrance) !== String(entrance)),
+          { entrance, blockedAt, footing }].slice(-6);
+        await policy.saveExhaustedQuarries?.(exhaustedQuarries);
+      }
       stairs.length = 0;
       await policy.saveQuarry?.([]);
       quarries++;

@@ -186,8 +186,11 @@ A player with the earned starter
 tools can resume searching for food and wool before a camp has been built.
 An interrupted iron quarry
 retains its grounded steps. The resumed controller can continue from the
-verified landing or use the recorded route to climb out. On the surface it
-offers Mushroom an earned portion if his first meal is still pending.
+verified landing or use the recorded route to climb out. A quarry that ends
+without enough ore records its entrance and the observed blocks at the last
+landing. If the same footing remains after reattachment, the controller
+scouts another opening. On the surface it offers Mushroom an earned portion
+if his first meal is still pending.
 
 ```shell
 MUSHROOM_EXPEDITION_STATUS="$RUN_DIRECTORY/status" MUSHROOM_EXPEDITION_RESUME=1 \
@@ -368,10 +371,13 @@ Set `MUSHROOM_EXPEDITION_STAGE=generated-end-crystals` to exercise the crystal
 phase on the generated island with the vanilla dragon active. The disposable
 fixture supplies a bow, arrows, armor, food, and a protected camp for Mushroom.
 The controller scouts the island, watches for incoming dragon breath, and
-shoots from observed positions. It finishes its retreat through damage
-before shooting again. For a guarded crystal, it surveys a dry pillar,
-water landing, and clear bow trajectory around nearby towers. It opens a
-side with a pickaxe and returns to ground to take the shot. The fixture
+shoots from observed positions. The bridge's automatic melee is disabled
+to keep it from attacking neutral Endermen. It finishes its retreat
+through damage before shooting again. For a guarded crystal, it surveys
+a dry pillar, water landing, and clear bow trajectory around nearby towers.
+It opens a side with a pickaxe and checks that water has reached the
+landing. It steers back toward the column if the current pushes it sideways.
+The fixture
 supplies the blocks, pickaxe, and buckets. The server checks for the removal of all ten
 original crystals and verifies Mushroom's identity and health at camp. The
 summary reports shot attempts, observed breaks, and the native verdict.

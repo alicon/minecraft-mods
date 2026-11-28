@@ -64,19 +64,25 @@ async function leaveShallowWater(action, line) {
   return false;
 }
 
-async function descendWater(action, player, plan, line) {
+export async function descendCrystalPillar(action, player, plan, line) {
   const [x, y, z] = feet(player);
   if (y <= plan.base[1] + 1) return true;
-  const water = [x + plan.dx, plan.base[1], z + plan.dz];
+  const bottom = plan.base[1];
+  const waterX = x + plan.dx;
+  const waterZ = z + plan.dz;
   await hold(action, WATER_BUCKET);
   // A bucket places water through ordinary item use. Block interaction
   // alone passes without placing the fluid.
   await action('look', { pitch: 90 });
   if (!(await action('use_item'))?.success) return false;
-  // Wait for the water to reach the ground before committing to the drop.
+  const column = {
+    center: [waterX, Math.floor((bottom + y + 1) / 2), waterZ],
+    size: [1, y - bottom + 1, 1],
+    format: 'json',
+  };
   for (let check = 0; check < 100; check++) {
-    const view = await action('get_blocks', { center: water, size: [1, 1, 1], format: 'json' });
-    if (view?.cells.some(cell => cell.b === WATER)) break;
+    const view = await action('get_blocks', column);
+    if (view?.cells.filter(cell => cell.b === WATER).length === column.size[1]) break;
     if (check === 99) return false;
     await setTimeout(200);
   }
@@ -85,8 +91,18 @@ async function descendWater(action, player, plan, line) {
   for (let wait = 0; wait < 60; wait++) {
     const landing = await action('observe');
     if (!landing?.inWorld || landing.dead) return false;
-    if (landing.position.y <= plan.base[1] + 1) return leaveShallowWater(action, line);
-    await setTimeout(240);
+    if (landing.position.y <= bottom + 1) return leaveShallowWater(action, line);
+    const dx = waterX + 0.5 - landing.position.x;
+    const dz = waterZ + 0.5 - landing.position.z;
+    const drift = Math.hypot(dx, dz);
+    if (drift > 0.2) {
+      // Water first flows off the pillar horizontally. Correct toward the
+      // surveyed column before that current carries us into a dry fall.
+      await action('move', { forward: true, sneak: landing.inWater,
+        yaw: Math.atan2(-dx, dz) * 180 / Math.PI, ticks: drift > 0.55 ? 4 : 2 });
+    } else {
+      await action('move', { sneak: true, ticks: 5 });
+    }
   }
   return false;
 }
@@ -204,6 +220,6 @@ export async function openCrystalCage(action, player, crystal, dangerous) {
     }
   }
   player = await action('observe');
-  if (!await descendWater(action, player, plan, line) || !opened) return null;
+  if (!await descendCrystalPillar(action, player, plan, line) || !opened) return null;
   return { line, heights };
 }
