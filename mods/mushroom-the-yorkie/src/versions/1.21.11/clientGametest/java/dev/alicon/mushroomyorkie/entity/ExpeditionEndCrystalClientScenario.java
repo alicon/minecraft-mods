@@ -7,16 +7,21 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.stats.Stats;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.feature.SpikeFeature;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 final class ExpeditionEndCrystalClientScenario {
@@ -90,6 +95,94 @@ final class ExpeditionEndCrystalClientScenario {
 			context.waitTicks(5);
 		}
 		throw new AssertionError("The controller did not finish the native End crystal replay");
+	}
+
+	static void runGenerated(ClientGameTestContext context, TestServerContext server, UUID ownerId, Path status) throws IOException {
+		var camp = server.computeOnServer(minecraft -> {
+			var end = Objects.requireNonNull(minecraft.getLevel(Level.END));
+			for (var spike : SpikeFeature.getSpikesForLevel(end)) {
+				end.getChunk(spike.getCenterX() >> 4, spike.getCenterZ() >> 4);
+			}
+			var ground = end.getChunk(3, 0);
+			var start = new BlockPos(58, ground.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, 10, 6) + 1, 6);
+			var shelter = start.east(2).south(2);
+			for (BlockPos pos : BlockPos.betweenClosed(start.offset(-2, -1, -3), start.offset(5, -1, 5))) {
+				end.setBlockAndUpdate(pos, Blocks.END_STONE.defaultBlockState());
+				end.setBlockAndUpdate(pos.above(), Blocks.AIR.defaultBlockState());
+				end.setBlockAndUpdate(pos.above(2), Blocks.AIR.defaultBlockState());
+			}
+			for (BlockPos pos : BlockPos.betweenClosed(shelter.offset(-1, 2, -1), shelter.offset(2, 2, 2))) {
+				end.setBlockAndUpdate(pos, Blocks.OBSIDIAN.defaultBlockState());
+			}
+			var owner = Objects.requireNonNull(minecraft.getPlayerList().getPlayer(ownerId));
+			owner.teleportTo(end, start.getX() + 0.5, start.getY(), start.getZ() + 0.5, Set.of(), 0, 0, false);
+			owner.setItemSlot(EquipmentSlot.HEAD, new ItemStack(Items.DIAMOND_HELMET));
+			owner.setItemSlot(EquipmentSlot.CHEST, new ItemStack(Items.DIAMOND_CHESTPLATE));
+			owner.setItemSlot(EquipmentSlot.LEGS, new ItemStack(Items.DIAMOND_LEGGINGS));
+			owner.setItemSlot(EquipmentSlot.FEET, new ItemStack(Items.DIAMOND_BOOTS));
+			owner.getInventory().add(new ItemStack(Items.BOW));
+			owner.getInventory().add(new ItemStack(Items.ARROW, 64));
+			owner.getInventory().add(new ItemStack(Items.ARROW, 32));
+			owner.getInventory().add(new ItemStack(Items.GOLDEN_APPLE, 4));
+			owner.getInventory().add(new ItemStack(ModItems.CAMP_MAT));
+			var dog = Objects.requireNonNull(ModEntities.MUSHROOM_YORKIE.create(end, EntitySpawnReason.TRIGGERED));
+			dog.claimFor(owner);
+			dog.setMushroomOrderedToSit(true);
+			dog.setPos(Vec3.atBottomCenterOf(shelter));
+			end.addFreshEntity(dog);
+			return new GeneratedCamp(start, shelter, dog.getUUID(), dog.getId(), dog.getHealth());
+		});
+		context.waitFor(client -> client.screen == null && client.level.dimension().equals(Level.END)
+				&& client.player.blockPosition().equals(camp.start())
+				&& client.level.getEntity(camp.dogRuntimeId()) instanceof MushroomYorkieEntity yorkie
+				&& yorkie.isAlive() && client.player.getInventory().contains(stack -> stack.is(Items.BOW)));
+		Set<UUID> crystals = Set.of();
+		for (int tick = 0; tick < 300 && crystals.size() < SpikeFeature.NUMBER_OF_SPIKES; tick += 5) {
+			crystals = server.computeOnServer(minecraft -> minecraft.getLevel(Level.END)
+					.getEntitiesOfClass(EndCrystal.class, new AABB(camp.start()).inflate(128)).stream()
+					.map(EndCrystal::getUUID).collect(Collectors.toUnmodifiableSet()));
+			if (crystals.size() < SpikeFeature.NUMBER_OF_SPIKES) context.waitTicks(5);
+		}
+		if (crystals.size() != SpikeFeature.NUMBER_OF_SPIKES) {
+			throw new AssertionError("Expected all vanilla End spike crystals to load, found " + crystals.size());
+		}
+		var recordedCrystals = crystals;
+		context.waitFor(client -> recordedCrystals.stream().anyMatch(uuid ->
+				client.level.getEntity(uuid) instanceof EndCrystal), 300);
+		Files.writeString(status.resolveSibling("end-crystal-companion"), camp.dogId().toString());
+		Files.writeString(status, "ready");
+		for (int tick = 0; tick < 12_000; tick += 5) {
+			String result = Files.readString(status);
+			if ("finished".equals(result)) {
+				server.runOnServer(minecraft -> {
+					var end = minecraft.getLevel(Level.END);
+					var owner = minecraft.getPlayerList().getPlayer(ownerId);
+					var dog = (MushroomYorkieEntity) end.getEntity(camp.dogId());
+					int shots = owner.getStats().getValue(Stats.ITEM_USED.get(Items.BOW));
+					if (!owner.isAlive() || !owner.level().dimension().equals(Level.END) || shots < recordedCrystals.size()
+							|| recordedCrystals.stream().anyMatch(uuid -> end.getEntity(uuid) != null)
+							|| !end.getEntitiesOfClass(EndCrystal.class, new AABB(camp.start()).inflate(128)).isEmpty()
+							|| end.getDragonFight().saveData().dragonKilled()) {
+						throw new AssertionError("Expected native bow shots to break all the generated crystals before the dragon fight");
+					}
+					if (dog == null || !dog.isAlive() || !dog.isOwnedBy(owner) || !dog.isOrderedToSit()
+							|| !dog.blockPosition().equals(camp.shelter()) || dog.getHealth() < camp.dogHealth()
+							|| dog.expeditionCamp.anchor() == null || !dog.expeditionCamp.anchor().dimension().equals(Level.END)) {
+						throw new AssertionError("Expected the original unhurt Mushroom at his marked End shelter");
+					}
+					System.out.printf("Expedition native generated crystals passed: count=%d arrows=%d dog=%s%n",
+							recordedCrystals.size(), shots, camp.dogId());
+				});
+				context.takeScreenshot("expedition-survival-generated-end-crystals");
+				return;
+			}
+			if ("failed".equals(result)) break;
+			context.waitTicks(5);
+		}
+		throw new AssertionError("The controller did not clear the generated End crystals");
+	}
+
+	private record GeneratedCamp(BlockPos start, BlockPos shelter, UUID dogId, int dogRuntimeId, float dogHealth) {
 	}
 
 	private record Fixture(BlockPos start, BlockPos shelter, UUID dogId, float dogHealth, int dogRuntimeId,

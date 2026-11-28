@@ -88,6 +88,7 @@ def summarize(path):
     status = status_path.read_text(encoding="utf-8").strip() if status_path.exists() else "starting"
     actions = Counter()
     choices = Counter()
+    broken_generated_crystals = set()
     latencies = []
     cost = 0.0
     tokens = 0
@@ -104,6 +105,8 @@ def summarize(path):
                 action = row.get("action")
                 if action:
                     actions[action] += 1
+                if action == "generated_crystal_shot" and row.get("destroyed"):
+                    broken_generated_crystals.add(row["crystal"])
                 if action == "agent_replaced_controller":
                     assisted = True
                 if row.get("policy") == "jev":
@@ -130,6 +133,9 @@ def summarize(path):
         "nativeCompanionEquipment": "Expedition companion equipment passed:" in game_log,
         "nativeEndEntry": "Expedition native End entry passed:" in game_log,
         "nativeEndCrystal": "Expedition native End crystal passed:" in game_log,
+        "nativeGeneratedEndCrystals": "Expedition native generated crystals passed:" in game_log,
+        "generatedCrystalShots": actions["generated_crystal_shot"],
+        "generatedCrystalsBroken": len(broken_generated_crystals),
         "nativeEyeRoute": "Expedition native eye route passed:" in game_log,
         "nativeStrongholdApproach": "Expedition native stronghold approach passed:" in game_log,
         "nativeNetherRoundTrip": "Expedition Nether round trip passed:" in game_log,

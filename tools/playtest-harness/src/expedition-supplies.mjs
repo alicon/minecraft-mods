@@ -11,7 +11,7 @@ import {
 import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
 import { earnBlazeRods } from './expedition-blaze-rods.mjs';
-import { shootEndCrystal } from './expedition-end-crystals.mjs';
+import { clearGeneratedCrystals, shootEndCrystal } from './expedition-end-crystals.mjs';
 import { crossEndPortal } from './expedition-end-entry.mjs';
 import { navigateToStronghold, scoutByEye } from './expedition-eye-route.mjs';
 import { COMPANION_WEARABLES, markExpeditionCamp, practiceStayAndRecall, prepareCompanionGear } from './expedition-gear.mjs';
@@ -65,6 +65,7 @@ const milestoneObjectives = {
   equipment: 'Craft the harness, padded vest, and mat. Fit Mushroom’s gear and mark camp.',
   'end-entry': 'Craft Eyes of Ender and bring Mushroom through the active portal.',
   'end-crystal': 'Mark Mushroom’s shelter and break an End crystal from a safe bow position.',
+  'generated-end-crystals': 'Shelter Mushroom and clear the generated End crystals using the bow and safe approaches.',
   'eye-route': 'Throw an Eye of Ender and follow its visible flight with Mushroom.',
   'stronghold-approach': 'Measure two Eye of Ender bearings and reach the stronghold area with Mushroom.',
   'quarry-tools': 'Craft the starter kit, shovel soil, and switch to a pickaxe for stone.',
@@ -213,7 +214,7 @@ try {
   const policy = process.env.MUSHROOM_EXPEDITION_POLICY ?? 'rules';
   await narrate('Run', `${resume ? 'Reattached to the same save' : 'Started the Survival controller'}. Stage ${stage}, policy ${policy}.`);
   const start = await action('observe');
-  const startDimension = stage === 'end-crystal' ? 'minecraft:the_end' : OVERWORLD;
+  const startDimension = ['end-crystal', 'generated-end-crystals'].includes(stage) ? 'minecraft:the_end' : OVERWORLD;
   assert.ok(start?.inWorld && !start.dead && (start.dimension === startDimension
     || (resume && stage === 'nether' && start.dimension === NETHER)), 'The controller was not in its expected starting dimension');
   if (milestoneObjectives[stage]) await narrate('Objective', milestoneObjectives[stage]);
@@ -248,14 +249,22 @@ try {
     companion = (await readFile(join(dirname(statusFile), 'end-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
     await crossEndPortal(action, craft, companion);
-  } else if (stage === 'end-crystal') {
+  } else if (stage === 'end-crystal' || stage === 'generated-end-crystals') {
     companion = (await readFile(join(dirname(statusFile), 'end-crystal-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
     const camp = await markExpeditionCamp(action);
-    let crystal;
-    for (let shot = 0; shot < 3 && !crystal; shot++) crystal = await shootEndCrystal(action, companion);
-    assert.ok(crystal, 'The crystal in bow range survived all shots');
-    console.log(JSON.stringify({ at: new Date().toISOString(), action: 'end_crystal_destroyed', crystal, camp, dog: companion }));
+    if (stage === 'generated-end-crystals') {
+      await clearGeneratedCrystals(action, companion, async ({ crystal, position, destroyed }) => {
+        console.log(JSON.stringify({ at: new Date().toISOString(), action: 'generated_crystal_shot',
+          crystal: crystal.uuid, target: crystal.pos, position, destroyed, camp, dog: companion }));
+        if (destroyed) await narrate('Result', 'A generated End crystal broke.');
+      });
+    } else {
+      let crystal;
+      for (let shot = 0; shot < 3 && !crystal; shot++) crystal = await shootEndCrystal(action, companion);
+      assert.ok(crystal, 'The crystal in bow range survived all shots');
+      console.log(JSON.stringify({ at: new Date().toISOString(), action: 'end_crystal_destroyed', crystal, camp, dog: companion }));
+    }
   } else if (stage === 'eye-route' || stage === 'stronghold-approach') {
     companion = (await readFile(join(dirname(statusFile), 'eye-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));

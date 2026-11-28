@@ -18,7 +18,7 @@ expedition_node=${MUSHROOM_EXPEDITION_NODE:-node}
 command -v "$expedition_node" >/dev/null
 export MUSHROOM_EXPEDITION_STAGE="${MUSHROOM_EXPEDITION_STAGE:-adoption}"
 case "$MUSHROOM_EXPEDITION_STAGE" in
-  adoption|stone|iron|nether|defense|feeding|portal|nether-supplies|shelter|equipment|end-entry|end-crystal|eye-route|stronghold-approach|quarry-tools|quarry-iron) ;;
+  adoption|stone|iron|nether|defense|feeding|portal|nether-supplies|shelter|equipment|end-entry|end-crystal|generated-end-crystals|eye-route|stronghold-approach|quarry-tools|quarry-iron) ;;
   *) echo "Unknown MUSHROOM_EXPEDITION_STAGE: $MUSHROOM_EXPEDITION_STAGE" >&2; exit 2 ;;
 esac
 
