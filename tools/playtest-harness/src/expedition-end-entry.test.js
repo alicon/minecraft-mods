@@ -41,6 +41,16 @@ test('End entry finds the full observed ring and sorts dry, unobstructed approac
   assert.equal(findEndRing([...frame, ...dryFloor, water, roof], player), undefined);
 });
 
+test('generated portal rooms expose lower interaction stances and a raised entry', async () => {
+  const { findEndRing } = await import('./expedition-end-entry.mjs');
+  const platform = [
+    cell(-3, 64, 0, 'cracked_stone_bricks'),
+    cell(0, 61, 3, 'mossy_stone_bricks'),
+    cell(0, 62, 3, 'cave_air'),
+  ];
+  assert.deepEqual(findEndRing([...frame, ...platform], player).approaches, [[0, 62, 3], [-3, 65, 0]]);
+});
+
 test('End entry requires all nine vanilla portal blocks when deciding if it can cross', async () => {
   const { findEndRing } = await import('./expedition-end-entry.mjs');
   const portal = [-1, 0, 1].flatMap(x => [-1, 0, 1].map(z => cell(x, 64, z, 'end_portal')));

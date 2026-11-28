@@ -551,6 +551,52 @@ test('iron scouting walks toward a visible vein and disregards a sealed one', as
   );
 });
 
+test('a verified flat quarry exit can finish a short move after a false drop warning', async () => {
+  const { climbQuarry } = await import('./expedition-home.mjs');
+  const target = [915, 68, 206];
+  const player = { inWorld: true, onGround: true, health: 20, position: { x: 915.52, y: 68, z: 206.87 } };
+  let nudged = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'go_to': return { arrived: false, reason: 'drop of more than 3 blocks ahead, stopped' };
+      case 'observe': return nudged ? { ...player, position: { ...player.position, z: 206.74 } } : player;
+      case 'get_blocks':
+        assert.deepEqual(args.center, target);
+        return { cells: [{ x: 915, y: 67, z: 206, b: 'minecraft:stone' }] };
+      case 'move':
+        assert.equal(args.ticks, 1);
+        nudged = true;
+        return {};
+      default: assert.fail(name);
+    }
+  };
+  assert.ok(await climbQuarry(action, target));
+  assert.ok(nudged);
+});
+
+test('stronghold scouting walks from half-block footing onto the next slab', async () => {
+  const { stepOut } = await import('./expedition-home.mjs');
+  const floor = [
+    { x: 0, y: -6, z: 0, b: 'minecraft:smooth_stone_slab' },
+    { x: 1, y: -5, z: 0, b: 'minecraft:stone_brick_slab' },
+    { x: 2, y: -5, z: 0, b: 'minecraft:mossy_stone_bricks' },
+    { x: 1, y: -4, z: 0, b: 'minecraft:cave_air' },
+    { x: 2, y: -4, z: 0, b: 'minecraft:cave_air' },
+    { x: 2, y: -3, z: 0, b: 'minecraft:stone_button' },
+  ];
+  const player = { position: { x: 0.5, y: -5.5, z: 0.5 }, onGround: true };
+  const action = async (name, args) => {
+    if (name === 'get_blocks') {
+      assert.deepEqual(args.center, [0, -5, 0]);
+      return { cells: floor };
+    }
+    assert.equal(name, 'go_to');
+    assert.deepEqual(args.pos, [2, -4, 0]);
+    return { arrived: true, position: [2.5, -4, 0.5] };
+  };
+  assert.ok(await stepOut(action, player, [], [2, -4, 0], 'stronghold'));
+});
+
 test('an escape between two clouds avoids both centers', async () => {
   const { dryWaypoint } = await import('./expedition-navigation.mjs');
   const cells = [];
@@ -620,6 +666,37 @@ test('a recovery forage keeps the chicken collected through ordinary play', asyn
   };
   assert.equal(await forageExpeditionMeal(action, { toward: [40, 64, 0] }), true);
   assert.ok(hunted && collected);
+});
+
+test('companion forage checks again after regrouping before looking for food', async () => {
+  const { forageExpeditionMeal } = await import('./expedition-home.mjs');
+  const player = { inWorld: true, health: 20, position: { x: 912, y: 72, z: 205 } };
+  let checked = 0;
+  let searched = 0;
+  let collected = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe': return player;
+      case 'get_inventory': return { slots: collected ? [{ id: 'minecraft:mutton', count: 1 }] : [] };
+      case 'get_entities':
+        assert.equal(checked, 2, 'Searching for food before regrouping would leave Mushroom below the quarry');
+        searched++;
+        return { entities: [{ id: 12, item: { id: 'minecraft:mutton' }, pos: [914, 72, 205], distance: 2 }] };
+      case 'go_to':
+        assert.equal(args.entityId, 12);
+        collected = true;
+        return { arrived: true };
+      default: assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  assert.equal(await forageExpeditionMeal(action, {
+    regroup: async current => {
+      assert.equal(current, player);
+      checked++;
+      return checked === 1;
+    },
+  }), true);
+  assert.equal(searched, 1);
 });
 
 test('the reserved recovery meal moves out of reach of automatic hotbar eating', async () => {

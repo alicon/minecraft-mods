@@ -1,12 +1,15 @@
 const CARDINAL = [[1, 0], [0, 1], [-1, 0], [0, -1]];
-const HEADROOM = /:(?:short_grass|tall_grass|fern|large_fern|dead_bush|dandelion|poppy|leaf_litter|wildflowers)$/;
-const SUPPORT = /:(?:grass_block|dirt|dirt_path|coarse_dirt|podzol|stone|cobblestone|stone_bricks|end_stone|end_stone_bricks|obsidian|bedrock|netherrack|blackstone|basalt|smooth_basalt|soul_soil|soul_sand|crimson_nylium|warped_nylium|nether_bricks|sandstone|terracotta|sand|gravel|snow_block|\w+_leaves|\w+_log|\w+_planks)$/;
+const HEADROOM = /:(?:air|cave_air|void_air|short_grass|tall_grass|fern|large_fern|dead_bush|dandelion|poppy|leaf_litter|wildflowers|\w+_button|torch|wall_torch)$/;
+const SUPPORT = /:(?:grass_block|dirt|dirt_path|coarse_dirt|podzol|stone|cobblestone|(?:mossy_|cracked_)?stone_bricks|end_stone|end_stone_bricks|obsidian|bedrock|netherrack|blackstone|basalt|smooth_basalt|soul_soil|soul_sand|crimson_nylium|warped_nylium|nether_bricks|sandstone|terracotta|sand|gravel|snow_block|\w+_leaves|\w+_log|\w+_planks)$/;
 const LEAVES = /_leaves$/;
 const QUARRY_BLOCK = /^minecraft:(?:grass_block|dirt|coarse_dirt|podzol|stone|andesite|diorite|granite|deepslate|(?:deepslate_)?(?:coal|iron)_ore)$/;
 const QUARRY_HAZARD = /^minecraft:(?:water|lava|powder_snow|.*sand|gravel)$/;
 const SHELTER_BLOCK = /^minecraft:(?:dirt|grass_block|stone|cobblestone|granite|diorite|andesite|deepslate|end_stone|end_stone_bricks|obsidian|netherrack|blackstone|nether_bricks)$/;
 const MAX_WALK_SEGMENT = 10;
 const IRON_ORE = /^minecraft:(?:deepslate_)?iron_ore$/;
+export const STRONGHOLD_MASONRY = /^minecraft:(?:(?:cracked_|mossy_|chiseled_)?stone_bricks|(?:mossy_)?stone_brick_stairs)$/;
+const STRONGHOLD_STEPS = /^minecraft:(?:(?:mossy_)?stone_brick_(?:stairs|slab)|smooth_stone_slab)$/;
+const INFESTED_STONE_BRICKS = /^minecraft:infested_(?:(?:mossy_|cracked_|chiseled_)?stone_bricks)$/;
 
 function gap(id) {
   return id === undefined || HEADROOM.test(id);
@@ -207,7 +210,9 @@ export function dryWaypoint(cells, start, visited, destination, preferredGround,
         const step = [tx, ty, tz];
         const key = step.join(',');
         const support = block(tx, ty - 1, tz);
-        if (seen.has(key) || rejectedSteps.has(dryStepKey(pos, step)) || !hasDrySupport(support)
+        const supported = hasDrySupport(support) || preferredGround === 'stronghold'
+          && (STRONGHOLD_STEPS.test(support ?? '') || INFESTED_STONE_BRICKS.test(support ?? ''));
+        if (seen.has(key) || rejectedSteps.has(dryStepKey(pos, step)) || !supported
             || (['surface', 'elevation', 'cave', 'iron'].includes(preferredGround) && /_(?:leaves|log)$/.test(support))
             || (hazards.length && clearance(step) <= clearance(pos))
             || !gap(block(tx, ty, tz)) || !gap(block(tx, ty + 1, tz))
@@ -233,12 +238,16 @@ export function dryWaypoint(cells, start, visited, destination, preferredGround,
         const cave = ['cave', 'iron'].includes(preferredGround) ? CARDINAL.filter(([ox, oz]) =>
           rock(block(tx + ox, ty, tz + oz)) || rock(block(tx + ox, ty + 1, tz + oz))).length
           + Number(rock(block(tx, ty - 1, tz))) + Number(rock(block(tx, ty + 2, tz))) : 0;
+        const masonry = preferredGround === 'stronghold' ? CARDINAL.filter(([ox, oz]) =>
+          STRONGHOLD_MASONRY.test(block(tx + ox, ty, tz + oz) ?? ''))
+          .length + Number(STRONGHOLD_MASONRY.test(support)) : 0;
         const score = (destination
           ? -2 * distance(destination, step)
             - (preferredGround === 'surface' ? 0 : (preferredGround === 'elevation' ? 5 : 1.25) * Math.abs(destination[1] - ty))
             - route.length * 0.25 + fresh * 0.1
           : fresh + 0.3 * distance(start, step) - route.length * 0.12 + pasture * 0.65
-            + exposedRock * 0.9 + cave * 1.8 + (hasVisibleIron(ores, block, step) ? 35 : 0)) - routeRepeatCost * 1.5;
+            + exposedRock * 0.9 + cave * 1.8 + masonry * 1.4
+            + (hasVisibleIron(ores, block, step) ? 35 : 0)) - routeRepeatCost * 1.5;
         if (score > bestScore) {
           best = route;
           bestScore = score;

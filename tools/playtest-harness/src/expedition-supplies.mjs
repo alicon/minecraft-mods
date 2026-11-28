@@ -13,7 +13,7 @@ import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
 import { blazePowderCount, craftBlazePowder, earnBlazeRods } from './expedition-blaze-rods.mjs';
 import { clearGeneratedCrystals, shootEndCrystal } from './expedition-end-crystals.mjs';
-import { craftEyes, crossEndPortal, enderEyeCount } from './expedition-end-entry.mjs';
+import { craftEyes, crossEndPortal, enderEyeCount, findStrongholdPortalRoom } from './expedition-end-entry.mjs';
 import { earnEnderPearls } from './expedition-pearls.mjs';
 import { navigateToStronghold, scoutByEye } from './expedition-eye-route.mjs';
 import { COMPANION_WEARABLES, markExpeditionCamp, practiceStayAndRecall, prepareCompanionGear } from './expedition-gear.mjs';
@@ -33,6 +33,15 @@ const statusFile = process.env.MUSHROOM_EXPEDITION_STATUS;
 assert.ok(statusFile && isAbsolute(statusFile), 'Set MUSHROOM_EXPEDITION_STATUS to the absolute run status path');
 const resume = process.env.MUSHROOM_EXPEDITION_RESUME === '1';
 assert.equal(await readFile(statusFile, 'utf8'), resume ? 'held' : 'ready', 'The disposable expedition is not in the expected state');
+const ownerFile = join(dirname(statusFile), 'controller-owner');
+const launchOwner = process.env.MUSHROOM_EXPEDITION_CONTROLLER_OWNER;
+if (launchOwner) {
+  assert.equal(await readFile(ownerFile, 'utf8'), launchOwner, 'The launcher no longer owns this expedition');
+} else {
+  const pendingOwner = `${ownerFile}-${process.pid}`;
+  await writeFile(pendingOwner, `controller-${process.pid}-${Date.now()}`);
+  await rename(pendingOwner, ownerFile);
+}
 const coachingFile = join(dirname(statusFile), 'coach.txt');
 const checkpointFile = join(dirname(statusFile), 'controller-checkpoint.json');
 const deathFile = join(dirname(statusFile), 'last-owner-death');
@@ -72,6 +81,7 @@ const milestoneObjectives = {
   shelter: 'Enter the furnished house and sleep with the door closed.',
   equipment: 'Craft the harness, padded vest, and mat. Fit Mushroom’s gear and mark camp.',
   'end-entry': 'Craft Eyes of Ender and bring Mushroom through the active portal.',
+  'generated-end-entry': 'Find the generated portal room, open its portal, and bring Mushroom through.',
   'end-crystal': 'Mark Mushroom’s shelter and break an End crystal from a safe bow position.',
   'generated-end-crystals': 'Shelter Mushroom and clear the generated End crystals using the bow and safe approaches.',
   'eye-route': 'Throw an Eye of Ender and follow its visible flight with Mushroom.',
@@ -262,10 +272,14 @@ try {
     await practiceStayAndRecall(action, companion);
     const camp = await markExpeditionCamp(action);
     console.log(JSON.stringify({ at: new Date().toISOString(), action: 'camp_marked', dog: companion, camp }));
-  } else if (stage === 'end-entry') {
+  } else if (stage === 'end-entry' || stage === 'generated-end-entry') {
     companion = (await readFile(join(dirname(statusFile), 'end-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
-    await crossEndPortal(action, craft, companion);
+    const ring = stage === 'generated-end-entry' ? await findStrongholdPortalRoom(action, companion, async (event, observation) => {
+      console.log(JSON.stringify({ at: new Date().toISOString(), action: event, observation }));
+      if (event === 'portal_room') await narrate('Result', 'Reached a dry position beside the generated End portal.');
+    }) : undefined;
+    await crossEndPortal(action, craft, companion, ring);
   } else if (stage === 'end-crystal' || stage === 'generated-end-crystals') {
     companion = (await readFile(join(dirname(statusFile), 'end-crystal-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
@@ -454,6 +468,14 @@ async function runExpedition(start, stage) {
     assert.ok(blockPosition(restored.camp?.bed) && blockPosition(restored.camp?.table));
     checkpoint = { owner: start.name, gameTime: start.gameTime, bridgeFingerprint, stage, phase: 'iron',
       camp: restored.camp, dog: restored.dog, fedDog: false };
+    if (restored.ironProgress) {
+      const { quarry, quarryLanding, lastDogMealAt } = restored.ironProgress;
+      assert.ok(Array.isArray(quarry) && quarry.length > 0 && quarry.length <= 44 && quarry.every(blockPosition)
+        && blockPosition(quarryLanding), 'Invalid archived quarry route');
+      assert.ok(Number.isInteger(lastDogMealAt) && lastDogMealAt >= 0 && lastDogMealAt <= start.gameTime,
+        'Invalid archived companion meal time');
+      Object.assign(checkpoint, { quarry, quarryLanding, lastDogMealAt, fedDog: true });
+    }
     companion = checkpoint.dog;
     if (live) await writeCheckpoint(checkpoint);
     console.log(JSON.stringify({ at: new Date().toISOString(), action: 'controller_restored_save', assisted: true,
@@ -542,9 +564,22 @@ async function runExpedition(start, stage) {
         || player.gameTime - (checkpoint.lastDogMealAt ?? checkpoint.gameTime) >= DOG_MEAL_INTERVAL)) return 'care';
       return null;
     };
+    const regroupForCare = async player => {
+      const nearby = await action('get_entities', { type: 'mushroom_yorkie:mushroom_yorkie', radius: 32 });
+      const dog = nearby?.entities.find(entity => entity.uuid === checkpoint.dog && entity.health > 0);
+      if (dog) lastCompanionPosition = dog.pos;
+      if (dog?.distance <= 6 || (dog?.distance <= 10 && Math.abs(dog.pos[1] - player.position.y) <= 4)) return false;
+      await narrate('Decision', 'Mushroom is too far away to forage together. Regrouping before searching for food.', 10_000);
+      const together = await regroupExpeditionCompanion(action, checkpoint.dog, lastCompanionPosition);
+      lastCompanionPosition = together.pos;
+      await narrate('Result', 'The original Mushroom is back within six blocks.');
+      return true;
+    };
     policy.tendCompanion = async () => {
-      await narrate('Objective', 'Feed the original Mushroom before resuming mining.');
-      assert.ok(await forageExpeditionMeal(action, { camp: checkpoint.camp.bed }), 'Could not earn food for the injured original dog');
+      await narrate('Objective', 'Pause the iron search and feed the original Mushroom.');
+      await regroupForCare(await action('observe'));
+      assert.ok(await forageExpeditionMeal(action, { regroup: regroupForCare }),
+        'Could not gather a meal near the original dog');
       const player = await action('observe');
       assert.ok(await feedAdoptedDog(action, checkpoint.dog,
         [player.position.x, player.position.y, player.position.z].map(Math.floor), 30),

@@ -180,7 +180,9 @@ The trace records the deaths, provisioning, and gear reacquisition.
 If a live controller has exited and its status is `held`, restart the external
 controller from its last saved phase with the same client still open. Use the
 same stage and policy and point to that run's status file. The client connection
-and owner must match the recorded checkpoint. A player with the earned starter
+and owner must match the recorded checkpoint. The replacement controller
+takes ownership of the run so the original launcher cannot mark it failed.
+A player with the earned starter
 tools can resume searching for food and wool before a camp has been built.
 An interrupted iron quarry
 retains its grounded steps. The resumed controller can continue from the
@@ -201,7 +203,11 @@ object with the `bed` and `table` block coordinates. Start the ordinary
 runner with the manifest path and the `iron`, `nether`, `nether-powder`, or
 `stronghold` stage. The client opens a copy, verifies the world, owner, camp, earned stone
 kit and original living dog, then hands control back at the iron phase. The
-trace records the recovery as assisted.
+trace records the recovery as assisted. An archive taken inside a quarry can
+include `ironProgress` with the recorded `quarry`, `quarryLanding`, and
+`lastDogMealAt` so the controller can resume the stairs. During the iron hunt,
+the controller pauses to regroup with the dog when care is due and checks
+that they stay together while looking for food nearby.
 
 Summarize the action logs and the native save/reopen evidence for comparison:
 
@@ -337,6 +343,14 @@ lava. The controller crafts the eyes, finds dry approaches, fills the
 sockets through Use, and jumps into the portal. The integrated server
 checks that the frame activated and the same living dog arrived with its
 owner in the End. This replay begins in the portal room.
+
+Set `MUSHROOM_EXPEDITION_STAGE=generated-end-entry` to test the route from a
+generated stronghold corridor into its vanilla End portal. The fixture
+supplies the Eyes and tools and disables mob spawning and the spawner to
+exercise navigation and portal interaction. The controller uses nearby
+block observations, finds dry footing for filling the frames, and crosses
+from the raised approach with the original dog. The verifier locates the
+structure independently and checks the original dog in the End.
 
 Set `MUSHROOM_EXPEDITION_STAGE=end-crystal` to replay the first combat step
 with a native bow. The disposable End fixture supplies a bow, arrows, a

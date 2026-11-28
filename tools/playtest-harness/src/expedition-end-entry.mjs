@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
-import { hold, stepOut } from './expedition-home.mjs';
+import { breakVisible, dogMealCount, feedAdoptedDog, hold, regroupExpeditionCompanion, stepOut } from './expedition-home.mjs';
 import { hasDrySupport } from './expedition-navigation.mjs';
 import { OVERWORLD, withCompanion } from './expedition-nether.mjs';
 
@@ -15,6 +15,8 @@ const SIDES = [[-1, 0], [0, -1], [1, 0], [0, 1]];
 const RING = SIDES.flatMap(([dx, dz]) => [-1, 0, 1].map(offset => [2 * dx + offset * dz, 2 * dz + offset * dx]));
 const INTERIOR = [-1, 0, 1].flatMap(x => [-1, 0, 1].map(z => [x, z]));
 const AIR = /^minecraft:(?:air|cave_air|void_air)$/;
+const DOG = 'mushroom_yorkie:mushroom_yorkie';
+const STRONGHOLD_BARRIER = /^minecraft:(?:\w+_door|iron_bars)$/;
 const feet = ({ position: { x, y, z } }) => [x, y, z].map(Math.floor);
 const count = (stock, item) => stock.slots.reduce((total, stack) => total + (stack.id === item ? stack.count : 0), 0);
 const distance = (pos, player) => Math.hypot(pos[0] + 0.5 - player.x, pos[1] - player.y, pos[2] + 0.5 - player.z);
@@ -42,13 +44,14 @@ export function findEndRing(cells, player) {
       const interior = INTERIOR.map(([ox, oz]) => at(cx + ox, y, cz + oz));
       const lit = interior.every(id => id === PORTAL);
       if (!lit && !interior.every(free)) continue;
-      const approaches = SIDES.flatMap(([ox, oz]) => {
-        const x = cx + 3 * ox;
-        const z = cz + 3 * oz;
-        return hasDrySupport(at(x, y - 1, z)) && free(at(x, y, z)) && free(at(x, y + 1, z))
-          && free(at(x, y + 2, z)) && free(at(cx + 2 * ox, y + 1, cz + 2 * oz))
-          && free(at(cx + 2 * ox, y + 2, cz + 2 * oz)) ? [[x, y, z]] : [];
-      }).sort((a, b) => distance(a, player) - distance(b, player));
+      const approaches = SIDES.flatMap(([ox, oz]) => [0, -1, 1].flatMap(offset => {
+        const x = cx + 3 * ox + offset * oz;
+        const z = cz + 3 * oz + offset * ox;
+        if (!free(at(x - ox, y + 1, z - oz)) || !free(at(x - ox, y + 2, z - oz))) return [];
+        return [y, y + 1, y - 1, y - 2].filter(height =>
+          hasDrySupport(at(x, height - 1, z)) && free(at(x, height, z)) && free(at(x, height + 1, z))
+          && free(at(x, height + 2, z))).map(height => [x, height, z]);
+      })).sort((a, b) => distance(a, player) - distance(b, player));
       if (approaches.length) found.push({ center, frame, approaches, lit });
     }
   }
@@ -73,7 +76,7 @@ async function approach(action, pos) {
     const player = await action('observe');
     if (distance(pos, player.position) <= 0.65) return true;
     visited.push(feet(player));
-    if (!await stepOut(action, player, visited, pos, undefined, rejected)) break;
+    if (!await stepOut(action, player, visited, pos, 'stronghold', rejected)) break;
   }
   return false;
 }
@@ -111,17 +114,72 @@ async function fillEndRing(action, ring) {
   }
 }
 
-export async function crossEndPortal(action, craft, uuid) {
+export async function findStrongholdPortalRoom(action, uuid, report = async () => {}) {
+  const visited = [];
+  const rejected = new Set();
+  let lastDog;
+  let nextCare = 0;
+  for (let step = 0; step < 150; step++) {
+    const player = await action('observe');
+    assert.ok(player?.inWorld && !player.dead && player.dimension === OVERWORLD && player.health >= 8,
+      'The stronghold route became unsafe');
+    if (player.gameTime >= nextCare) {
+      nextCare = player.gameTime + 240;
+      const dogs = await action('get_entities', { type: DOG, radius: 24 });
+      const dog = dogs?.entities.find(entity => entity.uuid === uuid && entity.health > 0);
+      if (!dog || dog.distance > 16) {
+        lastDog = (await regroupExpeditionCompanion(action, uuid, dog?.pos ?? lastDog)).pos;
+        continue;
+      }
+      lastDog = dog.pos;
+      if (dog.health <= 8) {
+        assert.ok(dogMealCount(await action('get_inventory')) > 0 && await feedAdoptedDog(action, uuid, feet(player), 22),
+          'Mushroom needs food before continuing through the stronghold');
+        continue;
+      }
+    }
+    const here = feet(player);
+    const room = await action('get_blocks', { center: here, size: [39, 13, 39], format: 'json' });
+    if (!room) continue;
+    const ring = findEndRing(room.cells, player.position);
+    if (ring?.approaches.some(stance => distance(stance, player.position) < 2.5)) {
+      const spawner = room.cells.find(cell => cell.b === 'minecraft:spawner'
+        && distance([cell.x, cell.y, cell.z], player.position) < 4);
+      if (spawner && (await breakVisible(action, [spawner.x, spawner.y, spawner.z]))?.broken) {
+        await report('disabled_spawner', { position: [spawner.x, spawner.y, spawner.z] });
+      }
+      await withCompanion(action, OVERWORLD, uuid);
+      await report('portal_room', { center: ring.center, from: here });
+      return ring;
+    }
+    visited.push(here);
+    const frame = ring ? undefined : room.cells.find(cell => cell.b === FRAME);
+    const target = ring?.approaches[0] ?? (frame && [frame.x, frame.y, frame.z]);
+    const moved = await stepOut(action, player, visited, target, 'stronghold', rejected, undefined, undefined, 45);
+    if (moved && step % 4 !== 3) continue;
+    const position = (await action('observe')).position;
+    for (const { x, y, z, b } of room.cells.filter(cell => STRONGHOLD_BARRIER.test(cell.b))) {
+      const pos = [x, y, z];
+      if (distance(pos, position) > 3.6) continue;
+      if (!(await breakVisible(action, pos))?.broken) continue;
+      await report('cleared_doorway', { position: pos, block: b });
+      break;
+    }
+  }
+  throw new Error('Could not reach a dry stance beside the generated stronghold portal');
+}
+
+export async function crossEndPortal(action, craft, uuid, observedRing) {
   const player = await withCompanion(action, OVERWORLD, uuid);
-  const area = await action('get_blocks', { center: feet(player), size: [19, 11, 19], format: 'json' });
-  const ring = area && findEndRing(area.cells, player.position);
+  const area = observedRing ? null : await action('get_blocks', { center: feet(player), size: [19, 11, 19], format: 'json' });
+  const ring = observedRing ?? (area && findEndRing(area.cells, player.position));
   assert.ok(ring, 'No observed End portal frame with a dry approach');
   if (!ring.lit) {
     await craftEyes(action, craft);
     await fillEndRing(action, ring);
   }
   assert.ok(await litPortal(action, ring.center), 'Native Use did not open the complete End portal');
-  for (const stance of ring.approaches) {
+  for (const stance of ring.approaches.filter(stance => stance[1] >= ring.center[1])) {
     if (!await approach(action, stance)) continue;
     const { position } = await action('observe');
     const dx = ring.center[0] + 0.5 - position.x;

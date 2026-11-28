@@ -16,7 +16,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 
-record ExpeditionSaveRecovery(Path source, long seed, UUID owner, UUID dog, JsonObject camp) {
+record ExpeditionSaveRecovery(Path source, long seed, UUID owner, UUID dog, JsonObject camp, JsonObject ironProgress) {
 	static ExpeditionSaveRecovery read(Path manifest, Path status) throws IOException {
 		var json = JsonParser.parseString(Files.readString(manifest)).getAsJsonObject();
 		var source = Path.of(json.get("source").getAsString()).toRealPath();
@@ -26,7 +26,7 @@ record ExpeditionSaveRecovery(Path source, long seed, UUID owner, UUID dog, Json
 		}
 		return new ExpeditionSaveRecovery(source, json.get("seed").getAsLong(),
 				UUID.fromString(json.get("owner").getAsString()), UUID.fromString(json.get("dog").getAsString()),
-				json.getAsJsonObject("camp"));
+				json.getAsJsonObject("camp"), json.getAsJsonObject("ironProgress"));
 	}
 
 	TestSingleplayerContext openCopy(TestWorldBuilder builder) throws IOException {
@@ -69,6 +69,7 @@ record ExpeditionSaveRecovery(Path source, long seed, UUID owner, UUID dog, Json
 		var checkpoint = new JsonObject();
 		checkpoint.addProperty("dog", dog.toString());
 		checkpoint.add("camp", camp);
+		if (ironProgress != null) checkpoint.add("ironProgress", ironProgress);
 		Files.writeString(status.resolveSibling("restored-checkpoint.json"), checkpoint.toString());
 	}
 

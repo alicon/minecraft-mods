@@ -16,7 +16,7 @@ const DOG = 'mushroom_yorkie:mushroom_yorkie';
 const PICKAXE = 'minecraft:wooden_pickaxe';
 const STONE_PICKAXE = 'minecraft:stone_pickaxe';
 const DIGGABLE = /^minecraft:(?:grass_block|dirt|coarse_dirt|rooted_dirt|dirt_path|podzol|mycelium|sand|red_sand|gravel|clay|soul_sand|snow_block)$/;
-const MINEABLE = /^minecraft:(?:stone|cobblestone|furnace|deepslate|andesite|diorite|granite|(?:deepslate_)?(?:coal|iron)_ore)$/;
+const MINEABLE = /^minecraft:(?:stone|cobblestone|furnace|deepslate|andesite|diorite|granite|(?:deepslate_)?(?:coal|iron)_ore|iron_door|iron_bars|spawner|(?:cracked_|mossy_|chiseled_)?stone_bricks)$/;
 const CHOPPABLE = /^minecraft:(?:crafting_table|\w+_(?:log|wood|planks))$/;
 const TOOL_TIERS = ['netherite', 'diamond', 'iron', 'stone', 'wooden'];
 const COBBLESTONE = 'minecraft:cobblestone';
@@ -228,6 +228,7 @@ export async function hunt(action, animal, dropMatches, canContinue) {
 
 export async function stepOut(action, player, visited, destination, preferredGround, rejectedSteps = new Set(), chooseRoute, avoid, maxTicks = 90) {
   const center = feet(player);
+  if (preferredGround === 'stronghold' && player.onGround) center[1] = Math.ceil(player.position.y);
   const width = preferredGround || chooseRoute ? 23 : 17;
   const height = ['surface', 'elevation', 'cave', 'iron'].includes(preferredGround) ? 15 : 9;
   const volume = await action('get_blocks', { center, size: [width, height, width], format: 'json' });
@@ -743,7 +744,7 @@ async function seekExpeditionFood(action, player, visited, rejectedSteps, tried,
   }
 }
 
-export async function forageExpeditionMeal(action, { camp, toward, minimum = 1 } = {}) {
+export async function forageExpeditionMeal(action, { camp, toward, minimum = 1, regroup } = {}) {
   const visited = [];
   const rejectedSteps = new Set();
   const tried = new Set();
@@ -756,6 +757,7 @@ export async function forageExpeditionMeal(action, { camp, toward, minimum = 1 }
     if (!player?.inWorld || player.dead || player.health < 8) return false;
     if (await retreatFromNearbyMob(action, player, visited, rejectedSteps)) continue;
     if (player.health < 12 && player.threats?.some(threat => threat.distance <= 3)) return false;
+    if (await regroup?.(player)) continue;
     if (returning) {
       const here = feet(player);
       returning = Math.hypot(...here.map((coordinate, axis) => coordinate - camp[axis])) > 6;
@@ -952,8 +954,12 @@ export async function reachQuarryLanding(action, landing) {
   if (!outcome?.reason?.includes('drop of more than 3 blocks')) return false;
 
   const player = await action('observe');
+  return nudgeOntoDryQuarryTile(action, player, landing, 1);
+}
+
+async function nudgeOntoDryQuarryTile(action, player, landing, heightDifference) {
   if (!player?.inWorld || !player.onGround || player.dead || player.inWater || player.health < 8
-      || Math.abs(player.position.y - landing[1] - 1) > 0.05) return false;
+      || Math.abs(player.position.y - landing[1] - heightDifference) > 0.05) return false;
   const dx = landing[0] + 0.5 - player.position.x;
   const dz = landing[2] + 0.5 - player.position.z;
   if (Math.hypot(dx, dz) > 0.45) return false;
@@ -1007,6 +1013,8 @@ export async function climbQuarry(action, pos, chooseEscape) {
     if (result?.arrived && await settleOnDryStep(action, pos)) return true;
     const player = await action('observe');
     if (!player?.inWorld || player.dead || player.health < 8) return false;
+    if (result?.reason?.includes('drop of more than 3 blocks')
+        && await nudgeOntoDryQuarryTile(action, player, pos, 0)) return true;
     const here = feet(player);
     const blocked = result?.reason?.match(/blocked by minecraft:\w+_leaves at (-?\d+),(-?\d+),(-?\d+)/);
     const choices = { walk_around: 'Take a different observed dry route toward the next known step.' };

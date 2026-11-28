@@ -18,7 +18,7 @@ expedition_node=${MUSHROOM_EXPEDITION_NODE:-node}
 command -v "$expedition_node" >/dev/null
 export MUSHROOM_EXPEDITION_STAGE="${MUSHROOM_EXPEDITION_STAGE:-adoption}"
 case "$MUSHROOM_EXPEDITION_STAGE" in
-  adoption|stone|iron|nether|nether-powder|stronghold|defense|feeding|portal|nether-supplies|nether-distant-supplies|ender-supplies|shelter|equipment|end-entry|end-crystal|generated-end-crystals|eye-route|stronghold-approach|quarry-tools|quarry-iron) ;;
+  adoption|stone|iron|nether|nether-powder|stronghold|defense|feeding|portal|nether-supplies|nether-distant-supplies|ender-supplies|shelter|equipment|end-entry|generated-end-entry|end-crystal|generated-end-crystals|eye-route|stronghold-approach|quarry-tools|quarry-iron) ;;
   *) echo "Unknown MUSHROOM_EXPEDITION_STAGE: $MUSHROOM_EXPEDITION_STAGE" >&2; exit 2 ;;
 esac
 
@@ -41,11 +41,16 @@ while [ ! -f "$MUSHROOM_EXPEDITION_STATUS" ] && kill -0 "$expedition_client" 2>/
 done
 expedition_controller=0
 if [ -f "$MUSHROOM_EXPEDITION_STATUS" ]; then
-  "$expedition_node" tools/playtest-harness/src/expedition-supplies.mjs \
+  expedition_owner="launcher-$$"
+  expedition_owner_file="$expedition_report/controller-owner"
+  printf '%s' "$expedition_owner" > "$expedition_owner_file"
+  MUSHROOM_EXPEDITION_CONTROLLER_OWNER="$expedition_owner" \
+    "$expedition_node" tools/playtest-harness/src/expedition-supplies.mjs \
     > "$expedition_report/actions.jsonl" 2> "$expedition_report/controller.log" || expedition_controller=$?
   expedition_last_death=
   while [ "$expedition_controller" -ne 0 ] && [ "${MUSHROOM_EXPEDITION_LIVE:-0}" = 1 ] \
     && [ "$(cat "$MUSHROOM_EXPEDITION_STATUS")" = held ] \
+    && [ "$(cat "$expedition_owner_file")" = "$expedition_owner" ] \
     && [ -f "$expedition_report/controller-checkpoint.json" ]; do
     # The client may still be waiting for the native Respawn button to enable.
     expedition_death=
@@ -58,15 +63,18 @@ if [ -f "$MUSHROOM_EXPEDITION_STATUS" ]; then
       fi
       sleep 1
     done
-    if [ -z "$expedition_death" ] || [ "$expedition_death" = "$expedition_last_death" ]; then
+    if [ -z "$expedition_death" ] || [ "$expedition_death" = "$expedition_last_death" ] \
+      || [ "$(cat "$expedition_owner_file")" != "$expedition_owner" ]; then
       break
     fi
     expedition_last_death=$expedition_death
     expedition_controller=0
-    MUSHROOM_EXPEDITION_RESUME=1 "$expedition_node" tools/playtest-harness/src/expedition-supplies.mjs \
+    MUSHROOM_EXPEDITION_RESUME=1 MUSHROOM_EXPEDITION_CONTROLLER_OWNER="$expedition_owner" \
+      "$expedition_node" tools/playtest-harness/src/expedition-supplies.mjs \
       >> "$expedition_report/actions.jsonl" 2>> "$expedition_report/controller.log" || expedition_controller=$?
   done
-  if [ "$expedition_controller" -ne 0 ] && [ "$(cat "$MUSHROOM_EXPEDITION_STATUS")" = ready ]; then
+  if [ "$expedition_controller" -ne 0 ] && [ "$(cat "$MUSHROOM_EXPEDITION_STATUS")" = ready ] \
+    && [ "$(cat "$expedition_owner_file")" = "$expedition_owner" ]; then
     # A startup error can happen before the controller begins reporting results.
     printf 'failed' > "$expedition_report/controller-failed"
     mv "$expedition_report/controller-failed" "$MUSHROOM_EXPEDITION_STATUS"
