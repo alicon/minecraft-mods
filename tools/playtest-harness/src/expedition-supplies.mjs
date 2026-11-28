@@ -5,9 +5,9 @@ import { dirname, isAbsolute, join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import {
   adoptAtNight, earnIronKit, earnStoneKit, feedAdoptedDog, forageExpeditionMeal, prepareAdoptionCamp,
-  breakVisible, ensurePlanks, hold, placeBeside, recoverDroppedLoadout, WOOD_LOGS,
+  breakVisible, ensurePlanks, hold, placeBeside, recoverDroppedLoadout, settleOnDryStep, WOOD_LOGS,
 } from './expedition-home.mjs';
-import { hasDrySupport } from './expedition-navigation.mjs';
+import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
 import { crossEndPortal } from './expedition-end-entry.mjs';
 import { scoutByEye } from './expedition-eye-route.mjs';
@@ -152,20 +152,25 @@ async function craft(item, count) {
 }
 
 async function descendFromCanopy(player) {
+  if (!player?.inWorld || !player.onGround || player.health < 8 || player.inWater) return null;
   const feet = [player.position.x, player.position.y, player.position.z].map(Math.floor);
   const [x, y, z] = feet;
   const column = await action('get_blocks', { center: [x, y - 2, z], size: [1, 7, 1], format: 'json' });
-  const support = column.cells.find(cell => cell.y === y - 1);
-  const landing = column.cells.filter(cell => cell.y < y - 1 && cell.b !== 'minecraft:leaf_litter')
-    .sort((a, b) => b.y - a.y)[0];
-  if (!/_(?:leaves|log)$/.test(support?.b ?? '') || !landing || y - landing.y > 4
-      || !hasDrySupport(landing.b)) return null;
-  const removed = await action('break_block', { pos: [x, y - 1, z], maxTicks: 100 });
-  if (!removed?.broken) return null;
-  for (let attempt = 0; attempt < 10; attempt++) {
-    await setTimeout(150);
-    const after = await action('observe');
-    if (after?.onGround && after.position.y < player.position.y) return after;
+  const landing = canopyLanding(column?.cells ?? [], feet, player.health);
+  if (!landing) return null;
+  // The player is wider than a point. Center over the checked column so
+  // the edge of a neighboring leaf does not catch the fall.
+  for (let adjustment = 0; adjustment < 4; adjustment++) {
+    const dx = x + 0.5 - player.position.x;
+    const dz = z + 0.5 - player.position.z;
+    if (Math.max(Math.abs(dx), Math.abs(dz)) <= 0.16) {
+      const removed = await action('break_block', { pos: [x, y - 1, z], maxTicks: 100 });
+      return removed?.broken && await settleOnDryStep(action, landing) ? action('observe') : null;
+    }
+    await action('move', { forward: true, sneak: true, ticks: 3, yaw: Math.atan2(-dx, dz) * 180 / Math.PI });
+    player = await action('observe');
+    if (!player?.onGround || !feet.every((value, axis) =>
+      value === Math.floor([player.position.x, player.position.y, player.position.z][axis]))) return null;
   }
   return null;
 }
@@ -480,6 +485,7 @@ async function collectStarterLogs(start) {
       .reduce((count, stack) => count + stack.count, 0);
   }
   if (await logCount() < 3) {
+    // go_to may reach the horizontal point with the logs still below.
     await walk(trunk.logs[0], 0.8);
     for (let height = 0; height < 3 && (await logCount()) < 3; height++) {
       if (!(await descendFromCanopy(await action('observe')))) break;
@@ -512,10 +518,6 @@ async function gatherStarterTools(start) {
   const hasWood = stock.slots.some(stack => /_(?:log|planks)$/.test(stack.id));
   if (!hasWood) await collectStarterLogs(start);
   else await recoverLooseLogs();
-  await ensurePlanks(action, craft, planks);
-  if (stickBatches) await craft('stick', stickBatches * 4);
-  if (needsTable) await craft('crafting_table', 1);
-  if (!tools.length) return;
 
   let player = await action('observe');
   for (let descent = 0; descent < 6; descent++) {
@@ -523,6 +525,10 @@ async function gatherStarterTools(start) {
     if (!lower) break;
     player = lower;
   }
+  await ensurePlanks(action, craft, planks);
+  if (stickBatches) await craft('stick', stickBatches * 4);
+  if (needsTable) await craft('crafting_table', 1);
+  if (!tools.length) return;
   await hold(action, 'minecraft:crafting_table');
 
   const { position } = await action('observe');

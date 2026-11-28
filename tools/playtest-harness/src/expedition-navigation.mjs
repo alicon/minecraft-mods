@@ -15,6 +15,20 @@ export function hasDrySupport(id) {
   return SUPPORT.test(id ?? '');
 }
 
+export function canopyLanding(cells, [x, y, z], health) {
+  const blocks = cells.filter(cell => cell.x === x && cell.z === z);
+  const support = blocks.find(cell => cell.y === y - 1);
+  if (!/_(?:leaves|log)$/.test(support?.b ?? '')) return null;
+  const floor = blocks.filter(cell => cell.y < y - 1 && cell.b !== 'minecraft:leaf_litter')
+    .sort((first, second) => second.y - first.y)[0];
+  if (!floor || !hasDrySupport(floor.b)) return null;
+  const landingY = floor.y + 1;
+  const drop = y - landingY;
+  // A full-health starter can take a short drop when loot is directly
+  // below the canopy. Keep the no-fall-damage limit when already hurt.
+  return drop <= (health >= 18 ? 4 : 3) ? [x, landingY, z] : null;
+}
+
 export function hasPlacedBed(cells, [x, y, z], item) {
   return cells.some(cell => cell.x === x && cell.y === y && cell.z === z && cell.b === item)
     && cells.some(cell => cell.y === y && cell.b === item && Math.abs(cell.x - x) + Math.abs(cell.z - z) === 1);

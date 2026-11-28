@@ -105,8 +105,12 @@ observations that changed the plan, and actions such as crafting. With Jev
 enabled, the log also names its selected action or the local fallback.
 
 The client starts in a fresh Normal Survival world with an empty inventory and
-commands disabled. The player gathers wood, crafts a wooden pickaxe, sword, and shovel, packs
-the crafting table, and looks for a bed behind a door and under a roof. It
+commands disabled. If wood drops through the canopy,
+the pilot centers over an observed dry landing before breaking its support
+and checks that the player actually landed. It permits a four-block drop
+only with at least 18 health. The player gathers wood, crafts a wooden
+pickaxe, sword, and shovel, packs the crafting table, and looks for a bed
+behind a door and under a roof. It
 walks through the door and closes it before sleeping. If it cannot find a
 reachable sheltered bed, it crafts a bed once it has collected matching wool.
 When food runs low, it can route toward nearby pigs or cows while scouting for

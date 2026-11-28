@@ -5,6 +5,17 @@ function cell(x, y, z, type = 'grass_block') {
   return { x, y, z, b: `minecraft:${type}` };
 }
 
+test('canopy drops are measured to the top of the landing block and reject hazardous floors', async () => {
+  const { canopyLanding } = await import('./expedition-navigation.mjs');
+  const start = [160, 78, 161];
+  const support = cell(160, 77, 161, 'birch_leaves');
+  const floor = cell(160, 73, 161, 'birch_log');
+  assert.deepEqual(canopyLanding([support, floor], start, 20), [160, 74, 161]);
+  assert.equal(canopyLanding([support, floor], start, 12), null);
+  assert.equal(canopyLanding([support, { ...floor, y: 72 }], start, 20), null);
+  assert.equal(canopyLanding([support, floor, cell(160, 75, 161, 'water')], start, 20), null);
+});
+
 test('an empty early-game food reserve can reroute the search toward a distant pig', async () => {
   const { gatherWool } = await import('./expedition-home.mjs');
   const player = { inWorld: true, health: 20, food: 6, position: { x: 0.5, y: 64, z: 0.5 } };
