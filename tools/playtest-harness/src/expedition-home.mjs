@@ -238,7 +238,7 @@ export async function stepOut(action, player, visited, destination, preferredGro
   const center = feet(player);
   if (preferredGround === 'stronghold' && player.onGround) center[1] = Math.ceil(player.position.y);
   const width = preferredGround || chooseRoute ? 23 : 17;
-  const height = ['surface', 'elevation', 'cave', 'iron', 'downhill'].includes(preferredGround) ? 15 : 9;
+  const height = ['surface', 'elevation', 'uphill', 'cave', 'iron', 'downhill'].includes(preferredGround) ? 15 : 9;
   const volume = await action('get_blocks', { center, size: [width, height, width], format: 'json' });
   if (!volume) return false;
   let pos = dryWaypoint(volume.cells, center, visited, destination, preferredGround, rejectedSteps, avoid);
@@ -410,13 +410,14 @@ export async function gatherWool(action, descendFromCanopy, chooseRoute, craft, 
     if (detour) {
       const tile = feet(player);
       const [x, y, z] = tile;
-      if (Math.hypot(x - detour.origin[0], z - detour.origin[2]) < 9 && detour.steps++ < 16) {
+      const anchorDistance = detour.anchor ? Math.hypot(...tile.map((value, axis) => value - detour.anchor[axis])) : Infinity;
+      if (anchorDistance > 2 && Math.hypot(x - detour.origin[0], z - detour.origin[2]) < 9 && detour.steps++ < 28) {
+        const goingUp = detour.anchor?.[1] > y + 1;
         if (detour.anchor) {
-          const distance = Math.hypot(...tile.map((value, axis) => value - detour.anchor[axis]));
-          if (distance < detour.best - 0.75) {
-            detour.best = distance;
+          if (anchorDistance < detour.best - 0.75) {
+            detour.best = anchorDistance;
             detour.stalled = 0;
-          } else if (++detour.stalled >= 3 && detour.anchor[1] > y + 1
+          } else if (++detour.stalled >= 3 && goingUp
               && await cutScoutingFoothold(action, player, detour)) {
             await reportScouting?.('Cut a dry foothold to climb back out of the ledge.');
             continue;
@@ -425,8 +426,12 @@ export async function gatherWool(action, descendFromCanopy, chooseRoute, craft, 
         // Ignore visits from the outbound trail, but count revisits while heading back.
         detour.walked.push(tile);
         const moved = await stepOut(action, player, detour.anchor ? detour.walked : visited, detour.anchor,
-          detour.anchor ? 'elevation' : 'grass', rejectedSteps);
+          goingUp ? 'uphill' : detour.anchor ? 'elevation' : 'grass', rejectedSteps);
         if (moved || await descendFromCanopy(player)) continue;
+        if (goingUp && await cutScoutingFoothold(action, player, detour)) {
+          await reportScouting?.('Cut a dry foothold to climb back out of the ledge.');
+          continue;
+        }
       }
       detour = undefined;
     }

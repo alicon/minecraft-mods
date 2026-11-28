@@ -58,6 +58,15 @@ test('a one-way scouting ledge can be cut into a dry one-block step', async () =
   assert.equal(uphillScoutingStep(face, here, toward, new Set(['-168,66,-33'])), null);
 });
 
+test('climbing out of a scouting ledge keeps the reached elevation', async () => {
+  const { dryWaypoint } = await import('./expedition-navigation.mjs');
+  const floor = [cell(0, 63, 0), cell(-1, 63, 0), cell(1, 62, 0), cell(2, 62, 0), cell(3, 62, 0)];
+  const start = [0, 64, 0];
+  const target = [3, 68, 0];
+  assert.deepEqual(dryWaypoint(floor, start, [], target, 'elevation'), [3, 63, 0]);
+  assert.deepEqual(dryWaypoint(floor, start, [], target, 'uphill'), [-1, 64, 0]);
+});
+
 test('canopy drops are measured to the top of the landing block and reject hazardous floors', async () => {
   const { canopyLanding } = await import('./expedition-navigation.mjs');
   const start = [160, 78, 161];
