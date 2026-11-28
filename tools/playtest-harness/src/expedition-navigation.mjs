@@ -1,10 +1,10 @@
 const CARDINAL = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 const HEADROOM = /:(?:short_grass|tall_grass|fern|large_fern|dead_bush|dandelion|poppy|leaf_litter|wildflowers)$/;
-const SUPPORT = /:(?:grass_block|dirt|dirt_path|coarse_dirt|podzol|stone|cobblestone|stone_bricks|end_stone|end_stone_bricks|obsidian|bedrock|netherrack|blackstone|basalt|smooth_basalt|soul_soil|nether_bricks|sandstone|terracotta|sand|gravel|snow_block|\w+_leaves|\w+_log|\w+_planks)$/;
+const SUPPORT = /:(?:grass_block|dirt|dirt_path|coarse_dirt|podzol|stone|cobblestone|stone_bricks|end_stone|end_stone_bricks|obsidian|bedrock|netherrack|blackstone|basalt|smooth_basalt|soul_soil|soul_sand|crimson_nylium|warped_nylium|nether_bricks|sandstone|terracotta|sand|gravel|snow_block|\w+_leaves|\w+_log|\w+_planks)$/;
 const LEAVES = /_leaves$/;
 const QUARRY_BLOCK = /^minecraft:(?:grass_block|dirt|coarse_dirt|podzol|stone|andesite|diorite|granite|deepslate|(?:deepslate_)?(?:coal|iron)_ore)$/;
 const QUARRY_HAZARD = /^minecraft:(?:water|lava|powder_snow|.*sand|gravel)$/;
-const SHELTER_BLOCK = /^minecraft:(?:dirt|grass_block|stone|cobblestone|granite|diorite|andesite|deepslate|end_stone|end_stone_bricks|obsidian)$/;
+const SHELTER_BLOCK = /^minecraft:(?:dirt|grass_block|stone|cobblestone|granite|diorite|andesite|deepslate|end_stone|end_stone_bricks|obsidian|netherrack|blackstone|nether_bricks)$/;
 const MAX_WALK_SEGMENT = 10;
 
 function gap(id) {

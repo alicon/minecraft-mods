@@ -10,7 +10,7 @@ import {
 } from './expedition-home.mjs';
 import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
-import { earnBlazeRods } from './expedition-blaze-rods.mjs';
+import { blazePowderCount, craftBlazePowder, earnBlazeRods } from './expedition-blaze-rods.mjs';
 import { clearGeneratedCrystals, shootEndCrystal } from './expedition-end-crystals.mjs';
 import { crossEndPortal } from './expedition-end-entry.mjs';
 import { navigateToStronghold, scoutByEye } from './expedition-eye-route.mjs';
@@ -39,6 +39,7 @@ const live = process.env.MUSHROOM_EXPEDITION_LIVE === '1';
 const deathAtStart = live ? await readFile(deathFile, 'utf8').catch(() => '') : '';
 const blockPosition = pos => Array.isArray(pos) && pos.length === 3 && pos.every(Number.isInteger);
 const DOG_MEAL_INTERVAL = 4_000;
+const PORTAL_POWDER = 12;
 
 const url = `http://127.0.0.1:${config.port}/mcp`;
 let session;
@@ -62,6 +63,7 @@ const milestoneObjectives = {
   feeding: 'Call Mushroom back from the sheep and give him a meal at camp.',
   portal: 'Find supplies, repair the Nether portal, and come home with Mushroom.',
   'nether-supplies': 'Shelter Mushroom in the Nether, earn a blaze rod, and return together.',
+  'nether-distant-supplies': 'Scout for a distant Nether fortress with Mushroom and bring home a blaze rod.',
   shelter: 'Enter the furnished house and sleep with the door closed.',
   equipment: 'Craft the harness, padded vest, and mat. Fit Mushroom’s gear and mark camp.',
   'end-entry': 'Craft Eyes of Ender and bring Mushroom through the active portal.',
@@ -224,7 +226,8 @@ try {
   const start = await action('observe');
   const startDimension = ['end-crystal', 'generated-end-crystals'].includes(stage) ? 'minecraft:the_end' : OVERWORLD;
   assert.ok(start?.inWorld && !start.dead && (start.dimension === startDimension
-    || (resume && stage === 'nether' && start.dimension === NETHER)), 'The controller was not in its expected starting dimension');
+    || (resume && ['nether', 'nether-powder'].includes(stage) && start.dimension === NETHER)),
+  'The controller was not in its expected starting dimension');
   if (milestoneObjectives[stage]) await narrate('Objective', milestoneObjectives[stage]);
   if (stage === 'defense') await runCompanionDrill();
   else if (stage === 'feeding') {
@@ -233,15 +236,12 @@ try {
     const camp = [start.position.x, start.position.y, start.position.z].map(Math.floor);
     assert.ok(await feedAdoptedDog(action, companion, camp, 24), 'The original Mushroom was not fed at camp');
   }
-  else if (stage === 'portal' || stage === 'nether-supplies') {
+  else if (['portal', 'nether-supplies', 'nether-distant-supplies'].includes(stage)) {
     companion = (await readFile(join(dirname(statusFile), 'portal-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
-    const work = stage === 'nether-supplies' ? async exit => {
-      await action('set_reflexes', { autoDefend: false, chargeRanged: false });
-      const mat = await earnBlazeRods(action, companion, exit, 1);
-      console.log(JSON.stringify({ at: new Date().toISOString(), action: 'blaze_rod_earned', dog: companion, mat }));
-    } : undefined;
+    const work = stage === 'portal' ? undefined : exit => bringBlazeRods(companion, exit, 2);
     await netherRoundTrip(action, companion, hold, () => prepareNetherPortal(action, craft), OVERWORLD, work);
+    if (work) await craftBlazePowder(action, craft, 2);
   } else if (stage === 'shelter') {
     const camp = await prepareAdoptionCamp(action, craft, descendFromCanopy);
     assert.ok(camp.door, 'Expected to find a furnished house in the shelter replay');
@@ -331,6 +331,9 @@ async function runCompanionDrill() {
 }
 
 async function runExpedition(start, stage) {
+  const huntBlazes = stage === 'nether-powder';
+  const visitNether = stage === 'nether' || huntBlazes;
+  const needsIron = stage === 'iron' || visitNether;
   const inventory = await action('get_inventory');
   const policy = await expeditionPolicy(process.env.MUSHROOM_EXPEDITION_POLICY ?? 'rules', coachingFile, narrate);
   policy.reportScouting = message => narrate('Scouting', message, 20_000);
@@ -342,7 +345,8 @@ async function runExpedition(start, stage) {
     assert.equal(checkpoint.owner, start.name);
     assert.equal(checkpoint.bridgeFingerprint, bridgeFingerprint, 'The recorded client is no longer listening');
     assert.ok(Number.isFinite(checkpoint.gameTime) && checkpoint.gameTime <= start.gameTime);
-    assert.ok(['starter', 'provision', 'camp', 'adoption', 'stone', 'iron', 'nether'].includes(checkpoint.phase));
+    assert.ok(['starter', 'provision', 'camp', 'adoption', 'stone', 'iron', 'nether'].includes(checkpoint.phase)
+      || huntBlazes && checkpoint.phase === 'nether-returned');
     assert.ok(checkpoint.timberSite === undefined || blockPosition(checkpoint.timberSite), 'Invalid recorded timber site');
     assert.ok(start.dimension === OVERWORLD || checkpoint.phase === 'nether', 'Unexpected dimension before the Nether phase');
     const starterItems = ['crafting_table', 'wooden_sword', 'wooden_pickaxe'];
@@ -484,9 +488,9 @@ async function runExpedition(start, stage) {
     }
     await earnStoneKit(action, craft, checkpoint.camp, policy);
     checkpoint.phase = 'iron';
-    if (live && ['iron', 'nether'].includes(stage)) await writeCheckpoint(checkpoint);
+    if (live && needsIron) await writeCheckpoint(checkpoint);
   }
-  if (['iron', 'nether'].includes(stage) && checkpoint.phase === 'iron') {
+  if (needsIron && checkpoint.phase === 'iron') {
     if (checkpoint.fedDog === false && !checkpoint.quarry?.length) {
       const player = await action('observe');
       if (player?.onGround && !player.inWater) {
@@ -541,7 +545,8 @@ async function runExpedition(start, stage) {
       }
       if (!checkpoint.quarry?.length && checkpoint.fedDog === false) await policy.tendCompanion();
       await narrate('Objective', 'Mine and smelt iron for a pickaxe, bucket, and shield.');
-      await earnIronKit(action, craft, checkpoint.camp, { ...policy, reserveIgnitionIron: stage === 'nether' });
+      await earnIronKit(action, craft, checkpoint.camp,
+        { ...policy, reserveIgnitionIron: visitNether, makeIronSword: huntBlazes });
     } finally {
       if (restoreAutoEat) {
         try {
@@ -562,7 +567,7 @@ async function runExpedition(start, stage) {
     checkpoint.lastDogMealAt = (await action('observe')).gameTime;
     if (live) await writeCheckpoint(checkpoint);
   }
-  if (stage === 'nether') {
+  if (visitNether && checkpoint.phase !== 'nether-returned') {
     if (checkpoint.phase !== 'nether') {
       await narrate('Objective', 'Equip Mushroom and pack the camp mat before travelling.');
       checkpoint.equipment ??= [];
@@ -574,8 +579,35 @@ async function runExpedition(start, stage) {
     }
     checkpoint.phase = 'nether';
     if (live) await writeCheckpoint(checkpoint);
-    await narrate('Objective', 'Make a dry Nether round trip with Mushroom.');
-    await netherRoundTrip(action, checkpoint.dog, hold, () => prepareNetherPortal(action, craft, checkpoint.camp), start.dimension);
+    await narrate('Objective', huntBlazes
+      ? 'Find a fortress, shelter Mushroom, and earn blaze rods for the stronghold supply.'
+      : 'Make a dry Nether round trip with Mushroom.');
+    const work = huntBlazes ? exit => bringBlazeRods(checkpoint.dog, exit, PORTAL_POWDER) : undefined;
+    await netherRoundTrip(action, checkpoint.dog, hold, () => prepareNetherPortal(action, craft, checkpoint.camp), start.dimension, work);
+    if (huntBlazes) {
+      checkpoint.phase = 'nether-returned';
+      if (live) await writeCheckpoint(checkpoint);
+    }
+  }
+  if (huntBlazes) {
+    await narrate('Objective', 'Craft the portal supply of blaze powder back in the Overworld.');
+    await craftBlazePowder(action, craft, PORTAL_POWDER);
+  }
+}
+
+async function bringBlazeRods(uuid, exit, neededPowder) {
+  const powder = blazePowderCount(await action('get_inventory'));
+  const wantedRods = Math.max(0, Math.ceil((neededPowder - powder) / 2));
+  if (!wantedRods) return;
+  const reflexes = await action('set_reflexes');
+  await action('set_reflexes', { autoDefend: false, chargeRanged: false });
+  try {
+    const mat = await earnBlazeRods(action, uuid, exit, wantedRods);
+    console.log(JSON.stringify({ at: new Date().toISOString(), action: 'blaze_rod_earned', dog: uuid, wantedRods, mat }));
+  } finally {
+    if (reflexes) {
+      await action('set_reflexes', { autoDefend: reflexes.autoDefend, chargeRanged: reflexes.chargeRanged });
+    }
   }
 }
 
@@ -628,7 +660,15 @@ async function collectStarterLogs(start) {
   let trunk;
   const visited = [];
   const rejected = new Set();
-  for (let step = 0; step < 24; step++) {
+  for (let step = 0; step < 70; step++) {
+    // The walker can reach the horizontal target before stepping down lands.
+    for (let settle = 0; positionAtStart?.inWorld && !positionAtStart.onGround
+      && !positionAtStart.inWater && !positionAtStart.dead && positionAtStart.health >= 8 && settle < 8; settle++) {
+      await setTimeout(125);
+      positionAtStart = await action('observe');
+    }
+    assert.ok(positionAtStart?.onGround && !positionAtStart.dead && positionAtStart.health >= 8,
+      'Could not scout for wood safely');
     const scan = await action('scan_blocks', scanArgs);
     trunk = nearbyTrunk(scan.matches, positionAtStart.position);
     if (trunk?.distance <= 6) break;
@@ -638,8 +678,6 @@ async function collectStarterLogs(start) {
       continue;
     }
     if (step === 0) await narrate('Decision', 'Scout dry ground for a tree before crafting.');
-    assert.ok(positionAtStart?.onGround && !positionAtStart.dead && positionAtStart.health >= 8,
-      'Could not scout for wood safely');
     if (!await retreatFromNearbyMob(action, positionAtStart, visited, rejected)) {
       const { x, y, z } = positionAtStart.position;
       visited.push([x, y, z].map(Math.floor));

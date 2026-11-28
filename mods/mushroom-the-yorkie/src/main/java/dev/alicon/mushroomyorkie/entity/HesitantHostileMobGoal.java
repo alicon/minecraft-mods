@@ -4,6 +4,7 @@ import java.util.EnumSet;
 import java.util.List;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.NeutralMob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.player.Player;
@@ -37,7 +38,7 @@ final class HesitantHostileMobGoal extends Goal {
 		return this.yorkie.level() instanceof ServerLevel level
 				&& this.canFight(level)
 				&& this.target != null
-				&& this.target.isAlive()
+				&& this.isThreat(this.target)
 				&& this.yorkie.distanceToSqr(this.target) < 256.0D;
 	}
 
@@ -102,7 +103,7 @@ final class HesitantHostileMobGoal extends Goal {
 	}
 
 	private Monster findTarget(ServerLevel level) {
-		if (this.nextSearchTick-- > 0 && this.target != null && this.target.isAlive()) {
+		if (this.nextSearchTick-- > 0 && this.target != null && this.isThreat(this.target)) {
 			return this.target;
 		}
 
@@ -110,7 +111,7 @@ final class HesitantHostileMobGoal extends Goal {
 		Player player = this.yorkie.trust.playerToStayNear(this.yorkie, level);
 		Vec3 center = player == null ? this.yorkie.position() : player.position();
 		AABB area = new AABB(center, center).inflate(MushroomYorkieEntity.HOSTILE_MOB_SEARCH_RADIUS, 5.0D, MushroomYorkieEntity.HOSTILE_MOB_SEARCH_RADIUS);
-		List<Monster> monsters = level.getEntitiesOfClass(Monster.class, area, monster -> monster.isAlive() && this.yorkie.canAttack(monster));
+		List<Monster> monsters = level.getEntitiesOfClass(Monster.class, area, this::isThreat);
 		Monster closest = null;
 		double closestDistance = Double.MAX_VALUE;
 		for (Monster monster : monsters) {
@@ -122,6 +123,17 @@ final class HesitantHostileMobGoal extends Goal {
 		}
 
 		return closest;
+	}
+
+	private boolean isThreat(Monster monster) {
+		if (!monster.isAlive() || !this.yorkie.canAttack(monster)) {
+			return false;
+		}
+		if (!(monster instanceof NeutralMob)) {
+			return true;
+		}
+		var target = monster.getTarget();
+		return target != null && (target == this.yorkie || target == this.yorkie.getOwner());
 	}
 
 	private void moveBehindPlayer(Player player) {

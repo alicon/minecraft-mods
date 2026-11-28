@@ -14,7 +14,9 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldSave;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.minecraft.client.gui.screens.DeathScreen;
+import net.minecraft.stats.Stats;
 import net.minecraft.world.Difficulty;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.gamerules.GameRules;
@@ -25,6 +27,8 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 	private static final int STONE_WINDOW_TICKS = 38_000;
 	private static final int IRON_WINDOW_TICKS = 56_000;
 	private static final int NETHER_WINDOW_TICKS = 96_000;
+	private static final int NETHER_POWDER_WINDOW_TICKS = 120_000;
+	private static final int PORTAL_POWDER = 12;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -41,12 +45,15 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 		String spawnRadius = System.getenv("MUSHROOM_EXPEDITION_SPAWN_RADIUS");
 		String requestedStage = System.getenv("MUSHROOM_EXPEDITION_STAGE");
 		String stage = requestedStage == null ? "adoption" : requestedStage;
+		boolean powderTrip = "nether-powder".equals(stage);
+		boolean visitsNether = "nether".equals(stage) || powderTrip;
 		int windowTicks = switch (stage) {
 			case "adoption" -> ADOPTION_WINDOW_TICKS;
 			case "stone" -> STONE_WINDOW_TICKS;
 			case "iron" -> IRON_WINDOW_TICKS;
 			case "nether" -> NETHER_WINDOW_TICKS;
-			case "defense", "feeding", "portal", "nether-supplies", "shelter", "equipment", "end-entry", "end-crystal", "generated-end-crystals",
+			case "nether-powder" -> NETHER_POWDER_WINDOW_TICKS;
+			case "defense", "feeding", "portal", "nether-supplies", "nether-distant-supplies", "shelter", "equipment", "end-entry", "end-crystal", "generated-end-crystals",
 					"eye-route", "stronghold-approach", "quarry-tools", "quarry-iron" -> 0;
 			default -> throw new AssertionError("Unknown expedition stage " + stage);
 		};
@@ -95,8 +102,9 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 					ExpeditionFeedingClientScenario.run(context, server, ownerId, status);
 					return;
 				}
-				if ("portal".equals(stage) || "nether-supplies".equals(stage)) {
-					ExpeditionPortalClientScenario.run(context, server, ownerId, status, "nether-supplies".equals(stage));
+				if ("portal".equals(stage) || "nether-supplies".equals(stage) || "nether-distant-supplies".equals(stage)) {
+					ExpeditionPortalClientScenario.run(context, server, ownerId, status, !"portal".equals(stage),
+							"nether-distant-supplies".equals(stage));
 					return;
 				}
 				if ("shelter".equals(stage)) {
@@ -180,7 +188,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 						if (dogs.size() == 1) {
 							originalDog.compareAndSet(null, dogs.getFirst().getUUID());
 						}
-						if ("nether".equals(stage) && originalDog.get() != null
+						if (visitsNether && originalDog.get() != null
 								&& owner.level().getEntity(originalDog.get()) instanceof MushroomYorkieEntity living
 								&& living.isAlive() && living.belongsTo(owner) && equipped(living)) {
 							if (owner.level().dimension().equals(Level.OVERWORLD) && living.isOrderedToSit()) {
@@ -205,14 +213,22 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 								|| !owner.getInventory().contains(stack -> stack.is(Items.FURNACE)))) {
 							throw new AssertionError("The player did not finish with the earned stone pickaxe and furnace");
 						}
-						if (("iron".equals(stage) || "nether".equals(stage)) && (!owner.getInventory().contains(stack -> stack.is(Items.IRON_PICKAXE))
+						if (("iron".equals(stage) || visitsNether) && (!owner.getInventory().contains(stack -> stack.is(Items.IRON_PICKAXE))
 								|| !owner.getInventory().contains(stack -> stack.is(Items.BUCKET))
 								|| !owner.getInventory().contains(stack -> stack.is(Items.SHIELD)))) {
 							throw new AssertionError("The player did not finish with the earned iron pickaxe, bucket and shield");
 						}
-						if ("nether".equals(stage) && (!togetherInNether.get() || !owner.level().dimension().equals(Level.OVERWORLD)
-								|| !equipped(dogs.getFirst()) || !owner.getInventory().contains(stack -> stack.is(ModItems.CAMP_MAT)))) {
-							throw new AssertionError("Expected the same equipped dog through the Nether round trip and the camp mat in the inventory");
+						if (visitsNether && (!togetherInNether.get() || !owner.level().dimension().equals(Level.OVERWORLD)
+								|| !equipped(dogs.getFirst()))) {
+							throw new AssertionError("Expected the same equipped dog through the Nether round trip");
+						}
+						if ("nether".equals(stage) && !owner.getInventory().contains(stack -> stack.is(ModItems.CAMP_MAT))) {
+							throw new AssertionError("The camp mat must be packed for the Nether round trip");
+						}
+						if (powderTrip && (owner.getStats().getValue(Stats.ENTITY_KILLED.get(EntityType.BLAZE)) == 0
+								|| owner.getStats().getValue(Stats.ITEM_CRAFTED.get(Items.BLAZE_POWDER)) < PORTAL_POWDER
+								|| owner.getInventory().countItem(Items.BLAZE_POWDER) < PORTAL_POWDER)) {
+							throw new AssertionError("Expected the fresh expedition to earn and craft its stronghold powder supply");
 						}
 						return dogs.getFirst().getUUID().toString();
 					});
@@ -249,8 +265,12 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 					if (dogs.size() != 1 || !dogs.getFirst().getUUID().equals(originalDog.get())) {
 						throw new AssertionError("Expected the original living dog after reopening the earned Survival save");
 					}
-					if ("nether".equals(stage) && !equipped(dogs.getFirst())) {
+					if (visitsNether && !equipped(dogs.getFirst())) {
 						throw new AssertionError("The original dog's harness and vest did not reload");
+					}
+					if (powderTrip && (!owner.level().dimension().equals(Level.OVERWORLD)
+							|| owner.getInventory().countItem(Items.BLAZE_POWDER) < PORTAL_POWDER)) {
+						throw new AssertionError("The earned powder and its owner did not reload back home");
 					}
 				});
 				System.out.printf("Expedition Survival %s reopened: dog=%s owner=%s%n", stage, originalDog.get(), ownerId);

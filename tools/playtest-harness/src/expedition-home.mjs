@@ -1309,7 +1309,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   const startingStock = await action('get_inventory');
   const resumedWithIron = stairs.length > 0
     && (count(startingStock, IRON_INGOT) > 0 || count(startingStock, RAW_IRON) > 0);
-  let plan = ironKitPlan(startingStock, policy.reserveIgnitionIron);
+  let plan = ironKitPlan(startingStock, policy);
   if (!plan.recipes.length && !plan.requiredOre) {
     await leaveQuarry(action, stairs, policy);
     if (stairs.length) await policy.saveQuarry?.([]);
@@ -1420,7 +1420,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       }
       await craftIronKit(action, craft, [shield], Math.min(requiredOre, count(inventory, RAW_IRON)),
         inventory, visited, true);
-      plan = ironKitPlan(await action('get_inventory'), policy.reserveIgnitionIron);
+      plan = ironKitPlan(await action('get_inventory'), policy);
       misses = 0;
       continue;
     }
@@ -1480,8 +1480,11 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   await craftIronKit(action, craft, plan.recipes, plan.requiredOre, materials, visited, false);
 }
 
-function ironKitPlan(inventory, reserveIgnitionIron) {
+function ironKitPlan(inventory, { reserveIgnitionIron, makeIronSword }) {
   const recipes = IRON_RECIPES.filter(([item]) => !count(inventory, item));
+  if (makeIronSword && !count(inventory, 'minecraft:iron_sword')) {
+    recipes.push(['minecraft:iron_sword', 2]);
+  }
   const needsIgnitionIngot = reserveIgnitionIron && !count(inventory, 'minecraft:flint_and_steel')
     && !count(inventory, 'minecraft:fire_charge');
   const ingots = recipes.reduce((amount, [, cost]) => amount + cost, Number(Boolean(needsIgnitionIngot)));
@@ -1495,8 +1498,9 @@ async function craftIronKit(action, craft, recipes, ore, inventory, visited, pac
   const tablePlanks = hasShieldRecipe ? 10 : recipes.length ? 4 : 0;
   const planks = tablePlanks + Number(needsCharcoal);
   await ensurePlanks(action, craft, planks);
-  if (recipes.some(([item]) => item === 'minecraft:iron_pickaxe')
-      && count(await action('get_inventory'), 'minecraft:stick') < 2) {
+  const sticks = recipes.reduce((total, [item]) => total + (
+    item === 'minecraft:iron_pickaxe' ? 2 : item === 'minecraft:iron_sword' ? 1 : 0), 0);
+  if (sticks && count(await action('get_inventory'), 'minecraft:stick') < sticks) {
     await ensurePlanks(action, craft, planks + 2);
     await craft('minecraft:stick', 4);
   }

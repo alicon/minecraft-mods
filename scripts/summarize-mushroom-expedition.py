@@ -9,8 +9,8 @@ import re
 from statistics import median
 
 
-PASSED = re.compile(r"Expedition Survival (\w+) passed: dog=(\S+) owner=(\S+)")
-REOPENED = re.compile(r"Expedition Survival (\w+) reopened: dog=(\S+) owner=(\S+)")
+PASSED = re.compile(r"Expedition Survival ([\w-]+) passed: dog=(\S+) owner=(\S+)")
+REOPENED = re.compile(r"Expedition Survival ([\w-]+) reopened: dog=(\S+) owner=(\S+)")
 SEED = re.compile(r"Expedition Survival ready: seed=(-?\d+)")
 BEDROCK_LINE = re.compile(
     r"^\[(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}):(\d{3}) (?:WARN|ERROR)] "

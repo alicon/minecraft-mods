@@ -267,14 +267,18 @@ server verifies the repaired frame and the living original dog with its owner
 in both dimensions.
 
 Set `MUSHROOM_EXPEDITION_STAGE=nether-supplies` to replay the crossing,
-then earn a blaze rod and bring Mushroom home. The fixture supplies a bow,
+then earn a blaze rod and craft powder after bringing Mushroom home. The fixture supplies a bow,
 arrows, a sword, iron armor, food and a camp mat. It stages live blazes one at
-a time beyond the portal, with time to pick up any rod that drops.
-The controller marks camp, asks Mushroom to stay, uses ranged combat, and
+a time beyond the portal. The controller finds a camp, asks Mushroom to stay,
+uses ranged combat, and
 returns to cover to recover if hurt. It picks up the rod and recalls the
 original dog for the exit. The integrated server
-checks bow use, a vanilla blaze kill, the earned rod, and the same living dog
+checks bow use, a vanilla blaze kill, the crafted powder, and the same living dog
 back in the Overworld with his Nether camp recorded.
+
+Use `MUSHROOM_EXPEDITION_STAGE=nether-distant-supplies` to start with the
+fortress beyond the portal survey. The same checks also require marking the
+camp down the route before recalling Mushroom for the trip home.
 
 Set `MUSHROOM_EXPEDITION_STAGE=nether` to play from a fresh Survival spawn
 through the iron stage and a round trip. The controller can reserve a smelted
@@ -284,6 +288,13 @@ controller looks for materials, crafts and fits Mushroom's harness and padded
 vest, practices stay and follow, and packs a camp mat. The integrated server
 requires the original living, equipped dog with its owner in each dimension
 and again after reopening the save.
+
+Set `MUSHROOM_EXPEDITION_STAGE=nether-powder` to keep playing the fresh
+Survival save through the Nether supply trip. The player earns an iron sword,
+finds a fortress from observed terrain, marks a camp for Mushroom, and hunts
+blazes. After recalling the dog and crossing home, the player crafts twelve
+blaze powder. The server verifies the kill and crafting stats, the powder in the
+inventory, and the original equipped dog after reopening the save.
 
 Set `MUSHROOM_EXPEDITION_STAGE=equipment` to replay crafting, fitting and
 marking camp in the native client. The disposable fixture places a crafting

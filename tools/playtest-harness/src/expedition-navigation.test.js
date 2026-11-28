@@ -339,6 +339,27 @@ test('a route to an elevated camp climbs instead of stopping directly below it',
   assert.deepEqual(dryWaypoint(terrain, [0, 1, 0], [], [2, 4, 0]), [0, 2, 1]);
 });
 
+test('Nether powder crafting spends only as many rods as needed when resuming', async () => {
+  const { craftBlazePowder } = await import('./expedition-blaze-rods.mjs');
+  const powderItem = 'minecraft:blaze_powder';
+  let powder = 10;
+  let rods = 2;
+  const action = async name => {
+    assert.equal(name, 'get_inventory');
+    return { slots: [{ id: powderItem, count: powder }, { id: 'minecraft:blaze_rod', count: rods }] };
+  };
+  const craft = async (item, amount) => {
+    assert.equal(item, powderItem);
+    assert.equal(amount, 2);
+    powder += amount;
+    rods--;
+  };
+  await craftBlazePowder(action, craft, 12);
+  await craftBlazePowder(action, craft, 12);
+  assert.equal(powder, 12);
+  assert.equal(rods, 1);
+});
+
 test('the respawn route picks up the original dropped guide before the remaining gear', async () => {
   const { recoverDroppedLoadout } = await import('./expedition-home.mjs');
   const guide = 'mushroom_yorkie:field_guide';

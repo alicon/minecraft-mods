@@ -30,6 +30,9 @@ an empty hand to recall him from a few steps away.
 He barks at crossings with a drop on both sides. Widen the bridge or take a
 safer route. He can warn the player holding his lead as well.
 
+In Java, Mushroom leaves neutral mobs such as zombified piglins alone until
+they target him or his owner.
+
 ## Field Guide and Leave it
 
 The first Survival adoption gives the player a Field Guide. Craft a
