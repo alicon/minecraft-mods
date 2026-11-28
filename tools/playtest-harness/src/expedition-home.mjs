@@ -130,13 +130,13 @@ function feet(player) {
   return [player.position.x, player.position.y, player.position.z].map(Math.floor);
 }
 
-async function visible(action, entityId) {
+export async function visible(action, entityId) {
   if (!await action('look', { entityId })) return false;
   await setTimeout(110);
   return (await action('observe'))?.crosshair?.id === entityId;
 }
 
-async function hunt(action, animal, dropMatches) {
+export async function hunt(action, animal, dropMatches) {
   const inventory = await action('get_inventory');
   const sword = SWORDS.find(item => count(inventory, item) > 0);
   // Mining tools lose extra durability in combat. Keep the pickaxe for

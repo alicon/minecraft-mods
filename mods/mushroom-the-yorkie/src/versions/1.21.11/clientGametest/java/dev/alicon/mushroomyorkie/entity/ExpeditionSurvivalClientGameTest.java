@@ -46,12 +46,13 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 			case "stone" -> STONE_WINDOW_TICKS;
 			case "iron" -> IRON_WINDOW_TICKS;
 			case "nether" -> NETHER_WINDOW_TICKS;
-			case "defense", "portal", "shelter" -> 0;
+			case "defense", "portal", "shelter", "equipment" -> 0;
 			default -> throw new AssertionError("Unknown expedition stage " + stage);
 		};
 		TestWorldSave save;
 		UUID ownerId;
 		var originalDog = new AtomicReference<UUID>();
+		var stayedWithGear = new AtomicBoolean();
 		var togetherInNether = new AtomicBoolean();
 		var companionDeath = new AtomicReference<String>();
 		ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
@@ -95,6 +96,10 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 				}
 				if ("shelter".equals(stage)) {
 					ExpeditionShelterClientScenario.run(context, server, ownerId, status);
+					return;
+				}
+				if ("equipment".equals(stage)) {
+					ExpeditionGearClientScenario.run(context, server, ownerId, status);
 					return;
 				}
 				Files.writeString(status, "ready", StandardOpenOption.CREATE_NEW);
@@ -146,10 +151,15 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 						if (dogs.size() == 1) {
 							originalDog.compareAndSet(null, dogs.getFirst().getUUID());
 						}
-						if ("nether".equals(stage) && owner.level().dimension().equals(Level.NETHER) && originalDog.get() != null
+						if ("nether".equals(stage) && originalDog.get() != null
 								&& owner.level().getEntity(originalDog.get()) instanceof MushroomYorkieEntity living
-								&& living.isAlive() && living.belongsTo(owner)) {
-							togetherInNether.set(true);
+								&& living.isAlive() && living.belongsTo(owner) && equipped(living)) {
+							if (owner.level().dimension().equals(Level.OVERWORLD) && living.isOrderedToSit()) {
+								stayedWithGear.set(true);
+							}
+							if (stayedWithGear.get() && owner.level().dimension().equals(Level.NETHER) && !living.isOrderedToSit()) {
+								togetherInNether.set(true);
+							}
 						}
 						if (!finished) {
 							return null;
@@ -171,8 +181,9 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 								|| !owner.getInventory().contains(stack -> stack.is(Items.SHIELD)))) {
 							throw new AssertionError("The player did not finish with the earned iron pickaxe, bucket and shield");
 						}
-						if ("nether".equals(stage) && (!togetherInNether.get() || !owner.level().dimension().equals(Level.OVERWORLD))) {
-							throw new AssertionError("The owner and original dog did not make a complete Nether round trip");
+						if ("nether".equals(stage) && (!togetherInNether.get() || !owner.level().dimension().equals(Level.OVERWORLD)
+								|| !equipped(dogs.getFirst()) || !owner.getInventory().contains(stack -> stack.is(ModItems.CAMP_MAT)))) {
+							throw new AssertionError("Expected the same equipped dog through the Nether round trip and the camp mat in the inventory");
 						}
 						return dogs.getFirst().getUUID().toString();
 					});
@@ -209,6 +220,9 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 					if (dogs.size() != 1 || !dogs.getFirst().getUUID().equals(originalDog.get())) {
 						throw new AssertionError("Expected the original living dog after reopening the earned Survival save");
 					}
+					if ("nether".equals(stage) && !equipped(dogs.getFirst())) {
+						throw new AssertionError("The original dog's harness and vest did not reload");
+					}
 				});
 				System.out.printf("Expedition Survival %s reopened: dog=%s owner=%s%n", stage, originalDog.get(), ownerId);
 				context.takeScreenshot("expedition-survival-" + stage + "-reopened");
@@ -217,5 +231,9 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 				throw failure;
 			}
 		}
+	}
+
+	private static boolean equipped(MushroomYorkieEntity dog) {
+		return dog.hasHarness() && dog.hasExpeditionVest();
 	}
 }

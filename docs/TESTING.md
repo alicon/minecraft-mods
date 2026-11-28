@@ -217,9 +217,18 @@ in both dimensions.
 Set `MUSHROOM_EXPEDITION_STAGE=nether` to play from a fresh Survival spawn
 through the iron stage and a round trip. The controller can reserve a smelted
 ingot for ignition and scout for a repairable ruined portal and usable chest.
-It can also look for accessible gravel to supply flint. The integrated server
-requires the original living dog with its owner in each dimension and again
-after reopening the save.
+It can also look for accessible gravel to supply flint. Before crossing, the
+controller looks for materials, crafts and fits Mushroom's harness and padded
+vest, practices stay and follow, and packs a camp mat. The integrated server
+requires the original living, equipped dog with its owner in each dimension
+and again after reopening the save.
+
+Set `MUSHROOM_EXPEDITION_STAGE=equipment` to replay crafting, fitting and
+marking camp in the native client. The disposable fixture places a crafting
+table and stages Mushroom and the raw ingredients. The controller crafts
+black dye from ink, makes the three mod recipes, fits the harness and vest,
+asks Mushroom to stay and follow, and places and marks the mat. The server
+checks the same dog's ownership, equipment, sit order and camp marker.
 
 Set `MUSHROOM_EXPEDITION_STAGE=shelter` to replay the Java sheltered adoption.
 The disposable world provides a furnished house at night. The player

@@ -9,6 +9,7 @@ import {
 } from './expedition-home.mjs';
 import { hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
+import { COMPANION_WEARABLES, markExpeditionCamp, practiceStayAndRecall, prepareCompanionGear } from './expedition-gear.mjs';
 import { expeditionPolicy } from './expedition-policy.mjs';
 import { NETHER, OVERWORLD, netherRoundTrip, prepareNetherPortal } from './expedition-nether.mjs';
 
@@ -178,8 +179,14 @@ try {
     const camp = await prepareAdoptionCamp(action, craft, descendFromCanopy);
     assert.ok(camp.door, 'Expected to find a furnished house in the shelter replay');
     await adoptAtNight(action, camp, craft);
-  }
-  else await runExpedition(start, stage);
+  } else if (stage === 'equipment') {
+    companion = (await readFile(join(dirname(statusFile), 'gear-companion'), 'utf8')).trim();
+    assert.ok(/^[\da-f-]{36}$/i.test(companion));
+    await prepareCompanionGear(action, craft, companion);
+    await practiceStayAndRecall(action, companion);
+    const camp = await markExpeditionCamp(action);
+    console.log(JSON.stringify({ at: new Date().toISOString(), action: 'camp_marked', dog: companion, camp }));
+  } else await runExpedition(start, stage);
   await reportStatus('finished');
 } catch (error) {
   await reportStatus(live ? 'held' : 'failed');
@@ -238,6 +245,9 @@ async function runExpedition(start, stage) {
     'Invalid recorded quarry path');
     assert.ok(checkpoint.quarryLanding === undefined || blockPosition(checkpoint.quarryLanding), 'Invalid recorded landing');
     assert.ok(checkpoint.dog === undefined || /^[\da-f-]{36}$/i.test(String(checkpoint.dog)), 'Invalid recorded dog UUID');
+    assert.ok(checkpoint.equipment === undefined || (Array.isArray(checkpoint.equipment)
+      && new Set(checkpoint.equipment).size === checkpoint.equipment.length
+      && checkpoint.equipment.every(item => COMPANION_WEARABLES.includes(item))), 'Invalid recorded companion equipment');
     companion = checkpoint.dog;
     await action('stop', { closeScreen: true });
     if (['stone', 'iron', 'nether'].includes(checkpoint.phase)
@@ -317,6 +327,14 @@ async function runExpedition(start, stage) {
     if (live) await writeCheckpoint(checkpoint);
   }
   if (stage === 'nether') {
+    if (checkpoint.phase !== 'nether') {
+      checkpoint.equipment ??= [];
+      await prepareCompanionGear(action, craft, checkpoint.dog, checkpoint.equipment, async item => {
+        checkpoint.equipment.push(item);
+        if (live) await writeCheckpoint(checkpoint);
+      });
+      await practiceStayAndRecall(action, checkpoint.dog);
+    }
     checkpoint.phase = 'nether';
     if (live) await writeCheckpoint(checkpoint);
     await netherRoundTrip(action, checkpoint.dog, hold, () => prepareNetherPortal(action, craft, checkpoint.camp), start.dimension);
