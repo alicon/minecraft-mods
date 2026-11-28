@@ -102,6 +102,32 @@ test('defense closes distance while a zombie is still far from the player but be
   assert.deepEqual(moves, [{ entityId: zombie.id, stopDistance: 2.3, maxTicks: 24 }]);
 });
 
+test('a blocked defense approach follows dry footing around the wall toward Mushroom', async () => {
+  const { defendCompanion } = await import('./expedition-companion.mjs');
+  const hurtDog = { ...dog, pos: [4.5, 64, 0.5], distance: 4, recentlyHurt: true };
+  const archer = { ...spider, type: 'minecraft:skeleton', pos: [6.5, 64, 0.5], distance: 6 };
+  const open = [{ x: 0, y: 63, z: 0, b: 'minecraft:stone' },
+    ...Array.from({ length: 7 }, (_, x) => ({ x, y: 63, z: 1, b: 'minecraft:stone' }))];
+  const wall = [{ x: 1, y: 64, z: 0, b: 'minecraft:stone' }, { x: 1, y: 65, z: 0, b: 'minecraft:stone' }];
+  const moves = [];
+  const onGround = { ...player, onGround: true, position: { x: 0.5, y: 64, z: 0.5 } };
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_entities': return { entities: [hurtDog, archer] };
+      case 'stop': return {};
+      case 'observe': return onGround;
+      case 'get_blocks': return { cells: [...open, ...wall] };
+      case 'go_to':
+        moves.push(args);
+        return args.entityId ? { arrived: false, reason: 'blocked by minecraft:stone at 1,64,0 (feet)' } : { arrived: true };
+      default: assert.fail(name);
+    }
+  };
+  assert.equal(await defendCompanion(action, onGround, hurtDog.uuid), true);
+  assert.equal(moves[0].entityId, archer.id);
+  assert.deepEqual(moves[1]?.pos, [0, 64, 1]);
+});
+
 test('when a creeper is close to the original dog, retreat without swinging', async () => {
   const { defendCompanion } = await import('./expedition-companion.mjs');
   const closeDog = { ...dog, pos: [1, 64, 0], distance: 1, recentlyHurt: false, health: 20 };
@@ -135,7 +161,8 @@ test('a creeper between the player and injured Mushroom overrides a melee rescue
     if (name === 'get_blocks') return { cells: ground };
     if (name === 'go_to') {
       assert.ok(args.pos[0] < 0);
-      moves.push(args.pos);
+        assert.equal(args.stopDistance, 0.3);
+        moves.push(args.pos);
       return { arrived: true };
     }
     assert.fail(name);

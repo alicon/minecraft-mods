@@ -31,7 +31,7 @@ export async function defendCompanion(action, player, dogUuid) {
   }
 
   if (attacker.distance > 4.25) {
-    await approach(action, attacker.id);
+    await approach(action, attacker.id, dog.pos);
     // Finish the defense on this interrupt when the walk reaches melee range.
     // A new planning turn can lose the target when the mob moves around the dog.
     const view = await action('get_entities', { radius: 24, max: 128 });
@@ -64,8 +64,17 @@ async function aimAtAttacker(action, entityId) {
   return action('observe');
 }
 
-async function approach(action, entityId) {
-  await action('go_to', { entityId, stopDistance: 2.3, maxTicks: 24 });
+async function approach(action, entityId, dogPosition) {
+  const direct = await action('go_to', { entityId, stopDistance: 2.3, maxTicks: 24 });
+  if (direct?.arrived || !direct?.reason?.startsWith('blocked by ')) return;
+  const player = await action('observe');
+  if (!player?.inWorld || !player.onGround || player.dead || player.inWater || player.health < 7) return;
+  const { x, y, z } = player.position;
+  const start = [x, y, z].map(Math.floor);
+  const local = await action('get_blocks', { center: start, size: [23, 15, 23], format: 'json' });
+  const waypoint = local && !local.stats?.unloadedChunks
+    && dryWaypoint(local.cells, start, [start], dogPosition, 'elevation');
+  if (waypoint) await action('go_to', { pos: waypoint, stopDistance: 0.3, maxTicks: 24 });
 }
 
 async function retreat(action, player, threat) {
@@ -76,6 +85,6 @@ async function retreat(action, player, threat) {
   const local = await action('get_blocks', { center: start, size: [15, 7, 15], format: 'json' });
   const waypoint = local && dryWaypoint(local.cells, start, [start], goal, undefined, new Set(), threat.pos);
   if (waypoint && distance(waypoint, threat.pos) > distance(start, threat.pos)) {
-    await action('go_to', { pos: waypoint, stopDistance: 0.7, maxTicks: 24 });
+    await action('go_to', { pos: waypoint, stopDistance: 0.3, maxTicks: 24 });
   }
 }
