@@ -521,6 +521,36 @@ test('iron scouting favors a dry cave with exposed walls', async () => {
   assert.deepEqual(dryWaypoint(cells, [0, 64, 0], [[0, 64, 0]], undefined, 'cave'), [0, 64, 4]);
 });
 
+test('iron scouting walks toward a visible vein and disregards a sealed one', async () => {
+  const { dryWaypoint } = await import('./expedition-navigation.mjs');
+  const start = [0, 64, 0];
+  const floor = [];
+  for (let x = -8; x <= 8; x++) {
+    for (let z = -8; z <= 8; z++) floor.push({ x, y: 63, z, b: 'minecraft:grass_block' });
+  }
+  const vein = { x: 0, y: 65, z: 6, b: 'minecraft:iron_ore' };
+  const approach = cells => {
+    const first = dryWaypoint(cells, start, [start], undefined, 'iron');
+    return dryWaypoint(cells, first, [start, first], undefined, 'iron');
+  };
+  const range = ([x, , z]) => Math.hypot(x - vein.x, z - vein.z);
+  assert.ok(range(approach([...floor, vein])) <= 4);
+  assert.ok(range(approach(floor)) > 4);
+
+  const shell = [];
+  for (let x = -1; x <= 1; x++) {
+    for (let y = 64; y <= 66; y++) {
+      for (let z = 5; z <= 7; z++) {
+        if (x !== 0 || y !== 65 || z !== 6) shell.push({ x, y, z, b: 'minecraft:stone' });
+      }
+    }
+  }
+  assert.deepEqual(
+    dryWaypoint([...floor, ...shell, vein], start, [], undefined, 'iron'),
+    dryWaypoint([...floor, ...shell, { ...vein, b: 'minecraft:stone' }], start, [], undefined, 'iron'),
+  );
+});
+
 test('an escape between two clouds avoids both centers', async () => {
   const { dryWaypoint } = await import('./expedition-navigation.mjs');
   const cells = [];

@@ -229,7 +229,7 @@ export async function hunt(action, animal, dropMatches, canContinue) {
 export async function stepOut(action, player, visited, destination, preferredGround, rejectedSteps = new Set(), chooseRoute, avoid, maxTicks = 90) {
   const center = feet(player);
   const width = preferredGround || chooseRoute ? 23 : 17;
-  const height = ['surface', 'elevation', 'cave'].includes(preferredGround) ? 15 : 9;
+  const height = ['surface', 'elevation', 'cave', 'iron'].includes(preferredGround) ? 15 : 9;
   const volume = await action('get_blocks', { center, size: [width, height, width], format: 'json' });
   if (!volume) return false;
   let pos = dryWaypoint(volume.cells, center, visited, destination, preferredGround, rejectedSteps, avoid);
@@ -1346,6 +1346,8 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   let nextCoverCheck = 0;
   let nextMealAttempt = 0;
   let nextCompanionCheck = 0;
+  let blockedCaveSteps = 0;
+  let movingToFreshGround = policy.scoutNewGround ? 8 : 0;
   let returningAfterCare = false;
   const triedFoodSources = new Set();
   for (let attempt = 0; attempt < 190; attempt++) {
@@ -1468,7 +1470,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       continue;
     }
     const fallback = misses >= 24 ? 'quarry' : 'scout';
-    const work = policy.chooseWork && misses >= 8 && !stairs.length
+    const work = movingToFreshGround ? 'scout' : policy.chooseWork && misses >= 8 && !stairs.length
       ? await policy.chooseWork(player, { material: 'iron', missedStone: misses,
         rawIron: count(inventory, RAW_IRON), needed: requiredOre, hasCoal: count(inventory, COAL) > 0 }, fallback)
       : fallback;
@@ -1488,10 +1490,20 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       quarries++;
       if (quarries >= 3) break;
       misses = 0;
+      movingToFreshGround = 8;
+      await policy.reportScouting?.('Quarry exit reached. Looking for exposed ore in fresh terrain.');
     }
     const scout = await action('observe');
     visited.push(feet(scout));
-    await stepOut(action, scout, visited, undefined, 'cave', rejectedSteps);
+    const moved = await stepOut(action, scout, visited, undefined, movingToFreshGround ? 'stone' : 'iron', rejectedSteps);
+    if (movingToFreshGround) movingToFreshGround--;
+    if (moved) blockedCaveSteps = 0;
+    else if (++blockedCaveSteps >= 2) {
+      blockedCaveSteps = 0;
+      misses = 0;
+      movingToFreshGround = 8;
+      await policy.reportScouting?.('Two blocked approaches. Looking for a different opening.');
+    }
   }
   await leaveQuarry(action, stairs, policy);
   await policy.saveQuarry?.([]);

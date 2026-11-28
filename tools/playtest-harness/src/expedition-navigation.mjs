@@ -6,6 +6,7 @@ const QUARRY_BLOCK = /^minecraft:(?:grass_block|dirt|coarse_dirt|podzol|stone|an
 const QUARRY_HAZARD = /^minecraft:(?:water|lava|powder_snow|.*sand|gravel)$/;
 const SHELTER_BLOCK = /^minecraft:(?:dirt|grass_block|stone|cobblestone|granite|diorite|andesite|deepslate|end_stone|end_stone_bricks|obsidian|netherrack|blackstone|nether_bricks)$/;
 const MAX_WALK_SEGMENT = 10;
+const IRON_ORE = /^minecraft:(?:deepslate_)?iron_ore$/;
 
 function gap(id) {
   return id === undefined || HEADROOM.test(id);
@@ -161,6 +162,22 @@ export function dryStepKey(from, to) {
   return `${from.join(',')}>${from[0] + dx},${from[2] + dz}`;
 }
 
+function hasVisibleIron(ores, block, [x, y, z]) {
+  const eye = [x + 0.5, y + 1.62, z + 0.5];
+  return ores.some(ore => {
+    const delta = ore.map((coordinate, axis) => coordinate + 0.5 - eye[axis]);
+    const range = Math.hypot(...delta);
+    if (range > 4.15) return false;
+    const samples = Math.ceil(range * 6);
+    for (let step = 1; step < samples; step++) {
+      const tile = eye.map((coordinate, axis) => Math.floor(coordinate + delta[axis] * step / samples));
+      if (tile.every((coordinate, axis) => coordinate === ore[axis])) return true;
+      if (!gap(block(...tile))) return false;
+    }
+    return true;
+  });
+}
+
 // Each edge fits a standing player through two adjacent columns, including the lift for a step up.
 // Use the native movement controller for the resulting straight segment.
 export function dryWaypoint(cells, start, visited, destination, preferredGround, rejectedSteps = new Set(), avoid) {
@@ -169,6 +186,8 @@ export function dryWaypoint(cells, start, visited, destination, preferredGround,
   const hazards = Array.isArray(avoid?.[0]) ? avoid : avoid ? [avoid] : [];
   const clearance = tile => Math.min(...hazards.map(hazard => distance(hazard, tile)));
   const rock = id => /:(?:stone|andesite|diorite|granite|deepslate|tuff)$/.test(id ?? '');
+  const ores = preferredGround === 'iron'
+    ? cells.filter(cell => IRON_ORE.test(cell.b)).map(({ x, y, z }) => [x, y, z]) : [];
   const visits = new Map();
   for (const [x, , z] of visited) {
     const key = `${x},${z}`;
@@ -189,7 +208,7 @@ export function dryWaypoint(cells, start, visited, destination, preferredGround,
         const key = step.join(',');
         const support = block(tx, ty - 1, tz);
         if (seen.has(key) || rejectedSteps.has(dryStepKey(pos, step)) || !hasDrySupport(support)
-            || (['surface', 'elevation', 'cave'].includes(preferredGround) && /_(?:leaves|log)$/.test(support))
+            || (['surface', 'elevation', 'cave', 'iron'].includes(preferredGround) && /_(?:leaves|log)$/.test(support))
             || (hazards.length && clearance(step) <= clearance(pos))
             || !gap(block(tx, ty, tz)) || !gap(block(tx, ty + 1, tz))
             || (ty > y && !gap(block(x, ty + 1, z)))
@@ -211,7 +230,7 @@ export function dryWaypoint(cells, start, visited, destination, preferredGround,
           return rock(block(px, ty - 1, pz))
             && gap(block(px, ty, pz)) && gap(block(px, ty + 1, pz));
         }).length : 0;
-        const cave = preferredGround === 'cave' ? CARDINAL.filter(([ox, oz]) =>
+        const cave = ['cave', 'iron'].includes(preferredGround) ? CARDINAL.filter(([ox, oz]) =>
           rock(block(tx + ox, ty, tz + oz)) || rock(block(tx + ox, ty + 1, tz + oz))).length
           + Number(rock(block(tx, ty - 1, tz))) + Number(rock(block(tx, ty + 2, tz))) : 0;
         const score = (destination
@@ -219,7 +238,7 @@ export function dryWaypoint(cells, start, visited, destination, preferredGround,
             - (preferredGround === 'surface' ? 0 : (preferredGround === 'elevation' ? 5 : 1.25) * Math.abs(destination[1] - ty))
             - route.length * 0.25 + fresh * 0.1
           : fresh + 0.3 * distance(start, step) - route.length * 0.12 + pasture * 0.65
-            + exposedRock * 0.9 + cave * 1.8) - routeRepeatCost * 1.5;
+            + exposedRock * 0.9 + cave * 1.8 + (hasVisibleIron(ores, block, step) ? 35 : 0)) - routeRepeatCost * 1.5;
         if (score > bestScore) {
           best = route;
           bestScore = score;

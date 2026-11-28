@@ -526,6 +526,7 @@ async function runExpedition(start, stage) {
       }
     }
     policy.reserveCompanionMeal = true;
+    policy.scoutNewGround = resume && !checkpoint.quarry?.length;
     policy.companionNeedsCare = async player => {
       const dogs = await action('get_entities', { type: 'mushroom_yorkie:mushroom_yorkie', radius: 32 });
       const dog = dogs?.entities.find(entity => entity.uuid === checkpoint.dog);
@@ -564,6 +565,7 @@ async function runExpedition(start, stage) {
           'Could not stock provisions before mining');
       }
       if (!checkpoint.quarry?.length && checkpoint.fedDog === false) await policy.tendCompanion();
+      if (policy.scoutNewGround) await policy.reportScouting('Leaving the previous quarry area to look for exposed iron.');
       await narrate('Objective', 'Mine and smelt iron for a pickaxe, bucket, and shield.');
       await earnIronKit(action, craft, checkpoint.camp,
         { ...policy, reserveIgnitionIron: visitNether, makeIronSword: huntBlazes });
