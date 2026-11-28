@@ -553,6 +553,48 @@ test('reattaching after the iron kit was earned does not start mining again', as
   assert.deepEqual(calls, ['get_inventory']);
 });
 
+test('the first earned ingot funds a shield before scouting for the rest of the kit', async () => {
+  const { earnIronKit } = await import('./expedition-home.mjs');
+  const slots = [
+    { id: 'minecraft:iron_ingot', count: 1, slot: 0 },
+    { id: 'minecraft:oak_planks', count: 10, slot: 1 },
+  ];
+  const block = 'minecraft:crafting_table';
+  const shield = 'minecraft:shield';
+  const crafted = [];
+  const nextScoutingPass = new Error('The controller resumed scouting');
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_inventory': return { slots };
+      case 'observe':
+        return { inWorld: true, onGround: true, health: 20, food: 20, position: { x: 0.5, y: 1, z: 0.5 } };
+      case 'get_blocks':
+        if (args.size[0] === 11) return { cells: [cell(0, 0, 0), cell(2, 0, 0)] };
+        assert.deepEqual(crafted, [block, shield]);
+        throw nextScoutingPass;
+      case 'select_slot': return { mainHand: slots.find(item => item.slot === args.slot) };
+      case 'place_block': return { placed: true, blockAtPos: block };
+      case 'interact_block': return { screenOpened: 'CraftingScreen' };
+      case 'get_container':
+        return { slots: slots.map(stack => ({ ...stack, section: 'player' })) };
+      case 'click_slot':
+        assert.deepEqual(args, { slot: slots.find(stack => stack.id === shield).slot, action: 'swap', hotbar: 40 });
+        slots.find(stack => stack.id === shield).slot = args.hotbar;
+        return {};
+      case 'stop': return {};
+      default: assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  const craft = async (item, amount) => {
+    crafted.push(item);
+    assert.equal(amount, 1);
+    if (item === shield) slots.find(stack => stack.id === 'minecraft:iron_ingot').count--;
+    slots.push({ id: item, count: amount, slot: slots.length });
+  };
+  await assert.rejects(earnIronKit(action, craft, { bed: [0, 1, 0] }), error => error === nextScoutingPass);
+  assert.equal(slots.find(stack => stack.id === shield)?.slot, 40);
+});
+
 test('a dry destination across water routes around the shore', async () => {
   const { dryWaypoint } = await import('./expedition-navigation.mjs');
   const blocks = [

@@ -79,7 +79,7 @@ final class ExpeditionIronClientScenario {
 					if (!owner.isAlive() || owner.getY() < fixture.start().getY()
 							|| !inventory.contains(stack -> stack.is(Items.IRON_PICKAXE))
 							|| !inventory.contains(stack -> stack.is(Items.BUCKET))
-							|| !inventory.contains(stack -> stack.is(Items.SHIELD))
+							|| !owner.getOffhandItem().is(Items.SHIELD)
 							|| !fixture.ores().stream().allMatch(pos -> level.getBlockState(pos).isAir())
 							|| dog == null || !dog.isAlive() || !dog.isOwnedBy(owner)
 							|| !dog.isOrderedToSit() || !dog.blockPosition().equals(fixture.start().west(3))) {

@@ -25,8 +25,9 @@ const RAW_IRON = 'minecraft:raw_iron';
 const IRON_INGOT = 'minecraft:iron_ingot';
 const COAL = 'minecraft:coal';
 const CHARCOAL = 'minecraft:charcoal';
+const SHIELD = 'minecraft:shield';
 const IRON_RECIPES = [
-  ['minecraft:iron_pickaxe', 3], ['minecraft:bucket', 3], ['minecraft:shield', 1],
+  ['minecraft:iron_pickaxe', 3], ['minecraft:bucket', 3], [SHIELD, 1],
 ];
 const SWORDS = TOOL_TIERS.map(tier => `minecraft:${tier}_sword`);
 const CAMP_WORK_END = 11_900;
@@ -1134,12 +1135,10 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
     }
   }
   const startingStock = await action('get_inventory');
-  const recipes = IRON_RECIPES.filter(([item]) => !count(startingStock, item));
-  const needsIgnitionIngot = policy.reserveIgnitionIron && !count(startingStock, 'minecraft:flint_and_steel')
-    && !count(startingStock, 'minecraft:fire_charge');
-  const wantedIngots = recipes.reduce((amount, [, cost]) => amount + cost, Number(Boolean(needsIgnitionIngot)));
-  const requiredOre = Math.max(0, wantedIngots - count(startingStock, IRON_INGOT));
-  if (!recipes.length && !requiredOre) {
+  const resumedWithIron = stairs.length > 0
+    && (count(startingStock, IRON_INGOT) > 0 || count(startingStock, RAW_IRON) > 0);
+  let plan = ironKitPlan(startingStock, policy.reserveIgnitionIron);
+  if (!plan.recipes.length && !plan.requiredOre) {
     await leaveQuarry(action, stairs, policy);
     if (stairs.length) await policy.saveQuarry?.([]);
     return;
@@ -1158,6 +1157,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   for (let attempt = 0; attempt < 190; attempt++) {
     const inventory = await action('get_inventory');
     const wanted = new Set();
+    const { requiredOre } = plan;
     if (count(inventory, RAW_IRON) < requiredOre) {
       wanted.add('minecraft:iron_ore');
       wanted.add('minecraft:deepslate_iron_ore');
@@ -1201,6 +1201,23 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
         continue;
       }
       await seekExpeditionFood(action, player, visited, rejectedSteps, triedFoodSources);
+      continue;
+    }
+    const shield = plan.recipes.find(([item]) => item === SHIELD);
+    if (shield && (!stairs.length || resumedWithIron || misses >= 6)
+        && player.onGround && !player.inWater && player.health >= 14
+        && !player.threats?.some(threat => threat.distance <= 8)
+        && (count(inventory, IRON_INGOT) || count(inventory, RAW_IRON))) {
+      if (stairs.length) {
+        await leaveQuarry(action, stairs, policy);
+        stairs.length = 0;
+        await policy.saveQuarry?.([]);
+        continue;
+      }
+      await craftIronKit(action, craft, [shield], Math.min(requiredOre, count(inventory, RAW_IRON)),
+        inventory, visited, true);
+      plan = ironKitPlan(await action('get_inventory'), policy.reserveIgnitionIron);
+      misses = 0;
       continue;
     }
     if (usable) {
@@ -1255,10 +1272,23 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   await leaveQuarry(action, stairs, policy);
   await policy.saveQuarry?.([]);
   const materials = await action('get_inventory');
-  assert.ok(count(materials, RAW_IRON) >= requiredOre, 'Could not earn enough reachable iron ore for the expedition kit');
-  const fuel = count(materials, COAL) ? COAL : CHARCOAL;
-  const needsCharcoal = requiredOre > 0 && !count(materials, fuel);
-  const tablePlanks = recipes.some(([item]) => item === 'minecraft:shield') ? 10 : recipes.length ? 4 : 0;
+  assert.ok(count(materials, RAW_IRON) >= plan.requiredOre, 'Could not earn enough reachable iron ore for the expedition kit');
+  await craftIronKit(action, craft, plan.recipes, plan.requiredOre, materials, visited, false);
+}
+
+function ironKitPlan(inventory, reserveIgnitionIron) {
+  const recipes = IRON_RECIPES.filter(([item]) => !count(inventory, item));
+  const needsIgnitionIngot = reserveIgnitionIron && !count(inventory, 'minecraft:flint_and_steel')
+    && !count(inventory, 'minecraft:fire_charge');
+  const ingots = recipes.reduce((amount, [, cost]) => amount + cost, Number(Boolean(needsIgnitionIngot)));
+  return { recipes, requiredOre: Math.max(0, ingots - count(inventory, IRON_INGOT)) };
+}
+
+async function craftIronKit(action, craft, recipes, ore, inventory, visited, packFurnace) {
+  const fuel = count(inventory, COAL) ? COAL : CHARCOAL;
+  const needsCharcoal = ore > 0 && !count(inventory, fuel);
+  const hasShieldRecipe = recipes.some(([item]) => item === SHIELD);
+  const tablePlanks = hasShieldRecipe ? 10 : recipes.length ? 4 : 0;
   const planks = tablePlanks + Number(needsCharcoal);
   await ensurePlanks(action, craft, planks);
   if (recipes.some(([item]) => item === 'minecraft:iron_pickaxe')
@@ -1269,12 +1299,18 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   if (needsCharcoal && !(await action('get_inventory')).slots.some(stack => stack.id.endsWith('_log'))) {
     assert.ok(await harvestReachableLog(action), 'Could not collect a reachable log for charcoal');
   }
-  if (requiredOre) {
+  if (ore) {
     const furnace = await placeBeside(action, FURNACE);
     await action('interact_block', { pos: furnace });
     if (needsCharcoal) await makeExpeditionCharcoal(action);
-    await smeltExpeditionIron(action, requiredOre, fuel);
+    await smeltExpeditionIron(action, ore, fuel);
     await action('stop', { closeScreen: true });
+    if (packFurnace) {
+      assert.ok((await breakVisible(action, furnace))?.broken, 'Could not pack the furnace after smelting the first iron');
+      await action('go_to', { pos: furnace, stopDistance: 0.3, maxTicks: 55 });
+      await setTimeout(350);
+      assert.ok(count(await action('get_inventory'), FURNACE), 'Did not pick the furnace back up');
+    }
   }
   if (!recipes.length) return;
   await craft('minecraft:crafting_table', 1);
@@ -1284,4 +1320,12 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
     await craft(item, 1);
   }
   await action('stop', { closeScreen: true });
+  if (hasShieldRecipe) {
+    const menu = await action('get_container');
+    const shield = menu?.slots.find(stack => stack.section === 'player' && stack.id === SHIELD);
+    assert.ok(shield, 'Could not find the crafted shield in the player inventory');
+    await action('click_slot', { slot: shield.slot, action: 'swap', hotbar: 40 });
+    assert.ok((await action('get_inventory')).slots.some(stack => stack.id === SHIELD && stack.slot === 40),
+      'The shield did not move to the offhand');
+  }
 }

@@ -224,10 +224,12 @@ Set `MUSHROOM_EXPEDITION_STAGE=quarry-iron` to replay the iron portion in a
 disposable native client. The fixture supplies the stone kit, fuel, timber
 and an ore pocket beside a one-block quarry stair. The run digs and descends
 the stair, clears any leaf litter that blocks the mining crosshair, collects
-and smelts seven raw iron, crafts the iron pickaxe, bucket,
-and shield, and returns to the same seated Mushroom. The server
-checks that the ore is gone, the player returned above the stair, and the
-original dog stayed alive with its original owner and sit order.
+and smelts seven raw iron, crafts the iron pickaxe and bucket, equips the
+shield in the offhand, and returns to the same seated Mushroom. The server
+checks the mined ore, the player's return above the stair, the equipped
+shield, and the original dog's owner and sit order. In a longer expedition,
+the player can use its first iron for a shield and pack the furnace before
+scouting again for the rest of the kit.
 
 Set `MUSHROOM_EXPEDITION_STAGE=defense` with the same runner for the focused
 native companion protection scenario. The disposable world stages an injured
