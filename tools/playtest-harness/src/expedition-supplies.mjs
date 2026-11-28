@@ -699,7 +699,7 @@ async function runExpedition(start, stage) {
     checkpoint = { owner: start.name, gameTime: start.gameTime, bridgeFingerprint, stage, phase: 'iron',
       camp: restored.camp, dog: restored.dog, fedDog: false };
     if (restored.ironProgress) {
-      const { quarry, quarryLanding, lastDogMealAt, returningAfterCare, careReturnTrail } = restored.ironProgress;
+      const { quarry, quarryLanding, lastDogMealAt, returningAfterCare, careReturnTrail, reenterQuarry } = restored.ironProgress;
       assert.ok(Number.isInteger(lastDogMealAt) && lastDogMealAt >= 0 && lastDogMealAt <= start.gameTime,
         'Invalid archived companion meal time');
       if (returningAfterCare === true) {
@@ -709,6 +709,7 @@ async function runExpedition(start, stage) {
         assert.ok(Array.isArray(quarry) && quarry.length > 0 && quarry.length <= 44 && quarry.every(blockPosition)
           && blockPosition(quarryLanding), 'Invalid archived quarry route');
         Object.assign(checkpoint, { quarry, quarryLanding });
+        if (reenterQuarry === true) checkpoint.reenterQuarry = true;
       }
       Object.assign(checkpoint, { lastDogMealAt, fedDog: true });
     }

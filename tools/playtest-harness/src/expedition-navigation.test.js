@@ -2185,6 +2185,65 @@ test('a reachable Mushroom eats at the quarry landing before any return climb', 
   }
 });
 
+test('a worn pick is replaced on the surface before returning to the same quarry', async () => {
+  const { earnIronKit } = await import('./expedition-home.mjs');
+  const entrance = [0, 64, 0];
+  const landing = [1, 63, 0];
+  const worn = { id: 'minecraft:stone_pickaxe', slot: 0, count: 1, maxDamage: 131, damage: 124 };
+  const fresh = { ...worn, slot: 1, damage: 0 };
+  const table = { id: 'minecraft:crafting_table', slot: 4, count: 1 };
+  for (const fromSurface of [false, true]) {
+    const resume = new Error('Back at the original landing with a fresh pick');
+    let at = fromSurface ? entrance : landing;
+    let mainHand = worn;
+    const slots = [worn, { id: 'minecraft:cobblestone', slot: 2, count: 32 },
+      { id: 'minecraft:oak_planks', slot: 3, count: 6 }, { id: 'minecraft:stick', slot: 5, count: 2 }];
+    const walked = [];
+    const saves = [];
+    const action = async (name, args) => {
+      switch (name) {
+        case 'observe': return { inWorld: true, onGround: true, health: 20, food: 20, gameTime: at === landing ? 80 : 120,
+          position: { x: at[0] + 0.5, y: at[1], z: at[2] + 0.5 } };
+        case 'get_inventory': return { slots, mainHand };
+        case 'get_blocks': return { cells: [cell(0, 63, 0, 'stone'), cell(1, 62, 0, 'stone'), cell(0, 63, 2, 'stone')] };
+        case 'select_slot': mainHand = slots.find(stack => stack.slot === args.slot); return { mainHand };
+        case 'place_block':
+          assert.deepEqual(args.pos, [0, 64, 2], 'Keep the entrance and staircase clear');
+          return { placed: true, blockAtPos: table.id };
+        case 'interact_block': return { screenOpened: 'CraftingScreen' };
+        case 'stop': return {};
+        case 'go_to':
+          at = String(args.pos) === String(entrance) ? entrance : landing;
+          walked.push(at);
+          return { arrived: true, position: at };
+        default: assert.fail(name);
+      }
+    };
+    const craft = async item => {
+      assert.equal(at, entrance);
+      if (item === table.id) slots.push(table);
+      else if (item === fresh.id) slots.push(fresh);
+      else assert.fail(item);
+    };
+    await assert.rejects(earnIronKit(action, craft, { bed: [-10, 64, 0] }, {
+      resumeQuarry: [entrance], resumeQuarryLanding: landing, reenterQuarry: fromSurface,
+      checkCompanion: async () => {},
+      saveQuarry: async (route, lower, reenter) => {
+        saves.push([[...route], lower, Boolean(reenter)]);
+        if (!reenter) {
+          assert.equal(at, landing);
+          assert.equal(mainHand, fresh);
+          throw resume;
+        }
+      },
+      saveExhaustedQuarries: async () => assert.fail('A worn pick does not exhaust the quarry'),
+    }), error => error === resume);
+    assert.deepEqual(walked, fromSurface ? [landing] : [entrance, landing]);
+    assert.deepEqual(saves, fromSurface ? [[[entrance], landing, false]]
+      : [[[entrance], landing, true], [[entrance], landing, false]]);
+  }
+});
+
 test('reentering a quarry can recover from drift across dry footing', async () => {
   const { earnIronKit } = await import('./expedition-home.mjs');
   const entrance = [0, 64, 0];

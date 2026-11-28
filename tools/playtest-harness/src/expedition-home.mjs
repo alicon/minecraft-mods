@@ -583,7 +583,7 @@ export async function gatherWool(action, descendFromCanopy, chooseRoute, craft, 
   throw new Error('Sheep search ended before earning three matching wool blocks');
 }
 
-export async function placeBeside(action, item) {
+export async function placeBeside(action, item, { avoidColumns = [] } = {}) {
   await hold(action, item);
   const player = await action('observe');
   const { cells } = await action('get_blocks', { center: feet(player), size: [11, 5, 11], format: 'json' });
@@ -593,6 +593,7 @@ export async function placeBeside(action, item) {
     spots.push(...buildingSpotsWithGroundCover(cells, player.position, bed));
   }
   for (const { pos, clear } of spots) {
+    if (avoidColumns.some(([x, , z]) => x === pos[0] && z === pos[2])) continue;
     for (const cover of clear) await action('break_block', { pos: cover, maxTicks: 25 });
     if (bed) {
       // Bed orientation uses the player's rotation on the server.
@@ -1875,8 +1876,26 @@ export async function repeatedQuarryEntrance(action, here, attempts) {
 export async function earnIronKit(action, craft, { bed }, policy = {}) {
   const stairs = [];
   const protectedGround = new Set();
+  const visited = [];
   let quarryLanding;
+  let madeBackup = false;
+  const makePickaxe = async (avoidColumns = []) => {
+    await ensurePlanks(action, craft, 6);
+    await craft('minecraft:crafting_table', 1);
+    if (count(await action('get_inventory'), 'minecraft:stick') < 2) await craft('minecraft:stick', 4);
+    const toolTable = await placeBeside(action, 'minecraft:crafting_table', { avoidColumns });
+    await openCampTable(action, toolTable, visited);
+    await craft(STONE_PICKAXE, 1);
+    await action('stop', { closeScreen: true });
+    await hold(action, STONE_PICKAXE);
+    madeBackup = true;
+  };
   const reopenQuarry = async (route, landing) => {
+    const stock = await action('get_inventory');
+    if (!stock.slots.some(stack => stack.id === STONE_PICKAXE && durability(stack) > 8) && count(stock, COBBLESTONE) >= 3) {
+      await makePickaxe([...route, landing]);
+      await policy.reportScouting?.('Replaced a worn stone pickaxe. Returning to the known quarry stairs.');
+    }
     const retraced = await reenterQuarry(action, route, landing);
     const nextLanding = route[retraced.length] ?? landing;
     if (retraced.length && String(feet(await action('observe'))) === String(nextLanding)) {
@@ -1920,13 +1939,11 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
     if (stairs.length) await policy.saveQuarry?.([]);
     return;
   }
-  const visited = [];
   const rejectedSteps = new Set();
   const mined = new Set();
   const drops = new Set([RAW_IRON, COAL]);
   let misses = 0;
   let quarries = 0;
-  let madeBackup = false;
   let nextSleepCheck = 0;
   let nextCoverCheck = 0;
   let nextMealAttempt = 0;
@@ -2056,17 +2073,17 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       }
     }
     misses++;
+    if (stairs.length && quarryLanding && !usable && count(inventory, COBBLESTONE) >= 3) {
+      const route = [...stairs];
+      await leaveQuarry(action, route, policy);
+      stairs.length = 0;
+      await policy.saveQuarry?.(route, quarryLanding, true);
+      await reopenQuarry(route, quarryLanding);
+      continue;
+    }
     const needsTool = !usable || (!madeBackup && picks.length < 2 && picks.every(pick => durability(pick) < 90));
     if (!stairs.length && needsTool && (misses >= 8 || !usable) && count(inventory, COBBLESTONE) >= 3) {
-      await ensurePlanks(action, craft, 6);
-      await craft('minecraft:crafting_table', 1);
-      if (count(await action('get_inventory'), 'minecraft:stick') < 2) await craft('minecraft:stick', 4);
-      const toolTable = await placeBeside(action, 'minecraft:crafting_table');
-      await openCampTable(action, toolTable, visited);
-      await craft(STONE_PICKAXE, 1);
-      await action('stop', { closeScreen: true });
-      await hold(action, STONE_PICKAXE);
-      madeBackup = true;
+      await makePickaxe();
       continue;
     }
     const scoutDownhill = !stairs.length && player.position.y >= 88 && highlandSearch < 48
