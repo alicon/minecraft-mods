@@ -362,6 +362,24 @@ test('the respawn route picks up the original dropped guide before the remaining
   assert.deepEqual(picked, [11, 10]);
 });
 
+test('the respawn route can verify the original live companion when the guide is gone', async () => {
+  const { recoverDroppedLoadout } = await import('./expedition-home.mjs');
+  const companionUuid = '032ed6d2-13a5-466b-8750-1f1b02ce3e36';
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe': return { inWorld: true, health: 15, position: { x: 10, y: 64, z: 10 } };
+      case 'get_inventory': return { slots: [
+        { id: 'minecraft:stone_pickaxe', count: 1 },
+        { id: 'minecraft:furnace', count: 1 },
+      ] };
+      case 'get_entities': return { entities: args.type === 'mushroom_yorkie:mushroom_yorkie'
+        ? [{ uuid: companionUuid, health: 5 }] : [] };
+      default: throw new Error(`Unexpected action: ${name}`);
+    }
+  };
+  assert.equal(await recoverDroppedLoadout(action, [10, 64, 10], { companionUuid }), 'companion');
+});
+
 test('a gear recovery with low health stops before approaching the old death location', async () => {
   const { recoverDroppedLoadout } = await import('./expedition-home.mjs');
   await assert.rejects(recoverDroppedLoadout(async name => {
@@ -397,6 +415,24 @@ test('a recovery forage keeps the chicken collected through ordinary play', asyn
   };
   assert.equal(await forageExpeditionMeal(action, { toward: [40, 64, 0] }), true);
   assert.ok(hunted && collected);
+});
+
+test('the reserved recovery meal moves out of reach of automatic hotbar eating', async () => {
+  const { packRecoveryMeal } = await import('./expedition-home.mjs');
+  const actions = [];
+  await packRecoveryMeal(async (name, args) => {
+    actions.push([name, args]);
+    if (name === 'get_inventory') return { slots: [
+      { slot: 2, id: 'minecraft:beef', count: 1 },
+      { slot: 9, id: 'minecraft:stick', count: 2 },
+    ] };
+    return {};
+  });
+  assert.deepEqual(actions, [
+    ['get_inventory', undefined],
+    ['stop', { closeScreen: true }],
+    ['click_slot', { slot: 10, action: 'swap', hotbar: 2 }],
+  ]);
 });
 
 test('feeding only succeeds when the original dog is reached and consumes one meal', async () => {

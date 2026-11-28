@@ -5,7 +5,7 @@ import { dirname, isAbsolute, join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import {
   adoptAtNight, earnIronKit, earnStoneKit, feedAdoptedDog, forageExpeditionMeal, prepareAdoptionCamp,
-  breakVisible, climbQuarry, descendQuarry, ensurePlanks, hold, placeBeside, recoverDroppedLoadout, retreatFromNearbyMob,
+  breakVisible, climbQuarry, descendQuarry, ensurePlanks, hold, packRecoveryMeal, placeBeside, recoverDroppedLoadout, retreatFromNearbyMob,
   settleOnDryStep, WOOD_LOGS,
 } from './expedition-home.mjs';
 import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
@@ -364,35 +364,57 @@ async function runExpedition(start, stage) {
     companion = checkpoint.dog;
     await action('stop', { closeScreen: true });
     const missingGuide = !inventory.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide');
-    const lostQuarryKit = ['iron', 'nether'].includes(checkpoint.phase) && deathAtStart
+    const newDeath = Number(deathAtStart.trim().split(' ').at(-1)) > checkpoint.gameTime;
+    const lostQuarryKit = ['iron', 'nether'].includes(checkpoint.phase) && newDeath
       && !inventory.slots.some(stack => stack.id === 'minecraft:stone_pickaxe')
       && !inventory.slots.some(stack => stack.id === 'minecraft:furnace');
     if (['stone', 'iron', 'nether'].includes(checkpoint.phase)
-        && (checkpoint.recoveryDestination || missingGuide || lostQuarryKit)) {
+        && (checkpoint.recoveryDestination || missingGuide && (!checkpoint.recoveredWithoutGuide || newDeath) || lostQuarryKit)) {
       const destination = checkpoint.recoveryDestination ?? verifiedDeathSite(start, checkpoint);
       checkpoint.recoveryDestination = destination;
       await writeCheckpoint(checkpoint);
       const { x, y, z } = start.position;
-      if (Math.hypot(destination[0] - x, destination[1] - y, destination[2] - z) > 32) {
-        await narrate('Objective', 'Earn a meal for Mushroom before returning from the respawn point.');
-        if (!inventory.slots.some(stack => stack.id.endsWith('_sword'))) {
-          const visited = [];
-          const rejected = new Set();
-          let player = start;
-          for (let retreat = 0; retreat < 10; retreat++) {
-            if (!await retreatFromNearbyMob(action, player, visited, rejected)) break;
-            player = await action('observe');
+      const longReturn = Math.hypot(destination[0] - x, destination[1] - y, destination[2] - z) > 32;
+      const resumeAutoEat = longReturn && (await action('set_reflexes'))?.autoEat;
+      if (resumeAutoEat) await action('set_reflexes', { autoEat: false });
+      try {
+        if (longReturn) {
+          await narrate('Objective', 'Earn food for the player and Mushroom before returning from the respawn point.');
+          if (!inventory.slots.some(stack => stack.id.endsWith('_sword'))) {
+            const visited = [];
+            const rejected = new Set();
+            let player = start;
+            for (let retreat = 0; retreat < 10; retreat++) {
+              if (!await retreatFromNearbyMob(action, player, visited, rejected)) break;
+              player = await action('observe');
+            }
+            assert.ok(player.health >= 8 && !player.threats?.some(threat => threat.distance <= 3),
+              'Could not reach safe ground to rebuild tools after respawn');
+            await gatherStarterTools(player, { combatOnly: true });
           }
-          assert.ok(player.health >= 8 && !player.threats?.some(threat => threat.distance <= 3),
-            'Could not reach safe ground to rebuild tools after respawn');
-          await gatherStarterTools(player, { combatOnly: true });
+          assert.ok(await forageExpeditionMeal(action, { toward: destination, minimum: 2 }),
+            'Could not find food for the player and Mushroom before the return');
+          await narrate('Result', 'Packed food for the player and reserved one portion for Mushroom.');
         }
-        assert.ok(await forageExpeditionMeal(action, { toward: destination }), 'Could not find a meal before the return to Mushroom');
-        await narrate('Result', 'Packed an earned meal for the return to Mushroom.');
+        await narrate('Objective', 'Return to the recorded death site and collect the dropped gear.');
+        console.log(JSON.stringify({ at: new Date().toISOString(), action: 'recover_dropped_loadout', destination }));
+        const recovered = await recoverDroppedLoadout(action, destination, {
+          reserveMeal: longReturn, companionUuid: checkpoint.dog,
+        });
+        checkpoint.recoveredWithoutGuide = recovered === 'companion';
+        checkpoint.gameTime = (await action('observe')).gameTime;
+        if (checkpoint.recoveredWithoutGuide) {
+          await narrate('Result', 'Recovered the stone kit and verified the original living Mushroom at camp.');
+        }
+      } finally {
+        if (resumeAutoEat) {
+          try {
+            await packRecoveryMeal(action);
+          } finally {
+            await action('set_reflexes', { autoEat: true });
+          }
+        }
       }
-      await narrate('Objective', 'Return to the recorded death site and collect the dropped gear.');
-      console.log(JSON.stringify({ at: new Date().toISOString(), action: 'recover_dropped_loadout', destination }));
-      await recoverDroppedLoadout(action, destination);
       delete checkpoint.quarry;
       delete checkpoint.quarryLanding;
       delete checkpoint.reenterQuarry;

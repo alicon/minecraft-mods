@@ -168,8 +168,11 @@ screen, then uses Minecraft's Respawn button in the same save. If the
 controller stopped and has a saved phase, the runner reattaches it once for
 that death. The controller can follow a dry route to the recorded location
 and recover the dropped guide and gear. When respawn is far away, it makes
-a wooden sword if needed and earns food for Mushroom along the way. It
+a wooden sword if needed and earns food for the player and Mushroom along
+the way. The last portion stays reserved for Mushroom. The controller
 retains the original gear location if the player dies again during recovery.
+If the guide is missing, it verifies the saved companion's UUID and confirms
+that the recovered stone kit is in the player's inventory before continuing.
 The trace records the deaths, provisioning, and gear reacquisition.
 
 If a live controller has exited and its status is `held`, restart the external

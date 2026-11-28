@@ -55,6 +55,21 @@ function count({ slots }, item) {
   return slots.reduce((total, stack) => total + (stack.id === item ? stack.count : 0), 0);
 }
 
+function dogMealCount(inventory) {
+  return inventory.slots.reduce((total, stack) => total + (DOG_FOOD.includes(stack.id) ? stack.count : 0), 0);
+}
+
+export async function packRecoveryMeal(action) {
+  const { slots } = await action('get_inventory');
+  const meals = slots.filter(stack => DOG_FOOD.includes(stack.id));
+  if (!meals.length || meals.some(stack => stack.slot >= 9)) return;
+  const free = Array.from({ length: 27 }, (_, index) => index + 9)
+    .find(slot => !slots.some(stack => stack.slot === slot));
+  if (free === undefined) return;
+  await action('stop', { closeScreen: true });
+  await action('click_slot', { slot: free, action: 'swap', hotbar: meals[0].slot });
+}
+
 function woolColor(inventory) {
   const colors = new Set(inventory.slots.map(({ id }) => WOOL.exec(id)?.[1]).filter(Boolean));
   return [...colors].find(color => count(inventory, `minecraft:${color}_wool`) >= 3);
@@ -608,14 +623,15 @@ async function seekExpeditionFood(action, player, visited, rejectedSteps, tried,
   }
 }
 
-export async function forageExpeditionMeal(action, { camp, toward } = {}) {
+export async function forageExpeditionMeal(action, { camp, toward, minimum = 1 } = {}) {
   const visited = [];
   const rejectedSteps = new Set();
   const tried = new Set();
   let returning = Boolean(camp);
+  let searchToward = toward;
   for (let attempt = 0; attempt < (camp || toward ? 48 : 28); attempt++) {
     const inventory = await action('get_inventory');
-    if (DOG_FOOD.some(item => count(inventory, item))) return true;
+    if (dogMealCount(inventory) >= minimum) return true;
     const player = await action('observe');
     if (!player?.inWorld || player.dead || player.health < 8) return false;
     if (await retreatFromNearbyMob(action, player, visited, rejectedSteps)) continue;
@@ -629,7 +645,10 @@ export async function forageExpeditionMeal(action, { camp, toward } = {}) {
         continue;
       }
     }
-    await seekExpeditionFood(action, player, visited, rejectedSteps, tried, toward);
+    if (searchToward && Math.hypot(searchToward[0] - player.position.x, searchToward[2] - player.position.z) <= 8) {
+      searchToward = undefined;
+    }
+    await seekExpeditionFood(action, player, visited, rejectedSteps, tried, searchToward);
   }
   return false;
 }
@@ -1011,7 +1030,7 @@ export async function sleepNearby(action, player) {
   return false;
 }
 
-export async function recoverDroppedLoadout(action, destination) {
+export async function recoverDroppedLoadout(action, destination, { reserveMeal = false, companionUuid } = {}) {
   const visited = [];
   const rejectedSteps = new Set();
   let stalled = 0;
@@ -1022,6 +1041,11 @@ export async function recoverDroppedLoadout(action, destination) {
     if (await retreatFromNearbyMob(action, player, visited, rejectedSteps)) continue;
     assert.ok(player.health >= 10, 'The return to the dropped gear became unsafe');
     if (attempt === 0 && await sleepNearby(action, player)) continue;
+    if (reserveMeal && player.food <= 16 && player.health < 18) {
+      const stock = await action('get_inventory');
+      const meal = DOG_FOOD.find(item => count(stock, item));
+      if (meal && dogMealCount(stock) > 1 && await eatExpeditionMeal(action, player, meal)) continue;
+    }
     const here = feet(player);
     if (Math.hypot(...destination.map((coordinate, axis) => coordinate - here[axis])) <= 5) {
       const { entities } = await action('get_entities', { type: 'item', radius: 8 });
@@ -1031,7 +1055,12 @@ export async function recoverDroppedLoadout(action, destination) {
         if (Math.abs(drop.pos[1] - player.position.y) > 1.5) continue;
         await action('go_to', { entityId: drop.id, stopDistance: 0.25, maxTicks: 40 });
       }
-      if (count(await action('get_inventory'), FIELD_GUIDE)) return;
+      const stock = await action('get_inventory');
+      if (count(stock, FIELD_GUIDE)) return 'guide';
+      if (companionUuid && count(stock, STONE_PICKAXE) && count(stock, FURNACE)) {
+        const dogs = await action('get_entities', { type: DOG, radius: FEEDING_SEARCH_RADIUS });
+        if (dogs?.entities.some(dog => dog.uuid === companionUuid && dog.health > 0)) return 'companion';
+      }
     }
     visited.push(here);
     const recent = new Set(visited.slice(-16).map(([x, , z]) => `${x},${z}`));
@@ -1045,7 +1074,7 @@ export async function recoverDroppedLoadout(action, destination) {
     if (stalled >= 3) break;
   }
   await takeCover(action);
-  throw new Error('Could not recover the original guide from the place where the player died');
+  throw new Error('Could not verify the original expedition after returning to the dropped gear');
 }
 
 export async function earnStoneKit(action, craft, { table, bed },
