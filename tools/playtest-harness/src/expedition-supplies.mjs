@@ -5,7 +5,8 @@ import { dirname, isAbsolute, join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import {
   adoptAtNight, dogMealCount, earnIronKit, earnStoneKit, feedAdoptedDog, forageExpeditionMeal, prepareAdoptionCamp,
-  breakVisible, climbQuarry, descendQuarry, ensurePlanks, hold, packRecoveryMeal, placeBeside, recoverDroppedLoadout, retreatFromNearbyMob,
+  breakVisible, climbQuarry, descendQuarry, ensurePlanks, hold, packRecoveryMeal, placeBeside, recoverDroppedLoadout,
+  regroupExpeditionCompanion, retreatFromNearbyMob,
   settleOnDryStep, stepOut, WOOD_LOGS,
 } from './expedition-home.mjs';
 import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
@@ -527,11 +528,21 @@ async function runExpedition(start, stage) {
     }
     policy.reserveCompanionMeal = true;
     policy.scoutNewGround = resume && !checkpoint.quarry?.length;
-    policy.companionNeedsCare = async player => {
+    let lastCompanionPosition;
+    policy.checkCompanion = async (player, canRegroup) => {
       const dogs = await action('get_entities', { type: 'mushroom_yorkie:mushroom_yorkie', radius: 32 });
       const dog = dogs?.entities.find(entity => entity.uuid === checkpoint.dog);
-      return dog?.health > 0 && (dog.health <= 8
-        || player.gameTime - (checkpoint.lastDogMealAt ?? checkpoint.gameTime) >= DOG_MEAL_INTERVAL);
+      if (dog?.health > 0) lastCompanionPosition = dog.pos;
+      if (canRegroup && (!dog || dog.distance > 16)) {
+        await narrate('Decision', 'Pause mining and regroup with the original Mushroom.');
+        const together = await regroupExpeditionCompanion(action, checkpoint.dog, lastCompanionPosition);
+        lastCompanionPosition = together.pos;
+        await narrate('Result', 'The original Mushroom is back within six blocks.');
+        return 'regrouped';
+      }
+      if (dog?.health > 0 && (dog.health <= 8
+        || player.gameTime - (checkpoint.lastDogMealAt ?? checkpoint.gameTime) >= DOG_MEAL_INTERVAL)) return 'care';
+      return null;
     };
     policy.tendCompanion = async () => {
       await narrate('Objective', 'Feed the original Mushroom before resuming mining.');
@@ -541,9 +552,15 @@ async function runExpedition(start, stage) {
         [player.position.x, player.position.y, player.position.z].map(Math.floor), 30),
       'Could not feed the original dog before returning to the quarry');
       checkpoint.fedDog = true;
-      checkpoint.lastDogMealAt = (await action('observe')).gameTime;
+      const afterMeal = await action('observe');
+      checkpoint.lastDogMealAt = afterMeal.gameTime;
       if (live) await writeCheckpoint(checkpoint);
-      await narrate('Result', 'The original Mushroom ate one portion. Returning to camp.');
+      const dogs = await action('get_entities', { type: 'mushroom_yorkie:mushroom_yorkie', radius: 24 });
+      const dog = dogs?.entities.find(entity => entity.uuid === checkpoint.dog);
+      const returnToCamp = afterMeal.timeOfDay >= 10_500 || afterMeal.health < 14 || !(dog?.health >= 9);
+      await narrate('Result', 'The original Mushroom ate one portion.'
+        + (returnToCamp ? ' Returning to camp.' : ' Continuing from here.'));
+      return returnToCamp;
     };
     if (live) {
       policy.resumeQuarry = checkpoint.quarry;
@@ -559,6 +576,7 @@ async function runExpedition(start, stage) {
     const restoreAutoEat = (await action('set_reflexes'))?.autoEat;
     if (restoreAutoEat) await action('set_reflexes', { autoEat: false });
     try {
+      if (!checkpoint.quarry?.length) await policy.checkCompanion(await action('observe'), true);
       if (!checkpoint.quarry?.length && dogMealCount(await action('get_inventory')) < 2) {
         await narrate('Objective', 'Gather food for Mushroom and keep a spare portion for the quarry.');
         assert.ok(await forageExpeditionMeal(action, { toward: checkpoint.camp.bed, minimum: 2 }),

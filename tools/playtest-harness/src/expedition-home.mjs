@@ -1150,6 +1150,29 @@ export async function sleepNearby(action, player) {
   return false;
 }
 
+export async function regroupExpeditionCompanion(action, uuid, lastPosition) {
+  const visited = [];
+  const rejected = new Set();
+  let blocked = 0;
+  for (let approach = 0; approach < 36; approach++) {
+    const player = await action('observe');
+    assert.ok(player?.inWorld && !player.dead && player.health >= 8, 'The player became unsafe during regrouping');
+    const dogs = await action('get_entities', { type: DOG, radius: 128 });
+    const dog = dogs?.entities.find(entity => entity.uuid === uuid && entity.health > 0);
+    if (dog?.distance <= 6) return dog;
+    lastPosition = dog?.pos ?? lastPosition;
+    assert.ok(lastPosition, 'The original Mushroom is out of sight and has no recorded position');
+    if (await retreatFromNearbyMob(action, player, visited, rejected)) continue;
+    const here = feet(player);
+    const ground = Math.hypot(here[0] - lastPosition[0], here[2] - lastPosition[2]) <= 8
+      ? 'elevation' : 'surface';
+    visited.push(here);
+    if (await stepOut(action, player, visited, lastPosition, ground, rejected)) blocked = 0;
+    else if (++blocked >= 4) break;
+  }
+  throw new Error('Could not reach the last known position of the original Mushroom');
+}
+
 export async function recoverDroppedLoadout(action, destination, { reserveMeal = false, companionUuid } = {}) {
   const visited = [];
   const rejectedSteps = new Set();
@@ -1367,26 +1390,27 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
     }
     const player = await action('observe');
     if (!stairs.length && await retreatFromNearbyMob(action, player, visited, rejectedSteps)) continue;
+    if (policy.checkCompanion && player.gameTime >= nextCompanionCheck) {
+      nextCompanionCheck = player.gameTime + 40;
+      const dogStatus = await policy.checkCompanion(player, !stairs.length);
+      if (dogStatus === 'regrouped') continue;
+      if (dogStatus === 'care' && !returningAfterCare) {
+        if (stairs.length) {
+          await leaveQuarry(action, stairs, policy);
+          stairs.length = 0;
+          await policy.saveQuarry?.([]);
+        }
+        returningAfterCare = await policy.tendCompanion();
+        misses = 0;
+        continue;
+      }
+    }
     if (returningAfterCare) {
       const here = feet(player);
       returningAfterCare = Math.hypot(...here.map((coordinate, axis) => coordinate - bed[axis])) > 6;
       if (returningAfterCare) {
         visited.push(here);
         await stepOut(action, player, visited, bed, 'surface', rejectedSteps);
-        continue;
-      }
-    }
-    if (policy.companionNeedsCare && player.gameTime >= nextCompanionCheck) {
-      nextCompanionCheck = player.gameTime + 40;
-      if (await policy.companionNeedsCare(player)) {
-        if (stairs.length) {
-          await leaveQuarry(action, stairs, policy);
-          stairs.length = 0;
-          await policy.saveQuarry?.([]);
-        }
-        await policy.tendCompanion();
-        returningAfterCare = true;
-        misses = 0;
         continue;
       }
     }

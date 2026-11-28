@@ -942,20 +942,22 @@ test('iron work returns to camp after feeding the injured companion before spend
     }
   };
   const policy = {
-    companionNeedsCare: async () => {
+    checkCompanion: async () => {
       checkedAt.push(x);
-      if (checkedAt.length > 1) throw atCamp;
-      return true;
+      if (x === 8) throw atCamp;
+      return 'care';
     },
     tendCompanion: async () => {
       assert.equal(x, 0);
+      assert.equal(caredFor, false);
       caredFor = true;
+      return true;
     },
   };
   await assert.rejects(earnIronKit(action, () => assert.fail('No recipe has ingredients'), {
     bed: [8, 1, 0],
   }, policy), error => error === atCamp);
-  assert.deepEqual(checkedAt, [0, 8]);
+  assert.deepEqual(checkedAt, [0, 0, 8]);
 });
 
 test('the first earned ingot funds a shield before scouting for the rest of the kit', async () => {
