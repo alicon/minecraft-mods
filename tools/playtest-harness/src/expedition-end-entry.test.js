@@ -30,6 +30,37 @@ test('a stronghold bearing uses observed horizontal flight and ignores vertical 
   assert.deepEqual(eyeBearing([4, 62, 3], [1, 63, 7]), { x: -0.6, z: 0.8, distance: 5 });
 });
 
+test('the single-eye replay walks in the observed direction with the original dog', async () => {
+  const { scoutByEye } = await import('./expedition-eye-route.mjs');
+  const eye = { uuid: 'thrown-eye', pos: [0, 65, 0] };
+  const ground = Array.from({ length: 12 }, (_, x) => cell(x, 63, 0, 'grass_block'));
+  const readings = [];
+  let position = { x: 0.5, y: 64, z: 0.5 };
+  let flight;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe': return { inWorld: true, dimension: 'minecraft:overworld', health: 20, onGround: true, position };
+      case 'get_inventory': return { slots: [{ slot: 0, id: 'minecraft:ender_eye', count: 1 }] };
+      case 'select_slot': return { mainHand: { id: 'minecraft:ender_eye' } };
+      case 'look': return {};
+      case 'use_item': flight = 0; return {};
+      case 'get_entities':
+        if (args.type === 'minecraft:eye_of_ender') {
+          return { entities: flight === undefined ? [] : [{ ...eye, pos: [flight++ * 5, 65, 0] }] };
+        }
+        return { entities: [{ uuid: 'original', health: 12 }] };
+      case 'get_blocks': return { cells: ground };
+      case 'go_to':
+        position = { x: args.pos[0] + 0.5, y: args.pos[1], z: args.pos[2] + 0.5 };
+        return { arrived: true, position: [position.x, position.y, position.z] };
+      default: assert.fail(name);
+    }
+  };
+  await scoutByEye(action, 'original', reading => readings.push(reading));
+  assert.deepEqual(readings, [{ x: 1, z: 0, distance: 5, eye: eye.uuid }]);
+  assert.ok(position.x >= 8.5);
+});
+
 test('End entry finds the full observed ring and sorts dry, unobstructed approaches by distance', async () => {
   const { findEndRing } = await import('./expedition-end-entry.mjs');
   const ring = findEndRing([...frame, ...dryFloor], player);

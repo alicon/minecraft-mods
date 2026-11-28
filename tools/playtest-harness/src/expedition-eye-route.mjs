@@ -71,8 +71,8 @@ export async function scoutByEye(action, uuid, report = async () => {}) {
   const rejected = new Set();
   for (let step = 0; step < 16; step++) {
     const player = await action('observe');
-    assert.ok(player?.inWorld && player.health >= 8 && player.dimension === OVERWORLD,
-      travel.returning ? 'Returning to the expedition bed became unsafe' : 'Stronghold scouting became unsafe');
+    assert.ok(player?.inWorld && !player.dead && player.health >= 8 && player.dimension === OVERWORLD,
+      'Stronghold scouting became unsafe');
     if (advance(player.position) >= 8) {
       await withCompanion(action, OVERWORLD, uuid);
       return;
