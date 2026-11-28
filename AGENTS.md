@@ -47,6 +47,17 @@ progression dominates, run the closest focused mod check and keep the
 long-duration run when it is still useful. Record harness failures as
 harness evidence and keep the full acceptance criteria for the owning issue.
 
+While working on [Mushroom expedition #158](https://github.com/alicon/minecraft-mods/issues/158),
+read the newest **Hourly Astra review** on continuation and at the next long-run
+review. The Mac also keeps the last delivered review in
+`~/Library/Application Support/MushroomQA/hourly-review/latest.md`.
+Compare its evidence with the current save and choose the next experiment.
+Carry forward the last verified Mushroom behavior, the farthest point reached
+in one uninterrupted campaign, and any intervention needed. A repeated harness
+stall calls for a different tactic. A focused replay can verify a mod fix while
+the campaign continues. Record what happened when the player next encounters
+that situation through ordinary play.
+
 ## Safe live testing
 
 Use a disposable copied save for destructive scenarios, never a family save.
