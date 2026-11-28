@@ -51,6 +51,10 @@ While working on [Mushroom expedition #158](https://github.com/alicon/minecraft-
 read the newest **Hourly Astra review** on continuation and at the next long-run
 review. The Mac also keeps the last delivered review in
 `~/Library/Application Support/MushroomQA/hourly-review/latest.md`.
+On Abel’s Mac, the expedition checkout publishes a timestamped local status
+and report summary after commits. At an uncommitted QA checkpoint or after
+a local run finishes, refresh it for the hourly reviewer with
+`/usr/bin/python3 "$HOME/Library/Application Support/MushroomQA/hourly-review/review.py" --publish-checkpoint`.
 Compare its evidence with the current save and choose the next experiment.
 Carry forward the last verified Mushroom behavior, the farthest point reached
 in one uninterrupted campaign, and any intervention needed. A repeated harness
