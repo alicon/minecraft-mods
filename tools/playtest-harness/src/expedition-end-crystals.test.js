@@ -1,6 +1,21 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
+test('a cage approach uses a dry column outside the spike and a clear adjacent descent', async () => {
+  const { cageApproach } = await import('./expedition-end-cage.mjs');
+  const crystal = { pos: [0.5, 85, 0.5] };
+  const player = { position: { x: 8.5, y: 64, z: 0.5 } };
+  const cells = [-1, 0, 1].map(offset => ({ x: 2, y: 85 + offset, z: 0, b: 'minecraft:iron_bars' }));
+  for (let x = 4; x <= 7; x++) cells.push({ x, y: 63, z: 0, b: 'minecraft:end_stone' });
+  cells.push({ x: 4, y: 71, z: 0, b: 'minecraft:obsidian' });
+  cells.push({ x: 7, y: 69, z: 0, b: 'minecraft:obsidian' });
+  const plan = cageApproach(cells, crystal, player);
+  assert.deepEqual(plan.base, [5, 64, 0]);
+  assert.equal(plan.top, 84);
+  assert.equal(plan.face, 'east');
+  assert.deepEqual(plan.bars, [[2, 84, 0], [2, 85, 0], [2, 86, 0]]);
+});
+
 test('a full draw crosses the target height between flight ticks', async () => {
   const { bowAim } = await import('./expedition-ballistics.mjs');
   const player = { position: { x: 0.5, y: 60, z: 0.5 } };

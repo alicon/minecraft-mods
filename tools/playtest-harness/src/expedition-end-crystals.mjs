@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
 import { hold, stepOut } from './expedition-home.mjs';
 import { bowAim } from './expedition-ballistics.mjs';
+import { openCrystalCage } from './expedition-end-cage.mjs';
 
 const CRYSTAL = 'minecraft:end_crystal';
 const DOG = 'mushroom_yorkie:mushroom_yorkie';
@@ -61,11 +62,14 @@ export async function clearGeneratedCrystals(action, uuid, report) {
   const broken = new Set();
   const positionsTried = new Set();
   const misses = new Map();
+  const cageStatus = new Map();
+  const openedCages = new Map();
   const visited = [];
   const rejected = new Set();
   let destination;
   let detourSteps = 0;
   let nextRecovery = 0;
+  let nextCageAttempt = 0;
 
   for (let attempt = 0; attempt < 160 && broken.size < SPIKE_COUNT; attempt++) {
     const player = await action('observe');
@@ -108,13 +112,28 @@ export async function clearGeneratedCrystals(action, uuid, report) {
 
     const group = [Math.floor(here[0] / 6), Math.floor(here[2] / 6)].join(',');
     const view = await action('get_entities', { type: CRYSTAL, radius: 128 });
-    for (const crystal of view?.entities ?? []) seen.set(crystal.uuid, crystal);
+    for (const crystal of view?.entities ?? []) {
+      seen.set(crystal.uuid, crystal);
+      if (cageStatus.has(crystal.uuid)) continue;
+      const terrain = await action('get_blocks', { center: crystal.pos.map(Math.floor), size: [5, 5, 5], format: 'json' });
+      if (terrain && !terrain.stats?.unloadedChunks) {
+        cageStatus.set(crystal.uuid, terrain.cells.some(cell => cell.b === 'minecraft:iron_bars'));
+      }
+    }
     const candidates = (view?.entities ?? []).filter(crystal => !broken.has(crystal.uuid))
       .map(crystal => ({ crystal, range: distance(crystal.pos, here),
       key: `${crystal.uuid}:${group}`, aim: bowAim(player, [crystal.pos[0], crystal.pos[1] + 1, crystal.pos[2]]) }))
       .filter(shot => distance(shot.crystal.pos, dog.pos) >= 14)
       .sort((a, b) => (misses.get(a.crystal.uuid) ?? 0) - (misses.get(b.crystal.uuid) ?? 0) || a.range - b.range);
-    const shot = candidates.find(candidate => candidate.aim && candidate.range >= 14 && !positionsTried.has(candidate.key));
+    const guarded = candidates.filter(({ crystal }) => cageStatus.get(crystal.uuid) && !openedCages.has(crystal.uuid));
+    const activeWindow = candidates.find(({ crystal }) => openedCages.has(crystal.uuid));
+    const vantage = activeWindow && openedCages.get(activeWindow.crystal.uuid);
+    const shot = candidates.find(candidate => {
+      const id = candidate.crystal.uuid;
+      if (!candidate.aim || candidate.range < 14 || positionsTried.has(candidate.key)) return false;
+      if (!cageStatus.get(id)) return !activeWindow;
+      return id === activeWindow?.crystal.uuid && Math.hypot(here[0] - vantage[0], here[2] - vantage[2]) <= 3;
+    });
     if (shot && detourSteps === 0) {
       positionsTried.add(shot.key);
       const destroyed = await fireAtCrystal(action, shot, 128, player.health);
@@ -124,9 +143,24 @@ export async function clearGeneratedCrystals(action, uuid, report) {
       continue;
     }
 
+    if (!vantage && guarded.length && broken.size >= 5 && player.health >= 16 && player.gameTime >= nextCageAttempt) {
+      const { crystal } = guarded.sort((a, b) => a.range - b.range)[0];
+      nextCageAttempt = player.gameTime + 400;
+      const line = await openCrystalCage(action, player, crystal, () => dragonBreathThreat(action));
+      if (line) {
+        openedCages.set(crystal.uuid, line);
+        await report({ crystal, position: line, openedCage: true });
+        detourSteps = 0;
+        continue;
+      }
+      continue;
+    }
+
     const next = candidates[0]?.crystal;
     if (detourSteps === 0 || !destination) {
-      if (next) {
+      if (vantage) {
+        destination = [vantage[0], here[1], vantage[2]];
+      } else if (next) {
         // Move around the spike to get a different sightline, then measure again.
         const angle = Math.atan2(here[2] - next.pos[2], here[0] - next.pos[0]) + Math.PI / 3;
         destination = [Math.floor(next.pos[0] + 24 * Math.cos(angle)), here[1],

@@ -126,6 +126,12 @@ final class ExpeditionEndCrystalClientScenario {
 			owner.getInventory().add(new ItemStack(Items.ARROW, 64));
 			owner.getInventory().add(new ItemStack(Items.ARROW, 32));
 			owner.getInventory().add(new ItemStack(Items.GOLDEN_APPLE, 4));
+			owner.getInventory().add(new ItemStack(Items.DIAMOND_PICKAXE));
+			owner.getInventory().add(new ItemStack(Items.COBBLESTONE, 64));
+			owner.getInventory().add(new ItemStack(Items.COBBLESTONE, 64));
+			for (int bucket = 0; bucket < 4; bucket++) {
+				owner.getInventory().add(new ItemStack(Items.WATER_BUCKET));
+			}
 			owner.getInventory().add(new ItemStack(ModItems.CAMP_MAT));
 			var dog = Objects.requireNonNull(ModEntities.MUSHROOM_YORKIE.create(end, EntitySpawnReason.TRIGGERED));
 			dog.claimFor(owner);

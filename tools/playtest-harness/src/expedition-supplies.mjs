@@ -255,9 +255,10 @@ try {
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
     const camp = await markExpeditionCamp(action);
     if (stage === 'generated-end-crystals') {
-      await clearGeneratedCrystals(action, companion, async ({ crystal, position, destroyed }) => {
-        console.log(JSON.stringify({ at: new Date().toISOString(), action: 'generated_crystal_shot',
-          crystal: crystal.uuid, target: crystal.pos, position, destroyed, camp, dog: companion }));
+      await clearGeneratedCrystals(action, companion, async ({ crystal, position, destroyed, openedCage }) => {
+        console.log(JSON.stringify({ at: new Date().toISOString(), action: openedCage ? 'generated_cage_opened' : 'generated_crystal_shot',
+          crystal: crystal.uuid, target: crystal.pos, position, destroyed, openedCage, camp, dog: companion }));
+        if (openedCage) await narrate('Result', 'Opened a crystal cage and descended to the ground.');
         if (destroyed) await narrate('Result', 'A generated End crystal broke.');
       });
     } else {
