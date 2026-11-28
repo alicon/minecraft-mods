@@ -1309,7 +1309,20 @@ async function packStarterTable(pos) {
     }
   }
   await setTimeout(400);
-  assert.ok(hasTable(await action('get_inventory')), 'The player did not pick up the crafting table');
+  if (hasTable(await action('get_inventory'))) return;
+
+  // The dropped table can roll off the tile where it was placed.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const drops = await action('get_entities', { type: 'item', radius: 8 });
+    const table = drops?.entities.find(entity => entity.item?.id === 'minecraft:crafting_table');
+    if (!table) break;
+    await action('go_to', { entityId: table.id, stopDistance: 0.3, maxTicks: 55 });
+    await setTimeout(400);
+    if (hasTable(await action('get_inventory'))) return;
+  }
+  await narrate('Decision', 'The table drop is out of reach. Make a replacement with earned planks.');
+  await ensurePlanks(action, craft, 4);
+  await craft('crafting_table', 1);
 }
 
 async function gatherStarterTools(start, { combatOnly = false, timberToward } = {}) {
