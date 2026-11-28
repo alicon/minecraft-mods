@@ -959,11 +959,11 @@ async function collectStarterLogs(start, toward) {
     if (!await retreatFromNearbyMob(action, positionAtStart, visited, rejected)) {
       const { x, y, z } = positionAtStart.position;
       visited.push([x, y, z].map(Math.floor));
-      let target = trunk?.logs[0];
+      let target = trunk?.logs[0] ?? toward;
       if (!target) {
         const wider = await action('scan_blocks', { ...scanArgs, radius: 32, max: 192 });
         const matches = wider?.matches ?? [];
-        target = nearbyTrunk(matches, positionAtStart.position)?.logs[0] ?? toward;
+        target = nearbyTrunk(matches, positionAtStart.position)?.logs[0];
         if (!target) {
           target = matches.flatMap(match => match.positions)
             .sort((a, b) => Math.hypot(a[0] - x, a[2] - z) - Math.hypot(b[0] - x, b[2] - z))[0];
