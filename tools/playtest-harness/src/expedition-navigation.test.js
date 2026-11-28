@@ -1100,6 +1100,35 @@ test('a stair landing that drifts into the next column is not recorded as settle
   assert.equal(readings.length, 0);
 });
 
+test('a grounded stair landing gets time for lateral drift to settle within its column', async () => {
+  const { settleOnDryStep } = await import('./expedition-home.mjs');
+  const landing = [298, 57, 115];
+  const readings = [[298.52, 115.64], [298.50, 115.53], [298.48, 115.36], [298.537, 115.31],
+    [298.648, 115.32], [298.7, 115.36], [298.7, 115.41], [298.7, 115.47], [298.7, 115.59],
+    [298.7, 115.699], [298.7, 115.7]];
+  let sample = 0;
+  const action = async name => {
+    assert.equal(name, 'observe');
+    if (sample === readings.length) return null;
+    const [x, z] = readings[sample++];
+    return { inWorld: true, health: 20, onGround: sample > 3,
+      position: { x, y: sample > 3 ? 57 : 57.6, z } };
+  };
+  assert.equal(await settleOnDryStep(action, landing, async () => {}, true), true);
+  assert.equal(sample, readings.length);
+});
+
+test('a long return after feeding plans for dusk before it takes the exposed route', async () => {
+  const { careReturnNeedsCover } = await import('./expedition-home.mjs');
+  const native = { dimension: 'minecraft:overworld', position: { x: 190.35, y: 74, z: 119.5 }, timeOfDay: 13_628 };
+  const bed = [-12, 63, -6];
+  assert.equal(careReturnNeedsCover(native, bed), true);
+  assert.equal(careReturnNeedsCover({ ...native, timeOfDay: 11_000 }, bed), true);
+  assert.equal(careReturnNeedsCover({ ...native, timeOfDay: 6_000 }, bed), false);
+  assert.equal(careReturnNeedsCover({ ...native, timeOfDay: 23_700 }, bed), false);
+  assert.equal(careReturnNeedsCover(native, [183, 76, 119]), false);
+});
+
 test('the sheep scout waits for its only dry descent instead of rejecting it at the rim', async () => {
   const { stepOut } = await import('./expedition-home.mjs');
   const start = { x: 306.65, y: 67, z: 438.5 };

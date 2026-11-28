@@ -36,6 +36,33 @@ export function leadDragonShot(player, previous, current, drawTicksLeft) {
   return null;
 }
 
+export function dragonSweepDodge(player, previous, current, fountain) {
+  if (!previous || !current || previous.dragon.uuid !== current.dragon.uuid
+      || previous.dragon.perched || current.dragon.perched) return null;
+  const elapsed = current.tick - previous.tick;
+  if (elapsed < 2 || elapsed > 24) return null;
+  const { x, y, z } = player.position;
+  for (const part of current.dragon.parts) {
+    if (!['head', 'body', 'wing'].includes(part.name)) continue;
+    const prior = previous.dragon.parts.find(box => box.id === part.id);
+    if (!prior) continue;
+    const [dx, dy, dz] = part.center.map((coordinate, axis) => (coordinate - prior.center[axis]) / elapsed);
+    const speed = Math.hypot(dx, dz);
+    const [px, py, pz] = part.center;
+    const horizontalRange = Math.hypot(px - x, pz - z);
+    if (speed < 0.35 || speed > 2.5 || horizontalRange > 24) continue;
+    const closest = ((x - px) * dx + (z - pz) * dz) / speed ** 2;
+    if (closest < 1 || closest > 23 || Math.abs(py + closest * dy - y - 1) > 6) continue;
+    const gap = Math.hypot(px + dx * closest - x, pz + dz * closest - z);
+    if (gap > 5.5) continue;
+    const [fx, , fz] = fountain;
+    const options = [-1, 1].map(side => [x - side * 8 * dz / speed, y, z + side * 8 * dx / speed]);
+    options.sort((a, b) => Math.hypot(a[0] - fx, a[2] - fz) - Math.hypot(b[0] - fx, b[2] - fz));
+    return { target: options[0].map(Math.floor), part: part.name, ticks: closest };
+  }
+  return null;
+}
+
 async function observeDragon(action) {
   const view = await action('get_entities', { type: DRAGON, radius: 128, max: 16 });
   return view?.entities.find(entity => entity.parts?.some(part => part.name === 'head'));
@@ -156,6 +183,31 @@ export async function keepLandingBucketOnHotbar(action, stock) {
   await action('select_slot', { slot: workingSlot });
 }
 
+export async function refillEndBucket(action, inventory, water) {
+  if (!inventory.slots.some(stack => stack.id === BUCKET)) return false;
+  await hold(action, BUCKET);
+  await action('look', water ? { at: water } : { pitch: 90 });
+  const filled = await action('use_item');
+  if (filled?.mainHand?.id !== WATER_BUCKET) return false;
+  const selected = (await action('get_inventory')).selectedSlot;
+  const workSlot = selected === inventory.selectedSlot ? (selected + 1) % 9 : inventory.selectedSlot;
+  await action('select_slot', { slot: workSlot });
+  return true;
+}
+
+export function chooseEndWater(scan, player, fountain, triedWater) {
+  const positions = scan?.matches?.find(group => group.name === 'minecraft:water')?.positions ?? [];
+  const { x, y, z } = player.position;
+  const reachable = ([wx, wy, wz]) => Math.hypot(wx + 0.5 - x, wz + 0.5 - z) + 3 * Math.abs(wy - y);
+  const candidates = positions.filter(pos => !triedWater.has(String(pos))
+    && Math.hypot(pos[0] - fountain[0], pos[2] - fountain[2]) >= 10);
+  if (scan?.waterSourcesOnly) return candidates.sort((a, b) => reachable(a) - reachable(b))[0];
+  // Older clients report every flowing block. Prefer the high point of each nearby pool.
+  const poolTops = candidates.filter(([wx, wy, wz]) => !positions.some(([px, py, pz]) =>
+    py > wy && Math.hypot(px - wx, pz - wz) <= 8));
+  return poolTops.sort((a, b) => reachable(a) - reachable(b))[0];
+}
+
 export async function fightEndDragon(action, report, progress = {},
     { useCarriedPickaxe = false, nativeWaterLanding = false, shootWhileFlying = false, stopAfterRefuge = false } = {}) {
   const start = await action('observe');
@@ -165,7 +217,7 @@ export async function fightEndDragon(action, report, progress = {},
   const weapon = options.find(id => stock.slots.some(stack => stack.id === id));
   assert.ok(weapon, 'The dragon fight requires a carried weapon');
   if (nativeWaterLanding) await keepLandingBucketOnHotbar(action, stock);
-  const view = await action('scan_blocks', { blocks: ['bedrock'], radius: 32, max: 128 });
+  const view = await action('scan_blocks', { blocks: ['bedrock'], center: progress.fountain, radius: 32, max: 128 });
   const fountain = findEndFountain(view?.matches?.find(group => group.name === 'minecraft:bedrock')?.positions ?? []);
   assert.ok(fountain, 'The native exit fountain was not found');
   await report('fountain', { position: fountain });
@@ -189,14 +241,20 @@ export async function fightEndDragon(action, report, progress = {},
     ? stock.slots.filter(stack => stack.id === ARROW).reduce((sum, stack) => sum + stack.count, 0) : 0;
   let nextShot = 0;
   let pendingShot;
+  let lastDragonFrame;
   let lastHealth = start.health;
   let endermanAttacker;
   let refugeUntil = 0;
   let usedRefuge = false;
+  let nextWaterSearch = 0;
+  let waterTarget;
+  let waterSteps = 0;
+  const triedWater = new Set();
+  let recovering = false;
   for (let attempt = 0; attempt < 1_200; attempt++) {
     const player = await action('observe');
-    assert.ok(player?.inWorld && player.dimension === END && !player.dead && player.health >= 4,
-      'The player became unsafe during the native dragon fight');
+    assert.ok(player?.inWorld && player.dimension === END && !player.dead && player.health > 0,
+      'The player died during the native dragon fight');
     const attacker = endermanThatHit(player, lastHealth);
     lastHealth = player.health;
     if (attacker !== undefined) {
@@ -220,8 +278,8 @@ export async function fightEndDragon(action, report, progress = {},
       if (!player.inWater) {
         await setTimeout(100);
         const confirmed = await action('observe');
-        assert.ok(confirmed?.inWorld && !confirmed.dead && confirmed.health >= 4,
-          'The player became unsafe on landing');
+        assert.ok(confirmed?.inWorld && !confirmed.dead && confirmed.health > 0,
+          'The player died on landing');
       }
       await report('fall_recovery', { launchY, groundY, landed: true, inWater: player.inWater });
       launchY = undefined;
@@ -231,6 +289,9 @@ export async function fightEndDragon(action, report, progress = {},
     // Vanilla's nearby scan can return the head, wings and tails under the
     // same type as their parent. Include all eight parts plus the dragon.
     const dragon = await observeDragon(action);
+    const dragonFrame = dragon && { tick: player.gameTime, dragon };
+    const dodge = shootWhileFlying ? dragonSweepDodge(player, lastDragonFrame, dragonFrame, fountain) : null;
+    lastDragonFrame = dragonFrame;
     if (!dragon && seenDragon) {
       const exit = await action('scan_blocks', { blocks: ['end_portal'], center: fountain, radius: 5, max: 20 });
       const portals = exit?.matches?.find(group => group.name === 'minecraft:end_portal')?.positions ?? [];
@@ -300,22 +361,47 @@ export async function fightEndDragon(action, report, progress = {},
     if (usedRefuge && player.gameTime >= refugeUntil) {
       usedRefuge = false;
       if (player.inWater && !player.threats?.some(threat => threat.distance < 6)) {
-        const inventory = await action('get_inventory');
-        if (inventory.slots.some(stack => stack.id === BUCKET)) {
-          await hold(action, BUCKET);
-          await action('look', { pitch: 90 });
-          const filled = await action('use_item');
-          if (filled?.mainHand?.id === WATER_BUCKET) {
-            const selected = (await action('get_inventory')).selectedSlot;
-            const workSlot = selected === inventory.selectedSlot ? (selected + 1) % 9 : inventory.selectedSlot;
-            await action('select_slot', { slot: workSlot });
-          }
-        }
+        await refillEndBucket(action, await action('get_inventory'));
       }
     }
-    if (stopAfterRefuge) {
+    if (player.health < 8) recovering = true;
+    if (recovering && player.health >= 14) {
+      recovering = false;
+      await report('health_recovered', { health: player.health });
+    }
+    if (dodge && await stepOut(action, player, [], dodge.target, 'surface', new Set(), undefined, undefined, 18)) {
+      await report('sweep_dodge', dodge);
+      continue;
+    }
+    if (stopAfterRefuge || recovering || dodge) {
       await setTimeout(200);
       continue;
+    }
+    if (nativeWaterLanding && player.onGround && player.health >= 14 && !player.threats?.some(threat => threat.distance < 6)
+        && (waterTarget || player.gameTime >= nextWaterSearch)) {
+      const inventory = await action('get_inventory');
+      if (!waterTarget && !inventory.slots.some(stack => stack.id === WATER_BUCKET)) {
+        const water = await action('scan_blocks', { blocks: ['water'], radius: 28, max: 256, waterSourcesOnly: true });
+        waterTarget = chooseEndWater(water, player, fountain, triedWater);
+        waterSteps = 0;
+      }
+      nextWaterSearch = player.gameTime + 180;
+      if (waterTarget && !breathBlocksWalk(player, waterTarget, clouds)) {
+        const water = waterTarget;
+        const eye = [player.position.x, player.position.y + 1.62, player.position.z];
+        if (Math.hypot(...water.map((axis, index) => axis + 0.5 - eye[index])) <= 4.15) {
+          if (await refillEndBucket(action, inventory, water)) {
+            await report('bucket_refilled', { position: water });
+          } else {
+            triedWater.add(String(water));
+          }
+          waterTarget = undefined;
+          continue;
+        }
+        if (waterSteps++ < 6 && await stepOut(action, player, [], water, 'surface', rejected, undefined, undefined, 36)) continue;
+        triedWater.add(String(water));
+      }
+      waterTarget = undefined;
     }
     // Stay beyond the breath around the fountain while the bow is the
     // safer way to whittle down the dragon. Approach for the final hits.

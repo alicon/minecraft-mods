@@ -52,6 +52,13 @@ function isBedtime(player) {
   return player?.dimension === 'minecraft:overworld' && player.timeOfDay >= 12_542 && player.timeOfDay < 23_460;
 }
 
+export function careReturnNeedsCover(player, bed) {
+  if (player.dimension !== 'minecraft:overworld' || !Number.isFinite(player.timeOfDay)
+      || player.timeOfDay >= 23_500) return false;
+  const remaining = Math.hypot(player.position.x - bed[0] - 0.5, player.position.z - bed[2] - 0.5);
+  return remaining > 24 && player.timeOfDay + remaining * 8 >= 12_250;
+}
+
 function count({ slots }, item) {
   return slots.reduce((total, stack) => total + (stack.id === item ? stack.count : 0), 0);
 }
@@ -955,7 +962,7 @@ export async function mineVisible(action, bed, alreadyMined, wanted, drops, prot
 export async function settleOnDryStep(action, landing, wait = setTimeout, confirmStopped = false) {
   const target = landing.join(',');
   let previous;
-  for (let attempt = 0; attempt < 8; attempt++) {
+  for (let attempt = 0; attempt < (confirmStopped ? 14 : 8); attempt++) {
     const player = await action('observe');
     if (!player?.inWorld || player.dead || player.health < 8 || player.inWater) return false;
     if (player.onGround && feet(player).join(',') === target) {
@@ -968,6 +975,9 @@ export async function settleOnDryStep(action, landing, wait = setTimeout, confir
     } else {
       previous = undefined;
     }
+    // Extend the wait only for a player already supported in the verified
+    // destination column. A drift out of it still invalidates the landing.
+    if (attempt >= 7 && !previous) return false;
     if (attempt === 3 && player.onGround && Math.abs(player.position.y - landing[1] - 1) < 0.05) {
       const dx = landing[0] + 0.5 - player.position.x;
       const dz = landing[2] + 0.5 - player.position.z;
@@ -1242,13 +1252,15 @@ export async function daylightLoadoutIsVisible(action, player, destination) {
   return [SHIELD, FIELD_GUIDE].every(item => nearDeath.some(drop => drop.item.id === item));
 }
 
-export async function recoverDroppedLoadout(action, destination, { reserveMeal = false, companionUuid, direct = false } = {}) {
+export async function recoverDroppedLoadout(action, destination,
+    { reserveMeal = false, companionUuid, direct = false, onCompanionFed } = {}) {
   const visited = [];
   const rejectedSteps = new Set();
   let stalled = 0;
   let detours = 0;
   let healingChecks = 0;
   let blockedRetreats = 0;
+  let nextCompanionCheck = 0;
   for (let attempt = 0; attempt < 100; attempt++) {
     const player = await action('observe');
     assert.ok(player?.inWorld && !player.dead, 'The return to the dropped gear became unsafe');
@@ -1268,6 +1280,16 @@ export async function recoverDroppedLoadout(action, destination, { reserveMeal =
     }
     assert.ok(player.health >= 10, 'The return to the dropped gear became unsafe');
     if (attempt === 0 && await sleepNearby(action, player)) continue;
+    if (reserveMeal && companionUuid && player.gameTime >= nextCompanionCheck) {
+      nextCompanionCheck = player.gameTime + 80;
+      const view = await action('get_entities', { type: DOG, radius: FEEDING_SEARCH_RADIUS });
+      const dog = view?.entities.find(entity => entity.uuid === companionUuid && entity.health > 0 && entity.health <= 8
+        && entity.distance <= 10);
+      if (dog && await feedAdoptedDog(action, companionUuid, feet(player), 12)) {
+        await onCompanionFed?.();
+        continue;
+      }
+    }
     if (reserveMeal && player.food <= 16 && player.health < 18) {
       const stock = await action('get_inventory');
       const meal = DOG_FOOD.find(item => count(stock, item));
@@ -1471,6 +1493,8 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   let blockedCaveSteps = 0;
   let movingToFreshGround = policy.scoutNewGround ? 8 : 0;
   let returningAfterCare = false;
+  let nextReturnCoverCheck = 0;
+  let returningUnderCover = false;
   const triedFoodSources = new Set();
   let exhaustedQuarries = policy.exhaustedQuarries ?? [];
   let bringFirstIronHome = policy.bringFirstIronHome;
@@ -1521,8 +1545,30 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       const here = feet(player);
       returningAfterCare = Math.hypot(...here.map((coordinate, axis) => coordinate - bed[axis])) > 6;
       if (returningAfterCare) {
+        const cautiousReturn = careReturnNeedsCover(player, bed);
+        if (cautiousReturn && isBedtime(player) && player.gameTime >= nextReturnCoverCheck) {
+          nextReturnCoverCheck = player.gameTime + 240;
+          if (await sleepNearby(action, player)) continue;
+          if (await takeCover(action)) {
+            returningUnderCover = true;
+            await policy.reportScouting?.('Waiting in nearby cover for daylight before returning to camp.');
+            continue;
+          }
+        }
+        if (cautiousReturn && player.threats?.some(threat => threat.distance <= 16)) {
+          returningUnderCover = false;
+          if (await retreatFromNearbyMob(action, player, visited, rejectedSteps, 16, 18)) continue;
+          await action('stop');
+          throw new Error('Mushroom’s return to camp needs a route clear of the nighttime mobs');
+        }
+        if (returningUnderCover && cautiousReturn) {
+          await setTimeout(1_500);
+          continue;
+        }
+        returningUnderCover = false;
         visited.push(here);
-        await stepOut(action, player, visited, bed, 'surface', rejectedSteps);
+        await stepOut(action, player, visited, bed, 'surface', rejectedSteps, undefined, undefined,
+          cautiousReturn ? 16 : 90);
         continue;
       }
     }

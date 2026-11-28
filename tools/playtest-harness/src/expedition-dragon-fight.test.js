@@ -95,6 +95,23 @@ test('flying dragon aim leads the exposed head and falls back to the body when t
   assert.equal(leadDragonShot(player, frame(90, -2, 21), frame(104, 0, 21), 5), null);
 });
 
+test('a low incoming dragon sweep calls for a sidestep toward the island', async () => {
+  const { dragonSweepDodge } = await import('./expedition-dragon-fight.mjs');
+  const player = { position: { x: -18.5, y: 59, z: 31.63 } };
+  const fountain = [0, 59, 0];
+  const frame = (tick, center, perched = false) => ({ tick,
+    dragon: { uuid: 'original', perched, parts: [{ name: 'head', id: 27, center }] } });
+  const prev = frame(17_958, [-1.12, 64.05, 16.94]);
+  const danger = frame(17_979, [-10.71, 63.64, 26.02]);
+  const dodge = dragonSweepDodge(player, prev, danger, fountain);
+  assert.ok(dodge.ticks < 18);
+  assert.ok(Math.hypot(dodge.target[0], dodge.target[2]) < Math.hypot(-18.5, 31.63));
+  assert.equal(dragonSweepDodge(player, prev, frame(17_979, [-10.71, 63.64, 26.02], true), fountain), null);
+  assert.equal(dragonSweepDodge(player, danger, frame(17_991, [-2, 63, 19]), fountain), null);
+  assert.equal(dragonSweepDodge(player, frame(17_958, [-1.12, 78.05, 16.94]),
+    frame(17_979, [-10.71, 77.64, 26.02]), fountain), null);
+});
+
 test('a real Enderman hit interrupts the duel for a water refuge', async () => {
   const { fightEndDragon } = await import('./expedition-dragon-fight.mjs');
   const sword = { id: 'minecraft:diamond_sword', slot: 0 };
@@ -192,4 +209,18 @@ test('the reserve bucket stays available when carried food uses the working hotb
   };
   await keepLandingBucketOnHotbar(action, { ...stock });
   assert.deepEqual(actions, [3, 3, 4]);
+});
+
+test('End water search prioritizes reachable sources and skips rejected positions', async () => {
+  const { chooseEndWater } = await import('./expedition-dragon-fight.mjs');
+  const player = { position: { x: -14.5, y: 62, z: 0.5 } };
+  const fountain = [0, 59, 0];
+  const nearby = [-16, 62, 0];
+  const elevated = [-16, 67, 0];
+  const insideRim = [-9, 62, 0];
+  const farther = [-28, 63, 0];
+  const scan = { waterSourcesOnly: true, matches: [{ name: 'minecraft:water', positions: [farther, elevated, insideRim, nearby] }] };
+  assert.deepEqual(chooseEndWater(scan, player, fountain, new Set()), nearby);
+  assert.deepEqual(chooseEndWater(scan, player, fountain, new Set([String(nearby)])), farther);
+  assert.deepEqual(chooseEndWater({ ...scan, waterSourcesOnly: undefined }, player, fountain, new Set()), farther);
 });

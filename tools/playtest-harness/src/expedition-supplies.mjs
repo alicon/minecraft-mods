@@ -325,11 +325,14 @@ try {
         : 'Fight the full-health dragon through native attacks while Mushroom stays in shelter.');
       const report = async (kind, observation) => {
         console.log(JSON.stringify({ at: new Date().toISOString(), action: `dragon_${kind}`, observation, camp, dog: companion }));
-        if (kind === 'strike') {
-          Object.assign(progress, { dragon: observation.dragon, hits: observation.hits });
+        if (kind === 'fountain' || kind === 'strike') {
+          if (kind === 'fountain') progress.fountain = observation.position;
+          else Object.assign(progress, { dragon: observation.dragon, hits: observation.hits });
           const next = `${endFile}-${process.pid}`;
           await writeFile(next, JSON.stringify(progress));
           await rename(next, endFile);
+        }
+        if (kind === 'strike') {
           await narrate('Action', observation.method === 'bow'
             ? `Hit the flying dragon with an arrow. Health is ${observation.after}.`
             : `Struck the perched dragon at ${observation.before} health.`, 4_000);
@@ -338,6 +341,8 @@ try {
           await narrate('Action', 'Recovered from dragon knockback and reached the ground.');
         }
         if (kind === 'enderman_refuge') await narrate('Action', 'Used water to take cover from an attacking Enderman.');
+        if (kind === 'bucket_refilled') await narrate('Action', 'Refilled a bucket from nearby water.');
+        if (kind === 'health_recovered') await narrate('Result', 'Recovered enough health to return to the fight.');
         if (kind === 'victory') await narrate('Result', 'The native End exit is open.');
       };
       if (refugeOnly) await reportStatus('refuge-ready');
@@ -520,7 +525,7 @@ async function runExpedition(start, stage) {
             }
             assert.ok(player.health >= 8 && !player.threats?.some(threat => threat.distance <= 3),
               'Could not reach safe ground to rebuild tools after respawn');
-            await gatherStarterTools(player, { combatOnly: true });
+            await gatherStarterTools(player, { combatOnly: true, timberToward: destination });
           }
           assert.ok(await forageExpeditionMeal(action, { toward: destination, minimum: 2 }),
             'Could not find food for the player and Mushroom before the return');
@@ -531,6 +536,12 @@ async function runExpedition(start, stage) {
         console.log(JSON.stringify({ at: new Date().toISOString(), action: 'recover_dropped_loadout', destination, direct }));
         const recovered = await recoverDroppedLoadout(action, destination, {
           reserveMeal: provisionFirst, companionUuid: checkpoint.dog, direct,
+          onCompanionFed: async () => {
+            checkpoint.fedDog = true;
+            checkpoint.lastDogMealAt = (await action('observe')).gameTime;
+            await writeCheckpoint(checkpoint);
+            await narrate('Result', 'Fed the injured original Mushroom before recovering the gear.');
+          },
         });
         if (direct) await narrate('Result', 'Retrieved the dropped shield and equipped it.');
         checkpoint.recoveredWithoutGuide = recovered === 'companion';
@@ -917,7 +928,7 @@ async function waitForCoaching(context) {
   return false;
 }
 
-async function collectStarterLogs(start) {
+async function collectStarterLogs(start, toward) {
   const scanArgs = {
     blocks: WOOD_LOGS,
     radius: 16,
@@ -950,9 +961,13 @@ async function collectStarterLogs(start) {
       visited.push([x, y, z].map(Math.floor));
       let target = trunk?.logs[0];
       if (!target) {
-        const wider = await action('scan_blocks', { ...scanArgs, radius: 32 });
-        target = wider?.matches.flatMap(match => match.positions)
-          .sort((a, b) => Math.hypot(a[0] - x, a[2] - z) - Math.hypot(b[0] - x, b[2] - z))[0];
+        const wider = await action('scan_blocks', { ...scanArgs, radius: 32, max: 192 });
+        const matches = wider?.matches ?? [];
+        target = nearbyTrunk(matches, positionAtStart.position)?.logs[0] ?? toward;
+        if (!target) {
+          target = matches.flatMap(match => match.positions)
+            .sort((a, b) => Math.hypot(a[0] - x, a[2] - z) - Math.hypot(b[0] - x, b[2] - z))[0];
+        }
       }
       await stepOut(action, positionAtStart, visited, target, 'surface', rejected);
     }
@@ -1022,7 +1037,7 @@ async function packStarterTable(pos) {
   assert.ok(hasTable(await action('get_inventory')), 'The player did not pick up the crafting table');
 }
 
-async function gatherStarterTools(start, { combatOnly = false } = {}) {
+async function gatherStarterTools(start, { combatOnly = false, timberToward } = {}) {
   const stock = await action('get_inventory');
   const amount = item => stock.slots.reduce((total, stack) => total + (stack.id === item ? stack.count : 0), 0);
   const tools = [['wooden_pickaxe', 3, 2], ['wooden_sword', 2, 1], ['wooden_shovel', 1, 2]]
@@ -1046,7 +1061,7 @@ async function gatherStarterTools(start, { combatOnly = false } = {}) {
   if (!planks) return;
 
   const hasWood = stock.slots.some(stack => /_(?:log|planks)$/.test(stack.id));
-  if (!hasWood) await collectStarterLogs(start);
+  if (!hasWood) await collectStarterLogs(start, timberToward);
   else await recoverLooseLogs();
 
   let player = await action('observe');

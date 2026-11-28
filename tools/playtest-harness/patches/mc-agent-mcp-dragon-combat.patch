@@ -101,3 +101,34 @@ index 789105d..3a4ab32 100644
 +		if (o.has("waterLanding")) waterLanding = o.get("waterLanding").getAsBoolean();
 @@ -47,0 +51 @@ public final class ReflexSettings {
 +		o.addProperty("waterLanding", waterLanding);
+diff --git a/src/client/java/com/mcagent/mcp/client/blocks/BlockScanner.java b/src/client/java/com/mcagent/mcp/client/blocks/BlockScanner.java
+index 7d6c847..fb619d5 100644
+--- a/src/client/java/com/mcagent/mcp/client/blocks/BlockScanner.java
++++ b/src/client/java/com/mcagent/mcp/client/blocks/BlockScanner.java
+@@ -107 +107 @@ public final class BlockScanner {
+-									java.util.Set<String> wanted, int maxPerName) {
++									java.util.Set<String> wanted, int maxPerName, boolean waterSourcesOnly) {
+@@ -134 +134,2 @@ public final class BlockScanner {
+-								String name = idOf(section.getBlockState(x & 15, y & 15, z & 15));
++								BlockState state = section.getBlockState(x & 15, y & 15, z & 15);
++								String name = idOf(state);
+@@ -135,0 +137,2 @@ public final class BlockScanner {
++								if (waterSourcesOnly && "minecraft:water".equals(name)
++										&& !state.getFluidState().isSource()) continue;
+diff --git a/src/client/java/com/mcagent/mcp/client/tools/ScanBlocksTool.java b/src/client/java/com/mcagent/mcp/client/tools/ScanBlocksTool.java
+index 732cd6a..34092d5 100644
+--- a/src/client/java/com/mcagent/mcp/client/tools/ScanBlocksTool.java
++++ b/src/client/java/com/mcagent/mcp/client/tools/ScanBlocksTool.java
+@@ -84,0 +85,5 @@ public final class ScanBlocksTool implements McpTool {
++		JsonObject sources = new JsonObject();
++		sources.addProperty("type", "boolean");
++		sources.addProperty("description", "Return only scoopable source blocks for minecraft:water.");
++		props.add("waterSourcesOnly", sources);
++
+@@ -98,0 +104 @@ public final class ScanBlocksTool implements McpTool {
++		boolean waterSourcesOnly = args.has("waterSourcesOnly") && args.get("waterSourcesOnly").getAsBoolean();
+@@ -130 +136 @@ public final class ScanBlocksTool implements McpTool {
+-			List<BlockScanner.MatchGroup> groups = scanner.scanFor(level, center, radius, wanted, max);
++			List<BlockScanner.MatchGroup> groups = scanner.scanFor(level, center, radius, wanted, max, waterSourcesOnly);
+@@ -133,0 +140 @@ public final class ScanBlocksTool implements McpTool {
++			if (waterSourcesOnly) out.addProperty("waterSourcesOnly", true);
