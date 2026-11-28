@@ -428,27 +428,26 @@ async function harvestReachableLog(action, camp, timberSite) {
   const visited = [];
   const rejected = new Set();
   const scan = { blocks: WOOD_LOGS, radius: 12, max: 40 };
-  let wood = await action('scan_blocks', scan);
-  for (let scouting = 0; !camp && !wood.matches.length && scouting < (timberSite ? 16 : 8); scouting++) {
+  const candidatesFrom = (view, { x, y, z }) => view.matches
+    .flatMap(({ name, positions }) => positions.map(pos => ({ name, pos })))
+    .filter(({ pos }) => Math.abs(pos[1] + 0.5 - y - 1.62) < 4)
+    .filter(({ pos }) => !camp || Math.hypot(...pos.map((axis, index) => axis - camp[index])) <= 9)
+    .sort((a, b) => Math.hypot(a.pos[0] + 0.5 - x, a.pos[1] + 0.5 - y - 1.62, a.pos[2] + 0.5 - z)
+      - Math.hypot(b.pos[0] + 0.5 - x, b.pos[1] + 0.5 - y - 1.62, b.pos[2] + 0.5 - z));
+  let candidates = candidatesFrom(await action('scan_blocks', scan), player.position);
+  for (let scouting = 0; !camp && !candidates.length && scouting < (timberSite ? 16 : 8); scouting++) {
     if (!player?.inWorld || player.dead || player.health < 8) return;
     if (!await retreatFromNearbyMob(action, player, visited, rejected)) {
       const wider = await action('scan_blocks', { ...scan, radius: 32 });
       const { x, z } = player.position;
-      const target = wider.matches.flatMap(match => match.positions)
-        .sort((a, b) => Math.hypot(a[0] - x, a[2] - z) - Math.hypot(b[0] - x, b[2] - z))[0]
+      const target = candidatesFrom(wider, player.position)[0]?.pos
         ?? (timberSite && Math.hypot(timberSite[0] - x, timberSite[2] - z) > 8 ? timberSite : undefined);
       visited.push(feet(player));
       if (!await stepOut(action, player, visited, target, 'surface', rejected)) return;
     }
     player = await action('observe');
-    wood = await action('scan_blocks', scan);
+    candidates = candidatesFrom(await action('scan_blocks', scan), player.position);
   }
-  const { position } = player;
-  const candidates = wood.matches.flatMap(({ name, positions }) => positions.map(pos => ({ name, pos })))
-    .filter(({ pos }) => Math.abs(pos[1] - position.y) < 2.5)
-    .filter(({ pos }) => !camp || Math.hypot(...pos.map((axis, index) => axis - camp[index])) <= 9)
-    .sort((a, b) => Math.hypot(a.pos[0] - position.x, a.pos[2] - position.z)
-      - Math.hypot(b.pos[0] - position.x, b.pos[2] - position.z));
   const detoured = new Set();
   for (const tree of candidates.slice(0, 8)) {
     const column = `${tree.pos[0]},${tree.pos[2]}`;

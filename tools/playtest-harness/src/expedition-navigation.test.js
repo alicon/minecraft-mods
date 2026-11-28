@@ -639,6 +639,32 @@ test('timber collection clears leaves blocking the walk and the mining crosshair
   assert.deepEqual(stock, [{ id: 'minecraft:oak_planks', count: 4 }]);
 });
 
+test('starter planks can use a reachable fourth log above the first three', async () => {
+  const { ensurePlanks } = await import('./expedition-home.mjs');
+  const player = { inWorld: true, onGround: true, health: 20, position: { x: -13.7, y: 63, z: -5.9 } };
+  const log = [-14, 66, -6];
+  const blocks = [{ name: 'minecraft:oak_log', positions: [log, [-14, 67, -6]] }];
+  let stock = [{ id: 'minecraft:oak_planks', count: 12 }];
+  const broken = [];
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_inventory': return { slots: stock };
+      case 'scan_blocks': return { matches: blocks };
+      case 'look': assert.deepEqual(args.at, log); return {};
+      case 'observe': return { ...player, crosshair: { pos: log, block: 'minecraft:oak_log' } };
+      case 'go_to':
+        if (args.entityId) stock.push({ id: 'minecraft:oak_log', count: 1 });
+        return { arrived: true };
+      case 'break_block': broken.push(args.pos); return { broken: true };
+      case 'get_entities': return { entities: [{ id: 11, item: { id: 'minecraft:oak_log' } }] };
+      default: assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  await ensurePlanks(action, async (item, quantity) => { stock = [{ id: item, count: 12 + quantity }]; }, 14);
+  assert.deepEqual(broken, [log]);
+  assert.equal(stock[0].count, 16);
+});
+
 test('a recovery forage keeps the chicken collected through ordinary play', async () => {
   const { forageExpeditionMeal } = await import('./expedition-home.mjs');
   const chicken = { id: 11, type: 'minecraft:chicken', distance: 2, pos: [2, 64, 0] };
