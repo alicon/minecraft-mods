@@ -257,6 +257,14 @@ Summarize the action logs and the native save/reopen evidence for comparison:
 python3 scripts/summarize-mushroom-expedition.py "$RUN_DIRECTORY" "$OTHER_RUN_DIRECTORY"
 ```
 
+Add `--compare-policies` to compare fresh Java expedition runs on seeds shared
+by rules and Jev at the same source revision. Pass the matched-seed reports and
+held-out reports in separate invocations. Only a native dragon victory followed
+by a return and reopen with the original dog counts as a win. The cost per win
+includes failed terminal attempts. It stays unset when there are no verified
+wins or when billable usage is unknown. Live attempts remain visible without
+being counted as finished.
+
 The same command accepts a Bedrock `--play-seconds` log. It reports elapsed
 time, completed cases, input recovery, and the add-on and fixture checksums.
 A Bedrock soak passes only after the logged duration meets the requested
