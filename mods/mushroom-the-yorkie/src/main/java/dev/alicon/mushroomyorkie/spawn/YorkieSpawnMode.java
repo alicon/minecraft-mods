@@ -2,7 +2,7 @@ package dev.alicon.mushroomyorkie.spawn;
 
 /** Configurable wake-up spawning behavior for a player's Mushroom companion. */
 public enum YorkieSpawnMode {
-	/** Spawn a replacement after sleep when the player no longer has a loaded Mushroom. */
+	/** Spawn a replacement after sleep when the player no longer has a known living Mushroom. */
 	RESPAWN,
 	/** Spawn only once per player; if Mushroom dies, that player does not get another one. */
 	EXTREME;

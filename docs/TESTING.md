@@ -46,6 +46,13 @@ same dog's armor, camp and training progress. A final Nether crossing checks
 that a seated dog stays behind.
 Screenshots are under `mods/mushroom-the-yorkie/build/run/clientGameTest/screenshots/`.
 
+Prefix the Java command with `MUSHROOM_EXPEDITION_SLEEP_OWNERSHIP_ONLY=1` for
+the focused wake-up regression. A native bed interaction adopts Mushroom.
+The fixture moves him out of loaded chunks and saves and reopens the world.
+Another native sleep leaves that same dog alive in his distant chunk. After
+a confirmed death, the following sleep creates one replacement in the
+default respawn mode.
+
 For Bedrock, build the add-on and run the expedition fixtures with the official
 Bedrock Dedicated Server archive.
 

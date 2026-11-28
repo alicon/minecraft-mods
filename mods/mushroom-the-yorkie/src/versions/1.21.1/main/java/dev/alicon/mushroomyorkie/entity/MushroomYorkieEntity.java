@@ -2,6 +2,7 @@ package dev.alicon.mushroomyorkie.entity;
 
 import dev.alicon.mushroomyorkie.item.YorkieFetchToyStacks;
 import dev.alicon.mushroomyorkie.pet.PetNeeds;
+import java.util.UUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -118,6 +119,14 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		this.tame(player);
 		this.setMushroomOrderedToSit(false);
 		this.setSleeping(false);
+		if (this.level() instanceof ServerLevel level && level.getEntity(this.getUUID()) == this) {
+			MushroomCompanions.record(level, this);
+		}
+	}
+
+	UUID companionOwnerId() {
+		UUID trusted = this.trust.trustedPlayerUuid();
+		return trusted != null ? trusted : this.getOwnerUUID();
 	}
 
 	boolean handleSleepingInteract(Player player) {

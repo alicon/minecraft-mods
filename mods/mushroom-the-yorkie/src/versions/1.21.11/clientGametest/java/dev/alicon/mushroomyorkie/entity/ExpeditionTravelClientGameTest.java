@@ -32,6 +32,16 @@ public final class ExpeditionTravelClientGameTest implements FabricClientGameTes
 		if (!Boolean.getBoolean("mushroom.expedition.clientTest")) {
 			return;
 		}
+		if ("1".equals(System.getenv("MUSHROOM_EXPEDITION_SLEEP_OWNERSHIP_ONLY"))) {
+			boolean pauseOnLostFocus = context.computeOnClient(client -> client.options.pauseOnLostFocus);
+			context.runOnClient(client -> client.options.pauseOnLostFocus = false);
+			try {
+				sleepWithUnloadedCompanion(context);
+			} finally {
+				context.runOnClient(client -> client.options.pauseOnLostFocus = pauseOnLostFocus);
+			}
+			return;
+		}
 		TestWorldSave save;
 		UUID ownerId;
 		UUID dogId;
@@ -115,15 +125,7 @@ public final class ExpeditionTravelClientGameTest implements FabricClientGameTes
 		server.runCommand("tp @a 16.5 90 16.5");
 		server.runCommand("setblock 16 90 18 minecraft:white_bed[facing=south,part=foot]");
 		server.runCommand("setblock 16 90 19 minecraft:white_bed[facing=south,part=head]");
-		server.runCommand("gamerule minecraft:advance_time true");
-		server.runCommand("time set midnight");
-		var bed = new BlockPos(16, 90, 18);
-		context.waitFor(client -> client.level.getBlockState(bed).getBlock() instanceof BedBlock);
-		context.runOnClient(client -> client.player.lookAt(EntityAnchorArgument.Anchor.EYES, Vec3.atCenterOf(bed)));
-		context.waitFor(client -> client.hitResult instanceof BlockHitResult hit && bed.equals(hit.getBlockPos()));
-		context.getInput().pressKey(options -> options.keyUse);
-		context.waitFor(client -> client.player.isSleeping());
-		context.waitFor(client -> !client.player.isSleeping(), 220);
+		sleepAtBed(context, server);
 		return server.computeOnServer(minecraft -> {
 			var owned = dogs(minecraft, owner(minecraft, ownerId));
 			if (owned.size() != 1 || !owned.getFirst().isAlive()) {
@@ -133,6 +135,75 @@ public final class ExpeditionTravelClientGameTest implements FabricClientGameTes
 			System.out.println("Expedition adoption passed: dog=" + dogId);
 			return dogId;
 		});
+	}
+
+	private static void sleepWithUnloadedCompanion(ClientGameTestContext context) {
+		TestWorldSave save;
+		UUID ownerId;
+		UUID dogId;
+		try (var world = context.worldBuilder().create()) {
+			world.getClientWorld().waitForChunksRender();
+			save = world.getWorldSave();
+			ownerId = context.computeOnClient(client -> client.player.getUUID());
+			var server = world.getServer();
+			dogId = adoptAfterSleep(context, server, ownerId);
+			server.runCommand("forceload add 2048 0");
+			server.runCommand("fill 2047 89 0 2049 89 2 minecraft:stone");
+			server.runOnServer(minecraft -> {
+				var dog = (MushroomYorkieEntity) minecraft.overworld().getEntity(dogId);
+				dog.setNoAi(true);
+				dog.teleportTo(2048.5, 90, 0.5);
+			});
+			server.runCommand("forceload remove 2048 0");
+		}
+		try (var world = save.open()) {
+			world.getClientWorld().waitForChunksRender();
+			var server = world.getServer();
+			if (server.computeOnServer(minecraft -> minecraft.overworld().getEntity(dogId) != null)) {
+				throw new AssertionError("The original Mushroom is still loaded after reopening");
+			}
+			server.runCommand("tp @a 16.5 90 16.5");
+			sleepAtBed(context, server);
+			if (!server.computeOnServer(minecraft -> dogs(minecraft, owner(minecraft, ownerId)).isEmpty())) {
+				throw new AssertionError("Sleeping spawned a duplicate while the original Mushroom was still alive");
+			}
+			server.runCommand("forceload add 2048 0");
+			boolean originalLoaded = false;
+			for (int tick = 0; tick < 300 && !originalLoaded; tick += 5) {
+				originalLoaded = server.computeOnServer(minecraft ->
+						minecraft.overworld().getEntity(dogId) instanceof MushroomYorkieEntity dog
+								&& dog.isAlive() && dog.belongsTo(owner(minecraft, ownerId)));
+				if (!originalLoaded) context.waitTicks(5);
+			}
+			if (!originalLoaded) {
+				throw new AssertionError("The distant chunk did not load the original living Mushroom");
+			}
+			server.runCommand("kill " + dogId);
+			context.waitTicks(25);
+			server.runCommand("tp @a 16.5 90 16.5");
+			sleepAtBed(context, server);
+			server.runOnServer(minecraft -> {
+				var owned = dogs(minecraft, owner(minecraft, ownerId));
+				if (owned.size() != 1 || dogId.equals(owned.getFirst().getUUID())) {
+					throw new AssertionError("Sleep should replace Mushroom after his death in the default mode");
+				}
+				System.out.printf("Expedition sleep ownership passed: original=%s replacement=%s%n",
+						dogId, owned.getFirst().getUUID());
+			});
+		}
+	}
+
+	private static void sleepAtBed(ClientGameTestContext context, TestServerContext server) {
+		server.runCommand("gamerule minecraft:advance_time true");
+		server.runCommand("time set midnight");
+		var bed = new BlockPos(16, 90, 18);
+		context.waitFor(client -> client.screen == null && client.player.blockPosition().equals(new BlockPos(16, 90, 16))
+				&& client.level.getBlockState(bed).getBlock() instanceof BedBlock);
+		context.runOnClient(client -> client.player.lookAt(EntityAnchorArgument.Anchor.EYES, Vec3.atCenterOf(bed)));
+		context.waitFor(client -> client.hitResult instanceof BlockHitResult hit && bed.equals(hit.getBlockPos()));
+		context.getInput().pressKey(options -> options.keyUse);
+		context.waitFor(client -> client.player.isSleeping());
+		context.waitFor(client -> !client.player.isSleeping(), 220);
 	}
 
 	private static void walkThroughPortal(ClientGameTestContext context, TestSingleplayerContext world,

@@ -12,6 +12,13 @@ The padded vest absorbs up to 30% of impact damage and the plated vest up to
 other sustained hazards still hurt. Watch for cracks and an action-bar warning.
 A worn-out vest stays on the harness and accepts repairs.
 
+## Java wake-up recovery
+
+With the default one-dog setting, sleeping keeps a known living Mushroom
+even while his chunk is unloaded or he is in another dimension. In the
+default respawn mode, he can be replaced after a confirmed death. Existing
+companions are recorded as their chunks load after updating.
+
 ## Expedition camp and crossings
 
 Craft a camp mat with two wool blocks and string. Put it on solid ground in

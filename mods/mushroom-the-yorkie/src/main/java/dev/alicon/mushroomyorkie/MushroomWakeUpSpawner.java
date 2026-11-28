@@ -1,7 +1,8 @@
 package dev.alicon.mushroomyorkie;
 
-import dev.alicon.mushroomyorkie.entity.MushroomLostRecoveryPolicy;
+import dev.alicon.mushroomyorkie.entity.MushroomCompanions;
 import dev.alicon.mushroomyorkie.entity.MushroomFieldGuide;
+import dev.alicon.mushroomyorkie.entity.MushroomLostRecoveryPolicy;
 import dev.alicon.mushroomyorkie.entity.MushroomYorkieEntity;
 import dev.alicon.mushroomyorkie.spawn.YorkieSpawnPolicy;
 import java.util.List;
@@ -46,9 +47,10 @@ final class MushroomWakeUpSpawner {
 			return;
 		}
 
-		boolean hasLoadedYorkie = hasLoadedYorkie(level, player);
+		boolean hasLivingYorkie = (this.config.oneMushroomPerPlayer()
+				&& MushroomCompanions.hasLivingCompanion(level, player.getUUID())) || hasLoadedYorkie(level, player);
 		boolean hasReceivedYorkie = player.getTags().contains(RECEIVED_TAG);
-		if (!YorkieSpawnPolicy.shouldSpawn(this.config.spawnMode(), successfulSleep, hasLoadedYorkie, hasReceivedYorkie)) {
+		if (!YorkieSpawnPolicy.shouldSpawn(this.config.spawnMode(), successfulSleep, hasLivingYorkie, hasReceivedYorkie)) {
 			return;
 		}
 

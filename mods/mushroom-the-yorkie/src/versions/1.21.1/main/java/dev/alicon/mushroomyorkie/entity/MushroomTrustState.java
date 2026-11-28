@@ -23,6 +23,10 @@ final class MushroomTrustState {
 		this.hitCountDay = -1L;
 	}
 
+	UUID trustedPlayerUuid() {
+		return this.trustedPlayerUuid;
+	}
+
 	boolean belongsTo(MushroomYorkieEntity yorkie, Player player) {
 		return yorkie.isOwnedBy(player) || (this.trustedPlayerUuid != null && this.trustedPlayerUuid.equals(player.getUUID()));
 	}
