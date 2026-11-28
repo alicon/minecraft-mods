@@ -86,3 +86,9 @@ if (project.hasProperty('yorkie_daycare_guest')) {
 				'--quickPlayMultiplayer', '127.0.0.1:57341'
 	}
 }
+
+if (tasks.findByName('runClientGameTest') != null && project.hasProperty('yorkie_daycare_owner_test')) {
+	tasks.named('runClientGameTest') {
+		systemProperty 'mushroom.daycare.ownerTest', 'true'
+	}
+}

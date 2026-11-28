@@ -859,6 +859,16 @@ Within 90 seconds, run the owner client from a separate worktree at the same com
 
 The first client uses the normal Use and movement bindings as a Survival guest. The test checks that a treat is consumed while the lead stays attached, the dog and guest both move, the harness stays on, and the connected owner keeps the dog. Look for `Daycare walk passed` in the first terminal and screenshots under `mods/mushroom-the-yorkie/build/run/clientGameTest/screenshots/`. The test stops the temporary server. Close the owner client after it disconnects.
 
+For independent input on both clients, prefix the first command with
+`MUSHROOM_DAYCARE_ACTIVE_OWNER=1`. Run a client GameTest from the second
+worktree with `-Pclient_game_tests -Pyorkie_daycare_owner_test` instead of
+`runClient -Pyorkie_daycare_guest`. The owner equips Mushroom's vest and the
+guest attaches the lead through normal client controls. The server logs both
+interaction ticks and requires them to be within 15 ticks. After saving the
+world, the server disconnects the owner, who reconnects and verifies the vest
+in the client. The server checks the same dog, owner, vest, harness, and guest
+lead. Look for `Daycare concurrent use passed` and `Daycare owner rejoin passed`.
+
 For an extended run, prefix the first command with `MUSHROOM_DAYCARE_SOAK_SECONDS=1800`. The guest keeps walking and feeds the dog when hungry while the owner stays connected and the clock advances in the test arena. The log records the elapsed seconds and ticks, moves with the dog, treats, and dawns. Every walk checks the original dog, owner, harness and lead.
 
 Screenshots close the active client screen before capture by default; set `BRIDGE_SCREENSHOT_RESUME=0` to keep the current screen visible. Set `BRIDGE_SCREENSHOT_HIDE_GUI=1` and `BRIDGE_SCREENSHOT_CLEAR_CHAT=1` for clean visual inspection captures.

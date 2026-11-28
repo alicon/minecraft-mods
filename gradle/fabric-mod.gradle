@@ -77,6 +77,9 @@ if (project.ext.has('enable_game_tests') && project.ext.enable_game_tests) {
 			createSourceSet = true
 			modId = "${modId}_gametest"
 			enableClientGameTests = enableClientTests
+			if (project.ext.mod_id == 'mushroom_yorkie' && project.hasProperty('yorkie_daycare_owner_test')) {
+				username = 'DaycareGuest'
+			}
 			eula = true
 		}
 	}

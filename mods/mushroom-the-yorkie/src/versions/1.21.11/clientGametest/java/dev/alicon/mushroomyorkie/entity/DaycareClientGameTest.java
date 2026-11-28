@@ -1,37 +1,59 @@
 package dev.alicon.mushroomyorkie.entity;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.function.Function;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import dev.alicon.mushroomyorkie.item.ModItems;
 import dev.alicon.mushroomyorkie.pet.PetNeeds;
 
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerContext;
+import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
+import net.minecraft.client.gui.screens.ConnectScreen;
+import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.EntityHitResult;
+import org.lwjgl.glfw.GLFW;
 
 public final class DaycareClientGameTest implements FabricClientGameTest {
 	private static final String DOG_OWNER = "DaycareGuest";
 	private static final int SERVER_PORT = 57341;
+	private static final String SERVER_ADDRESS = "127.0.0.1:" + SERVER_PORT;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
 		if (Boolean.getBoolean("mushroom.expedition.clientTest") || Boolean.getBoolean("mushroom.expedition.survivalTest")) {
 			return;
 		}
+		if (Boolean.getBoolean("mushroom.daycare.ownerTest")) {
+			try {
+				driveOwner(context);
+			} catch (AssertionError | RuntimeException failure) {
+				context.takeScreenshot("daycare-owner-failure");
+				throw failure;
+			}
+			return;
+		}
+		boolean activeOwner = "1".equals(System.getenv("MUSHROOM_DAYCARE_ACTIVE_OWNER"));
 		int soakSeconds = Integer.parseInt(System.getenv().getOrDefault("MUSHROOM_DAYCARE_SOAK_SECONDS", "0"));
 		if (soakSeconds != 0 && (soakSeconds < 90 || soakSeconds > 14400)) {
 			throw new IllegalArgumentException("Set MUSHROOM_DAYCARE_SOAK_SECONDS from 90 to 14400 seconds");
@@ -44,7 +66,7 @@ public final class DaycareClientGameTest implements FabricClientGameTest {
 		try (var server = context.worldBuilder().createServer(settings); var connection = server.connect()) {
 			connection.getClientWorld().waitForChunksRender();
 			var walkerId = context.computeOnClient(client -> client.player.getUUID());
-			System.out.println("Daycare ready for DaycareGuest at 127.0.0.1:" + SERVER_PORT);
+			System.out.println("Daycare ready for DaycareGuest at " + SERVER_ADDRESS);
 			long deadline = System.nanoTime() + Duration.ofSeconds(90).toNanos();
 			while (!server.computeOnServer(mc -> mc.getPlayerList().getPlayerByName(DOG_OWNER) != null)) {
 				if (System.nanoTime() >= deadline) {
@@ -53,7 +75,18 @@ public final class DaycareClientGameTest implements FabricClientGameTest {
 				context.waitTick();
 			}
 			try {
-				walkBorrowedDog(context, server, walkerId, soakSeconds);
+				if (activeOwner) {
+					while (!server.computeOnServer(mc -> {
+						var owner = mc.getPlayerList().getPlayerByName(DOG_OWNER);
+						return owner != null && owner.isShiftKeyDown();
+					})) {
+						if (System.nanoTime() >= deadline) {
+							throw new IllegalStateException("Daycare owner did not send native ready input");
+						}
+						context.waitTick();
+					}
+				}
+				walkBorrowedDog(context, server, walkerId, soakSeconds, activeOwner);
 			} catch (AssertionError | RuntimeException failure) {
 				context.takeScreenshot("daycare-client-failure");
 				throw failure;
@@ -65,8 +98,21 @@ public final class DaycareClientGameTest implements FabricClientGameTest {
 	}
 
 	private static void walkBorrowedDog(ClientGameTestContext context, TestDedicatedServerContext server,
-			UUID walkerId, int soakSeconds) {
+			UUID walkerId, int soakSeconds, boolean activeOwner) {
 		var ownerId = server.computeOnServer(mc -> mc.getPlayerList().getPlayerByName(DOG_OWNER).getUUID());
+		var useTicks = new HashMap<UUID, Long>();
+		if (activeOwner) {
+			UseEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
+				if (!level.isClientSide() && hand == InteractionHand.MAIN_HAND && entity instanceof MushroomYorkieEntity
+						&& (player.getUUID().equals(ownerId) && player.getMainHandItem().is(ModItems.PADDED_VEST)
+						|| player.getUUID().equals(walkerId) && player.getMainHandItem().is(Items.LEAD))) {
+					if (useTicks.putIfAbsent(player.getUUID(), level.getGameTime()) == null) {
+						System.out.printf("Daycare native use: player=%s tick=%d%n", player.getUUID(), level.getGameTime());
+					}
+				}
+				return InteractionResult.PASS;
+			});
+		}
 		var dog = server.computeOnServer(mc -> {
 			var walker = Objects.requireNonNull(mc.getPlayerList().getPlayer(walkerId));
 			var owner = Objects.requireNonNull(mc.getPlayerList().getPlayer(ownerId));
@@ -79,16 +125,50 @@ public final class DaycareClientGameTest implements FabricClientGameTest {
 			yorkie.setHarness(true);
 			yorkie.setNoAi(true);
 			walker.level().addFreshEntity(yorkie);
-			walker.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.LEAD));
+			if (activeOwner) {
+				owner.teleportTo(walker.getX(), walker.getY(), walker.getZ() + 4.6);
+			} else {
+				walker.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.LEAD));
+			}
 			return yorkie;
 		});
 		var dogId = dog.getUUID();
 		var aim = server.computeOnServer(mc -> dog.getBoundingBox().getCenter());
-		context.waitFor(client -> client.player.getMainHandItem().is(Items.LEAD));
 		context.runOnClient(client -> client.player.lookAt(EntityAnchorArgument.Anchor.EYES, aim));
 		context.waitFor(client -> client.hitResult instanceof EntityHitResult hit && hit.getEntity().getUUID().equals(dogId));
+		if (activeOwner) {
+			for (int ticks = 0; ticks <= 120; ticks++) {
+				boolean ready = server.computeOnServer(mc -> {
+					var owner = Objects.requireNonNull(mc.getPlayerList().getPlayer(ownerId));
+					if (owner.isShiftKeyDown()) return false;
+					owner.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.PADDED_VEST));
+					mc.getPlayerList().getPlayer(walkerId).setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.LEAD));
+					return true;
+				});
+				if (ready) break;
+				if (ticks == 120) throw new AssertionError("Owner did not aim at Mushroom before the simultaneous Use test");
+				context.waitTick();
+			}
+		}
+		context.waitFor(client -> client.player.getMainHandItem().is(Items.LEAD));
 		context.getInput().pressKey(options -> options.keyUse);
 		context.waitFor(client -> client.player.getMainHandItem().isEmpty());
+		if (activeOwner) {
+			context.waitFor(client -> client.level.getEntity(dog.getId()) instanceof MushroomYorkieEntity yorkie
+					&& yorkie.getItemBySlot(EquipmentSlot.BODY).is(ModItems.PADDED_VEST));
+			server.runOnServer(mc -> {
+				Long ownerUse = useTicks.get(ownerId);
+				Long walkerUse = useTicks.get(walkerId);
+				var owner = Objects.requireNonNull(mc.getPlayerList().getPlayer(ownerId));
+				var walker = Objects.requireNonNull(mc.getPlayerList().getPlayer(walkerId));
+				assertBorrowedDog(dog, owner, walker);
+				if (ownerUse == null || walkerUse == null || Math.abs(ownerUse - walkerUse) > 15
+						|| !owner.getMainHandItem().isEmpty() || !dog.getItemBySlot(EquipmentSlot.BODY).is(ModItems.PADDED_VEST)) {
+					throw new AssertionError("Expected concurrent native owner vest and guest lead at ticks " + ownerUse + " and " + walkerUse);
+				}
+				System.out.printf("Daycare concurrent use passed: dog=%s ownerUse=%d guestUse=%d%n", dogId, ownerUse, walkerUse);
+			});
+		}
 		server.runOnServer(mc -> {
 			dog.needs = new PetNeeds(65, 0, 80, 80);
 		});
@@ -120,9 +200,97 @@ public final class DaycareClientGameTest implements FabricClientGameTest {
 					dogId, ownerId, walkerId, walkerMovement, dogMovement);
 		});
 		context.takeScreenshot("daycare-client-walk");
+		if (activeOwner) verifyOwnerRejoin(context, server, ownerId, walkerId, dog);
 		if (soakSeconds > 0) {
 			soakWalks(context, server, walkerId, ownerId, dog, walkerStart.x(), soakSeconds);
 		}
+	}
+
+	private static void driveOwner(ClientGameTestContext context) {
+		// A keyboard Use binding lets both Mac windows act without sharing the mouse grab.
+		context.runOnClient(client -> {
+			client.options.keyUse.setKey(InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_R));
+			KeyMapping.resetMapping();
+		});
+		connectOwner(context);
+		context.waitFor(client -> client.player != null && client.screen == null);
+		var input = context.getInput();
+		input.holdKey(options -> options.keyShift);
+		try {
+			context.waitFor(DaycareClientGameTest::aimAtOwnedDog);
+		} finally {
+			input.releaseKey(options -> options.keyShift);
+		}
+		context.waitFor(client -> client.player.getMainHandItem().is(ModItems.PADDED_VEST)
+				&& !client.player.isCrouching() && aimAtOwnedDog(client));
+		input.pressKey(options -> options.keyUse);
+		context.waitFor(client -> client.player != null && client.player.getMainHandItem().isEmpty());
+		context.takeScreenshot("daycare-owner-vest");
+		context.waitFor(client -> client.level == null, 1200);
+		connectOwner(context);
+		context.waitFor(client -> client.player != null && client.screen == null);
+		context.waitFor(client -> {
+			for (var entity : client.level.entitiesForRendering()) {
+				if (entity instanceof MushroomYorkieEntity dog && dog.isOwnedBy(client.player)
+						&& dog.getItemBySlot(EquipmentSlot.BODY).is(ModItems.PADDED_VEST)) return true;
+			}
+			return false;
+		});
+		context.takeScreenshot("daycare-owner-rejoined");
+		input.holdKey(options -> options.keyShift);
+		try {
+			context.waitFor(client -> client.level == null, 6000);
+		} finally {
+			input.releaseKey(options -> options.keyShift);
+		}
+		context.runOnClient(client -> client.setScreen(new TitleScreen()));
+	}
+
+	private static boolean aimAtOwnedDog(Minecraft client) {
+		if (client.hitResult instanceof EntityHitResult hit && hit.getEntity() instanceof MushroomYorkieEntity dog
+				&& dog.isOwnedBy(client.player)) return true;
+		for (var entity : client.level.entitiesForRendering()) {
+			if (entity instanceof MushroomYorkieEntity dog && dog.isOwnedBy(client.player)
+					&& dog.distanceTo(client.player) < 3.5) {
+				client.player.lookAt(EntityAnchorArgument.Anchor.EYES, dog.getBoundingBox().getCenter());
+				break;
+			}
+		}
+		return false;
+	}
+
+	private static void connectOwner(ClientGameTestContext context) {
+		context.runOnClient(client -> ConnectScreen.startConnecting(new TitleScreen(), client,
+				ServerAddress.parseString(SERVER_ADDRESS),
+				new ServerData("Mushroom Daycare", SERVER_ADDRESS, ServerData.Type.OTHER), false, null));
+	}
+
+	private static void verifyOwnerRejoin(ClientGameTestContext context, TestDedicatedServerContext server,
+			UUID ownerId, UUID walkerId, MushroomYorkieEntity dog) {
+		server.runCommand("save-all flush");
+		var oldConnection = server.computeOnServer(mc -> {
+			var connection = Objects.requireNonNull(mc.getPlayerList().getPlayer(ownerId)).connection;
+			connection.disconnect(Component.literal("Daycare rejoin check"));
+			return connection;
+		});
+		for (int tick = 0; tick < 200; tick++) {
+			boolean restored = server.computeOnServer(mc -> {
+				var owner = mc.getPlayerList().getPlayer(ownerId);
+				if (owner == null || owner.connection == oldConnection || !owner.isShiftKeyDown()) return false;
+				var walker = Objects.requireNonNull(mc.getPlayerList().getPlayer(walkerId));
+				assertBorrowedDog(dog, owner, walker);
+				if (!dog.getItemBySlot(EquipmentSlot.BODY).is(ModItems.PADDED_VEST)) {
+					throw new AssertionError("Owner reconnect lost Mushroom's vest");
+				}
+				return true;
+			});
+			if (restored) {
+				System.out.printf("Daycare owner rejoin passed: dog=%s owner=%s walker=%s%n", dog.getUUID(), ownerId, walkerId);
+				return;
+			}
+			context.waitTick();
+		}
+		throw new AssertionError("The native owner client did not reconnect after saving");
 	}
 
 	private static void soakWalks(ClientGameTestContext context, TestDedicatedServerContext server, UUID walkerId,
