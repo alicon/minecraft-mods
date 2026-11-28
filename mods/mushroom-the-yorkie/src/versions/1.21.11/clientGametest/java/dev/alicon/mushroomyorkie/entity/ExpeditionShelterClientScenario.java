@@ -9,6 +9,10 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.stats.Stats;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -16,6 +20,7 @@ import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.entity.EntityTypeTest;
+import net.minecraft.world.level.gamerules.GameRules;
 
 final class ExpeditionShelterClientScenario {
 	private ExpeditionShelterClientScenario() {
@@ -81,5 +86,70 @@ final class ExpeditionShelterClientScenario {
 			context.waitTicks(5);
 		}
 		throw new AssertionError("The sheltered Java adoption did not finish");
+	}
+
+	static void runFieldSleep(ClientGameTestContext context, TestServerContext server, UUID ownerId, Path status) throws IOException {
+		var fixture = server.computeOnServer(minecraft -> {
+			var level = minecraft.overworld();
+			var owner = minecraft.getPlayerList().getPlayer(ownerId);
+			var site = owner.blockPosition().above(6);
+			for (BlockPos pos : BlockPos.betweenClosed(site.offset(-4, -1, -4), site.offset(4, -1, 4))) {
+				level.setBlockAndUpdate(pos, Blocks.STONE.defaultBlockState());
+			}
+			for (BlockPos pos : BlockPos.betweenClosed(site.offset(-4, 0, -4), site.offset(4, 3, 4))) {
+				level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
+			}
+			level.getGameRules().set(GameRules.SPAWN_MOBS, false, minecraft);
+			level.setDayTime(13_300);
+			owner.teleportTo(site.getX() + 0.5, site.getY(), site.getZ() + 0.5);
+			owner.getInventory().add(new ItemStack(Items.WHITE_BED));
+			var dog = ModEntities.MUSHROOM_YORKIE.create(level, EntitySpawnReason.TRIGGERED);
+			dog.claimFor(owner);
+			dog.setPos(site.getX() + 3.5, site.getY(), site.getZ() + 0.5);
+			level.addFreshEntity(dog);
+			return new FieldSleepFixture(site, dog.getUUID());
+		});
+		context.waitFor(client -> client.player.blockPosition().equals(fixture.site())
+				&& client.player.getInventory().contains(stack -> stack.is(Items.WHITE_BED))
+				&& client.level.getDayTime() % 24_000 >= 13_300);
+		Files.writeString(status.resolveSibling("field-sleep-dog"), fixture.dog().toString());
+		Files.writeString(status, "ready");
+		boolean sleptOnPlacedBed = false;
+		try {
+			for (int tick = 0; tick < 1_000; tick += 5) {
+				String result = Files.readString(status);
+				sleptOnPlacedBed |= server.computeOnServer(minecraft -> {
+					var owner = minecraft.getPlayerList().getPlayer(ownerId);
+					return owner.isSleeping() && owner.getSleepingPos()
+							.filter(pos -> pos.closerThan(fixture.site(), 5))
+							.filter(pos -> owner.level().getBlockState(pos).is(Blocks.WHITE_BED)).isPresent();
+				});
+				if ("finished".equals(result)) {
+					if (!sleptOnPlacedBed) throw new AssertionError("Expected native sleep on the carried bed after placement");
+					server.runOnServer(minecraft -> {
+						var owner = minecraft.getPlayerList().getPlayer(ownerId);
+						var dogs = minecraft.overworld().getEntities(EntityTypeTest.forClass(MushroomYorkieEntity.class),
+								dog -> dog.isAlive() && dog.belongsTo(owner));
+						if (!owner.isAlive() || owner.isSleeping() || owner.level().getDayTime() < 24_000
+								|| owner.getStats().getValue(Stats.ITEM_USED.get(Items.WHITE_BED)) != 1
+								|| dogs.size() != 1 || !dogs.getFirst().getUUID().equals(fixture.dog())) {
+							throw new AssertionError("Expected dawn with the original living Mushroom and one used spare bed");
+						}
+					});
+					context.takeScreenshot("expedition-survival-field-sleep");
+					System.out.printf("Expedition native field sleep passed: dog=%s owner=%s%n", fixture.dog(), ownerId);
+					return;
+				}
+				if ("failed".equals(result)) break;
+				context.waitTicks(5);
+			}
+			throw new AssertionError("The native spare-bed sleep did not reach dawn");
+		} catch (AssertionError failure) {
+			context.takeScreenshot("expedition-survival-field-sleep-failure");
+			throw failure;
+		}
+	}
+
+	private record FieldSleepFixture(BlockPos site, UUID dog) {
 	}
 }

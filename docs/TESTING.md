@@ -199,17 +199,18 @@ The live verifier freezes world ticks while the controller is held and
 resumes them before the replacement controller starts issuing gameplay input.
 A player with the earned starter
 tools can resume searching for food and wool before a camp has been built.
-An interrupted iron quarry
-retains its grounded steps. The resumed controller can continue from the
-verified landing or use the recorded route to climb out. A quarry that ends
+An interrupted iron quarry retains its grounded steps. The resumed controller
+can continue from the verified landing or use the recorded route to climb out.
+When an old exit has missing support, the player can place carried blocks from
+an observed dry ledge. If Mushroom occupies the build space, the player can
+choose a neighboring foothold. A quarry that ends
 without enough ore records its entrance and the observed blocks at the last
 landing. If the same footing remains after reattachment, the controller
 scouts another opening. On the surface it offers Mushroom an earned portion
 if his first meal is still pending. A decision to return after a meal
 survives a handoff. When far from camp and clear of immediate threats, the
 player can place a carried bed and sleep until daylight. The first mined
-iron goes back to the
-camp bed before smelting. When the outbound path is in the local action
+iron goes back to the camp bed before smelting. When the outbound path is in the local action
 trace, the controller retraces grounded positions it observed before the
 first ore pickup. The trace records the original living dog, the raw ore
 still in inventory and their positions at the bed.
@@ -556,6 +557,11 @@ The disposable world provides a furnished house at night. The player
 starts outside with an empty inventory. The integrated server verifies the
 player slept inside with the door closed and woke to a living owned Mushroom
 and a Field Guide.
+
+Set `MUSHROOM_EXPEDITION_STAGE=field-sleep` to check the spare-bed route.
+The Normal Survival fixture starts after dusk with the original dog, one
+carried bed, and no nearby bed or hostile mobs. The verifier observes the
+player sleeping in the placed bed, the resulting dawn, and the same living dog.
 
 ### Playtest bridge and server GameTests
 

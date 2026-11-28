@@ -613,6 +613,23 @@ test('iron scouting walks toward a visible vein and disregards a sealed one', as
   );
 });
 
+test('a recorded quarry exit with no footing can be restored from a dry adjacent ledge', async () => {
+  const { missingQuarryExitSupport } = await import('./expedition-navigation.mjs');
+  const target = [256, 85, -64];
+  const floor = [
+    { x: 256, y: 82, z: -64, b: 'minecraft:grass_block' },
+    { x: 256, y: 83, z: -65, b: 'minecraft:grass_block' },
+  ];
+  assert.deepEqual(missingQuarryExitSupport(floor, target), {
+    stances: [[256, 84, -65]],
+    blocksToPlace: [[256, 83, -64], [256, 84, -64]],
+  });
+  assert.equal(missingQuarryExitSupport([
+    ...floor, { x: 256, y: 83, z: -64, b: 'minecraft:water' },
+  ], target), null);
+  assert.equal(missingQuarryExitSupport(floor.slice(1), target), null);
+});
+
 test('a verified flat quarry exit can finish a short move after a false drop warning', async () => {
   const { climbQuarry } = await import('./expedition-home.mjs');
   const target = [915, 68, 206];

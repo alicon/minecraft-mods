@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { setTimeout } from 'node:timers/promises';
 import {
-  bedSpotsWithGroundCover, dryStepKey, dryWaypoint, exitObstruction, hasPlacedBed, nearbyBuildingSpots,
-  nearestCover, quarryLandingIsClear, quarryStep,
+  bedSpotsWithGroundCover, dryStepKey, dryWaypoint, exitObstruction, hasDrySupport, hasPlacedBed, nearbyBuildingSpots,
+  missingQuarryExitSupport, nearestCover, quarryLandingIsClear, quarryStep,
 } from './expedition-navigation.mjs';
 import { cookExpeditionMutton, makeExpeditionCharcoal, smeltExpeditionIron } from './expedition-furnace.mjs';
 import { enterShelter, findShelteredBed, useShelterDoor } from './expedition-shelter.mjs';
@@ -1032,6 +1032,8 @@ async function nudgeOntoDryQuarryTile(action, player, landing, heightDifference,
 export async function descendQuarry(action, player, bed, stairs, protectedGround, route) {
   const start = feet(player);
   const { cells } = await action('get_blocks', { center: start, size: [7, route?.masonry ? 9 : 7, 7], format: 'json' });
+  if (!player.onGround || (!route?.masonry && !cells.some(({ x, y, z, b }) =>
+    x === start[0] && y === start[1] - 1 && z === start[2] && hasDrySupport(b)))) return 'unavailable';
   const step = quarryStep(cells, start, bed, stairs, route);
   if (!step) return 'unavailable';
   route?.rejected?.add(String(step.landing));
@@ -1063,6 +1065,46 @@ export async function descendQuarry(action, player, bed, stairs, protectedGround
   return step.landing;
 }
 
+async function rebuildQuarryExit(action, player, pos) {
+  const volume = await action('get_blocks', { center: pos, size: [5, 7, 5], format: 'json' });
+  if (!volume || volume.stats?.unloadedChunks || !missingQuarryExitSupport(volume.cells, pos)) return false;
+  const stock = await action('get_inventory');
+  const here = feet(player);
+  const [x, y, z] = pos;
+  const exits = [pos, [x + 1, y, z], [x - 1, y, z], [x, y, z + 1], [x, y, z - 1]];
+  for (const exit of exits) {
+    const repair = missingQuarryExitSupport(volume.cells, exit);
+    if (!repair) continue;
+    const material = ['minecraft:dirt', COBBLESTONE].find(id => count(stock, id) >= repair.blocksToPlace.length);
+    if (!material) continue;
+    const approaches = repair.stances.sort((a, b) =>
+      Math.hypot(...a.map((n, i) => n - here[i])) - Math.hypot(...b.map((n, i) => n - here[i])));
+    let found = false;
+    for (const stance of approaches) {
+      const move = await action('go_to', { pos: stance, stopDistance: 0.3, maxTicks: 40 });
+      if (move?.arrived && await settleOnDryStep(action, stance, setTimeout, true)) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) continue;
+    await hold(action, material);
+    let supported = true;
+    for (const block of repair.blocksToPlace) {
+      const placed = await action('place_block', { pos: block });
+      if (placed?.blockAtPos === material) continue;
+      // A companion can occupy the lower cell. Keep that tile clear and
+      // find a neighboring stair with a solid foundation.
+      supported = false;
+      break;
+    }
+    if (!supported) continue;
+    const walk = await action('go_to', { pos: exit, stopDistance: 0.3, maxTicks: 40 });
+    if (walk?.arrived && await settleOnDryStep(action, exit)) return true;
+  }
+  return false;
+}
+
 export async function climbQuarry(action, pos, chooseEscape) {
   const visited = [];
   const rejectedSteps = new Set();
@@ -1071,6 +1113,8 @@ export async function climbQuarry(action, pos, chooseEscape) {
     if (result?.arrived && await settleOnDryStep(action, pos)) return true;
     const player = await action('observe');
     if (!player?.inWorld || player.dead || player.health < 8) return false;
+    if (attempt < 2 && result?.arrived && player.position.y < pos[1]
+        && await rebuildQuarryExit(action, player, pos)) return true;
     if (result?.reason?.includes('drop of more than 3 blocks')
         && await nudgeOntoDryQuarryTile(action, player, pos, 0)) return true;
     const here = feet(player);

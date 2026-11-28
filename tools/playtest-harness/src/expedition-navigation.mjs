@@ -166,6 +166,22 @@ export function quarryLandingIsClear(cells, [x, y, z], masonry = false) {
     && !cells.some(cell => cell.y >= y - 1 && QUARRY_HAZARD.test(cell.b));
 }
 
+export function missingQuarryExitSupport(cells, [x, y, z]) {
+  const blocks = new Map(cells.map(cell => [`${cell.x},${cell.y},${cell.z}`, cell.b]));
+  const at = (dx, height, dz) => blocks.get(`${dx},${height},${dz}`);
+  const air = block => !block || /:(?:air|cave_air|void_air)$/.test(block);
+  if (![y - 1, y, y + 1].every(height => air(at(x, height, z)))) return null;
+  const foundation = [y - 2, y - 3].find(height => hasDrySupport(at(x, height, z)));
+  if (foundation === undefined || !air(at(x, foundation + 1, z))) return null;
+  const stances = CARDINAL.flatMap(([dx, dz]) => [y - 1, y].filter(height =>
+    hasDrySupport(at(x + dx, height - 1, z + dz))
+      && air(at(x + dx, height, z + dz)) && air(at(x + dx, height + 1, z + dz)))
+    .map(height => [x + dx, height, z + dz]));
+  if (!stances.length) return null;
+  const blocksToPlace = Array.from({ length: y - foundation - 1 }, (_, index) => [x, foundation + 1 + index, z]);
+  return { stances, blocksToPlace };
+}
+
 export function dryStepKey(from, to) {
   const dx = Math.sign(to[0] - from[0]);
   const dz = Math.sign(to[2] - from[2]);

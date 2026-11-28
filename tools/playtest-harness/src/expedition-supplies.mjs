@@ -24,7 +24,7 @@ import {
 } from './expedition-eye-route.mjs';
 import { COMPANION_WEARABLES, markExpeditionCamp, practiceStayAndRecall, prepareCompanionGear } from './expedition-gear.mjs';
 import { expeditionPolicy } from './expedition-policy.mjs';
-import { NETHER, OVERWORLD, netherRoundTrip, prepareNetherPortal } from './expedition-nether.mjs';
+import { NETHER, OVERWORLD, netherRoundTrip, prepareNetherPortal, withCompanion } from './expedition-nether.mjs';
 
 const configFile = new URL(
   '../../../mods/mushroom-the-yorkie/build/run/clientGameTest/config/mcagent.json',
@@ -89,6 +89,7 @@ const milestoneObjectives = {
   'nether-distant-supplies': 'Scout for a distant Nether fortress with Mushroom and bring home a blaze rod.',
   'ender-supplies': 'Shelter Mushroom, earn an Ender pearl, and craft an Eye of Ender.',
   shelter: 'Enter the furnished house and sleep with the door closed.',
+  'field-sleep': 'Place the carried bed before the nighttime return with Mushroom.',
   equipment: 'Craft the harness, padded vest, and mat. Fit Mushroom’s gear and mark camp.',
   'end-entry': 'Craft Eyes of Ender and bring Mushroom through the active portal.',
   'generated-end-entry': 'Find the generated portal room, open its portal, and bring Mushroom through.',
@@ -261,6 +262,13 @@ try {
   if (!duel && milestoneObjectives[stage]) await narrate('Objective', milestoneObjectives[stage]);
   if (stage === 'defense') await runCompanionDrill();
   else if (stage === 'reunion') await runReunion(start);
+  else if (stage === 'field-sleep') {
+    companion = (await readFile(join(dirname(statusFile), 'field-sleep-dog'), 'utf8')).trim();
+    const { x, y, z } = start.position;
+    await waitForDaylightRecovery(action, [Math.floor(x) + 64, Math.floor(y), Math.floor(z)],
+      message => narrate('Decision', message));
+    await withCompanion(action, OVERWORLD, companion);
+  }
   else if (stage === 'feeding') {
     companion = (await readFile(join(dirname(statusFile), 'feeding-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
