@@ -35,11 +35,15 @@ It stages a bed, squirrel and portal entrances, then uses the normal Use,
 crouch and movement bindings. It opens the adoption guide, calls Mushroom off
 a chase and uses a treat to record the first paw. It also equips the vest,
 attaches scute plates and places the camp mat. In the End, a staged breath cloud
-tests whether Mushroom retreats and keeps shelter while his owner dies and returns. Each crossing checks the
-original dog's UUID, ownership and living arrival. A staged exit exercises
-the credits and return path, then save and reopen verify the same dog,
-armor, camp and training progress. A final Nether crossing checks that a seated
-dog stays behind.
+tests whether Mushroom retreats and keeps shelter while his owner dies and
+returns. Each crossing checks the original dog's UUID, ownership and living
+arrival. The final fight fixture starts with the crystals cleared, the vanilla
+dragon perched at two health, and a nearby sheltered camp. A native sword
+strike kills the dragon. The server verifies that vanilla opens the exit and
+that the original dog waits at camp. The player recalls Mushroom and they
+walk through the exit. Save and reopen verify the dragon victory and the
+same dog's armor, camp and training progress. A final Nether crossing checks
+that a seated dog stays behind.
 Screenshots are under `mods/mushroom-the-yorkie/build/run/clientGameTest/screenshots/`.
 
 For Bedrock, build the add-on and run the expedition fixtures with the official

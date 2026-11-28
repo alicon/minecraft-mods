@@ -11,6 +11,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldSave;
 import net.minecraft.client.gui.screens.WinScreen;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -34,6 +35,7 @@ public final class ExpeditionTravelClientGameTest implements FabricClientGameTes
 		TestWorldSave save;
 		UUID ownerId;
 		UUID dogId;
+		GlobalPos finalCamp;
 		try (var world = context.worldBuilder().create()) {
 			world.getClientWorld().waitForChunksRender();
 			save = world.getWorldSave();
@@ -50,7 +52,7 @@ public final class ExpeditionTravelClientGameTest implements FabricClientGameTes
 				ExpeditionEndShelterClientScenario.shelterThroughOwnerDeath(context, server, ownerId, dogId);
 				walkThroughPortal(context, world, ownerId, dogId, Level.END, new BlockPos(48, 90, 48), false);
 				ExpeditionEndShelterClientScenario.recallInEnd(context, server, dogId);
-				walkThroughPortal(context, world, ownerId, dogId, Level.OVERWORLD, new BlockPos(112, 65, 0), false);
+				finalCamp = ExpeditionEndVictoryClientScenario.finishAndReturn(context, world, ownerId, dogId);
 			} catch (RuntimeException | AssertionError exception) {
 				context.takeScreenshot("expedition-travel-failure");
 				throw exception;
@@ -62,7 +64,11 @@ public final class ExpeditionTravelClientGameTest implements FabricClientGameTes
 				assertDog(reopened.getServer(), ownerId, dogId, Level.OVERWORLD, Level.OVERWORLD, false);
 				ExpeditionVestClientScenario.assertPlated(reopened.getServer(), ownerId, dogId);
 				ExpeditionGuideClientScenario.checkReopened(context, reopened.getServer(), ownerId, dogId);
-				ExpeditionCampClientScenario.assertMarked(reopened.getServer(), dogId, ExpeditionEndShelterClientScenario.CAMP);
+				ExpeditionCampClientScenario.assertMarked(reopened.getServer(), dogId, finalCamp);
+				if (!reopened.getServer().computeOnServer(minecraft -> minecraft.getLevel(Level.END)
+						.getDragonFight().saveData().dragonKilled())) {
+					throw new AssertionError("The native dragon victory did not survive reopening");
+				}
 				System.out.printf("Expedition rejoin passed: dog=%s save=%s%n", dogId, save.getSaveDirectory());
 				context.takeScreenshot("expedition-rejoin");
 				askDogToSit(context, reopened.getServer(), dogId);
@@ -174,16 +180,7 @@ public final class ExpeditionTravelClientGameTest implements FabricClientGameTes
 		} finally {
 			input.releaseKey(options -> options.keyUp);
 		}
-		if (origin.equals(Level.END)) {
-			context.waitFor(client -> client.screen instanceof WinScreen
-					|| client.level != null && client.level.dimension().equals(target), PORTAL_WAIT_TICKS);
-			if (context.computeOnClient(client -> client.screen instanceof WinScreen)) {
-				input.pressKey(GLFW.GLFW_KEY_ESCAPE);
-			}
-		}
-		context.waitFor(client -> client.screen == null && client.level != null && client.player != null
-				&& client.level.dimension().equals(target), PORTAL_WAIT_TICKS);
-		world.getClientWorld().waitForChunksRender();
+		finishPortalTravel(context, world, origin, target);
 		assertDog(server, ownerId, dogId, target, sitting ? origin : target, sitting);
 		System.out.printf("Expedition portal passed: %s -> %s dog=%s sitting=%s%n", origin.identifier(), target.identifier(), dogId, sitting);
 		if (!sitting) {
@@ -191,7 +188,21 @@ public final class ExpeditionTravelClientGameTest implements FabricClientGameTes
 		}
 	}
 
-	private static void assertDog(TestServerContext server, UUID ownerId, UUID dogId,
+	static void finishPortalTravel(ClientGameTestContext context, TestSingleplayerContext world,
+			ResourceKey<Level> origin, ResourceKey<Level> target) {
+		if (origin.equals(Level.END)) {
+			context.waitFor(client -> client.screen instanceof WinScreen
+					|| client.level != null && client.level.dimension().equals(target), PORTAL_WAIT_TICKS);
+			if (context.computeOnClient(client -> client.screen instanceof WinScreen)) {
+				context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+			}
+		}
+		context.waitFor(client -> client.screen == null && client.level != null && client.player != null
+				&& client.level.dimension().equals(target), PORTAL_WAIT_TICKS);
+		world.getClientWorld().waitForChunksRender();
+	}
+
+	static void assertDog(TestServerContext server, UUID ownerId, UUID dogId,
 			ResourceKey<Level> playerDimension, ResourceKey<Level> dogDimension, boolean sitting) {
 		server.runOnServer(minecraft -> {
 			var owner = owner(minecraft, ownerId);

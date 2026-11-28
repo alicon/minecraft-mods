@@ -2,6 +2,7 @@ package dev.alicon.mushroomyorkie.entity;
 
 import java.util.Locale;
 import java.util.UUID;
+import java.util.stream.IntStream;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.minecraft.client.gui.screens.DeathScreen;
@@ -81,19 +82,30 @@ final class ExpeditionEndShelterClientScenario {
 		server.runCommand(String.format(Locale.ROOT, "execute in minecraft:the_end run tp @a %.4f %.4f %.4f",
 				approach.x, approach.y, approach.z));
 		context.waitFor(client -> client.player.position().distanceToSqr(approach) < 0.04);
-		var aim = server.computeOnServer(minecraft -> minecraft.getLevel(Level.END).getEntity(dogId).getBoundingBox().getCenter());
-		context.runOnClient(client -> client.player.lookAt(EntityAnchorArgument.Anchor.EYES, aim));
-		context.waitFor(client -> client.hitResult instanceof EntityHitResult hit && hit.getEntity().getUUID().equals(dogId));
-		context.getInput().pressKey(options -> options.keyUse);
-		for (int tick = 0; tick < 20; tick++) {
-			if (server.computeOnServer(minecraft -> {
+		recallFromReach(context, server, dogId);
+	}
+
+	static void recallFromReach(ClientGameTestContext context, TestServerContext server, UUID dogId) {
+		int emptySlot = context.computeOnClient(client -> IntStream.range(0, 9)
+				.filter(slot -> client.player.getInventory().getItem(slot).isEmpty()).findFirst().orElseThrow());
+		context.getInput().pressKey(options -> options.keyHotbarSlots[emptySlot]);
+		context.waitFor(client -> client.player.getMainHandItem().isEmpty());
+		for (int attempt = 0; attempt <= 3; attempt++) {
+			var aim = server.computeOnServer(minecraft -> {
 				var dog = (MushroomYorkieEntity) minecraft.getLevel(Level.END).getEntity(dogId);
-				return !dog.isHoldingExpeditionShelter() && !dog.isOrderedToSit();
-			})) {
-				System.out.println("Expedition End shelter recall passed");
+				if (dog == null || !dog.isAlive()) throw new AssertionError("The original End companion is missing");
+				return dog.isHoldingExpeditionShelter() || dog.isOrderedToSit() || dog.isCurledUpSleeping()
+						? dog.getBoundingBox().getCenter() : null;
+			});
+			if (aim == null) {
+				System.out.println("Expedition original dog is following in the End");
 				return;
 			}
-			context.waitTick();
+			if (attempt == 3) break;
+			context.runOnClient(client -> client.player.lookAt(EntityAnchorArgument.Anchor.EYES, aim));
+			context.waitFor(client -> client.hitResult instanceof EntityHitResult hit && hit.getEntity().getUUID().equals(dogId));
+			context.getInput().pressKey(options -> options.keyUse);
+			context.waitTicks(5);
 		}
 		throw new AssertionError("The returned owner could not recall Mushroom for the exit");
 	}
