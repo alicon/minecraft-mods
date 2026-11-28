@@ -197,16 +197,21 @@ test('the archer removes only his own pillar and stops on the original ground', 
   const material = 'minecraft:cobblestone';
   const base = [-7, 56, 39];
   const state = y => ({ inWorld: true, onGround: true, health: 20, position: { x: -6.5, y, z: 39.5 } });
+  const pickaxe = { id: 'minecraft:diamond_pickaxe', slot: 2 };
   let height = 59;
+  let held = material;
   const removed = [];
   const action = async (name, args) => {
     switch (name) {
+      case 'get_inventory': return { slots: [pickaxe] };
+      case 'select_slot': assert.equal(args.slot, pickaxe.slot); held = pickaxe.id; return { mainHand: pickaxe };
       case 'get_blocks':
         return { cells: [args.center[1] - 1, args.center[1]].map(y =>
           ({ x: -7, y, z: 39, b: y === 55 ? 'minecraft:end_stone' : material })) };
       case 'look': assert.equal(args.pitch, 90); return {};
       case 'observe': return state(height);
       case 'break_block':
+        assert.equal(held, pickaxe.id, 'use the pickaxe even when the climb stopped before opening the cage');
         assert.deepEqual(args.pos, [-7, height - 1, 39]);
         removed.push(height - 1);
         height--;
@@ -214,7 +219,7 @@ test('the archer removes only his own pillar and stops on the original ground', 
       default: assert.fail(`Unexpected action: ${name}`);
     }
   };
-  assert.equal(await dismantleCrystalPillar(action, state(height), base, material), true);
+  assert.equal(await dismantleCrystalPillar(action, state(height), base, material, pickaxe.id), true);
   assert.deepEqual(removed, [58, 57, 56]);
   assert.equal(height, 56);
   assert.equal(await dismantleCrystalPillar(action, state(58), [-8, 56, 39], material), false);

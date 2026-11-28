@@ -144,12 +144,18 @@ export async function catchCrystalFall(action, player) {
   return false;
 }
 
-export async function dismantleCrystalPillar(action, player, base, material) {
+export async function dismantleCrystalPillar(action, player, base, material, pickaxe) {
   const [x, floor, z] = base;
   const safeStance = (view, height) => view?.inWorld && view.onGround && !view.dead && view.health >= 10
     && String(feet(view)) === String([x, height, z]);
+  const top = Math.floor(player.position.y);
+  if (top <= floor || !safeStance(player, top)) return safeStance(player, floor);
+  if (player.mainHand?.id !== pickaxe) {
+    await hold(action, pickaxe);
+    player = await action('observe');
+  }
   await action('look', { pitch: 90 });
-  for (let height = Math.floor(player.position.y); height > floor; height--) {
+  for (let height = top; height > floor; height--) {
     if (!safeStance(player, height)) return false;
     const pos = [x, height - 1, z];
     const view = await action('get_blocks', { center: pos, size: [1, 3, 1], format: 'json' });
@@ -286,7 +292,7 @@ export async function openCrystalCage(action, player, crystal, dangerous) {
   player = await action('observe');
   // Dismantling keeps the bow corridor dry. Water remains the way down
   // if damage or a displaced stance makes it unsafe to keep mining.
-  let returned = await dismantleCrystalPillar(action, player, plan.base, blocks);
+  let returned = await dismantleCrystalPillar(action, player, plan.base, blocks, pickaxe);
   if (!returned) {
     player = await action('observe');
     if (player.onGround && horizontal(feet(player), plan.base) === 0) {
