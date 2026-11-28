@@ -5,7 +5,7 @@ import { dirname, isAbsolute, join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import {
   adoptAtNight, dogMealCount, earnIronKit, earnStoneKit, feedAdoptedDog, forageExpeditionMeal, prepareAdoptionCamp,
-  breakVisible, climbQuarry, daylightLoadoutIsVisible, descendQuarry, ensurePlanks, hold, packRecoveryMeal, placeBeside, recoverDroppedLoadout,
+  breakVisible, climbQuarry, collectDroppedLog, daylightLoadoutIsVisible, descendQuarry, ensurePlanks, hold, packRecoveryMeal, placeBeside, recoverDroppedLoadout,
   regroupExpeditionCompanion, retreatFromNearbyMob,
   settleOnDryStep, sleepNearby, stepOut, waitForDaylightRecovery, WOOD_LOGS,
 } from './expedition-home.mjs';
@@ -1316,7 +1316,7 @@ async function collectStarterLogs(start, toward) {
 async function recoverLooseLogs() {
   const loose = await action('get_entities', { type: 'item', radius: 6 });
   for (const entity of loose?.entities.filter(item => WOOD_LOGS.includes(item.item?.id.replace(/^minecraft:/, ''))) ?? []) {
-    await action('go_to', { entityId: entity.id, stopDistance: 0.3, maxTicks: 40 });
+    await collectDroppedLog(action, entity, 40);
   }
 }
 

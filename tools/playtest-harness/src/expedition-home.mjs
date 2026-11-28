@@ -618,6 +618,17 @@ export async function placeBeside(action, item, { avoidColumns = [] } = {}) {
   throw new Error(`No nearby supported position for ${item}`);
 }
 
+export async function collectDroppedLog(action, log, maxTicks = 55) {
+  const approach = { entityId: log.id, stopDistance: 0.3, maxTicks };
+  const result = await action('go_to', approach);
+  const obstruction = result?.reason?.match(/blocked by minecraft:\w+_leaves at (-?\d+),(-?\d+),(-?\d+) \(head\)/);
+  if (!obstruction || !Number.isFinite(result.position?.[1])) return;
+  const pos = obstruction.slice(1).map(Number);
+  if (pos[1] > Math.floor(result.position[1]) && (await action('break_block', { pos, maxTicks: 30 }))?.broken) {
+    await action('go_to', approach);
+  }
+}
+
 async function harvestReachableLog(action, camp, timberSite) {
   const visited = [];
   const rejected = new Set();
@@ -696,7 +707,7 @@ async function harvestReachableLog(action, camp, timberSite) {
     for (let check = 0; check < 4; check++) {
       const drops = await action('get_entities', { type: 'item', radius: 7 });
       const log = drops.entities.find(candidate => candidate.item?.id === tree.name);
-      if (log) await action('go_to', { entityId: log.id, stopDistance: 0.3, maxTicks: 55 });
+      if (log) await collectDroppedLog(action, log);
       await setTimeout(350);
       if (count(await action('get_inventory'), tree.name) > stock) return tree.name;
     }

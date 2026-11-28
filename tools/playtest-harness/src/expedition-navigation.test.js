@@ -1174,6 +1174,40 @@ test('a log cut from above is collected after it falls into reach', async () => 
   assert.ok(selected, 'use the owned axe for chopping timber');
 });
 
+test('starter timber pickup clears head-level leaves after cutting a log', async () => {
+  const { ensurePlanks } = await import('./expedition-home.mjs');
+  const trunk = [4, 69, 4];
+  const leaves = [4, 71, 3];
+  const drop = { id: 574, pos: [4.25, 69.5, 4], item: { id: 'minecraft:oak_log' } };
+  const stock = [];
+  const broken = [];
+  let pickups = 0;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe': return { inWorld: true, onGround: true, health: 20, position: { x: 3.7, y: 70, z: 3.7 },
+        crosshair: { pos: trunk, block: 'minecraft:oak_log' } };
+      case 'scan_blocks': return { matches: [{ name: 'minecraft:oak_log', positions: [trunk] }] };
+      case 'get_blocks': return { cells: [] };
+      case 'get_inventory': return { slots: stock };
+      case 'look': return {};
+      case 'get_entities': return { entities: [drop] };
+      case 'break_block': broken.push(args.pos); return { broken: true };
+      case 'go_to':
+        if (!args.entityId) return { arrived: true };
+        pickups++;
+        if (broken.length < 2) return { arrived: false, position: [3.7, 70, 3.7],
+          reason: 'blocked by minecraft:oak_leaves at 4,71,3 (head); break it or go around' };
+        stock.push({ id: 'minecraft:oak_log', count: 1 });
+        return { arrived: true };
+      default: assert.fail(name);
+    }
+  };
+  await ensurePlanks(action, async (item, count) => stock.push({ id: item, count }), 4);
+  assert.deepEqual(broken, [trunk, leaves]);
+  assert.equal(pickups, 2);
+  assert.ok(stock.some(stack => stack.id === 'minecraft:oak_planks' && stack.count === 4));
+});
+
 test('the player clears tall grass from the crosshair before packing the camp furnace', async () => {
   const { recoverPlacedFurnace } = await import('./expedition-home.mjs');
   const furnace = [-226, 69, -120];
