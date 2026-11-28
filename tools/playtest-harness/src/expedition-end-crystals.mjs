@@ -135,9 +135,10 @@ export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = 
     const vantage = activeWindow && openedCages.get(activeWindow.crystal.uuid);
     const shot = candidates.find(candidate => {
       const id = candidate.crystal.uuid;
-      if (!candidate.aim || candidate.range < 14 || positionsTried.has(candidate.key)) return false;
-      if (!cageStatus.get(id)) return !activeWindow;
-      return id === activeWindow?.crystal.uuid && Math.hypot(here[0] - vantage[0], here[2] - vantage[2]) <= 3;
+      if (!candidate.aim || candidate.range < 14) return false;
+      if (!cageStatus.get(id)) return !activeWindow && !positionsTried.has(candidate.key);
+      return id === activeWindow?.crystal.uuid && (misses.get(id) ?? 0) < 4
+        && Math.hypot(player.position.x - vantage[0] - 0.5, player.position.z - vantage[2] - 0.5) <= 0.65;
     });
     if (shot && detourSteps === 0) {
       positionsTried.add(shot.key);
@@ -163,6 +164,9 @@ export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = 
     }
 
     const next = candidates[0]?.crystal;
+    if (vantage && (misses.get(activeWindow.crystal.uuid) ?? 0) >= 4) {
+      throw new Error('The prepared firing line did not reach the opened crystal');
+    }
     if (detourSteps === 0 || !destination) {
       if (vantage) {
         destination = [vantage[0], here[1], vantage[2]];

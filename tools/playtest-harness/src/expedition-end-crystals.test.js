@@ -30,6 +30,15 @@ test('a full draw crosses the target height between flight ticks', async () => {
   assert.ok(Math.abs(y - target[1]) < 0.01, `arrow crossed at y=${y}`);
 });
 
+test('the archer can reject an arc that crosses a nearer spike', async () => {
+  const { clearBowArc } = await import('./expedition-ballistics.mjs');
+  const player = { position: { x: 19.5, y: 58, z: 39.5 } };
+  const crystal = [-12.5, 84, 39.5];
+  const pillar = ([x, y, z]) => x >= 10 && x <= 15 && y < 77 && z >= 37 && z <= 41;
+  assert.equal(clearBowArc(player, crystal, pillar), false);
+  assert.equal(clearBowArc({ position: { ...player.position, z: 48.5 } }, crystal, pillar), true);
+});
+
 test('the End archer leaves crystals within blast range of the original dog intact', async () => {
   const { shootEndCrystal } = await import('./expedition-end-crystals.mjs');
   const player = { dimension: 'minecraft:the_end', position: { x: 0, y: 65, z: 0 }, onGround: true, health: 20 };

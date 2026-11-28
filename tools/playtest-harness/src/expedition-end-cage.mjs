@@ -1,6 +1,7 @@
 import { setTimeout } from 'node:timers/promises';
 import { hold, stepOut } from './expedition-home.mjs';
 import { dryWaypoint, hasDrySupport } from './expedition-navigation.mjs';
+import { clearBowArc } from './expedition-ballistics.mjs';
 
 const BARS = 'minecraft:iron_bars';
 const MATERIAL = ['minecraft:cobblestone', 'minecraft:end_stone', 'minecraft:dirt'];
@@ -90,17 +91,30 @@ async function descendWater(action, player, plan, line) {
 }
 
 async function firingGround(action, crystal, plan) {
-  const [x, , z] = crystal.pos.map(Math.floor);
-  const center = [x + plan.dx * 32, plan.base[1], z + plan.dz * 32];
-  const size = plan.dx ? [19, 13, 1] : [1, 13, 19];
+  const [x, y, z] = crystal.pos.map(Math.floor);
+  const bottom = plan.base[1] - 6;
+  const top = y + 5;
+  const center = [x + plan.dx * 19, Math.floor((bottom + top + 1) / 2), z + plan.dz * 19];
+  const size = plan.dx ? [49, top - bottom + 1, 25] : [25, top - bottom + 1, 49];
   const view = await action('get_blocks', { center, size, format: 'json' });
   if (!view || view.stats?.unloadedChunks) return null;
   const solid = new Set(view.cells.map(cell => `${cell.x},${cell.y},${cell.z}`));
-  const dry = view.cells.filter(cell => hasDrySupport(cell.b)
+  const [pillarX, pillarY, pillarZ] = plan.base;
+  for (let height = pillarY; height < plan.top; height++) {
+    solid.add(String([pillarX, height, pillarZ]));
+    solid.add(String([pillarX + plan.dx, height, pillarZ + plan.dz]));
+  }
+  const opening = new Set(plan.bars.map(String));
+  const target = [crystal.pos[0], crystal.pos[1] + 1, crystal.pos[2]];
+  const dry = view.cells.filter(cell => (cell.x - x) * plan.dx + (cell.z - z) * plan.dz >= 14
+    && Math.abs(cell.y + 1 - plan.base[1]) <= 5 && hasDrySupport(cell.b)
     && !solid.has(`${cell.x},${cell.y + 1},${cell.z}`)
     && !solid.has(`${cell.x},${cell.y + 2},${cell.z}`));
+  const vantage = [x + plan.dx * 30, plan.base[1], z + plan.dz * 30];
   return dry.map(cell => [cell.x, cell.y + 1, cell.z])
-    .sort((a, b) => horizontal(a, center) - horizontal(b, center) || b[1] - a[1])[0] ?? null;
+    .sort((a, b) => horizontal(a, vantage) - horizontal(b, vantage))
+    .find(([x, y, z]) => clearBowArc({ position: { x: x + 0.5, y, z: z + 0.5 } }, target,
+      pos => solid.has(String(pos)) && !opening.has(String(pos)))) ?? null;
 }
 
 export async function openCrystalCage(action, player, crystal, dangerous) {

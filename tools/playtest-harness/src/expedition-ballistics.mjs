@@ -2,6 +2,26 @@ const FULL_DRAW_SPEED = 3;
 const AIR_DRAG = 0.99;
 const ARROW_GRAVITY = 0.05;
 
+export function clearBowArc(player, target, solidAt) {
+  const aim = bowAim(player, target);
+  if (!aim) return false;
+  const { x, y, z } = player.position;
+  const range = Math.hypot(target[0] - x, target[2] - z);
+  if (range < 1) return false;
+  const pitch = -aim.pitch * Math.PI / 180;
+  const horizontal = FULL_DRAW_SPEED * Math.cos(pitch);
+  const vertical = FULL_DRAW_SPEED * Math.sin(pitch);
+  for (let ticks = 0.125; ticks <= 45; ticks += 0.125) {
+    const travel = (1 - AIR_DRAG ** ticks) / (1 - AIR_DRAG);
+    const progress = horizontal * travel / range;
+    if (progress >= 1) return true;
+    const height = y + 1.52 + vertical * travel - ARROW_GRAVITY * (ticks - travel) / (1 - AIR_DRAG);
+    const pos = [x + (target[0] - x) * progress, height, z + (target[2] - z) * progress].map(Math.floor);
+    if (solidAt(pos)) return false;
+  }
+  return false;
+}
+
 export function bowAim(player, target) {
   const dx = target[0] - player.position.x;
   const dy = target[1] - (player.position.y + 1.52);
