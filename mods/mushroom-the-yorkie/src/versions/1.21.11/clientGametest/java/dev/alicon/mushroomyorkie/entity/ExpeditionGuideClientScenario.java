@@ -115,7 +115,7 @@ final class ExpeditionGuideClientScenario {
 				"The server was still using the guide's hotbar slot");
 	}
 
-	private static void aimAtDog(ClientGameTestContext context, UUID dogId) {
+	static void aimAtDog(ClientGameTestContext context, UUID dogId) {
 		for (int tick = 0; tick < 20; tick++) {
 			boolean aimed = context.computeOnClient(client -> {
 				if (client.hitResult instanceof EntityHitResult hit && hit.getEntity().getUUID().equals(dogId)) {

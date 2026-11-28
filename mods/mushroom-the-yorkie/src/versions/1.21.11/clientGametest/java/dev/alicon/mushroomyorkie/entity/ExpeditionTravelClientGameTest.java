@@ -20,7 +20,6 @@ import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.Vec3;
 import org.lwjgl.glfw.GLFW;
 
@@ -32,16 +31,20 @@ public final class ExpeditionTravelClientGameTest implements FabricClientGameTes
 		if (!Boolean.getBoolean("mushroom.expedition.clientTest")) {
 			return;
 		}
-		if ("1".equals(System.getenv("MUSHROOM_EXPEDITION_SLEEP_OWNERSHIP_ONLY"))) {
-			boolean pauseOnLostFocus = context.computeOnClient(client -> client.options.pauseOnLostFocus);
-			context.runOnClient(client -> client.options.pauseOnLostFocus = false);
-			try {
+		boolean pauseOnLostFocus = context.computeOnClient(client -> client.options.pauseOnLostFocus);
+		context.runOnClient(client -> client.options.pauseOnLostFocus = false);
+		try {
+			if ("1".equals(System.getenv("MUSHROOM_EXPEDITION_SLEEP_OWNERSHIP_ONLY"))) {
 				sleepWithUnloadedCompanion(context);
-			} finally {
-				context.runOnClient(client -> client.options.pauseOnLostFocus = pauseOnLostFocus);
+			} else {
+				travelAndReopen(context);
 			}
-			return;
+		} finally {
+			context.runOnClient(client -> client.options.pauseOnLostFocus = pauseOnLostFocus);
 		}
+	}
+
+	private static void travelAndReopen(ClientGameTestContext context) {
 		TestWorldSave save;
 		UUID ownerId;
 		UUID dogId;
@@ -92,21 +95,30 @@ public final class ExpeditionTravelClientGameTest implements FabricClientGameTes
 
 	private static void askDogToSit(ClientGameTestContext context, TestServerContext server, UUID dogId) {
 		server.runCommand("tp @a 16.5 90 17.5");
-		var aim = server.computeOnServer(minecraft -> {
+		server.runOnServer(minecraft -> {
 			var dog = (MushroomYorkieEntity) minecraft.overworld().getEntity(dogId);
 			dog.setPos(16.5, 90.0, 15.2);
 			dog.getNavigation().stop();
-			return dog.getBoundingBox().getCenter();
 		});
-		context.waitFor(client -> client.player.blockPosition().equals(new BlockPos(16, 90, 17)));
-		context.runOnClient(client -> client.player.lookAt(EntityAnchorArgument.Anchor.EYES, aim));
-		context.waitFor(client -> client.hitResult instanceof EntityHitResult hit && hit.getEntity().getUUID().equals(dogId));
-		context.getInput().pressKey(options -> options.keyUse);
-		for (int tick = 0; tick < 20; tick++) {
-			if (server.computeOnServer(minecraft -> ((MushroomYorkieEntity) minecraft.overworld().getEntity(dogId)).isOrderedToSit())) {
-				return;
+		int emptySlot = context.computeOnClient(client -> {
+			for (int slot = 0; slot < 9; slot++) {
+				if (client.player.getInventory().getItem(slot).isEmpty()) return slot;
 			}
-			context.waitTick();
+			throw new AssertionError("The sit cue fixture needs an empty hotbar slot");
+		});
+		context.getInput().pressKey(options -> options.keyHotbarSlots[emptySlot]);
+		context.waitFor(client -> client.screen == null && client.player.getMainHandItem().isEmpty()
+				&& client.player.blockPosition().equals(new BlockPos(16, 90, 17)));
+		for (int cue = 0; cue < 4; cue++) {
+			ExpeditionGuideClientScenario.aimAtDog(context, dogId);
+			context.getInput().pressKey(options -> options.keyUse);
+			for (int tick = 0; tick < 6; tick++) {
+				if (server.computeOnServer(minecraft -> ((MushroomYorkieEntity) minecraft.overworld().getEntity(dogId)).isOrderedToSit())) {
+					System.out.printf("Expedition native sit cue passed: dog=%s uses=%s%n", dogId, cue + 1);
+					return;
+				}
+				context.waitTick();
+			}
 		}
 		throw new AssertionError("Native empty-hand Use did not order Mushroom to sit");
 	}
