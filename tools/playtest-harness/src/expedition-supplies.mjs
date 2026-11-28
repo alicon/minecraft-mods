@@ -121,9 +121,16 @@ async function playerAction(name, args = {}) {
       : null;
     await playerAction('look', { pitch: endermen?.entities?.length ? 26 : 4 });
   }
-  const result = await rpc('tools/call', { name, arguments: args });
-  const observation = result.structuredContent ?? result.content;
-  console.log(JSON.stringify({ at: new Date().toISOString(), action: name, args, observation, ok: !result.isError }));
+  let result;
+  let observation;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    result = await rpc('tools/call', { name, arguments: args });
+    observation = result.structuredContent ?? result.content;
+    console.log(JSON.stringify({ at: new Date().toISOString(), action: name, args, observation, ok: !result.isError }));
+    const delay = observation?.retryAfterMs;
+    if (attempt === 1 || !result.isError || !Number.isFinite(delay) || delay <= 0 || delay > 1_000) break;
+    await setTimeout(delay + 20);
+  }
   if (name === 'observe' && !result.isError) {
     lastPlayer = observation;
     if (observation?.dead || (live && await readFile(deathFile, 'utf8').catch(() => '') !== deathAtStart)) {

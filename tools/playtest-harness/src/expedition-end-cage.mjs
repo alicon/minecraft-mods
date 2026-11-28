@@ -1,6 +1,6 @@
 import { setTimeout } from 'node:timers/promises';
 import { hold, stepOut } from './expedition-home.mjs';
-import { hasDrySupport } from './expedition-navigation.mjs';
+import { dryWaypoint, hasDrySupport } from './expedition-navigation.mjs';
 
 const BARS = 'minecraft:iron_bars';
 const MATERIAL = ['minecraft:cobblestone', 'minecraft:end_stone', 'minecraft:dirt'];
@@ -45,7 +45,24 @@ export function cageApproach(cells, crystal, player) {
     || Math.abs(a.base[1] - here[1]) - Math.abs(b.base[1] - here[1]))[0];
 }
 
-async function descendWater(action, player, plan) {
+async function leaveShallowWater(action, line) {
+  for (let step = 0; step < 10; step++) {
+    const player = await action('observe');
+    if (!player?.inWorld || player.dead) return false;
+    if (player.onGround && !player.inWater) return true;
+    const here = feet(player);
+    const view = await action('get_blocks', { center: here, size: [13, 7, 13], format: 'json' });
+    if (!view || view.stats?.unloadedChunks) return false;
+    // Allow shallow water in the route while still requiring solid support.
+    const footing = view.cells.filter(cell => cell.b !== WATER || cell.y < here[1]);
+    const next = dryWaypoint(footing, here, [], line, 'surface');
+    if (!next) return false;
+    await action('go_to', { pos: next, stopDistance: 0.3, maxTicks: 55 });
+  }
+  return false;
+}
+
+async function descendWater(action, player, plan, line) {
   const [x, y, z] = feet(player);
   if (y <= plan.base[1] + 1) return true;
   const water = [x + plan.dx, plan.base[1], z + plan.dz];
@@ -66,7 +83,7 @@ async function descendWater(action, player, plan) {
   for (let wait = 0; wait < 60; wait++) {
     const landing = await action('observe');
     if (!landing?.inWorld || landing.dead) return false;
-    if (landing.position.y <= plan.base[1] + 1) return true;
+    if (landing.position.y <= plan.base[1] + 1) return leaveShallowWater(action, line);
     await setTimeout(240);
   }
   return false;
@@ -149,6 +166,6 @@ export async function openCrystalCage(action, player, crystal, dangerous) {
     }
   }
   player = await action('observe');
-  if (!await descendWater(action, player, plan) || !opened) return null;
+  if (!await descendWater(action, player, plan, line) || !opened) return null;
   return line;
 }
