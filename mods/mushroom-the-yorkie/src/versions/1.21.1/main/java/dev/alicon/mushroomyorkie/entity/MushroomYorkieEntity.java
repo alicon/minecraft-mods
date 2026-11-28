@@ -14,11 +14,13 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.AgeableMob;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.level.entity.EntityTypeTest;
 
 /** Tameable Yorkie companion entity that adapts Minecraft events to Mushroom's pet state. */
@@ -57,6 +59,7 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 	final MushroomLeaveItTraining leaveItTraining = new MushroomLeaveItTraining();
 	final MushroomCampState expeditionCamp = new MushroomCampState();
 	net.minecraft.core.GlobalPos lastWarnedTrailStep;
+	MushroomTrailFollowingGoal trailFollowingGoal;
 	final MushroomCreativeFlightRecovery creativeRecoveryFlight = new MushroomCreativeFlightRecovery();
 	final MushroomFlightRoute fetchFlight = new MushroomFlightRoute(this);
 	final MushroomWaterEscape waterEscape = new MushroomWaterEscape(this);
@@ -138,6 +141,12 @@ public final class MushroomYorkieEntity extends net.minecraft.world.entity.Tamab
 		super.customServerAiStep();
 		ServerLevel level = (ServerLevel) this.level();
 		MushroomYorkieServerAi.tick(this, level);
+	}
+
+	@Override
+	public void move(MoverType type, Vec3 movement) {
+		super.move(type, type == MoverType.SELF && this.trailFollowingGoal != null
+				? this.trailFollowingGoal.guardStride(movement) : movement);
 	}
 
 	@Override
