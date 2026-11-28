@@ -55,6 +55,7 @@ const playtestLog = join(dirname(statusFile), 'playtest.log');
 const live = process.env.MUSHROOM_EXPEDITION_LIVE === '1';
 const deathAtStart = live ? await readFile(deathFile, 'utf8').catch(() => '') : '';
 const blockPosition = pos => Array.isArray(pos) && pos.length === 3 && pos.every(Number.isInteger);
+const campTrail = trail => Array.isArray(trail) && trail.length <= 256 && trail.every(blockPosition);
 const DOG_MEAL_INTERVAL = 4_000;
 const PORTAL_POWDER = 12;
 // Leave enough for the twelve sockets after up to eight scouting throws.
@@ -600,6 +601,8 @@ async function runExpedition(start, stage) {
     assert.ok(checkpoint.firstIronHome === undefined || checkpoint.firstIronHome === true, 'Invalid first iron return');
     assert.ok(checkpoint.returningAfterCare === undefined || checkpoint.returningAfterCare === true,
       'Invalid care return');
+    assert.ok(checkpoint.careReturnTrail === undefined
+      || (checkpoint.returningAfterCare && campTrail(checkpoint.careReturnTrail)), 'Invalid archived camp trail');
     assert.ok(checkpoint.exhaustedQuarries === undefined || (Array.isArray(checkpoint.exhaustedQuarries)
       && checkpoint.exhaustedQuarries.length <= 6 && checkpoint.exhaustedQuarries.every(attempt =>
         blockPosition(attempt?.entrance) && blockPosition(attempt?.blockedAt) && /^[\da-f]{64}$/.test(attempt.footing))),
@@ -696,12 +699,18 @@ async function runExpedition(start, stage) {
     checkpoint = { owner: start.name, gameTime: start.gameTime, bridgeFingerprint, stage, phase: 'iron',
       camp: restored.camp, dog: restored.dog, fedDog: false };
     if (restored.ironProgress) {
-      const { quarry, quarryLanding, lastDogMealAt } = restored.ironProgress;
-      assert.ok(Array.isArray(quarry) && quarry.length > 0 && quarry.length <= 44 && quarry.every(blockPosition)
-        && blockPosition(quarryLanding), 'Invalid archived quarry route');
+      const { quarry, quarryLanding, lastDogMealAt, returningAfterCare, careReturnTrail } = restored.ironProgress;
       assert.ok(Number.isInteger(lastDogMealAt) && lastDogMealAt >= 0 && lastDogMealAt <= start.gameTime,
         'Invalid archived companion meal time');
-      Object.assign(checkpoint, { quarry, quarryLanding, lastDogMealAt, fedDog: true });
+      if (returningAfterCare === true) {
+        assert.ok(campTrail(careReturnTrail), 'Invalid archived camp trail');
+        Object.assign(checkpoint, { returningAfterCare, careReturnTrail });
+      } else {
+        assert.ok(Array.isArray(quarry) && quarry.length > 0 && quarry.length <= 44 && quarry.every(blockPosition)
+          && blockPosition(quarryLanding), 'Invalid archived quarry route');
+        Object.assign(checkpoint, { quarry, quarryLanding });
+      }
+      Object.assign(checkpoint, { lastDogMealAt, fedDog: true });
     }
     companion = checkpoint.dog;
     if (live) await writeCheckpoint(checkpoint);
@@ -846,13 +855,14 @@ async function runExpedition(start, stage) {
     policy.returnAfterCare = async () => {
       const bed = checkpoint.camp.bed;
       const trace = await recentActions();
-      const trail = campOutboundTrail(trace, bed);
+      const trail = checkpoint.careReturnTrail ?? campOutboundTrail(trace, bed);
       await narrate('Objective', 'Get the original Mushroom safely back to camp before looking for more iron.');
       const { owner, dog } = await returnToCampWithCompanion(action, checkpoint.dog, bed, trail, {
         report: message => narrate('Decision', message, 15_000),
         regroupTrail: companionRegroupTrail(trace, checkpoint.dog),
       });
       delete checkpoint.returningAfterCare;
+      delete checkpoint.careReturnTrail;
       if (live) await writeCheckpoint(checkpoint);
       console.log(JSON.stringify({ at: new Date().toISOString(), action: 'companion_care_return',
         dog: dog.uuid, dogHealth: dog.health, dogPosition: dog.pos, player: owner.position, camp: bed }));

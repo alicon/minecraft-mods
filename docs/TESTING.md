@@ -273,7 +273,11 @@ the world, owner, camp, earned stone kit and original living dog before
 handing control back at the iron phase. The
 trace records the recovery as assisted. An archive taken inside a quarry can
 include `ironProgress` with the recorded `quarry`, `quarryLanding`, and
-`lastDogMealAt` so the controller can resume the stairs. During the iron hunt,
+`lastDogMealAt` so the controller can resume the stairs. For a save taken
+during a care return after feeding, use `ironProgress` with
+`returningAfterCare: true`, `lastDogMealAt`, and `careReturnTrail` containing
+the grounded positions observed before the archive. The copied save finishes
+the care return before looking for ore. During the iron hunt,
 the controller pauses to regroup with the dog when care is due and checks
 that they stay together while looking for food nearby. If the dog gets
 separated by terrain, it can retrace dry footing from their last same-level
