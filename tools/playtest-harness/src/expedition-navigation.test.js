@@ -1445,6 +1445,42 @@ test('repeated nighttime regrouping pauses forage until daylight', async () => {
   assert.ok(collected);
 });
 
+test('daylight forage tries a different trail after a walk separates Mushroom', async () => {
+  const { forageExpeditionMeal } = await import('./expedition-home.mjs');
+  const sheep = { id: 8, type: 'minecraft:sheep', pos: [15, 64, 0], distance: 15 };
+  const drop = { id: 12, item: { id: 'minecraft:mutton' }, pos: [-4, 64, 0], distance: 2 };
+  const ground = Array.from({ length: 19 }, (_, index) => cell(index - 9, 63, 0, 'grass_block'));
+  const steps = [];
+  let x = 0;
+  let collected = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe': return { inWorld: true, onGround: true, dimension: 'minecraft:overworld', health: 20,
+        timeOfDay: 1_200, position: { x: x + 0.5, y: 64, z: 0.5 } };
+      case 'get_inventory': return { slots: collected ? [{ id: drop.item.id, count: 1 }] : [] };
+      case 'get_entities': return { entities: x < 0 ? [drop] : [sheep] };
+      case 'get_blocks': return { cells: ground };
+      case 'go_to':
+        if (args.entityId === drop.id) collected = true;
+        else {
+          x = args.pos[0];
+          steps.push(Math.sign(x));
+          assert.ok(steps.length === 1 || x < 0, 'The player repeated the route that separated Mushroom');
+        }
+        return { arrived: true, position: [x, 64, 0] };
+      default: assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  assert.ok(await forageExpeditionMeal(action, {
+    regroup: async () => {
+      if (x <= 0) return false;
+      x = 0;
+      return true;
+    },
+  }));
+  assert.deepEqual(steps, [1, -1]);
+});
+
 test('the reserved recovery meal moves out of reach of automatic hotbar eating', async () => {
   const { packRecoveryMeal } = await import('./expedition-home.mjs');
   const actions = [];

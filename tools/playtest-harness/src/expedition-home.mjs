@@ -988,19 +988,28 @@ export async function forageExpeditionMeal(action, { camp, toward, minimum = 1, 
   let returning = Boolean(camp);
   let searchToward = toward;
   let sighting;
+  let forageStart;
   let nighttimeRegroups = 0;
   for (let attempt = 0; attempt < (camp || toward ? 48 : 28); attempt++) {
     const inventory = await action('get_inventory');
     if (dogMealCount(inventory) >= minimum) return true;
     const player = await action('observe');
     if (!player?.inWorld || player.dead || player.health < 8) return false;
-    if (await retreatFromNearbyMob(action, player, visited, rejectedSteps)) continue;
+    if (await retreatFromNearbyMob(action, player, visited, rejectedSteps)) {
+      forageStart = undefined;
+      continue;
+    }
     if (player.health < 12 && player.threats?.some(threat => threat.distance <= 3)) return false;
     if (await regroup?.(player)) {
+      const separatedAt = feet(player);
+      if (forageStart && (forageStart[0] !== separatedAt[0] || forageStart[2] !== separatedAt[2])) {
+        rejectedSteps.add(dryStepKey(forageStart, separatedAt));
+      }
+      forageStart = undefined;
+      sighting = undefined;
       if (restUntilDaylight && isBedtime(player) && ++nighttimeRegroups >= 2) {
         await restUntilDaylight();
         nighttimeRegroups = 0;
-        sighting = undefined;
       }
       continue;
     }
@@ -1016,6 +1025,7 @@ export async function forageExpeditionMeal(action, { camp, toward, minimum = 1, 
     if (searchToward && Math.hypot(searchToward[0] - player.position.x, searchToward[2] - player.position.z) <= 8) {
       searchToward = undefined;
     }
+    forageStart = feet(player);
     sighting = await seekExpeditionFood(action, player, visited, rejectedSteps, attempts, searchToward, sighting);
   }
   return false;
