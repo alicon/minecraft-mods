@@ -31,6 +31,30 @@ export async function cookExpeditionMutton(action) {
   await action('transfer_items', { to: 'player', item: fuel.id });
 }
 
+export async function cookExpeditionFood(action, meat, count) {
+  const menu = await action('get_container');
+  assert.equal(menu?.type, 'minecraft:furnace');
+  const raw = menu.slots.find(stack => stack.section === 'player' && stack.id === meat);
+  assert.ok(raw && raw.count >= count, 'The ration batch needs enough raw food in one slot');
+  const fuel = menu.slots.find(stack => stack.section === 'player' && stack.id.endsWith('_planks')
+    && stack.count >= Math.ceil(count / 1.5));
+  assert.ok(fuel, 'The ration batch needs enough matching planks for fuel');
+  const cooked = meat.replace('minecraft:', 'minecraft:cooked_');
+  await putInSlot(action, raw, 0, count);
+  await putInSlot(action, fuel, 1, Math.ceil(count / 1.5));
+  for (let poll = 0; poll < count * 36; poll++) {
+    const current = await action('get_container');
+    assert.equal(current?.containerId, menu.containerId, 'The ration furnace closed while cooking');
+    if (current.slots.some(item => item.section === 'result' && item.id === cooked && item.count >= count)) {
+      assert.ok((await action('transfer_items', { to: 'player', item: cooked }))?.moved >= count);
+      await action('transfer_items', { to: 'player', item: fuel.id });
+      return;
+    }
+    await setTimeout(800);
+  }
+  throw new Error('The native furnace did not finish the ration batch');
+}
+
 export async function makeExpeditionCharcoal(action) {
   const furnace = await action('get_container');
   assert.equal(furnace?.type, 'minecraft:furnace');

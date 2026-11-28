@@ -222,7 +222,7 @@ export function dryWaypoint(cells, start, visited, destination, preferredGround,
         const supported = hasDrySupport(support) || preferredGround === 'stronghold'
           && (STRONGHOLD_STEPS.test(support ?? '') || INFESTED_STONE_BRICKS.test(support ?? ''));
         if (seen.has(key) || rejectedSteps.has(dryStepKey(pos, step)) || !supported
-            || (['surface', 'elevation', 'cave', 'iron'].includes(preferredGround) && /_(?:leaves|log)$/.test(support))
+            || (['surface', 'elevation', 'cave', 'iron', 'downhill'].includes(preferredGround) && /_(?:leaves|log)$/.test(support))
             || (hazards.length && clearance(step) <= clearance(pos))
             || !gap(block(tx, ty, tz)) || !gap(block(tx, ty + 1, tz))
             || (ty > y && !gap(block(x, ty + 1, z)))
@@ -263,6 +263,7 @@ export function dryWaypoint(cells, start, visited, destination, preferredGround,
             - route.length * 0.25 + fresh * 0.1
           : fresh + 0.3 * distance(start, step) - route.length * 0.12 + pasture * 0.65
             + exposedRock * 0.9 + cave * 1.8 + masonry * 1.4
+            + (preferredGround === 'downhill' ? (start[1] - ty) * 2.4 : 0)
             + (hasVisibleIron(ores, block, step) ? 35 : 0)) - routeRepeatCost * 1.5;
         if (score > bestScore) {
           best = route;

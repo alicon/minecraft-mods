@@ -238,7 +238,7 @@ export async function stepOut(action, player, visited, destination, preferredGro
   const center = feet(player);
   if (preferredGround === 'stronghold' && player.onGround) center[1] = Math.ceil(player.position.y);
   const width = preferredGround || chooseRoute ? 23 : 17;
-  const height = ['surface', 'elevation', 'cave', 'iron'].includes(preferredGround) ? 15 : 9;
+  const height = ['surface', 'elevation', 'cave', 'iron', 'downhill'].includes(preferredGround) ? 15 : 9;
   const volume = await action('get_blocks', { center, size: [width, height, width], format: 'json' });
   if (!volume) return false;
   let pos = dryWaypoint(volume.cells, center, visited, destination, preferredGround, rejectedSteps, avoid);
@@ -278,7 +278,7 @@ export async function stepOut(action, player, visited, destination, preferredGro
     result?.position?.[2] - player.position.z);
   // Downhill momentum can carry an overland walker past the exact tile.
   // Replan from the grounded observation instead of banning a usable exit.
-  if (wrongHeight && preferredGround === 'surface' && displacement >= 0.6) return true;
+  if (wrongHeight && ['surface', 'downhill'].includes(preferredGround) && displacement >= 0.6) return true;
   const moved = result?.arrived || displacement >= 0.6;
   if (wrongHeight || (!moved && result?.reason)) rejectedSteps.add(dryStepKey(center, pos));
   return !wrongHeight && moved;
@@ -1500,6 +1500,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   let nextMealAttempt = 0;
   let nextCompanionCheck = 0;
   let blockedCaveSteps = 0;
+  let highlandSearch = 0;
   let movingToFreshGround = policy.scoutNewGround ? 8 : 0;
   let returningAfterCare = false;
   let nextReturnCoverCheck = 0;
@@ -1656,8 +1657,13 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       madeBackup = true;
       continue;
     }
+    const scoutDownhill = !stairs.length && player.position.y >= 88 && highlandSearch < 48
+      && (exhaustedQuarries.length > 0 || policy.scoutNewGround);
+    if (scoutDownhill && highlandSearch === 0) {
+      await policy.reportScouting?.('Several high quarries ran out of reachable ore. Looking for a dry route downhill.');
+    }
     const fallback = misses >= 12 ? 'quarry' : 'scout';
-    const work = movingToFreshGround ? 'scout' : policy.chooseWork && misses >= 8 && !stairs.length
+    const work = movingToFreshGround || scoutDownhill ? 'scout' : policy.chooseWork && misses >= 8 && !stairs.length
       ? await policy.chooseWork(player, { material: 'iron', missedStone: misses,
         rawIron: count(inventory, RAW_IRON), needed: requiredOre, hasCoal: count(inventory, COAL) > 0 }, fallback)
       : fallback;
@@ -1700,7 +1706,9 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
     }
     const scout = await action('observe');
     visited.push(feet(scout));
-    const moved = await stepOut(action, scout, visited, undefined, movingToFreshGround ? 'stone' : 'iron', rejectedSteps);
+    const terrain = scoutDownhill ? 'downhill' : movingToFreshGround ? 'stone' : 'iron';
+    const moved = await stepOut(action, scout, visited, undefined, terrain, rejectedSteps);
+    if (scoutDownhill) highlandSearch++;
     if (movingToFreshGround) movingToFreshGround--;
     if (moved) blockedCaveSteps = 0;
     else if (++blockedCaveSteps >= 2) {
@@ -1718,8 +1726,14 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   await craftIronKit(action, craft, plan.recipes, plan.requiredOre, materials, visited, false);
 }
 
-function ironKitPlan(inventory, { reserveIgnitionIron, makeIronSword }) {
-  const recipes = IRON_RECIPES.filter(([item]) => !count(inventory, item));
+function ironKitPlan(inventory, { reserveIgnitionIron, makeIronSword, extraEndBucket }) {
+  const buckets = count(inventory, 'minecraft:bucket') + count(inventory, 'minecraft:water_bucket');
+  const missingBuckets = Math.max(0, (extraEndBucket ? 2 : 1) - buckets);
+  const recipes = IRON_RECIPES.flatMap(recipe => {
+    const [item] = recipe;
+    if (item === 'minecraft:bucket') return Array.from({ length: missingBuckets }, () => recipe);
+    return count(inventory, item) ? [] : [recipe];
+  });
   if (makeIronSword && !count(inventory, 'minecraft:iron_sword')) {
     recipes.push(['minecraft:iron_sword', 2]);
   }

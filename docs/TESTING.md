@@ -350,11 +350,19 @@ inventory, and the original equipped dog after reopening the save.
 
 Set `MUSHROOM_EXPEDITION_STAGE=stronghold` for a continuous run from fresh
 Survival to the generated stronghold portal room. After the Nether trip, the
-controller gathers pearls, crafts twenty Eyes, and follows their observed
-bearings. It uses dry stairs into the stronghold and checks on Mushroom during
-the descent. The native verifier requires earned blaze powder, twenty crafted
-Eyes, ordinary Eye throws, twelve Eyes available for the portal, and the
-original living dog with the same owner at the portal room after reopening.
+controller gathers pearls, crafts twenty Eyes, prepares a combat kit, and
+follows the Eyes' observed bearings. It uses dry stairs into the stronghold
+and checks on Mushroom during the descent. The native verifier requires earned
+blaze powder, twenty crafted Eyes, ordinary Eye throws, twelve Eyes available
+for the portal, a bow, 96 arrows, two filled water buckets, and the original
+living dog with the same owner at the portal room after reopening.
+
+Set `MUSHROOM_EXPEDITION_STAGE=end-kit` to replay combat preparation separately.
+The Normal Survival fixture starts with an iron sword, raw ingredients and
+nearby chickens and water. The controller hunts for the missing feather,
+crafts a bow and twelve arrows, cooks rations in a furnace, and fills a spare
+bucket. The native verifier checks the kill, crafting statistics, carried food
+and water, and the original living dog with the same owner.
 
 Set `MUSHROOM_EXPEDITION_STAGE=ender-supplies` to replay the transition from
 blaze powder to an Eye of Ender. The flat Normal Survival fixture supplies an

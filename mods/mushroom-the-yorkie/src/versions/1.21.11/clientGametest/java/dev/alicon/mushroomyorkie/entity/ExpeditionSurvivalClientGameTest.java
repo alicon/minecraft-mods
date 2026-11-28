@@ -65,7 +65,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 			case "nether" -> NETHER_WINDOW_TICKS;
 			case "nether-powder" -> NETHER_POWDER_WINDOW_TICKS;
 			case "stronghold" -> STRONGHOLD_WINDOW_TICKS;
-			case "defense", "feeding", "portal", "nether-supplies", "nether-distant-supplies", "shelter", "equipment", "end-entry", "end-crystal", "generated-end-crystals",
+			case "end-kit", "defense", "feeding", "portal", "nether-supplies", "nether-distant-supplies", "shelter", "equipment", "end-entry", "end-crystal", "generated-end-crystals",
 					"eye-route", "stronghold-approach", "ender-supplies", "generated-end-entry", "quarry-tools", "quarry-iron", "end-return" -> 0;
 			default -> throw new AssertionError("Unknown expedition stage " + stage);
 		};
@@ -150,6 +150,10 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 				}
 				if ("ender-supplies".equals(stage)) {
 					ExpeditionPearlClientScenario.run(context, server, ownerId, status);
+					return;
+				}
+				if ("end-kit".equals(stage)) {
+					ExpeditionEndKitClientScenario.run(context, server, ownerId, status);
 					return;
 				}
 				if ("end-entry".equals(stage) || "generated-end-entry".equals(stage)) {
@@ -251,7 +255,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 							throw new AssertionError("The player did not finish with the earned stone pickaxe and furnace");
 						}
 						if (("iron".equals(stage) || visitsNether) && (!owner.getInventory().contains(stack -> stack.is(Items.IRON_PICKAXE))
-								|| !owner.getInventory().contains(stack -> stack.is(Items.BUCKET))
+								|| !owner.getInventory().contains(stack -> stack.is(Items.BUCKET) || stack.is(Items.WATER_BUCKET))
 								|| !owner.getInventory().contains(stack -> stack.is(Items.SHIELD)))) {
 							throw new AssertionError("The player did not finish with the earned iron pickaxe, bucket and shield");
 						}
@@ -358,8 +362,11 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 				|| stats.getValue(Stats.ITEM_CRAFTED.get(Items.BLAZE_POWDER)) < STRONGHOLD_EYES
 				|| stats.getValue(Stats.ITEM_CRAFTED.get(Items.ENDER_EYE)) < STRONGHOLD_EYES
 				|| stats.getValue(Stats.ITEM_USED.get(Items.ENDER_EYE)) < 2
-				|| owner.getInventory().countItem(Items.ENDER_EYE) < 12) {
-			throw new AssertionError("Expected the original dog and earned Eye supply in the generated stronghold portal room");
+				|| owner.getInventory().countItem(Items.ENDER_EYE) < 12
+				|| owner.getInventory().countItem(Items.WATER_BUCKET) < 2
+				|| owner.getInventory().countItem(Items.BOW) < 1
+				|| owner.getInventory().countItem(Items.ARROW) < 96) {
+			throw new AssertionError("Expected the original dog, earned Eyes, bow, arrows and two water buckets at the stronghold portal room");
 		}
 	}
 }

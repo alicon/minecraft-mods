@@ -1475,3 +1475,14 @@ test('a visible log in the same trunk can supply the missing bed planks', async 
   assert.deepEqual(broken, [actual]);
   assert.deepEqual(stock, [{ id: 'minecraft:oak_planks', count: 6 }]);
 });
+
+test('an exhausted highland scout prefers a supported descent to open plateau ground', async () => {
+  const { dryWaypoint } = await import('./expedition-navigation.mjs');
+  const cells = [{ x: 0, y: 98, z: 0, b: 'minecraft:stone' }];
+  for (let index = 1; index <= 6; index++) {
+    cells.push({ x: index, y: 98, z: 0, b: 'minecraft:stone' });
+    cells.push({ x: -index, y: 98 - index, z: 0, b: 'minecraft:stone' });
+  }
+  cells.push({ x: 0, y: 93, z: 1, b: 'minecraft:stone' });
+  assert.deepEqual(dryWaypoint(cells, [0, 99, 0], [], undefined, 'downhill'), [-6, 93, 0]);
+});

@@ -14,6 +14,7 @@ import { defendCompanion } from './expedition-companion.mjs';
 import { blazePowderCount, craftBlazePowder, earnBlazeRods } from './expedition-blaze-rods.mjs';
 import { clearGeneratedCrystals, readCrystalProgress, shootEndCrystal } from './expedition-end-crystals.mjs';
 import { fightEndDragon, recallAndExitEnd } from './expedition-dragon-fight.mjs';
+import { prepareEndCombatKit } from './expedition-end-kit.mjs';
 import { craftEyes, crossEndPortal, descendToStronghold, enderEyeCount, findStrongholdPortalRoom } from './expedition-end-entry.mjs';
 import { earnEnderPearls } from './expedition-pearls.mjs';
 import {
@@ -277,6 +278,11 @@ try {
     await practiceStayAndRecall(action, companion);
     const camp = await markExpeditionCamp(action);
     console.log(JSON.stringify({ at: new Date().toISOString(), action: 'camp_marked', dog: companion, camp }));
+  } else if (stage === 'end-kit') {
+    companion = (await readFile(join(dirname(statusFile), 'end-kit-companion'), 'utf8')).trim();
+    assert.ok(/^[\da-f-]{36}$/i.test(companion));
+    await narrate('Objective', 'Earn the missing feather, craft a bow and arrows, and pack cooked food and water.');
+    await prepareEndCombatKit(action, craft, companion, reportEndKit, { arrows: 12, rations: 3 });
   } else if (stage === 'end-entry' || stage === 'generated-end-entry') {
     companion = (await readFile(join(dirname(statusFile), 'end-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
@@ -457,7 +463,7 @@ async function runExpedition(start, stage) {
     assert.ok(Number.isFinite(checkpoint.gameTime) && checkpoint.gameTime <= start.gameTime);
     assert.ok(['starter', 'provision', 'camp', 'adoption', 'stone', 'iron', 'nether'].includes(checkpoint.phase)
       || huntBlazes && checkpoint.phase === 'nether-returned'
-      || findStronghold && ['gather-eyes', 'follow-eyes', 'descend-stronghold'].includes(checkpoint.phase));
+      || findStronghold && ['gather-eyes', 'arm-for-end', 'follow-eyes', 'descend-stronghold'].includes(checkpoint.phase));
     assert.ok(checkpoint.timberSite === undefined || blockPosition(checkpoint.timberSite), 'Invalid recorded timber site');
     if (checkpoint.phase === 'descend-stronghold') {
       assert.ok(blockPosition(checkpoint.surfaceFix), 'Invalid recorded Eye bearing fix');
@@ -504,7 +510,7 @@ async function runExpedition(start, stage) {
     await action('stop', { closeScreen: true });
     const missingGuide = !inventory.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide');
     const newDeath = Number(deathAtStart.trim().split(' ').at(-1)) > checkpoint.gameTime;
-    const equippedPhase = ['iron', 'nether', 'nether-returned', 'gather-eyes', 'follow-eyes', 'descend-stronghold'].includes(checkpoint.phase);
+    const equippedPhase = ['iron', 'nether', 'nether-returned', 'gather-eyes', 'arm-for-end', 'follow-eyes', 'descend-stronghold'].includes(checkpoint.phase);
     const lostQuarryKit = equippedPhase && newDeath
       && !inventory.slots.some(stack => stack.id === 'minecraft:stone_pickaxe')
       && !inventory.slots.some(stack => stack.id === 'minecraft:furnace');
@@ -781,7 +787,7 @@ async function runExpedition(start, stage) {
       if (policy.scoutNewGround) await policy.reportScouting('Leaving the previous quarry area to look for exposed iron.');
       await narrate('Objective', 'Mine and smelt iron for a pickaxe, bucket, and shield.');
       await earnIronKit(action, craft, checkpoint.camp,
-        { ...policy, reserveIgnitionIron: visitNether, makeIronSword: huntBlazes });
+        { ...policy, reserveIgnitionIron: visitNether, makeIronSword: huntBlazes, extraEndBucket: findStronghold });
     } finally {
       if (restoreAutoEat) {
         try {
@@ -836,6 +842,12 @@ async function runExpedition(start, stage) {
   if (findStronghold && checkpoint.phase === 'gather-eyes') {
     await narrate('Objective', 'Shelter Mushroom and earn the Eyes of Ender for scouting and the portal.');
     await earnEyes(checkpoint.dog, STRONGHOLD_EYES);
+    checkpoint.phase = 'arm-for-end';
+    if (live) await writeCheckpoint(checkpoint);
+  }
+  if (findStronghold && checkpoint.phase === 'arm-for-end') {
+    await narrate('Objective', 'Earn a durable bow, ammunition, two water buckets and cooked rations for the End.');
+    await prepareEndCombatKit(action, craft, checkpoint.dog, reportEndKit);
     checkpoint.phase = 'follow-eyes';
     if (live) await writeCheckpoint(checkpoint);
   }
@@ -852,6 +864,11 @@ async function runExpedition(start, stage) {
     await descendToStronghold(action, checkpoint.dog, checkpoint.surfaceFix, reportStrongholdEntry);
     await findStrongholdPortalRoom(action, checkpoint.dog, reportStrongholdEntry);
   }
+}
+
+async function reportEndKit(kind, observation) {
+  console.log(JSON.stringify({ at: new Date().toISOString(), action: `end_kit_${kind}`, observation, dog: companion }));
+  if (kind === 'packed') await narrate('Result', 'Packed the bow, arrows, rations and two filled buckets.');
 }
 
 async function reportStrongholdEntry(kind, observation) {

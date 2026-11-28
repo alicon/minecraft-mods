@@ -68,7 +68,7 @@ async function gatherGearSupplies(action, equipped) {
   throw new Error('Could not gather wool, leather, string and black dye for Mushroom’s expedition gear');
 }
 
-async function findTable(action, craft) {
+export async function openExpeditionTable(action, craft) {
   const player = await action('observe');
   const area = await action('get_blocks', { center: feet(player), size: [7, 5, 7], format: 'json' });
   for (const cell of area?.cells.filter(cell => cell.b === TABLE) ?? []) {
@@ -102,7 +102,7 @@ export async function prepareCompanionGear(action, craft, uuid, equipped = [], r
   const wanted = await gatherGearSupplies(action, equipped);
   if (wanted.dye) await craft(DYE, 1);
   if (wanted.missing.length) {
-    await findTable(action, craft);
+    await openExpeditionTable(action, craft);
     try {
       for (const item of wanted.missing) await craft(item, 1);
     } finally {
