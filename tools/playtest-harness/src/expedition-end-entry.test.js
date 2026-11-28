@@ -165,42 +165,49 @@ test('the return to an expedition bed verifies the original living dog nearby', 
   assert.ok(Math.abs(returned.owner.position.x - 0.5) <= 4);
 });
 
-test('a camp return can climb out of a dry shelf with the original dog', async () => {
-  const { returnToCampWithCompanion } = await import('./expedition-eye-route.mjs');
-  const bed = [8, 66, 0];
-  const headroom = [1, 65, 0];
-  const step = [1, 64, 0];
-  const pick = { id: 'minecraft:stone_pickaxe', slot: 0, count: 1, maxDamage: 131 };
-  const base = [cell(0, 62, 0, 'stone'), cell(1, 63, 0, 'stone'), cell(2, 64, 0, 'stone'),
-    ...Array.from({ length: 6 }, (_, x) => cell(x + 3, 65, 0, 'stone'))];
-  const remaining = new Set([String(headroom), String(step)]);
-  const broken = [];
-  let position = { x: 0.5, y: 63, z: 0.5 };
-  let aimed;
-  const action = async (name, args) => {
-    switch (name) {
-      case 'observe': return { inWorld: true, dimension: 'minecraft:overworld', onGround: true, health: 20,
-        gameTime: 100, position, crosshair: aimed && { pos: aimed, block: 'minecraft:stone' } };
-      case 'get_entities': return { entities: [{ uuid: 'original', health: 12, distance: 1,
-        pos: [position.x, position.y, position.z + 1] }] };
-      case 'get_inventory': return { slots: [pick], mainHand: pick };
-      case 'get_blocks': return { cells: [...base, ...[headroom, step].filter(pos => remaining.has(String(pos)))
-        .map(([x, y, z]) => cell(x, y, z, 'stone'))] };
-      case 'look': aimed = args.at; return {};
-      case 'break_block':
-        assert.ok(remaining.delete(String(args.pos)));
-        broken.push(args.pos);
-        return { broken: true };
-      case 'go_to':
-        position = { x: args.pos[0] + 0.5, y: args.pos[1], z: args.pos[2] + 0.5 };
-        return { arrived: true, position: Object.values(position) };
-      default: assert.fail(name);
-    }
-  };
-  const { owner, dog } = await returnToCampWithCompanion(action, 'original', bed);
-  assert.deepEqual(broken, [headroom, step]);
-  assert.equal(owner.position.y, 66);
-  assert.equal(dog.uuid, 'original');
+test('a camp return can climb out of a dry shelf with the original dog', async t => {
+  for (const lowerExit of [false, true]) {
+    await t.test(lowerExit ? 'the only open step leads back down' : 'there is no open step', async () => {
+      const { returnToCampWithCompanion } = await import('./expedition-eye-route.mjs');
+      const bed = [8, 66, 0];
+      const headroom = [1, 65, 0];
+      const step = [1, 64, 0];
+      const pick = { id: 'minecraft:stone_pickaxe', slot: 0, count: 1, maxDamage: 131 };
+      const base = [cell(0, 62, 0, 'stone'), cell(1, 63, 0, 'stone'), cell(2, 64, 0, 'stone'),
+        ...Array.from({ length: 6 }, (_, x) => cell(x + 3, 65, 0, 'stone'))];
+      if (lowerExit) base.push(cell(-1, 61, 0, 'stone'));
+      const remaining = new Set([String(headroom), String(step)]);
+      const broken = [];
+      let walks = 0;
+      let position = { x: 0.5, y: 63, z: 0.5 };
+      let aimed;
+      const action = async (name, args) => {
+        switch (name) {
+          case 'observe': return { inWorld: true, dimension: 'minecraft:overworld', onGround: true, health: 20,
+            gameTime: 100, position, crosshair: aimed && { pos: aimed, block: 'minecraft:stone' } };
+          case 'get_entities': return { entities: [{ uuid: 'original', health: 12, distance: 1,
+            pos: [position.x, position.y, position.z + 1] }] };
+          case 'get_inventory': return { slots: [pick], mainHand: pick };
+          case 'get_blocks': return { cells: [...base, ...[headroom, step].filter(pos => remaining.has(String(pos)))
+            .map(([x, y, z]) => cell(x, y, z, 'stone'))] };
+          case 'look': aimed = args.at; return {};
+          case 'break_block':
+            assert.ok(remaining.delete(String(args.pos)));
+            broken.push(args.pos);
+            return { broken: true };
+          case 'go_to':
+            assert.ok(++walks <= 14, 'The player kept walking between the same two shelves');
+            position = { x: args.pos[0] + 0.5, y: args.pos[1], z: args.pos[2] + 0.5 };
+            return { arrived: true, position: Object.values(position) };
+          default: assert.fail(name);
+        }
+      };
+      const { owner, dog } = await returnToCampWithCompanion(action, 'original', bed);
+      assert.deepEqual(broken, [headroom, step]);
+      assert.equal(owner.position.y, 66);
+      assert.equal(dog.uuid, 'original');
+    });
+  }
 });
 
 test('an unfinished care return reaches the bed with an injured dog even without ore or food', async () => {

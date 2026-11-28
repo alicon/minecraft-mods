@@ -142,14 +142,19 @@ async function travelToward(action, target, arrived, maxSteps, travel) {
       side = -side;
       stalled = 0;
     }
+    // A downhill step can look successful while cycling between the same landings.
+    const recent = travel.visited.slice(-8);
+    const preferUphill = travel.returning && target.y - player.position.y >= 2
+      && recent.length === 8 && recent.every(([x, y, z]) =>
+        Math.hypot(x - player.position.x, z - player.position.z) <= 8 && player.position.y - y < 2);
     travel.visited.push(feet(player));
-    const destination = detour ?? target;
-    const approachKnownHeight = !detour && travel.returning && Number.isFinite(target.y)
-      && (travel.careReturn || remaining <= 12);
+    const destination = preferUphill ? target : detour ?? target;
+    const approachKnownHeight = travel.returning && Number.isFinite(target.y)
+      && (preferUphill || (!detour && (travel.careReturn || remaining <= 12)));
+    const ground = preferUphill ? 'uphill' : approachKnownHeight ? 'elevation' : 'surface';
     const walked = await stepOut(action, player, travel.visited, [
       Math.floor(destination.x), Math.floor(approachKnownHeight ? target.y : player.position.y), Math.floor(destination.z),
-    ], approachKnownHeight ? 'elevation' : 'surface', travel.rejected, undefined, undefined,
-    travel.careReturn ? 40 : 90);
+    ], ground, travel.rejected, undefined, undefined, travel.careReturn ? 40 : 90);
     if (walked) {
       blockedSteps = 0;
     } else if (travel.returning && ++blockedSteps >= 2 && target.y > player.position.y + 0.5) {
