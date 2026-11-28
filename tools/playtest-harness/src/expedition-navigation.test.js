@@ -45,6 +45,19 @@ test('a quarry stair skips leaf litter above headroom and still removes the soli
     { landing: [318, 68, 288], clear: [[318, 69, 288], [318, 68, 288]] });
 });
 
+test('a one-way scouting ledge can be cut into a dry one-block step', async () => {
+  const { uphillScoutingStep } = await import('./expedition-navigation.mjs');
+  const here = [-168, 65, -32];
+  const toward = [-162, 72, -31];
+  const face = [cell(-168, 65, -33, 'dirt'), cell(-168, 66, -33, 'dirt'), cell(-168, 67, -33)];
+  assert.deepEqual(uphillScoutingStep(face, here, toward), {
+    landing: [-168, 66, -33],
+    clear: [[-168, 67, -33], [-168, 66, -33]],
+  });
+  assert.equal(uphillScoutingStep([...face, cell(-167, 67, -33, 'water')], here, toward), null);
+  assert.equal(uphillScoutingStep(face, here, toward, new Set(['-168,66,-33'])), null);
+});
+
 test('canopy drops are measured to the top of the landing block and reject hazardous floors', async () => {
   const { canopyLanding } = await import('./expedition-navigation.mjs');
   const start = [160, 78, 161];
@@ -149,6 +162,54 @@ test('mixed wool uses a single collected dye to complete the most common color',
   };
   assert.equal(await matchWoolWithDye(action, async (item, amount) => craft.push([item, amount]), stock), 'white');
   assert.deepEqual(craft, [['minecraft:white_dye', 1], ['minecraft:white_wool', 1]]);
+});
+
+test('a successful two-tile sheep loop retraces dry ground and defers the stationary sheep', async () => {
+  const { gatherWool } = await import('./expedition-home.mjs');
+  const floor = Array.from({ length: 41 }, (_, i) => cell(i - 20, 63, 0, 'grass_block'));
+  const sheep = { id: 72, type: 'minecraft:sheep', distance: 55, pos: [55.5, 64, 0.5] };
+  let x = -11;
+  let walks = 0;
+  let escaped = false;
+  let freshWalk = false;
+  let modelDecisions = 0;
+  const scouting = [];
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_inventory':
+        return { slots: freshWalk ? [{ id: 'minecraft:white_wool', count: 3 }] : [] };
+      case 'observe':
+        return { inWorld: true, onGround: true, position: { x: x + 0.5, y: 64, z: 0.5 }, health: 20, food: 20 };
+      case 'get_entities':
+        assert.equal(args.type, 'sheep');
+        return { entities: [sheep] };
+      case 'get_blocks':
+        return { cells: floor };
+      case 'go_to': {
+        if (++walks <= 8) {
+          // Successful arrivals can bounce inside the same small patch.
+          x = walks % 2;
+        } else if (!escaped) {
+          assert.ok(args.pos[0] < 0, 'Retrace the route out before making more decisions about the flock');
+          x = args.pos[0];
+          escaped = x <= -9;
+        } else {
+          x = args.pos[0];
+          freshWalk = true;
+        }
+        return { arrived: true, position: [x + 0.5, 64, 0.5] };
+      }
+      default: assert.fail(name);
+    }
+  };
+  const color = await gatherWool(action, () => assert.fail('Known dry way out'), (_, routes) => {
+    assert.ok(!escaped, 'The same stationary sheep must not immediately restart the loop');
+    modelDecisions++;
+    return routes[0];
+  }, undefined, message => scouting.push(message));
+  assert.equal(color, 'white');
+  assert.equal(modelDecisions, 8);
+  assert.ok(scouting.some(message => message.startsWith('The route keeps returning')));
 });
 
 test('an unarmored scout runs away from a close skeleton along native dry waypoints', async () => {

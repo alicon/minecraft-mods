@@ -20,7 +20,7 @@ import { prepareEndCombatKit } from './expedition-end-kit.mjs';
 import { craftEyes, crossEndPortal, descendToStronghold, enderEyeCount, findStrongholdPortalRoom } from './expedition-end-entry.mjs';
 import { earnEnderPearls } from './expedition-pearls.mjs';
 import {
-  campOutboundTrail, companionRegroupTrail, navigateToStronghold, returnToCampWithCompanion, scoutByEye,
+  campOutboundTrail, companionRegroupTrail, groundedScoutingTrail, navigateToStronghold, returnToCampWithCompanion, scoutByEye,
 } from './expedition-eye-route.mjs';
 import { COMPANION_WEARABLES, markExpeditionCamp, practiceStayAndRecall, prepareCompanionGear } from './expedition-gear.mjs';
 import { expeditionPolicy } from './expedition-policy.mjs';
@@ -503,6 +503,10 @@ async function runExpedition(start, stage) {
   const powderNeeded = findStronghold ? STRONGHOLD_EYES : PORTAL_POWDER;
   const visitNether = stage === 'nether' || huntBlazes;
   const needsIron = stage === 'iron' || visitNether;
+  const recentActions = () => readFile(join(dirname(statusFile), 'actions.jsonl'), 'utf8').catch(error => {
+    if (error.code !== 'ENOENT') throw error;
+    return '';
+  });
   const inventory = await action('get_inventory');
   const policy = await expeditionPolicy(process.env.MUSHROOM_EXPEDITION_POLICY ?? 'rules', coachingFile, narrate);
   policy.reportScouting = message => narrate('Scouting', message, 20_000);
@@ -698,7 +702,9 @@ async function runExpedition(start, stage) {
   }
   if (checkpoint.phase === 'provision') {
     await narrate('Objective', 'Find a sheltered bed, or gather wool to make one.');
-    checkpoint.camp = await prepareAdoptionCamp(action, craft, descendFromCanopy, { ...policy, timberSite: checkpoint.timberSite });
+    const observedTrail = resume ? groundedScoutingTrail(await recentActions()) : undefined;
+    checkpoint.camp = await prepareAdoptionCamp(action, craft, descendFromCanopy,
+      { ...policy, observedTrail, timberSite: checkpoint.timberSite });
     checkpoint.phase = 'camp';
     if (live) await writeCheckpoint(checkpoint);
   }
@@ -734,10 +740,6 @@ async function runExpedition(start, stage) {
     if (live && needsIron) await writeCheckpoint(checkpoint);
   }
   if (needsIron && checkpoint.phase === 'iron') {
-    const recentActions = () => readFile(join(dirname(statusFile), 'actions.jsonl'), 'utf8').catch(error => {
-      if (error.code !== 'ENOENT') throw error;
-      return '';
-    });
     if (checkpoint.fedDog === false && !checkpoint.quarry?.length) {
       const player = await action('observe');
       if (player?.onGround && !player.inWater) {

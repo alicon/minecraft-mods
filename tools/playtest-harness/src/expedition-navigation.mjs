@@ -166,6 +166,27 @@ export function quarryLandingIsClear(cells, [x, y, z], masonry = false) {
     && !cells.some(cell => cell.y >= y - 1 && QUARRY_HAZARD.test(cell.b));
 }
 
+export function uphillScoutingStep(cells, [x, y, z], toward, rejected = new Set()) {
+  const blocks = new Map(cells.map(({ x, y, z, b }) => [`${x},${y},${z}`, b]));
+  const at = (a, b, c) => blocks.get(`${a},${b},${c}`);
+  if (!gap(at(x, y + 2, z))) return null;
+  const candidates = [];
+  for (const [dx, dz] of CARDINAL) {
+    const tx = x + dx;
+    const tz = z + dz;
+    const landing = [tx, y + 1, tz];
+    if (rejected.has(String(landing)) || !quarryBlock(at(tx, y, tz), false)) continue;
+    const clear = [y + 2, y + 1].filter(height => !gap(at(tx, height, tz)));
+    if (!clear.length || !clear.every(height => quarryBlock(at(tx, height, tz), false))) continue;
+    const exposed = [[0, 0], ...CARDINAL].some(([sx, sz]) =>
+      [y, y + 1, y + 2, y + 3].some(height => QUARRY_HAZARD.test(at(tx + sx, height, tz + sz) ?? '')));
+    if (exposed) continue;
+    candidates.push({ landing, clear: clear.map(height => [tx, height, tz]) });
+  }
+  return candidates.sort((a, b) => distance(a.landing, toward) - distance(b.landing, toward)
+    || a.clear.length - b.clear.length)[0] ?? null;
+}
+
 export function missingQuarryExitSupport(cells, [x, y, z]) {
   const blocks = new Map(cells.map(cell => [`${cell.x},${cell.y},${cell.z}`, cell.b]));
   const at = (dx, height, dz) => blocks.get(`${dx},${height},${dz}`);

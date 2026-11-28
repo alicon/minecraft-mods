@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { setTimeout } from 'node:timers/promises';
 import {
   bedSpotsWithGroundCover, dryStepKey, dryWaypoint, exitObstruction, hasDrySupport, hasPlacedBed, nearbyBuildingSpots,
-  missingQuarryExitSupport, nearestCover, quarryLandingIsClear, quarryStep,
+  missingQuarryExitSupport, nearestCover, quarryLandingIsClear, quarryStep, uphillScoutingStep,
 } from './expedition-navigation.mjs';
 import { cookExpeditionMutton, makeExpeditionCharcoal, smeltExpeditionIron } from './expedition-furnace.mjs';
 import { enterShelter, findShelteredBed, useShelterDoor } from './expedition-shelter.mjs';
@@ -351,12 +351,42 @@ async function separatedByRock(action, player, threat) {
   return false;
 }
 
-export async function gatherWool(action, descendFromCanopy, chooseRoute, craft, reportScouting) {
+function woolScoutDetour(trail) {
+  const recent = trail.slice(-8);
+  const origin = recent.at(-1);
+  if (recent.length < 8 || recent.some(tile => Math.hypot(...tile.map((value, axis) => value - origin[axis])) > 4)) {
+    return null;
+  }
+  const anchor = trail.slice(0, -8).findLast(([x, y, z]) => {
+    const distance = Math.hypot(x - origin[0], z - origin[2]);
+    return distance >= 9 && distance <= 18 && Math.abs(y - origin[1]) <= 12;
+  });
+  return { origin, anchor, steps: 0, best: Infinity, stalled: 0, walked: [], rejectedClimbs: new Set() };
+}
+
+async function cutScoutingFoothold(action, player, detour) {
+  if (!player.onGround || player.inWater || player.health < 12 || player.threats?.some(threat => threat.distance <= 8)) return false;
+  const here = feet(player);
+  const volume = await action('get_blocks', { center: here, size: [5, 9, 5], format: 'json' });
+  const step = volume && !volume.stats?.unloadedChunks
+    && uphillScoutingStep(volume.cells, here, detour.anchor, detour.rejectedClimbs);
+  if (!step) return false;
+  detour.rejectedClimbs.add(String(step.landing));
+  for (const block of step.clear) {
+    if (!(await breakVisible(action, block))?.broken) return false;
+  }
+  return climbQuarry(action, step.landing);
+}
+
+export async function gatherWool(action, descendFromCanopy, chooseRoute, craft, reportScouting, observedTrail = []) {
   const visited = [];
   const rejectedSteps = new Set();
   const triedAnimals = new Map();
   const triedFlowers = new Set();
   const blockedShelters = new Set();
+  const scoutingTrail = [...observedTrail];
+  const deferredSheep = new Map();
+  let detour;
   let shelter;
   let shelterSteps = 0;
   let stalls = 0;
@@ -377,6 +407,29 @@ export async function gatherWool(action, descendFromCanopy, chooseRoute, craft, 
       await hold(action, meal);
       await action('use_item', { ticks: 36 });
     }
+    if (detour) {
+      const tile = feet(player);
+      const [x, y, z] = tile;
+      if (Math.hypot(x - detour.origin[0], z - detour.origin[2]) < 9 && detour.steps++ < 16) {
+        if (detour.anchor) {
+          const distance = Math.hypot(...tile.map((value, axis) => value - detour.anchor[axis]));
+          if (distance < detour.best - 0.75) {
+            detour.best = distance;
+            detour.stalled = 0;
+          } else if (++detour.stalled >= 3 && detour.anchor[1] > y + 1
+              && await cutScoutingFoothold(action, player, detour)) {
+            await reportScouting?.('Cut a dry foothold to climb back out of the ledge.');
+            continue;
+          }
+        }
+        // Ignore visits from the outbound trail, but count revisits while heading back.
+        detour.walked.push(tile);
+        const moved = await stepOut(action, player, detour.anchor ? detour.walked : visited, detour.anchor,
+          detour.anchor ? 'elevation' : 'grass', rejectedSteps);
+        if (moved || await descendFromCanopy(player)) continue;
+      }
+      detour = undefined;
+    }
     if (craft && !shelter && round % 8 === 0) {
       shelter = await findShelteredBed(action, player, blockedShelters);
       shelterSteps = 0;
@@ -395,6 +448,8 @@ export async function gatherWool(action, descendFromCanopy, chooseRoute, craft, 
     }
     const nearby = await action('get_entities', { type: 'sheep', radius: 96, max: 16 });
     const sheep = nearby.entities.find(entity => (triedAnimals.get(entity.id) ?? -10) < round - 3
+      && (!deferredSheep.has(entity.id) || Math.hypot(...entity.pos.map((value, axis) =>
+        value - deferredSheep.get(entity.id)[axis])) >= 8)
       && Math.abs(entity.pos[1] - player.position.y) <= 8);
     let target = sheep;
     if (!meal && player.food <= 15) {
@@ -420,14 +475,27 @@ export async function gatherWool(action, descendFromCanopy, chooseRoute, craft, 
       }
     }
     const here = await action('observe');
+    const tile = feet(here);
+    if (here.onGround && !here.inWater) {
+      scoutingTrail.push(tile);
+      if (sheep && target === sheep && sheep.distance > 6) {
+        detour = woolScoutDetour(scoutingTrail);
+        if (detour) {
+          deferredSheep.set(sheep.id, sheep.pos);
+          scoutingTrail.length = 0;
+          await reportScouting?.('The route keeps returning to the same ground. Retracing a dry way out before looking for sheep again.');
+          continue;
+        }
+      }
+    }
     const next = target === sheep ? 'No sheep nearby. Looking for open grassland.'
       : flower === target ? 'Looking for dye to make the wool match.'
         : 'Looking for food before continuing the wool search.';
     await reportScouting?.(sheep && target === sheep
       ? `Saw a sheep about ${Math.round(sheep.distance)} blocks away. Following dry ground toward it.` : next);
-    visited.push(feet(here));
+    visited.push(tile);
     if (await stepOut(action, here, visited, target?.pos, target ? undefined : 'grass', rejectedSteps,
-      target === sheep ? chooseRoute : undefined)
+      sheep && target === sheep ? chooseRoute : undefined)
         || await descendFromCanopy(here)) {
       stalls = 0;
     } else {
@@ -831,8 +899,9 @@ export async function forageExpeditionMeal(action, { camp, toward, minimum = 1, 
   return false;
 }
 
-export async function prepareAdoptionCamp(action, craft, descendFromCanopy, { chooseRoute, reportScouting, timberSite } = {}) {
-  const bedding = await gatherWool(action, descendFromCanopy, chooseRoute, craft, reportScouting);
+export async function prepareAdoptionCamp(action, craft, descendFromCanopy,
+  { chooseRoute, reportScouting, timberSite, observedTrail } = {}) {
+  const bedding = await gatherWool(action, descendFromCanopy, chooseRoute, craft, reportScouting, observedTrail);
   if (typeof bedding !== 'string') {
     return { bed: bedding.bed, door: bedding.door, entrance: bedding.entrance };
   }

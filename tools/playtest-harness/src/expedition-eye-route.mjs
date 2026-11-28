@@ -166,13 +166,28 @@ function* completeActionRows(trace) {
   }
 }
 
+function groundedOverworldPoint(observation) {
+  return observation?.onGround && !observation.inWater && !observation.dead
+    && observation.dimension === OVERWORLD ? feet(observation) : undefined;
+}
+
+export function groundedScoutingTrail(trace) {
+  const trail = [];
+  for (const { action, observation } of completeActionRows(trace)) {
+    if (action !== 'observe') continue;
+    const point = groundedOverworldPoint(observation);
+    if (point && String(point) !== String(trail.at(-1))) trail.push(point);
+  }
+  return trail;
+}
+
 export function campOutboundTrail(trace, bed, { beforeIron = false } = {}) {
   const trail = [];
   for (const { action, observation } of completeActionRows(trace)) {
     if (beforeIron && action === 'get_inventory' && observation?.slots?.some(stack => stack.id === 'minecraft:raw_iron')) break;
-    if (action !== 'observe' || !observation?.onGround || observation.inWater || observation.dead
-        || observation.dimension !== OVERWORLD) continue;
-    const point = feet(observation);
+    if (action !== 'observe') continue;
+    const point = groundedOverworldPoint(observation);
+    if (!point) continue;
     if (Math.hypot(...point.map((value, index) => value - bed[index])) <= 4) {
       trail.splice(0, trail.length, point);
       continue;
@@ -197,8 +212,7 @@ export function companionRegroupTrail(trace, uuid) {
       continue;
     }
     if (action !== 'observe') continue;
-    grounded = observation?.onGround && !observation.inWater && !observation.dead
-      && observation.dimension === OVERWORLD ? feet(observation) : undefined;
+    grounded = groundedOverworldPoint(observation);
     if (!grounded || !trail.length) continue;
     const repeat = trail.findIndex(pos => pos[1] === grounded[1]
       && Math.hypot(pos[0] - grounded[0], pos[2] - grounded[2]) <= 1);
