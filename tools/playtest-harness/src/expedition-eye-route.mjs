@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
 import {
-  careReturnNeedsCover, dogMealCount, feedAdoptedDog, hold, regroupExpeditionCompanion,
+  careReturnNeedsCover, cutScoutingFoothold, dogMealCount, feedAdoptedDog, hold, regroupExpeditionCompanion,
   retreatFromNearbyMob, stepOut, waitForDaylightRecovery,
 } from './expedition-home.mjs';
 import { OVERWORLD, withCompanion } from './expedition-nether.mjs';
@@ -87,6 +87,7 @@ export async function scoutByEye(action, uuid, report = async () => {}) {
 async function travelToward(action, target, arrived, maxSteps, travel) {
   let closest = Infinity;
   let stalled = 0;
+  let blockedSteps = 0;
   let detour;
   let side = 1;
   for (let step = 0; step <= maxSteps; step++) {
@@ -145,10 +146,27 @@ async function travelToward(action, target, arrived, maxSteps, travel) {
     const destination = detour ?? target;
     const approachKnownHeight = !detour && travel.returning && Number.isFinite(target.y)
       && (travel.careReturn || remaining <= 12);
-    await stepOut(action, player, travel.visited, [
+    const walked = await stepOut(action, player, travel.visited, [
       Math.floor(destination.x), Math.floor(approachKnownHeight ? target.y : player.position.y), Math.floor(destination.z),
     ], approachKnownHeight ? 'elevation' : 'surface', travel.rejected, undefined, undefined,
     travel.careReturn ? 40 : 90);
+    if (walked) {
+      blockedSteps = 0;
+    } else if (travel.returning && ++blockedSteps >= 2 && target.y > player.position.y + 0.5) {
+      const stopped = await action('observe');
+      const dogs = await action('get_entities', { type: DOG, radius: 12 });
+      const dog = dogs?.entities.find(entity => entity.uuid === travel.uuid && entity.health > 0);
+      if (stopped?.inWorld && !stopped.dead && dog?.distance <= 8 && await cutScoutingFoothold(action, stopped, {
+        anchor: [target.x, target.y, target.z], rejectedClimbs: travel.rejectedClimbs, allowCeiling: true,
+        protectedDog: dog.pos,
+      })) {
+        await travel.report?.('Cut a dry foothold to climb out with Mushroom.');
+        blockedSteps = 0;
+        stalled = 0;
+        detour = undefined;
+      }
+    }
+    if (travel.returning && blockedSteps >= 8) break;
   }
   return null;
 }
@@ -254,7 +272,7 @@ export async function returnToCampWithCompanion(action, uuid, bed, trail = [], {
   const camp = { x: bed[0] + 0.5, y: bed[1], z: bed[2] + 0.5 };
   const atCamp = pos => horizontalDistance(pos, camp) <= 4 && Math.abs(pos.y - bed[1]) <= 2;
   const travel = { visited: [], rejected: new Set(), uuid, nextCareCheck: 0, returning: true,
-    careReturn: Boolean(report), protectCompanion };
+    careReturn: Boolean(report), protectCompanion, report, rejectedClimbs: new Set() };
   const nearby = trail.map(([x, y, z], index) => ({ index,
     range: Math.hypot(start.position.x - x - 0.5, start.position.y - y, start.position.z - z - 0.5) }))
     .filter(point => point.range <= 14).sort((a, b) => a.range - b.range)[0];

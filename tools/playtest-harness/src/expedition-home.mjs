@@ -365,7 +365,7 @@ function woolScoutDetour(trail) {
   return { origin, anchor, steps: 0, best: Infinity, stalled: 0, walked: [], rejectedClimbs: new Set() };
 }
 
-async function cutScoutingFoothold(action, player, detour) {
+export async function cutScoutingFoothold(action, player, detour) {
   if (!player.onGround || player.inWater || player.health < 12 || player.threats?.some(threat => threat.distance <= 8)) return false;
   const here = feet(player);
   const volume = await action('get_blocks', { center: here, size: [5, 9, 5], format: 'json' });
@@ -373,6 +373,10 @@ async function cutScoutingFoothold(action, player, detour) {
     && uphillScoutingStep(volume.cells, here, detour.anchor, detour.rejectedClimbs, detour);
   if (!step) return false;
   detour.rejectedClimbs.add(String(step.landing));
+  if (detour.protectedDog) {
+    const [x, y, z] = detour.protectedDog.map(Math.floor);
+    if (step.clear.some(([bx, by, bz]) => bx === x && bz === z && Math.abs(by - y) <= 1)) return false;
+  }
   for (const block of step.clear) {
     if (!(await breakVisible(action, block))?.broken) return false;
   }
