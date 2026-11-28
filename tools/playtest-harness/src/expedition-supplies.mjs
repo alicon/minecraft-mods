@@ -1279,15 +1279,21 @@ async function packStarterTable(pos) {
   if (!removed?.broken) {
     const { position } = await action('observe');
     const [x, y, z] = pos;
-    // A hanging log can hide the table's center while leaving its near face open.
+    // An uphill corner can hide the center while the top is visible. A
+    // hanging log can hide the top while leaving the near face reachable.
     const near = (player, block) => Math.max(block + 0.02, Math.min(player, block + 0.98));
-    const dx = near(position.x, x) - position.x;
-    const dy = y + 0.55 - (position.y + 1.62);
-    const dz = near(position.z, z) - position.z;
-    removed = await breakVisible(action, pos, {
-      yaw: Math.atan2(-dx, dz) * 180 / Math.PI,
-      pitch: -Math.atan2(dy, Math.hypot(dx, dz)) * 180 / Math.PI,
-    });
+    const visibleFaces = [[x + 0.5, y + 0.98, z + 0.5],
+      [near(position.x, x), y + 0.55, near(position.z, z)]];
+    for (const [tx, ty, tz] of visibleFaces) {
+      const dx = tx - position.x;
+      const dy = ty - position.y - 1.62;
+      const dz = tz - position.z;
+      removed = await breakVisible(action, pos, {
+        yaw: Math.atan2(-dx, dz) * 180 / Math.PI,
+        pitch: -Math.atan2(dy, Math.hypot(dx, dz)) * 180 / Math.PI,
+      });
+      if (removed?.broken) break;
+    }
   }
   assert.ok(removed?.broken, 'Could not pack up the crafting table');
   await setTimeout(400);
