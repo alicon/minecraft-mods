@@ -174,6 +174,10 @@ Each run reserves at most 76 requests, including after controller reattachment.
 It logs the choices, latency and reported input cost in `actions.jsonl`.
 The controller has a local fallback.
 The ordinary Survival actions and assertions are identical in both modes.
+For concurrent comparisons, use separate worktrees and set
+`MUSHROOM_EXPEDITION_BRIDGE_PORT` to a different unused loopback port in each
+run. Both clients can use the same bridge JAR. The runner writes each client's
+bridge configuration after Loom clears its disposable run directory.
 
 After a respawn, the controller can take a direct daylight recovery route
 when it can see both the dropped shield and Field Guide near the recorded

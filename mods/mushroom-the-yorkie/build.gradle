@@ -1,4 +1,5 @@
 import java.nio.file.Files
+import groovy.json.JsonOutput
 
 ext {
 	mod_id = 'mushroom_yorkie'
@@ -72,6 +73,18 @@ if (tasks.findByName('runClientGameTest') != null && project.hasProperty('yorkie
 	tasks.named('runClientGameTest') {
 		systemProperty 'mushroom.expedition.survivalTest', 'true'
 		systemProperty 'fabric.addMods', agentJar.absolutePath
+		def port = providers.environmentVariable('MUSHROOM_EXPEDITION_BRIDGE_PORT').getOrNull()
+		if (port != null) {
+			if (!port.isInteger() || port.toInteger() < 1024 || port.toInteger() > 65535) {
+				throw new GradleException('MUSHROOM_EXPEDITION_BRIDGE_PORT must be an integer between 1024 and 65535')
+			}
+			def bridgeConfig = project.file('build/run/clientGameTest/config/mcagent.json').toPath()
+			doFirst {
+				// Loom clears this disposable run directory before launching the client.
+				Files.createDirectories(bridgeConfig.parent)
+				Files.writeString(bridgeConfig, JsonOutput.toJson([port: port.toInteger(), bindAddress: '127.0.0.1', allowCommands: false]))
+			}
+		}
 	}
 }
 
