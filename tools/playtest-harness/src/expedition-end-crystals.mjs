@@ -27,6 +27,22 @@ export async function dragonBreathThreat(action) {
   return fireballs.length ? [...fireballs, ...breath] : null;
 }
 
+export async function retreatFromDragonThreat(action, player, danger) {
+  const here = feet(player);
+  const [x, , z] = danger[0].pos;
+  const away = [here[0] + 8 * Math.sign(player.position.x - x), here[1],
+    here[2] + 8 * Math.sign(player.position.z - z)];
+  // Breath damages the player repeatedly before the edge of the cloud.
+  // Finish the escape segment even if one of those ticks lands.
+  const restoreInterrupt = (await action('set_reflexes'))?.interruptOnDamage;
+  if (restoreInterrupt) await action('set_reflexes', { interruptOnDamage: false });
+  try {
+    return await stepOut(action, player, [], away, 'surface', new Set(), undefined, danger.map(threat => threat.pos), 35);
+  } finally {
+    if (restoreInterrupt) await action('set_reflexes', { interruptOnDamage: true });
+  }
+}
+
 async function enterEndermanRefuge(action, player) {
   if (player.inWater) return true;
   if (!(await action('get_inventory')).slots.some(stack => stack.id === WATER_BUCKET)) return false;
@@ -152,18 +168,7 @@ export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = 
       if (approaching) danger = [approaching];
     }
     if (danger) {
-      const closest = danger[0].pos;
-      const retreat = [here[0] + 8 * Math.sign(player.position.x - closest[0]), here[1],
-        here[2] + 8 * Math.sign(player.position.z - closest[2])];
-      // The last dry route is useful cover when a fireball is inbound.
-      // Ignore ordinary scouting repeat penalties while leaving its path.
-      const restoreInterrupt = (await action('set_reflexes'))?.interruptOnDamage;
-      if (restoreInterrupt) await action('set_reflexes', { interruptOnDamage: false });
-      try {
-        await stepOut(action, player, [], retreat, 'surface', new Set(), undefined, danger.map(threat => threat.pos), 35);
-      } finally {
-        if (restoreInterrupt) await action('set_reflexes', { interruptOnDamage: true });
-      }
+      await retreatFromDragonThreat(action, player, danger);
       continue;
     }
     const sheltered = player.gameTime < refugeUntil && await enterEndermanRefuge(action, player);

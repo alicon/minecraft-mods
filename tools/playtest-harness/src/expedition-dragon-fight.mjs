@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
 import { eatExpeditionMeal, hold, stepOut } from './expedition-home.mjs';
-import { dragonBreathThreat } from './expedition-end-crystals.mjs';
+import { dragonBreathThreat, retreatFromDragonThreat } from './expedition-end-crystals.mjs';
 
 const END = 'minecraft:the_end';
 const DRAGON = 'minecraft:ender_dragon';
@@ -97,11 +97,7 @@ export async function fightEndDragon(action, report, progress = {}) {
 
     const danger = await dragonBreathThreat(action);
     if (danger) {
-      const here = feet(player);
-      const [tx, , tz] = danger[0].pos;
-      const away = [here[0] + 7 * Math.sign(player.position.x - tx), here[1],
-        here[2] + 7 * Math.sign(player.position.z - tz)];
-      await stepOut(action, player, [], away, 'surface', new Set(), undefined, danger.map(threat => threat.pos), 35);
+      await retreatFromDragonThreat(action, player, danger);
       continue;
     }
     if ((player.health < 16 || player.food < 18) && player.gameTime >= nextMeal) {
