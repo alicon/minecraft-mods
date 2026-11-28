@@ -10,7 +10,7 @@ export async function defendCompanion(action, player, dogUuid) {
   const dog = snapshot?.entities.find(entity => entity.type === DOG && entity.uuid === dogUuid);
   if (!dog) return false;
   const injured = dog.recentlyHurt || dog.health <= 8;
-  const threats = snapshot.entities.filter(entity => entity.hostile);
+  let threats = snapshot.entities.filter(entity => entity.hostile);
   const creeper = threats.filter(entity => entity.type === 'minecraft:creeper'
     && (distance(entity.pos, dog.pos) <= 5 || (injured || dog.distance <= 6) && entity.distance <= 7))
     .sort((a, b) => a.distance - b.distance)[0];
@@ -37,7 +37,8 @@ export async function defendCompanion(action, player, dogUuid) {
     const view = await action('get_entities', { radius: 24, max: 128 });
     const nearbyDog = view?.entities.find(entity => entity.uuid === dogUuid && entity.health > 0);
     if (!nearbyDog) return true;
-    attacker = view.entities.find(entity => entity.id === attacker.id && entity.hostile
+    threats = view.entities.filter(entity => entity.hostile);
+    attacker = threats.find(entity => entity.id === attacker.id
       && entity.distance <= 4.25 && distance(entity.pos, nearbyDog.pos) <= 4.5);
     if (!attacker) return true;
   }
@@ -52,8 +53,12 @@ export async function defendCompanion(action, player, dogUuid) {
     await setTimeout(650);
     aimed = await aimAtAttacker(action, attacker.id);
   }
-  if (aimed?.crosshair?.id === attacker.id && aimed.attackStrength >= 0.88) {
-    await action('attack_entity', { entityId: attacker.id });
+  const target = aimed?.crosshair?.id;
+  // In a narrow passage a second hostile can block the swing at the dog's attacker.
+  const blocker = threats.find(entity => entity.id === target && entity.distance <= 3
+    && entity.type !== 'minecraft:creeper');
+  if ((target === attacker.id || blocker) && aimed.attackStrength >= 0.88) {
+    await action('attack_entity', { entityId: target });
   }
   return true;
 }
