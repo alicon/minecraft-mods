@@ -1,5 +1,7 @@
 package dev.alicon.mushroomyorkie.entity;
 
+import dev.alicon.mushroomyorkie.block.ModBlocks;
+import dev.alicon.mushroomyorkie.item.ModItems;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,12 +32,19 @@ final class ExpeditionEndEntryClientScenario {
 	private ExpeditionEndEntryClientScenario() {
 	}
 
-	static void run(ClientGameTestContext context, TestServerContext server, UUID ownerId, Path status, boolean generated) throws IOException {
+	static void run(ClientGameTestContext context, TestServerContext server, UUID ownerId, Path status,
+			boolean generated, boolean shelter) throws IOException {
 		boolean startAbove = generated && "1".equals(System.getenv("MUSHROOM_EXPEDITION_START_ABOVE_STRONGHOLD"));
 		var fixture = server.computeOnServer(minecraft -> {
 			var owner = Objects.requireNonNull(minecraft.getPlayerList().getPlayer(ownerId));
 			var level = minecraft.overworld();
-			if (generated) return prepareGeneratedStronghold(level, owner, startAbove);
+			if (generated) {
+				if (shelter) {
+					owner.getInventory().add(new ItemStack(ModItems.CAMP_MAT));
+					owner.getInventory().add(new ItemStack(Items.COBBLESTONE, 32));
+				}
+				return prepareGeneratedStronghold(level, owner, startAbove);
+			}
 			var center = owner.blockPosition().above(6);
 			var landing = center.south(3);
 			for (BlockPos pos : BlockPos.betweenClosed(center.offset(-6, -2, -6), center.offset(6, -1, 6))) {
@@ -77,7 +86,7 @@ final class ExpeditionEndEntryClientScenario {
 					var owner = minecraft.getPlayerList().getPlayer(ownerId);
 					if (!owner.isAlive() || !owner.level().dimension().equals(Level.END)
 							|| !(owner.level().getEntity(fixture.dogId()) instanceof MushroomYorkieEntity dog)
-							|| !dog.isAlive() || !dog.belongsTo(owner) || dog.isOrderedToSit()
+							|| !dog.isAlive() || !dog.belongsTo(owner) || dog.isOrderedToSit() != shelter
 							|| !minecraft.overworld().getBlockState(fixture.center()).is(Blocks.END_PORTAL)
 							|| (startAbove && owner.getStats().getValue(Stats.BLOCK_MINED.get(Blocks.STONE)) == 0)
 							|| (generated ? owner.getInventory().countItem(Items.ENDER_EYE) >= 12
@@ -85,9 +94,24 @@ final class ExpeditionEndEntryClientScenario {
 											|| stack.is(Items.BLAZE_POWDER) || stack.is(Items.BLAZE_ROD)))) {
 						throw new AssertionError("Expected a completed vanilla portal and the same living dog in the End");
 					}
+					if (shelter) {
+						var anchor = dog.expeditionCamp.anchor();
+						var dogRoof = dog.blockPosition().above(2);
+						if (anchor == null || !anchor.dimension().equals(Level.END)
+								|| !owner.level().getBlockState(anchor.pos()).is(ModBlocks.CAMP_MAT)
+								|| !owner.level().getBlockState(dogRoof).isFaceSturdy(owner.level(), dogRoof, Direction.DOWN)
+								|| !owner.level().getBlockState(anchor.pos().above(2)).isFaceSturdy(
+										owner.level(), anchor.pos().above(2), Direction.DOWN)
+								|| anchor.pos().distSqr(dog.blockPosition()) > 2
+								|| owner.getStats().getValue(Stats.ITEM_USED.get(Items.COBBLESTONE)) == 0) {
+							throw new AssertionError("Expected the original dog and its marked mat beneath player-built cover");
+						}
+					}
 				});
-				context.takeScreenshot(generated ? "expedition-survival-generated-end-entry" : "expedition-survival-end-entry");
-				System.out.printf("Expedition native %sEnd entry passed: dog=%s owner=%s%n", generated ? "generated " : "", fixture.dogId(), ownerId);
+				context.takeScreenshot(shelter ? "expedition-survival-end-camp"
+						: generated ? "expedition-survival-generated-end-entry" : "expedition-survival-end-entry");
+				System.out.printf("Expedition native %s passed: dog=%s owner=%s%n",
+						shelter ? "End camp" : generated ? "generated End entry" : "End entry", fixture.dogId(), ownerId);
 				return;
 			}
 			if ("failed".equals(result)) break;

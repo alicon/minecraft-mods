@@ -65,7 +65,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 			case "nether" -> NETHER_WINDOW_TICKS;
 			case "nether-powder" -> NETHER_POWDER_WINDOW_TICKS;
 			case "stronghold" -> STRONGHOLD_WINDOW_TICKS;
-			case "end-kit", "defense", "feeding", "portal", "nether-supplies", "nether-distant-supplies", "shelter", "equipment", "end-entry", "end-crystal", "generated-end-crystals",
+			case "end-kit", "defense", "feeding", "portal", "nether-supplies", "nether-distant-supplies", "shelter", "equipment", "end-entry", "end-camp", "end-crystal", "generated-end-crystals",
 					"eye-route", "stronghold-approach", "ender-supplies", "generated-end-entry", "quarry-tools", "quarry-iron", "end-return" -> 0;
 			default -> throw new AssertionError("Unknown expedition stage " + stage);
 		};
@@ -156,8 +156,9 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 					ExpeditionEndKitClientScenario.run(context, server, ownerId, status);
 					return;
 				}
-				if ("end-entry".equals(stage) || "generated-end-entry".equals(stage)) {
-					ExpeditionEndEntryClientScenario.run(context, server, ownerId, status, "generated-end-entry".equals(stage));
+				if ("end-entry".equals(stage) || "generated-end-entry".equals(stage) || "end-camp".equals(stage)) {
+					ExpeditionEndEntryClientScenario.run(context, server, ownerId, status,
+							!"end-entry".equals(stage), "end-camp".equals(stage));
 					return;
 				}
 				if ("end-crystal".equals(stage)) {
@@ -182,6 +183,9 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 				}
 				Files.writeString(status, "ready", StandardOpenOption.CREATE_NEW);
 				boolean passed = false;
+				boolean frozenForHandoff = false;
+				Path handoffState = status.resolveSibling("live-handoff-safety");
+				if (live) Files.writeString(handoffState, "running");
 				for (int elapsed = 0; elapsed < windowTicks; elapsed += 10) {
 					String dogLoss = companionDeath.get();
 					if (dogLoss != null) {
@@ -210,6 +214,12 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 						Files.writeString(status.resolveSibling("last-owner-death"), death);
 						System.out.println("Expedition Survival owner respawned in the same save");
 						continue;
+					}
+					if (live && frozenForHandoff != "held".equals(result)) {
+						frozenForHandoff = "held".equals(result);
+						boolean freeze = frozenForHandoff;
+						server.runOnServer(minecraft -> minecraft.tickRateManager().setFrozen(freeze));
+						Files.writeString(handoffState, freeze ? "frozen" : "running");
 					}
 					String dogEvidence = server.computeOnServer(minecraft -> {
 						var owner = minecraft.getPlayerList().getPlayer(ownerId);

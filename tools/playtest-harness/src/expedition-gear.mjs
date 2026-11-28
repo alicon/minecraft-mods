@@ -136,8 +136,12 @@ async function selectEmptyHand(action) {
   assert.ok(!(await action('get_inventory')).mainHand?.count, 'Camp marking requires the empty main hand');
 }
 
-export async function markExpeditionCamp(action) {
-  const pos = await placeBeside(action, MAT);
+export async function markExpeditionCamp(action, target) {
+  const pos = target ?? await placeBeside(action, MAT);
+  if (target) {
+    await hold(action, MAT);
+    assert.equal((await action('place_block', { pos }))?.blockAtPos, MAT, 'Could not place the End camp mat under cover');
+  }
   await selectEmptyHand(action);
   await setTimeout(180);
   assert.ok((await action('interact_block', { pos, face: 'up' }))?.success, 'The owner could not mark the placed camp mat');

@@ -11,6 +11,7 @@ import {
 } from './expedition-home.mjs';
 import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
+import { shelterAtEndArrival } from './expedition-end-camp.mjs';
 import { blazePowderCount, craftBlazePowder, earnBlazeRods } from './expedition-blaze-rods.mjs';
 import { clearGeneratedCrystals, readCrystalProgress, shootEndCrystal } from './expedition-end-crystals.mjs';
 import { fightEndDragon, recallAndExitEnd } from './expedition-dragon-fight.mjs';
@@ -86,6 +87,7 @@ const milestoneObjectives = {
   equipment: 'Craft the harness, padded vest, and mat. Fit Mushroom’s gear and mark camp.',
   'end-entry': 'Craft Eyes of Ender and bring Mushroom through the active portal.',
   'generated-end-entry': 'Find the generated portal room, open its portal, and bring Mushroom through.',
+  'end-camp': 'Cross the generated portal with Mushroom and build his shelter on safe footing.',
   'end-crystal': 'Mark Mushroom’s shelter and break an End crystal from a safe bow position.',
   'generated-end-crystals': 'Shelter Mushroom and clear the generated End crystals using the bow and safe approaches.',
   'eye-route': 'Throw an Eye of Ender and follow its visible flight with Mushroom.',
@@ -283,18 +285,19 @@ try {
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
     await narrate('Objective', 'Earn the missing feather, craft a bow and arrows, and pack cooked food and water.');
     await prepareEndCombatKit(action, craft, companion, reportEndKit, { arrows: 12, rations: 3 });
-  } else if (stage === 'end-entry' || stage === 'generated-end-entry') {
+  } else if (stage === 'end-entry' || stage === 'generated-end-entry' || stage === 'end-camp') {
     companion = (await readFile(join(dirname(statusFile), 'end-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
-    if (stage === 'generated-end-entry' && process.env.MUSHROOM_EXPEDITION_START_ABOVE_STRONGHOLD === '1') {
+    if (stage !== 'end-entry' && process.env.MUSHROOM_EXPEDITION_START_ABOVE_STRONGHOLD === '1') {
       const { x, y, z } = start.position;
       await descendToStronghold(action, companion, [x, y, z].map(Math.floor), reportStrongholdEntry);
     }
-    const ring = stage === 'generated-end-entry' ? await findStrongholdPortalRoom(action, companion, async (event, observation) => {
+    const ring = stage !== 'end-entry' ? await findStrongholdPortalRoom(action, companion, async (event, observation) => {
       console.log(JSON.stringify({ at: new Date().toISOString(), action: event, observation }));
       if (event === 'portal_room') await narrate('Result', 'Reached a dry position beside the generated End portal.');
     }) : undefined;
     await crossEndPortal(action, craft, companion, ring);
+    if (stage === 'end-camp') await shelterAtEndArrival(action, companion, reportEndCamp);
   } else if (stage === 'end-crystal' || stage === 'generated-end-crystals' || archivedEnd) {
     const archive = archivedEnd
       ? JSON.parse(await readFile(join(dirname(statusFile), 'archived-end-start.json'), 'utf8')) : null;
@@ -469,6 +472,18 @@ async function runExpedition(start, stage) {
       assert.ok(blockPosition(checkpoint.surfaceFix), 'Invalid recorded Eye bearing fix');
     }
     assert.ok(start.dimension === OVERWORLD || checkpoint.phase === 'nether', 'Unexpected dimension before the Nether phase');
+    const handoffState = join(dirname(statusFile), 'live-handoff-safety');
+    const worldTicks = () => readFile(handoffState, 'utf8').catch(error => {
+      if (error.code === 'ENOENT') return null;
+      throw error;
+    });
+    if (live && await worldTicks() !== null) {
+      await reportStatus('resuming');
+      for (let attempt = 0; attempt < 40 && await worldTicks() !== 'running'; attempt++) {
+        await setTimeout(125);
+      }
+      assert.equal(await worldTicks(), 'running', 'The held world has not resumed ticking');
+    }
     const starterItems = ['crafting_table', 'wooden_sword', 'wooden_pickaxe'];
     if (checkpoint.phase === 'provision'
       && starterItems.some(item => !inventory.slots.some(stack => stack.id === `minecraft:${item}`))) {
@@ -494,6 +509,8 @@ async function runExpedition(start, stage) {
     'Invalid recorded quarry path');
     assert.ok(checkpoint.quarryLanding === undefined || blockPosition(checkpoint.quarryLanding), 'Invalid recorded landing');
     assert.ok(checkpoint.firstIronHome === undefined || checkpoint.firstIronHome === true, 'Invalid first iron return');
+    assert.ok(checkpoint.returningAfterCare === undefined || checkpoint.returningAfterCare === true,
+      'Invalid care return');
     assert.ok(checkpoint.exhaustedQuarries === undefined || (Array.isArray(checkpoint.exhaustedQuarries)
       && checkpoint.exhaustedQuarries.length <= 6 && checkpoint.exhaustedQuarries.every(attempt =>
         blockPosition(attempt?.entrance) && blockPosition(attempt?.blockedAt) && /^[\da-f]{64}$/.test(attempt.footing))),
@@ -716,10 +733,11 @@ async function runExpedition(start, stage) {
       checkpoint.fedDog = true;
       const afterMeal = await action('observe');
       checkpoint.lastDogMealAt = afterMeal.gameTime;
-      if (live) await writeCheckpoint(checkpoint);
       const dogs = await action('get_entities', { type: 'mushroom_yorkie:mushroom_yorkie', radius: 24 });
       const dog = dogs?.entities.find(entity => entity.uuid === checkpoint.dog);
       const returnToCamp = afterMeal.timeOfDay >= 10_500 || afterMeal.health < 14 || !(dog?.health >= 9);
+      if (returnToCamp) checkpoint.returningAfterCare = true;
+      if (live) await writeCheckpoint(checkpoint);
       await narrate('Result', 'The original Mushroom ate one portion.'
         + (returnToCamp ? ' Returning to camp.' : ' Continuing from here.'));
       return returnToCamp;
@@ -729,6 +747,11 @@ async function runExpedition(start, stage) {
       policy.resumeQuarryLanding = checkpoint.quarryLanding;
       policy.reenterQuarry = checkpoint.reenterQuarry === true;
       policy.exhaustedQuarries = checkpoint.exhaustedQuarries;
+      policy.returningAfterCare = checkpoint.returningAfterCare;
+      policy.finishCareReturn = async () => {
+        delete checkpoint.returningAfterCare;
+        await writeCheckpoint(checkpoint);
+      };
       policy.saveExhaustedQuarries = async attempts => {
         checkpoint.exhaustedQuarries = attempts;
         await writeCheckpoint(checkpoint);
@@ -808,7 +831,8 @@ async function runExpedition(start, stage) {
     checkpoint.lastDogMealAt = (await action('observe')).gameTime;
     if (live) await writeCheckpoint(checkpoint);
   }
-  const returnedFromNether = ['nether-returned', 'gather-eyes', 'follow-eyes'].includes(checkpoint.phase);
+  const returnedFromNether = ['nether-returned', 'gather-eyes', 'arm-for-end', 'follow-eyes', 'descend-stronghold']
+    .includes(checkpoint.phase);
   if (visitNether && !returnedFromNether) {
     if (checkpoint.phase !== 'nether') {
       await narrate('Objective', 'Equip Mushroom and pack the camp mat before travelling.');
@@ -869,6 +893,11 @@ async function runExpedition(start, stage) {
 async function reportEndKit(kind, observation) {
   console.log(JSON.stringify({ at: new Date().toISOString(), action: `end_kit_${kind}`, observation, dog: companion }));
   if (kind === 'packed') await narrate('Result', 'Packed the bow, arrows, rations and two filled buckets.');
+}
+
+async function reportEndCamp(kind, observation) {
+  console.log(JSON.stringify({ at: new Date().toISOString(), action: `end_camp_${kind}`, observation, dog: companion }));
+  if (kind === 'sheltered') await narrate('Result', 'Marked the mat and settled the original Mushroom under cover.');
 }
 
 async function reportStrongholdEntry(kind, observation) {

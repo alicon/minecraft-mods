@@ -195,6 +195,8 @@ controller from its last saved phase with the same client still open. Use the
 same stage and policy and point to that run's status file. The client connection
 and owner must match the recorded checkpoint. The replacement controller
 takes ownership of the run so the original launcher cannot mark it failed.
+The live verifier freezes world ticks while the controller is held and
+resumes them before the replacement controller starts issuing gameplay input.
 A player with the earned starter
 tools can resume searching for food and wool before a camp has been built.
 An interrupted iron quarry
@@ -203,7 +205,10 @@ verified landing or use the recorded route to climb out. A quarry that ends
 without enough ore records its entrance and the observed blocks at the last
 landing. If the same footing remains after reattachment, the controller
 scouts another opening. On the surface it offers Mushroom an earned portion
-if his first meal is still pending. The first mined iron goes back to the
+if his first meal is still pending. A decision to return after a meal
+survives a handoff. When far from camp and clear of immediate threats, the
+player can place a carried bed and sleep until daylight. The first mined
+iron goes back to the
 camp bed before smelting. When the outbound path is in the local action
 trace, the controller retraces grounded positions it observed before the
 first ore pickup. The trace records the original living dog, the raw ore
@@ -395,6 +400,13 @@ from the raised approach with the original dog. The verifier locates the
 structure independently and checks the original dog in the End. Add
 `MUSHROOM_EXPEDITION_START_ABOVE_STRONGHOLD=1` to start above the generated
 corridor and require stone mining before opening and crossing its portal.
+
+Set `MUSHROOM_EXPEDITION_STAGE=end-camp` to continue from the generated portal
+through building Mushroom's camp at the observed End landing. This fixture
+adds a mat and cobblestone to the supplied gear. The controller asks the
+original dog to stay, builds a roof with room for him and his mat, and
+marks the mat through normal Use. The server verifies the same living,
+seated dog and marked mat beneath solid cover.
 
 Set `MUSHROOM_EXPEDITION_STAGE=end-crystal` to replay the first combat step
 with a native bow. The disposable End fixture supplies a bow, arrows, a

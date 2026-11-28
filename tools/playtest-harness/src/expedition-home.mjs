@@ -1211,6 +1211,20 @@ export async function sleepNearby(action, player) {
   return false;
 }
 
+async function sleepInField(action, player, bed) {
+  if (!isBedtime(player) || !player.onGround || player.health < 14
+      || player.threats?.some(threat => threat.distance < 11)
+      || !careReturnNeedsCover(player, bed)) return false;
+  const { slots } = await action('get_inventory');
+  const carried = slots.find(stack => /^minecraft:\w+_bed$/.test(stack.id));
+  if (!carried) return false;
+  const landing = await placeBeside(action, carried.id).catch(error => {
+    if (error.message.startsWith('No nearby supported position for ')) return null;
+    throw error;
+  });
+  return Boolean(landing && await sleepNearby(action, await action('observe')));
+}
+
 export async function regroupExpeditionCompanion(action, uuid, lastPosition, trail = []) {
   const distanceFrom = (first, second) => Math.hypot(...first.map((value, axis) => value - second[axis]));
   const visited = [];
@@ -1502,7 +1516,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   let blockedCaveSteps = 0;
   let highlandSearch = 0;
   let movingToFreshGround = policy.scoutNewGround ? 8 : 0;
-  let returningAfterCare = false;
+  let returningAfterCare = policy.returningAfterCare === true;
   let nextReturnCoverCheck = 0;
   let returningUnderCover = false;
   const triedFoodSources = new Set();
@@ -1536,6 +1550,10 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
     if (!stairs.length && isBedtime(player) && player.gameTime >= nextSleepCheck) {
       nextSleepCheck = player.gameTime + 300;
       if (await sleepNearby(action, player)) continue;
+      if (await sleepInField(action, player, bed)) {
+        await policy.reportScouting?.('Slept in a carried bed so the player and Mushroom can travel in daylight.');
+        continue;
+      }
     }
     if (policy.checkCompanion && player.gameTime >= nextCompanionCheck) {
       nextCompanionCheck = player.gameTime + 40;
@@ -1554,6 +1572,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
     if (returningAfterCare) {
       const here = feet(player);
       returningAfterCare = Math.hypot(...here.map((coordinate, axis) => coordinate - bed[axis])) > 6;
+      if (!returningAfterCare) await policy.finishCareReturn?.();
       if (returningAfterCare) {
         const cautiousReturn = careReturnNeedsCover(player, bed);
         if (cautiousReturn && isBedtime(player) && player.gameTime >= nextReturnCoverCheck) {
