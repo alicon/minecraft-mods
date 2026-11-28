@@ -198,8 +198,8 @@ A closed test world can be continued at the iron phase with
 `build/playtest-reports`. Make a JSON manifest containing the absolute
 `source` directory, the `seed`, the `owner` and `dog` UUIDs, and a `camp`
 object with the `bed` and `table` block coordinates. Start the ordinary
-runner with the manifest path and the `iron`, `nether`, or `nether-powder`
-stage. The client opens a copy, verifies the world, owner, camp, earned stone
+runner with the manifest path and the `iron`, `nether`, `nether-powder`, or
+`stronghold` stage. The client opens a copy, verifies the world, owner, camp, earned stone
 kit and original living dog, then hands control back at the iron phase. The
 trace records the recovery as assisted.
 
@@ -257,9 +257,10 @@ scouting again for the rest of the kit.
 
 Set `MUSHROOM_EXPEDITION_STAGE=defense` with the same runner for the focused
 native companion protection scenario. The disposable world stages an injured
-Mushroom next to a spider and gives the owner a stone sword. It verifies that
-the controller interrupts a proposed walk, the owner kills the spider through
-the native client, and the same injured dog survives. The staged encounter
+Mushroom next to a spider beyond the player's melee reach and gives the owner
+a stone sword. It verifies that the controller interrupts a proposed errand,
+approaches and kills the spider in the same interruption, and keeps the
+original injured dog alive. The staged encounter
 provides companion-defense coverage separately from fresh Survival progress.
 
 Set `MUSHROOM_EXPEDITION_STAGE=feeding` to replay a meal while Mushroom is
@@ -307,6 +308,13 @@ finds a fortress from observed terrain, marks a camp for Mushroom, and hunts
 blazes. After recalling the dog and crossing home, the player crafts twelve
 blaze powder. The server verifies the kill and crafting stats, the powder in the
 inventory, and the original equipped dog after reopening the save.
+
+Set `MUSHROOM_EXPEDITION_STAGE=stronghold` for a continuous run from fresh
+Survival through the stronghold surface approach. After the Nether trip, the
+controller gathers pearls, crafts twenty Eyes, and uses a portion for scouting.
+The native verifier requires earned blaze powder, twenty crafted Eyes, ordinary
+Eye throws, twelve Eyes still available for the portal, and the original living
+dog with the same owner at the generated stronghold after reopening the save.
 
 Set `MUSHROOM_EXPEDITION_STAGE=ender-supplies` to replay the transition from
 blaze powder to an Eye of Ender. The flat Normal Survival fixture supplies an
@@ -367,10 +375,11 @@ the direction from the thrown eye.
 
 Set `MUSHROOM_EXPEDITION_STAGE=stronghold-approach` to check a longer
 route over generated terrain. The fixture starts the player about 54 blocks
-from a real stronghold, with eyes, food, and Mushroom nearby. Set
+from a real stronghold, with eleven eyes, ingredients for one more, food, and
+Mushroom nearby. Set
 `MUSHROOM_EXPEDITION_STRONGHOLD_DISTANCE=224` to exercise a longer approach.
-The controller observes one throw, moves sideways for a second reading,
-and intersects the bearings. It takes another pair of readings after walking
+The controller crafts the missing Eye, observes one throw, moves sideways for
+a second reading, and intersects the bearings. It takes another pair of readings after walking
 toward a distant estimate and checks on Mushroom during the journey. The
 integrated server verifies ordinary throws, the final position relative to
 the actual stronghold, and the original living dog. This stage stops at the

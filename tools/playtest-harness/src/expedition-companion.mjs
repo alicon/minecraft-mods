@@ -9,10 +9,12 @@ export async function defendCompanion(action, player, dogUuid) {
   const snapshot = await action('get_entities', { radius: 24, max: 128 });
   const dog = snapshot?.entities.find(entity => entity.type === DOG && entity.uuid === dogUuid);
   if (!dog) return false;
-  const threats = snapshot.entities.filter(entity => entity.hostile && distance(entity.pos, dog.pos) <= 3);
+  const injured = dog.recentlyHurt || dog.health <= 8;
+  const threats = snapshot.entities.filter(entity => entity.hostile && distance(entity.pos, dog.pos)
+    <= (injured && entity.type !== 'minecraft:creeper' ? 4.5 : 3));
   const creeper = threats.find(entity => entity.type === 'minecraft:creeper');
-  const attacker = threats.sort((a, b) => distance(a.pos, dog.pos) - distance(b.pos, dog.pos))[0];
-  if (!creeper && (!attacker || (!dog.recentlyHurt && dog.health > 8))) return false;
+  let attacker = threats.sort((a, b) => distance(a.pos, dog.pos) - distance(b.pos, dog.pos))[0];
+  if (!creeper && (!attacker || !injured)) return false;
 
   await action('stop', { closeScreen: Boolean(player.screen) });
   if (creeper || player.health < 7) {
@@ -22,8 +24,16 @@ export async function defendCompanion(action, player, dogUuid) {
   }
 
   if (attacker.distance > 4.25) {
-    if (attacker.distance <= 10) await approach(action, attacker.id);
-    return true;
+    if (attacker.distance > 10) return true;
+    await approach(action, attacker.id);
+    // Finish the defense on this interrupt when the walk reaches melee range.
+    // A new planning turn can lose the target when the mob moves around the dog.
+    const view = await action('get_entities', { radius: 24, max: 128 });
+    const nearbyDog = view?.entities.find(entity => entity.uuid === dogUuid && entity.health > 0);
+    if (!nearbyDog) return true;
+    attacker = view.entities.find(entity => entity.id === attacker.id && entity.hostile
+      && entity.distance <= 4.25 && distance(entity.pos, nearbyDog.pos) <= 4.5);
+    if (!attacker) return true;
   }
   const inventory = await action('get_inventory');
   const sword = SWORDS.map(id => inventory?.slots.find(stack => stack.id === id && stack.slot < 9)).find(Boolean);

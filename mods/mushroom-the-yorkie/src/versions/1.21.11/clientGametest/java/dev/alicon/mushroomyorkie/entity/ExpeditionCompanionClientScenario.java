@@ -25,22 +25,22 @@ final class ExpeditionCompanionClientScenario {
 			var level = minecraft.overworld();
 			var owner = Objects.requireNonNull(minecraft.getPlayerList().getPlayer(ownerId));
 			BlockPos origin = owner.blockPosition().above(5);
-			for (BlockPos pos : BlockPos.betweenClosed(origin.offset(-4, -1, -4), origin.offset(4, -1, 4))) {
+			for (BlockPos pos : BlockPos.betweenClosed(origin.offset(-4, -1, -4), origin.offset(9, -1, 4))) {
 				level.setBlockAndUpdate(pos, Blocks.COBBLESTONE.defaultBlockState());
 			}
-			for (BlockPos pos : BlockPos.betweenClosed(origin.offset(-4, 0, -4), origin.offset(4, 2, 4))) {
+			for (BlockPos pos : BlockPos.betweenClosed(origin.offset(-4, 0, -4), origin.offset(9, 2, 4))) {
 				level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
 			}
 			owner.teleportTo(origin.getX() + 0.5, origin.getY(), origin.getZ() + 0.5);
 			owner.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.STONE_SWORD));
 			var dog = Objects.requireNonNull(ModEntities.MUSHROOM_YORKIE.create(level, EntitySpawnReason.TRIGGERED));
 			dog.claimFor(owner);
-			dog.setPos(origin.getX() + 2.05, origin.getY(), origin.getZ() - 0.65);
+			dog.setPos(origin.getX() + 5.6, origin.getY(), origin.getZ() - 0.65);
 			dog.setNoAi(true);
 			dog.setHealth(7);
 			level.addFreshEntity(dog);
 			var spider = Objects.requireNonNull(EntityType.SPIDER.create(level, EntitySpawnReason.TRIGGERED));
-			spider.setPos(origin.getX() + 2.7, origin.getY(), origin.getZ() + 0.4);
+			spider.setPos(origin.getX() + 6.2, origin.getY(), origin.getZ() + 0.4);
 			spider.setHealth(4);
 			// Hold the replay pose so the attack path is isolated from the bridge's owner-defense reflex.
 			spider.setNoAi(true);
@@ -62,8 +62,8 @@ final class ExpeditionCompanionClientScenario {
 					var owner = minecraft.getPlayerList().getPlayer(ownerId);
 					if (fixture.spider().isAlive() || fixture.spider().getKillCredit() != owner
 							|| !fixture.dog().isAlive() || fixture.dog().getHealth() < 7
-							|| !owner.blockPosition().equals(fixture.origin())) {
-						throw new AssertionError("Expected the owner to protect the original dog without leaving for the errand");
+							|| owner.blockPosition().getX() <= fixture.origin().getX()) {
+						throw new AssertionError("Expected the owner to approach the spider and protect the dog during the first interruption");
 					}
 				});
 				context.takeScreenshot("expedition-survival-companion-defense");

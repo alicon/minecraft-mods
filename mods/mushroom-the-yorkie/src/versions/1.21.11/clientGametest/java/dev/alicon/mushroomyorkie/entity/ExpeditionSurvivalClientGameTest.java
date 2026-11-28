@@ -16,7 +16,9 @@ import net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldBuilder;
 import net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldSave;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.minecraft.client.gui.screens.DeathScreen;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.stats.Stats;
+import net.minecraft.tags.StructureTags;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Items;
@@ -30,7 +32,9 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 	private static final int IRON_WINDOW_TICKS = 56_000;
 	private static final int NETHER_WINDOW_TICKS = 96_000;
 	private static final int NETHER_POWDER_WINDOW_TICKS = 120_000;
+	private static final int STRONGHOLD_WINDOW_TICKS = 240_000;
 	private static final int PORTAL_POWDER = 12;
+	private static final int STRONGHOLD_EYES = 20;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -48,7 +52,8 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 		String requestedStage = System.getenv("MUSHROOM_EXPEDITION_STAGE");
 		String stage = requestedStage == null ? "adoption" : requestedStage;
 		boolean powderTrip = "nether-powder".equals(stage);
-		boolean visitsNether = "nether".equals(stage) || powderTrip;
+		boolean strongholdTrip = "stronghold".equals(stage);
+		boolean visitsNether = "nether".equals(stage) || powderTrip || strongholdTrip;
 		var recovery = recoveryFromManifest(status, stage);
 		int windowTicks = switch (stage) {
 			case "adoption" -> ADOPTION_WINDOW_TICKS;
@@ -56,6 +61,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 			case "iron" -> IRON_WINDOW_TICKS;
 			case "nether" -> NETHER_WINDOW_TICKS;
 			case "nether-powder" -> NETHER_POWDER_WINDOW_TICKS;
+			case "stronghold" -> STRONGHOLD_WINDOW_TICKS;
 			case "defense", "feeding", "portal", "nether-supplies", "nether-distant-supplies", "shelter", "equipment", "end-entry", "end-crystal", "generated-end-crystals",
 					"eye-route", "stronghold-approach", "ender-supplies", "quarry-tools", "quarry-iron" -> 0;
 			default -> throw new AssertionError("Unknown expedition stage " + stage);
@@ -249,6 +255,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 								|| owner.getInventory().countItem(Items.BLAZE_POWDER) < PORTAL_POWDER)) {
 							throw new AssertionError("Expected the fresh expedition to earn and craft its stronghold powder supply");
 						}
+						if (strongholdTrip) verifyStrongholdArrival(owner, dogs.getFirst());
 						return dogs.getFirst().getUUID().toString();
 					});
 					if (dogEvidence != null) {
@@ -291,6 +298,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 							|| owner.getInventory().countItem(Items.BLAZE_POWDER) < PORTAL_POWDER)) {
 						throw new AssertionError("The earned powder and its owner did not reload back home");
 					}
+				if (strongholdTrip) verifyStrongholdArrival(owner, dogs.getFirst());
 				});
 				System.out.printf("Expedition Survival %s reopened: dog=%s owner=%s%n", stage, originalDog.get(), ownerId);
 				context.takeScreenshot("expedition-survival-" + stage + "-reopened");
@@ -304,8 +312,8 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 	private static ExpeditionSaveRecovery recoveryFromManifest(Path status, String stage) {
 		String manifest = System.getenv("MUSHROOM_EXPEDITION_RESTORE_MANIFEST");
 		if (manifest == null) return null;
-		if (!"iron".equals(stage) && !"nether".equals(stage) && !"nether-powder".equals(stage)) {
-			throw new AssertionError("An archived iron checkpoint requires an iron or Nether stage");
+		if (!"iron".equals(stage) && !"nether".equals(stage) && !"nether-powder".equals(stage) && !"stronghold".equals(stage)) {
+			throw new AssertionError("The selected stage cannot continue from an archived iron checkpoint");
 		}
 		try {
 			return ExpeditionSaveRecovery.read(Path.of(manifest), status);
@@ -324,5 +332,20 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 
 	private static boolean equipped(MushroomYorkieEntity dog) {
 		return dog.hasHarness() && dog.hasExpeditionVest();
+	}
+
+	private static void verifyStrongholdArrival(ServerPlayer owner, MushroomYorkieEntity dog) {
+		var underground = owner.level().findNearestMapStructure(StructureTags.EYE_OF_ENDER_LOCATED, owner.blockPosition(), 16, false);
+		var stats = owner.getStats();
+		if (underground == null
+				|| Math.hypot(owner.getX() - underground.getX() - 0.5, owner.getZ() - underground.getZ() - 0.5) > 12
+				|| dog.distanceTo(owner) > 16
+				|| stats.getValue(Stats.ENTITY_KILLED.get(EntityType.BLAZE)) == 0
+				|| stats.getValue(Stats.ITEM_CRAFTED.get(Items.BLAZE_POWDER)) < STRONGHOLD_EYES
+				|| stats.getValue(Stats.ITEM_CRAFTED.get(Items.ENDER_EYE)) < STRONGHOLD_EYES
+				|| stats.getValue(Stats.ITEM_USED.get(Items.ENDER_EYE)) < 2
+				|| owner.getInventory().countItem(Items.ENDER_EYE) < 12) {
+			throw new AssertionError("Expected the original dog and earned Eye supply at the generated stronghold approach");
+		}
 	}
 }

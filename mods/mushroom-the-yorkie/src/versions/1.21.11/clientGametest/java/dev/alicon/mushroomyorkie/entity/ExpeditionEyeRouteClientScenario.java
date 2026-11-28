@@ -50,8 +50,12 @@ final class ExpeditionEyeRouteClientScenario {
 			}
 			if (locate) level.setDayTime(1_000);
 			owner.teleportTo(start.getX() + 0.5, start.getY(), start.getZ() + 0.5);
-			owner.getInventory().add(new ItemStack(Items.ENDER_EYE, locate ? 12 : 1));
-			if (locate) owner.getInventory().add(new ItemStack(Items.COOKED_MUTTON, 8));
+			owner.getInventory().add(new ItemStack(Items.ENDER_EYE, locate ? 11 : 1));
+			if (locate) {
+				owner.getInventory().add(new ItemStack(Items.ENDER_PEARL));
+				owner.getInventory().add(new ItemStack(Items.BLAZE_POWDER));
+				owner.getInventory().add(new ItemStack(Items.COOKED_MUTTON, 8));
+			}
 			var dog = Objects.requireNonNull(ModEntities.MUSHROOM_YORKIE.create(level, EntitySpawnReason.TRIGGERED));
 			dog.claimFor(owner);
 			dog.setPos(start.getX() + 1.5, start.getY(), start.getZ() + 0.5);
@@ -73,6 +77,7 @@ final class ExpeditionEyeRouteClientScenario {
 					double remaining = distance(owner.getX(), owner.getZ(), stronghold);
 					double gain = distance(start.getX() + 0.5, start.getZ() + 0.5, stronghold) - remaining;
 					boolean proof = locate ? gain >= 25 && remaining <= 12
+								&& owner.getStats().getValue(Stats.ITEM_CRAFTED.get(Items.ENDER_EYE)) == 1
 							&& owner.getStats().getValue(Stats.ITEM_USED.get(Items.ENDER_EYE)) >= 2
 							: !owner.getInventory().contains(stack -> stack.is(Items.ENDER_EYE));
 					if (!owner.isAlive() || !owner.level().dimension().equals(Level.OVERWORLD) || gain < 7

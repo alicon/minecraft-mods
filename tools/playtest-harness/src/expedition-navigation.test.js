@@ -960,6 +960,39 @@ test('iron work returns to camp after feeding the injured companion before spend
   assert.deepEqual(checkedAt, [0, 0, 8]);
 });
 
+test('companion meals do not erase the iron search history', async () => {
+  const { earnIronKit } = await import('./expedition-home.mjs');
+  const pickaxe = { id: 'minecraft:stone_pickaxe', slot: 0, count: 1, maxDamage: 131 };
+  let x = 0;
+  let gameTime = 0;
+  let checks = 0;
+  let meals = 0;
+  const digging = new Error('Reached the supported staircase fallback');
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_inventory': return { slots: [pickaxe], mainHand: pickaxe };
+      case 'observe':
+        gameTime += 50;
+        return { inWorld: true, onGround: true, position: { x: x + 0.5, y: 1, z: 0.5 },
+          health: 20, food: 20, gameTime };
+      case 'get_blocks': return { cells: Array.from({ length: 23 }, (_, offset) => cell(x + offset - 11, 0, 0)) };
+      case 'go_to':
+        x = args.pos[0];
+        return { arrived: true, position: args.pos };
+      default: assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  await assert.rejects(earnIronKit(action, () => assert.fail('No recipe has ingredients'), { bed: [0, 1, 0] }, {
+    checkCompanion: async () => ++checks % 4 === 0 ? 'care' : null,
+    tendCompanion: async () => { meals++; return false; },
+    chooseWork: async (_player, _progress, fallback) => {
+      if (fallback === 'quarry') throw digging;
+      return fallback;
+    },
+  }), error => error === digging);
+  assert.ok(meals >= 2);
+});
+
 test('the first earned ingot funds a shield before scouting for the rest of the kit', async () => {
   const { earnIronKit } = await import('./expedition-home.mjs');
   const slots = [

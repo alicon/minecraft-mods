@@ -1401,7 +1401,6 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
           await policy.saveQuarry?.([]);
         }
         returningAfterCare = await policy.tendCompanion();
-        misses = 0;
         continue;
       }
     }
@@ -1493,15 +1492,17 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       madeBackup = true;
       continue;
     }
-    const fallback = misses >= 24 ? 'quarry' : 'scout';
+    const fallback = misses >= 12 ? 'quarry' : 'scout';
     const work = movingToFreshGround ? 'scout' : policy.chooseWork && misses >= 8 && !stairs.length
       ? await policy.chooseWork(player, { material: 'iron', missedStone: misses,
         rawIron: count(inventory, RAW_IRON), needed: requiredOre, hasCoal: count(inventory, COAL) > 0 }, fallback)
       : fallback;
     let openedBlockedQuarry = false;
     if (usable && stairs.length < 44 && player.position.y > 20 && (stairs.length || work === 'quarry')) {
+      const opening = stairs.length === 0;
       const descent = await descendQuarry(action, player, bed, stairs, protectedGround);
       if (Array.isArray(descent)) {
+        if (opening) await policy.reportScouting?.('Started a supported staircase after scouting for exposed iron.');
         await policy.saveQuarry?.(stairs, descent);
         continue;
       }

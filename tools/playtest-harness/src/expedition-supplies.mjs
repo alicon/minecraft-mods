@@ -13,7 +13,7 @@ import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
 import { blazePowderCount, craftBlazePowder, earnBlazeRods } from './expedition-blaze-rods.mjs';
 import { clearGeneratedCrystals, shootEndCrystal } from './expedition-end-crystals.mjs';
-import { craftEyes, crossEndPortal } from './expedition-end-entry.mjs';
+import { craftEyes, crossEndPortal, enderEyeCount } from './expedition-end-entry.mjs';
 import { earnEnderPearls } from './expedition-pearls.mjs';
 import { navigateToStronghold, scoutByEye } from './expedition-eye-route.mjs';
 import { COMPANION_WEARABLES, markExpeditionCamp, practiceStayAndRecall, prepareCompanionGear } from './expedition-gear.mjs';
@@ -42,6 +42,8 @@ const deathAtStart = live ? await readFile(deathFile, 'utf8').catch(() => '') : 
 const blockPosition = pos => Array.isArray(pos) && pos.length === 3 && pos.every(Number.isInteger);
 const DOG_MEAL_INTERVAL = 4_000;
 const PORTAL_POWDER = 12;
+// Leave enough for the twelve sockets after up to eight scouting throws.
+const STRONGHOLD_EYES = 20;
 
 const url = `http://127.0.0.1:${config.port}/mcp`;
 let session;
@@ -229,7 +231,7 @@ try {
   const start = await action('observe');
   const startDimension = ['end-crystal', 'generated-end-crystals'].includes(stage) ? 'minecraft:the_end' : OVERWORLD;
   assert.ok(start?.inWorld && !start.dead && (start.dimension === startDimension
-    || (resume && ['nether', 'nether-powder'].includes(stage) && start.dimension === NETHER)),
+    || (resume && ['nether', 'nether-powder', 'stronghold'].includes(stage) && start.dimension === NETHER)),
   'The controller was not in its expected starting dimension');
   if (milestoneObjectives[stage]) await narrate('Objective', milestoneObjectives[stage]);
   if (stage === 'defense') await runCompanionDrill();
@@ -248,11 +250,7 @@ try {
   } else if (stage === 'ender-supplies') {
     companion = (await readFile(join(dirname(statusFile), 'pearl-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
-    await earnEnderPearls(action, companion, 1, async (kind, observation) => {
-      console.log(JSON.stringify({ at: new Date().toISOString(), action: `pearl_${kind}`, observation }));
-      if (kind === 'camp') await narrate('Decision', 'Mushroom is staying at camp while the player looks for an Enderman.');
-    });
-    await craftEyes(action, craft, 1);
+    await earnEyes(companion, 1);
   } else if (stage === 'shelter') {
     const camp = await prepareAdoptionCamp(action, craft, descendFromCanopy);
     assert.ok(camp.door, 'Expected to find a furnished house in the shelter replay');
@@ -289,11 +287,8 @@ try {
     companion = (await readFile(join(dirname(statusFile), 'eye-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
     if (stage === 'stronghold-approach') {
-      await navigateToStronghold(action, companion, async (kind, observation) => {
-        console.log(JSON.stringify({ at: new Date().toISOString(), action: `stronghold_${kind}`, observation }));
-        if (kind === 'fix') await narrate('Decision',
-          `The bearings cross near ${Math.round(observation.x)}, ${Math.round(observation.z)}. Walking there with Mushroom.`);
-      });
+      await earnEyes(companion, PORTAL_POWDER);
+      await followEyes(companion);
     } else await scoutByEye(action, companion, async bearing => {
       console.log(JSON.stringify({ at: new Date().toISOString(), action: 'eye_bearing', bearing }));
       const yaw = Math.round(Math.atan2(-bearing.x, bearing.z) * 180 / Math.PI);
@@ -336,13 +331,14 @@ async function runCompanionDrill() {
     await setTimeout(250);
     const observed = await playerAction('get_entities', { type: 'minecraft:spider', radius: 8 });
     if (!observed.entities.length) return;
-    await action('observe');
   }
-  throw new Error('The spider was still alive after the companion interruption');
+  throw new Error('The spider was still alive after the first companion interruption');
 }
 
 async function runExpedition(start, stage) {
-  const huntBlazes = stage === 'nether-powder';
+  const findStronghold = stage === 'stronghold';
+  const huntBlazes = stage === 'nether-powder' || findStronghold;
+  const powderNeeded = findStronghold ? STRONGHOLD_EYES : PORTAL_POWDER;
   const visitNether = stage === 'nether' || huntBlazes;
   const needsIron = stage === 'iron' || visitNether;
   const inventory = await action('get_inventory');
@@ -357,7 +353,8 @@ async function runExpedition(start, stage) {
     assert.equal(checkpoint.bridgeFingerprint, bridgeFingerprint, 'The recorded client is no longer listening');
     assert.ok(Number.isFinite(checkpoint.gameTime) && checkpoint.gameTime <= start.gameTime);
     assert.ok(['starter', 'provision', 'camp', 'adoption', 'stone', 'iron', 'nether'].includes(checkpoint.phase)
-      || huntBlazes && checkpoint.phase === 'nether-returned');
+      || huntBlazes && checkpoint.phase === 'nether-returned'
+      || findStronghold && ['gather-eyes', 'follow-eyes'].includes(checkpoint.phase));
     assert.ok(checkpoint.timberSite === undefined || blockPosition(checkpoint.timberSite), 'Invalid recorded timber site');
     assert.ok(start.dimension === OVERWORLD || checkpoint.phase === 'nether', 'Unexpected dimension before the Nether phase');
     const starterItems = ['crafting_table', 'wooden_sword', 'wooden_pickaxe'];
@@ -392,10 +389,11 @@ async function runExpedition(start, stage) {
     await action('stop', { closeScreen: true });
     const missingGuide = !inventory.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide');
     const newDeath = Number(deathAtStart.trim().split(' ').at(-1)) > checkpoint.gameTime;
-    const lostQuarryKit = ['iron', 'nether'].includes(checkpoint.phase) && newDeath
+    const equippedPhase = ['iron', 'nether', 'nether-returned', 'gather-eyes', 'follow-eyes'].includes(checkpoint.phase);
+    const lostQuarryKit = equippedPhase && newDeath
       && !inventory.slots.some(stack => stack.id === 'minecraft:stone_pickaxe')
       && !inventory.slots.some(stack => stack.id === 'minecraft:furnace');
-    if (['stone', 'iron', 'nether'].includes(checkpoint.phase)
+    if ((checkpoint.phase === 'stone' || equippedPhase)
         && (checkpoint.recoveryDestination || missingGuide && (!checkpoint.recoveredWithoutGuide || newDeath) || lostQuarryKit)) {
       const destination = checkpoint.recoveryDestination ?? verifiedDeathSite(start, checkpoint);
       checkpoint.recoveryDestination = destination;
@@ -577,10 +575,14 @@ async function runExpedition(start, stage) {
     if (restoreAutoEat) await action('set_reflexes', { autoEat: false });
     try {
       if (!checkpoint.quarry?.length) await policy.checkCompanion(await action('observe'), true);
-      if (!checkpoint.quarry?.length && dogMealCount(await action('get_inventory')) < 2) {
-        await narrate('Objective', 'Gather food for Mushroom and keep a spare portion for the quarry.');
-        assert.ok(await forageExpeditionMeal(action, { toward: checkpoint.camp.bed, minimum: 2 }),
-          'Could not stock provisions before mining');
+      if (!checkpoint.quarry?.length) {
+        const miner = await action('observe');
+        const minimum = miner.health >= 16 && miner.food >= 18 ? 1 : 2;
+        if (dogMealCount(await action('get_inventory')) < minimum) {
+          await narrate('Objective', 'Gather food for the quarry and reserve a portion for Mushroom.');
+          assert.ok(await forageExpeditionMeal(action, { toward: checkpoint.camp.bed, minimum }),
+            'Could not stock provisions before mining');
+        }
       }
       if (!checkpoint.quarry?.length && checkpoint.fedDog === false) await policy.tendCompanion();
       if (policy.scoutNewGround) await policy.reportScouting('Leaving the previous quarry area to look for exposed iron.');
@@ -607,7 +609,8 @@ async function runExpedition(start, stage) {
     checkpoint.lastDogMealAt = (await action('observe')).gameTime;
     if (live) await writeCheckpoint(checkpoint);
   }
-  if (visitNether && checkpoint.phase !== 'nether-returned') {
+  const returnedFromNether = ['nether-returned', 'gather-eyes', 'follow-eyes'].includes(checkpoint.phase);
+  if (visitNether && !returnedFromNether) {
     if (checkpoint.phase !== 'nether') {
       await narrate('Objective', 'Equip Mushroom and pack the camp mat before travelling.');
       checkpoint.equipment ??= [];
@@ -622,17 +625,51 @@ async function runExpedition(start, stage) {
     await narrate('Objective', huntBlazes
       ? 'Find a fortress, shelter Mushroom, and earn blaze rods for the stronghold supply.'
       : 'Make a dry Nether round trip with Mushroom.');
-    const work = huntBlazes ? exit => bringBlazeRods(checkpoint.dog, exit, PORTAL_POWDER) : undefined;
+    const work = huntBlazes ? exit => bringBlazeRods(checkpoint.dog, exit, powderNeeded) : undefined;
     await netherRoundTrip(action, checkpoint.dog, hold, () => prepareNetherPortal(action, craft, checkpoint.camp), start.dimension, work);
     if (huntBlazes) {
       checkpoint.phase = 'nether-returned';
       if (live) await writeCheckpoint(checkpoint);
     }
   }
-  if (huntBlazes) {
+  if (huntBlazes && checkpoint.phase === 'nether-returned') {
     await narrate('Objective', 'Craft the portal supply of blaze powder back in the Overworld.');
-    await craftBlazePowder(action, craft, PORTAL_POWDER);
+    await craftBlazePowder(action, craft, powderNeeded);
+    if (findStronghold) {
+      checkpoint.phase = 'gather-eyes';
+      if (live) await writeCheckpoint(checkpoint);
+    }
   }
+  if (findStronghold && checkpoint.phase === 'gather-eyes') {
+    await narrate('Objective', 'Shelter Mushroom and earn the Eyes of Ender for scouting and the portal.');
+    await earnEyes(checkpoint.dog, STRONGHOLD_EYES);
+    checkpoint.phase = 'follow-eyes';
+    if (live) await writeCheckpoint(checkpoint);
+  }
+  if (findStronghold && checkpoint.phase === 'follow-eyes') {
+    await narrate('Objective', 'Follow the earned Eyes of Ender to the stronghold with the original Mushroom.');
+    await followEyes(checkpoint.dog);
+  }
+}
+
+async function earnEyes(uuid, total) {
+  const needed = Math.max(0, total - enderEyeCount(await action('get_inventory')));
+  if (needed) {
+    await earnEnderPearls(action, uuid, needed, async (kind, observation) => {
+      console.log(JSON.stringify({ at: new Date().toISOString(), action: `pearl_${kind}`, observation }));
+      if (kind === 'camp') await narrate('Decision', 'Mushroom is staying at camp while the player looks for an Enderman.');
+    });
+    await craftEyes(action, craft, total);
+  }
+  assert.ok(enderEyeCount(await action('get_inventory')) >= total, 'The player did not craft enough Eyes of Ender');
+}
+
+async function followEyes(uuid) {
+  return navigateToStronghold(action, uuid, async (kind, observation) => {
+    console.log(JSON.stringify({ at: new Date().toISOString(), action: `stronghold_${kind}`, observation }));
+    if (kind === 'fix') await narrate('Decision',
+      `The bearings cross near ${Math.round(observation.x)}, ${Math.round(observation.z)}. Walking there with Mushroom.`);
+  });
 }
 
 async function bringBlazeRods(uuid, exit, neededPowder) {

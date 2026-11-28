@@ -31,6 +31,31 @@ test('an injured original dog interrupts normal work and the player hits only th
   }
 });
 
+test('reaching a spider attacking the dog converts the same interrupt into a sword strike', async () => {
+  const { defendCompanion } = await import('./expedition-companion.mjs');
+  const distantDog = { ...dog, pos: [6, 64, -1], distance: 6.1 };
+  const distantSpider = { ...spider, pos: [7, 64, 0], distance: 7 };
+  const strikes = [];
+  let approached = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_entities': return { entities: [distantDog, { ...distantSpider, distance: approached ? 2.3 : 7 }] };
+      case 'stop': return {};
+      case 'go_to':
+        assert.equal(args.entityId, spider.id);
+        approached = true;
+        return { arrived: true, position: [4.7, 64, 0] };
+      case 'get_inventory': return { slots: [{ slot: 0, id: 'minecraft:stone_sword' }], selectedSlot: 0 };
+      case 'look': return {};
+      case 'observe': return { ...player, crosshair: { type: 'entity', id: spider.id } };
+      case 'attack_entity': strikes.push(args.entityId); return {};
+      default: assert.fail(name);
+    }
+  };
+  assert.equal(await defendCompanion(action, player, dog.uuid), true);
+  assert.deepEqual(strikes, [spider.id]);
+});
+
 test('when a creeper is close to the original dog, retreat without swinging', async () => {
   const { defendCompanion } = await import('./expedition-companion.mjs');
   const closeDog = { ...dog, pos: [1, 64, 0], distance: 1, recentlyHurt: false, health: 20 };

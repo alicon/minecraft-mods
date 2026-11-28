@@ -20,6 +20,10 @@ const count = (stock, item) => stock.slots.reduce((total, stack) => total + (sta
 const distance = (pos, player) => Math.hypot(pos[0] + 0.5 - player.x, pos[1] - player.y, pos[2] + 0.5 - player.z);
 const free = id => id === undefined || AIR.test(id);
 
+export function enderEyeCount(inventory) {
+  return count(inventory, EYE);
+}
+
 export function findEndRing(cells, player) {
   const blocks = new Map(cells.map(({ x, y, z, b }) => [String([x, y, z]), b]));
   const at = (x, y, z) => blocks.get(String([x, y, z]));
@@ -53,7 +57,7 @@ export function findEndRing(cells, player) {
 
 export async function craftEyes(action, craft, total = 12) {
   let inventory = await action('get_inventory');
-  const wanted = Math.min(total - count(inventory, EYE), count(inventory, PEARL));
+  const wanted = Math.min(total - enderEyeCount(inventory), count(inventory, PEARL));
   if (wanted > count(inventory, POWDER) && count(inventory, ROD)) {
     await craft(POWDER, Math.min(wanted - count(inventory, POWDER), 2 * count(inventory, ROD)));
     inventory = await action('get_inventory');
