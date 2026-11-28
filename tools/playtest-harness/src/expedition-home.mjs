@@ -1575,6 +1575,9 @@ export async function shelterUnderRangedFire(action, player) {
     await action('move', { yaw: Math.atan2(-dx, dz) * 180 / Math.PI, forward: true, ticks: 2 });
     aligned = await action('observe');
   }
+  const leafLitter = volume.cells.some(({ x, y, z, b }) => x === here[0] && y === here[1] && z === here[2]
+    && b === 'minecraft:leaf_litter');
+  if (leafLitter && !(await breakVisible(action, here))?.broken) return false;
   const settle = landing => settleOnDryStep(action, landing, setTimeout, false, player.health);
   for (const block of plan.dig) {
     assert.ok((await breakVisible(action, block))?.broken && await settle(block),

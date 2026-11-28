@@ -449,7 +449,7 @@ test('an emergency dugout requires solid ground and leaves a three-step exit aft
   assert.equal(planEmergencyDugout(flooded, [0, 64, 0]), null);
 });
 
-test('an off-center player uses a short movement input before digging and waits under the cap', async () => {
+test('an off-center player clears leaf litter before digging and waits under the cap', async () => {
   const { shelterUnderRangedFire } = await import('./expedition-home.mjs');
   const terrain = new Map();
   for (let x = -3; x <= 3; x++) {
@@ -457,6 +457,7 @@ test('an off-center player uses a short movement input before digging and waits 
       for (let y = 60; y < 64; y++) terrain.set(String([x, y, z]), cell(x, y, z, 'stone'));
     }
   }
+  terrain.set('0,64,0', cell(0, 64, 0, 'leaf_litter'));
   let position = { x: 0.82, y: 64, z: 0.25 };
   const player = { inWorld: true, health: 1, onGround: true, position };
   let aim;
@@ -477,8 +478,11 @@ test('an off-center player uses a short movement input before digging and waits 
         centered = true;
         return {};
       case 'look': aim = args.at; return {};
-      case 'observe': return { ...player, position, timeOfDay: covered ? 1_000 : 18_000,
-        crosshair: aim && { pos: aim, block: terrain.get(String(aim))?.b } };
+      case 'observe': {
+        const hit = String(aim) === '0,63,0' && terrain.has('0,64,0') ? [0, 64, 0] : aim;
+        return { ...player, position, timeOfDay: covered ? 1_000 : 18_000,
+          crosshair: hit && { pos: hit, block: terrain.get(String(hit))?.b } };
+      }
       case 'break_block':
         assert.ok(centered && terrain.delete(String(args.pos)));
         if (args.pos[0] === 0 && args.pos[2] === 0 && args.pos[1] === position.y - 1) {
