@@ -68,6 +68,11 @@ export function dogMealCount(inventory) {
   return inventory.slots.reduce((total, stack) => total + (DOG_FOOD.includes(stack.id) ? stack.count : 0), 0);
 }
 
+export function spareExpeditionMeal(inventory) {
+  if (dogMealCount(inventory) <= 1) return;
+  return [...COOKED_FOOD, ...BACKUP_FOOD, MUTTON].find(item => count(inventory, item));
+}
+
 export async function packRecoveryMeal(action) {
   const { slots } = await action('get_inventory');
   const meals = slots.filter(stack => DOG_FOOD.includes(stack.id));
@@ -423,6 +428,7 @@ export async function gatherWool(action, descendFromCanopy, chooseRoute, craft, 
   const deferredSheep = new Map();
   let detour;
   let shelter;
+  let dyeTarget;
   let shelterSteps = 0;
   let stalls = 0;
   // The first flock can come into range after several minutes of safe scouting.
@@ -513,13 +519,27 @@ export async function gatherWool(action, descendFromCanopy, chooseRoute, craft, 
     }
     const mixed = craft && inventory.slots.filter(stack => WOOL.test(stack.id)).reduce((total, stack) => total + stack.count, 0) >= 3;
     const flower = mixed && (meal || player.food > 12) && target === sheep
-      ? await findDyeFlower(action, player, inventory, triedFlowers) : null;
-    if (flower && (!target || flower.distance < target.distance)) {
-      if (flower.distance < 3.6) {
+      ? dyeTarget ?? await findDyeFlower(action, player, inventory, triedFlowers) : null;
+    if (flower && (dyeTarget || !target || flower.distance < target.distance)) {
+      const [fx, fy, fz] = flower.pos;
+      const { x, y, z } = player.position;
+      const distance = Math.hypot(fx + 0.5 - x, fy + 0.5 - y, fz + 0.5 - z);
+      if (distance < 3.6) {
+        dyeTarget = undefined;
         triedFlowers.add(String(flower.pos));
         if (await collectFlower(action, player, flower)) continue;
       } else {
-        target = flower;
+        // The small scan can change as we move along a hillside. Keep using the
+        // observed position until we reach it or stop getting any closer.
+        const improved = distance < (dyeTarget?.best ?? Infinity) - 0.75;
+        const stalled = improved ? 0 : (dyeTarget?.stalled ?? 0) + 1;
+        if (stalled >= 6) {
+          triedFlowers.add(String(flower.pos));
+          dyeTarget = undefined;
+        } else {
+          dyeTarget = { ...flower, best: improved ? distance : dyeTarget.best, stalled };
+          target = flower;
+        }
       }
     }
     const here = await action('observe');
@@ -542,7 +562,8 @@ export async function gatherWool(action, descendFromCanopy, chooseRoute, craft, 
     await reportScouting?.(sheep && target === sheep
       ? `Saw a sheep about ${Math.round(sheep.distance)} blocks away. Following dry ground toward it.` : next);
     visited.push(tile);
-    if (await stepOut(action, here, visited, target?.pos, target ? undefined : 'grass', rejectedSteps,
+    const terrain = target && target === flower ? 'elevation' : target ? undefined : 'grass';
+    if (await stepOut(action, here, visited, target?.pos, terrain, rejectedSteps,
       sheep && target === sheep ? chooseRoute : undefined)
         || await descendFromCanopy(here)) {
       stalls = 0;
@@ -1945,9 +1966,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
     }
     let meal;
     if (policy.reserveCompanionMeal) {
-      if (dogMealCount(inventory) > 1) {
-        meal = [...COOKED_FOOD, ...BACKUP_FOOD, MUTTON].find(item => count(inventory, item));
-      }
+      meal = spareExpeditionMeal(inventory);
     } else {
       meal = [...COOKED_FOOD, ...BACKUP_FOOD].find(item => count(inventory, item));
       if (!meal && count(inventory, MUTTON) > (player.health < 14 || player.food <= 12 ? 0 : 1)) meal = MUTTON;

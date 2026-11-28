@@ -257,6 +257,59 @@ test('mixed wool uses a single collected dye to complete the most common color',
   assert.deepEqual(craft, [['minecraft:white_dye', 1], ['minecraft:white_wool', 1]]);
 });
 
+test('a mixed-wool scout keeps walking toward an observed flower when the next scan would omit it', async () => {
+  const { gatherWool } = await import('./expedition-home.mjs');
+  const flower = [9, 65, 0];
+  const floor = Array.from({ length: 12 }, (_, x) => cell(x, x >= 5 ? 64 : 63, 0));
+  let position = { x: 0.5, y: 64, z: 0.5 };
+  let scanned = false;
+  let crushed = false;
+  let collected = false;
+  let bedReady = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_inventory':
+        return { slots: bedReady ? [{ id: 'minecraft:white_wool', count: 3 }] : [
+          { id: 'minecraft:white_wool', count: 2 }, { id: 'minecraft:gray_wool', count: 1 },
+          ...(collected ? [{ id: 'minecraft:lily_of_the_valley', count: 1 }] : []),
+        ] };
+      case 'observe':
+        return { inWorld: true, onGround: true, health: 20, food: 20, position,
+          crosshair: !crushed && { pos: flower, block: 'minecraft:lily_of_the_valley' } };
+      case 'scan_blocks':
+        if (args.blocks.some(block => block.endsWith('_bed'))) return { matches: [] };
+        assert.ok(!scanned, 'The scout dropped its reachable flower target between steps');
+        scanned = true;
+        return { matches: [{ name: 'minecraft:lily_of_the_valley', positions: [flower] }] };
+      case 'get_entities':
+        return { entities: args.type === 'item' && crushed && !collected
+          ? [{ id: 7, item: { id: 'minecraft:lily_of_the_valley' } }] : [] };
+      case 'get_blocks':
+        return { cells: floor };
+      case 'go_to':
+        if (args.entityId === 7) {
+          collected = true;
+          return { arrived: true, position: Object.values(position) };
+        }
+        assert.ok(args.pos[0] > position.x - 0.5, 'Stay on the route toward the flower');
+        position = { x: Math.min(args.pos[0], Math.floor(position.x) + 2) + 0.5,
+          y: args.pos[1], z: 0.5 };
+        return { arrived: true, position: Object.values(position) };
+      case 'look': return {};
+      case 'break_block':
+        assert.deepEqual(args.pos, flower);
+        crushed = true;
+        return { broken: true };
+      default: assert.fail(name);
+    }
+  };
+  const craft = async item => {
+    if (item === 'minecraft:white_wool') bedReady = true;
+  };
+  assert.equal(await gatherWool(action, () => assert.fail('A dry path leads to the flower'), undefined, craft), 'white');
+  assert.ok(collected);
+});
+
 test('a successful two-tile sheep loop retraces dry ground and defers the stationary sheep', async () => {
   const { gatherWool } = await import('./expedition-home.mjs');
   const floor = Array.from({ length: 41 }, (_, i) => cell(i - 20, 63, 0, 'grass_block'));

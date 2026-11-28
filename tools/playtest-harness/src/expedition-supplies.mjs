@@ -860,8 +860,13 @@ async function runExpedition(start, stage) {
     if (!checkpoint.firstIronHome) {
       policy.bringFirstIronHome = async () => {
         await narrate('Objective', 'Bring the first mined iron back to camp with Mushroom.');
-        const trail = campOutboundTrail(await recentActions(), checkpoint.camp.bed, { beforeIron: true });
-        const { owner, dog } = await returnToCampWithCompanion(action, checkpoint.dog, checkpoint.camp.bed, trail);
+        const trace = await recentActions();
+        const bed = checkpoint.camp.bed;
+        const trail = campOutboundTrail(trace, bed, { beforeIron: true });
+        const { owner, dog } = await returnToCampWithCompanion(action, checkpoint.dog, bed, trail, {
+          report: message => narrate('Decision', message, 15_000),
+          regroupTrail: companionRegroupTrail(trace, checkpoint.dog),
+        });
         const stock = await action('get_inventory');
         const rawIron = stock.slots.filter(stack => stack.id === 'minecraft:raw_iron')
           .reduce((total, stack) => total + stack.count, 0);
@@ -878,9 +883,10 @@ async function runExpedition(start, stage) {
     if (restoreAutoEat) await action('set_reflexes', { autoEat: false });
     try {
       if (!checkpoint.returningAfterCare && !checkpoint.quarry?.length) {
-        await policy.checkCompanion(await action('observe'), true);
+        const companionStatus = await policy.checkCompanion(await action('observe'), true);
         const miner = await action('observe');
-        const minimum = miner.health >= 16 && miner.food >= 18 ? 1 : 2;
+        const minimum = (miner.health >= 16 && miner.food >= 18 ? 1 : 2)
+          + Number(companionStatus === 'care');
         if (dogMealCount(await action('get_inventory')) < minimum) {
           await narrate('Objective', 'Gather food for the quarry and reserve a portion for Mushroom.');
           assert.ok(await forageExpeditionMeal(action, { toward: checkpoint.camp.bed, minimum }),

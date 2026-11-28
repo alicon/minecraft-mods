@@ -165,6 +165,47 @@ test('the return to an expedition bed verifies the original living dog nearby', 
   assert.ok(Math.abs(returned.owner.position.x - 0.5) <= 4);
 });
 
+test('a hungry player returning with iron eats a carried meal and keeps one for Mushroom', async t => {
+  const { returnToCampWithCompanion } = await import('./expedition-eye-route.mjs');
+  for (const portions of [1, 2]) {
+    await t.test(`${portions} carried portions`, async () => {
+      const bed = [0, 64, 0];
+      let position = { x: 12.5, y: 64, z: 0.5 };
+      let portionsLeft = portions;
+      let food = 7;
+      const action = async (name, args) => {
+        switch (name) {
+          case 'observe': return { inWorld: true, dimension: 'minecraft:overworld',
+            onGround: true, health: 20, food, gameTime: 100, position };
+          case 'get_entities': return { entities: [{ uuid: 'original', health: 12, distance: 1,
+            pos: [position.x + 1, 64, 0.5] }] };
+          case 'get_inventory': return { slots: [
+            { id: 'minecraft:cooked_mutton', slot: 1, count: portionsLeft },
+            { id: 'minecraft:raw_iron', slot: 2, count: 1 },
+          ] };
+          case 'select_slot': return { mainHand: { id: 'minecraft:cooked_mutton' } };
+          case 'look': return {};
+          case 'use_item':
+            assert.equal(portionsLeft, 2);
+            portionsLeft--;
+            food += 6;
+            return { completed: true, food };
+          case 'get_blocks': return { cells: Array.from({ length: 16 }, (_, x) =>
+            cell(x, 63, 0, 'grass_block')) };
+          case 'go_to':
+            assert.equal(food, portions === 2 ? 13 : 7, 'The first walk left without a spare meal');
+            position = { x: args.pos[0] + 0.5, y: args.pos[1], z: args.pos[2] + 0.5 };
+            return { arrived: true, position: Object.values(position) };
+          default: assert.fail(name);
+        }
+      };
+      const result = await returnToCampWithCompanion(action, 'original', bed);
+      assert.equal(result.dog.uuid, 'original');
+      assert.equal(portionsLeft, 1);
+    });
+  }
+});
+
 test('a camp return can climb out of a dry shelf with the original dog', async t => {
   for (const lowerExit of [false, true]) {
     await t.test(lowerExit ? 'the only open step leads back down' : 'there is no open step', async () => {

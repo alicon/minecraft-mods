@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
 import {
-  careReturnNeedsCover, cutScoutingFoothold, dogMealCount, feedAdoptedDog, hold, regroupExpeditionCompanion,
-  retreatFromNearbyMob, stepOut, waitForDaylightRecovery,
+  careReturnNeedsCover, cutScoutingFoothold, dogMealCount, eatExpeditionMeal, feedAdoptedDog, hold, regroupExpeditionCompanion,
+  retreatFromNearbyMob, spareExpeditionMeal, stepOut, waitForDaylightRecovery,
 } from './expedition-home.mjs';
 import { OVERWORLD, withCompanion } from './expedition-nether.mjs';
 
@@ -120,6 +120,15 @@ async function travelToward(action, target, arrived, maxSteps, travel) {
         const portions = dogMealCount(await action('get_inventory'));
         assert.ok(portions > 0, 'Mushroom needs food before continuing the expedition route');
         assert.ok(await feedAdoptedDog(action, travel.uuid, feet(player), 24), 'Could not feed Mushroom on the route');
+        continue;
+      }
+    }
+    if (travel.returning && player.food <= 12 && player.gameTime >= travel.nextOwnerMeal
+        && !player.threats?.some(threat => threat.distance <= 8)) {
+      travel.nextOwnerMeal = player.gameTime + 80;
+      const meal = spareExpeditionMeal(await action('get_inventory'));
+      if (meal && await eatExpeditionMeal(action, player, meal)) {
+        await travel.report?.('Ate a carried meal and saved one for Mushroom.');
         continue;
       }
     }
@@ -276,7 +285,7 @@ export async function returnToCampWithCompanion(action, uuid, bed, trail = [], {
   }
   const camp = { x: bed[0] + 0.5, y: bed[1], z: bed[2] + 0.5 };
   const atCamp = pos => horizontalDistance(pos, camp) <= 4 && Math.abs(pos.y - bed[1]) <= 2;
-  const travel = { visited: [], rejected: new Set(), uuid, nextCareCheck: 0, returning: true,
+  const travel = { visited: [], rejected: new Set(), uuid, nextCareCheck: 0, returning: true, nextOwnerMeal: 0,
     careReturn: Boolean(report), protectCompanion, report, rejectedClimbs: new Set() };
   const nearby = trail.map(([x, y, z], index) => ({ index,
     range: Math.hypot(start.position.x - x - 0.5, start.position.y - y, start.position.z - z - 0.5) }))
