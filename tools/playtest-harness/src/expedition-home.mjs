@@ -1279,7 +1279,9 @@ export async function waitForDaylightRecovery(action, bed, report) {
   const rejected = new Set();
   let nextShelter = 0;
   let nextSleep = 0;
-  for (let check = 0; check < 180; check++) {
+  // The Mac client can advance the integrated server at about ten ticks per
+  // second under load. Allow a whole night at that rate when there is no bed.
+  for (let check = 0; check < 500; check++) {
     const player = await action('observe');
     assert.ok(player?.inWorld && !player.dead, 'The player did not survive the night before the reunion');
     if (player.timeOfDay < 12_000) return;
