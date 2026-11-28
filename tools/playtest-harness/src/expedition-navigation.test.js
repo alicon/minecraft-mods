@@ -5,6 +5,20 @@ function cell(x, y, z, type = 'grass_block') {
   return { x, y, z, b: `minecraft:${type}` };
 }
 
+test('night cover requires headroom, a solid roof, and a way out', async () => {
+  const { nearestCover } = await import('./expedition-navigation.mjs');
+  const alcove = [
+    cell(3, 0, 0, 'stone'), cell(3, 3, 0, 'stone'),
+    cell(4, 1, 0, 'stone'), cell(4, 2, 0, 'stone'),
+    cell(3, 1, 1, 'dirt'), cell(3, 2, 1, 'dirt'),
+  ];
+  const nearLeaves = [cell(1, 0, 0), cell(1, 3, 0, 'oak_leaves')];
+  assert.deepEqual(nearestCover([...alcove, ...nearLeaves], [0, 1, 0]), [3, 1, 0]);
+  assert.equal(nearestCover([...alcove, cell(3, 1, 0, 'lava')], [0, 1, 0]), null);
+  assert.equal(nearestCover([...alcove, cell(2, 1, 0), cell(2, 2, 0), cell(3, 1, -1), cell(3, 2, -1)],
+    [0, 1, 0]), null);
+});
+
 test('a fire interruption stops further mining and walks away from the lava', async () => {
   const { mineVisible } = await import('./expedition-home.mjs');
   const positions = [];

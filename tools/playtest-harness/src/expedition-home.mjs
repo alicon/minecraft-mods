@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
 import {
-  bedSpotsWithGroundCover, dryStepKey, dryWaypoint, hasPlacedBed, leavesBlockingExit, nearbyBuildingSpots, quarryStep,
+  bedSpotsWithGroundCover, dryStepKey, dryWaypoint, hasPlacedBed, leavesBlockingExit, nearbyBuildingSpots,
+  nearestCover, quarryStep,
 } from './expedition-navigation.mjs';
 import { cookExpeditionMutton, makeExpeditionCharcoal, smeltExpeditionIron } from './expedition-furnace.mjs';
 
@@ -692,10 +693,29 @@ async function openCampTable(action, table, visited) {
   throw new Error('Could not walk back to the crafting table after quarrying');
 }
 
+async function takeCover(action) {
+  const player = await action('observe');
+  if (!player?.inWorld || player.dead || player.timeOfDay < 12_000 || player.timeOfDay >= 23_500) return;
+  const center = feet(player);
+  const area = await action('get_blocks', { center, size: [19, 9, 19], format: 'json' });
+  const cover = nearestCover(area.cells, center);
+  if (!cover) return;
+  const visited = [];
+  const rejected = new Set();
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const position = await action('observe');
+    const tile = feet(position);
+    if (tile.join(',') === cover.join(',')) return;
+    visited.push(tile);
+    await stepOut(action, position, visited, cover, undefined, rejected);
+  }
+}
+
 export async function recoverDroppedLoadout(action, destination) {
   const visited = [];
   const rejectedSteps = new Set();
   let stalled = 0;
+  let detours = 0;
   for (let attempt = 0; attempt < 100; attempt++) {
     const player = await action('observe');
     assert.ok(player?.inWorld && !player.dead && player.health >= 10, 'The return to the dropped gear became unsafe');
@@ -711,9 +731,17 @@ export async function recoverDroppedLoadout(action, destination) {
       if (count(await action('get_inventory'), FIELD_GUIDE)) return;
     }
     visited.push(here);
+    const recent = new Set(visited.slice(-16).map(([x, , z]) => `${x},${z}`));
+    if (visited.length >= 16 && recent.size <= 4) {
+      if (++detours > 2) break;
+      await stepOut(action, player, visited, undefined, undefined, rejectedSteps);
+      visited.splice(0, visited.length - 4);
+      continue;
+    }
     stalled = await stepOut(action, player, visited, destination, false, rejectedSteps) ? 0 : stalled + 1;
     if (stalled >= 3) break;
   }
+  await takeCover(action);
   throw new Error('Could not recover the original guide from the place where the player died');
 }
 

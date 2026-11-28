@@ -4,6 +4,7 @@ const SUPPORT = /:(?:grass_block|dirt|coarse_dirt|podzol|stone|sand|gravel|snow_
 const LEAVES = /_leaves$/;
 const QUARRY_BLOCK = /^minecraft:(?:grass_block|dirt|coarse_dirt|podzol|stone|andesite|diorite|granite|deepslate|(?:deepslate_)?(?:coal|iron)_ore)$/;
 const QUARRY_HAZARD = /^minecraft:(?:water|lava|powder_snow|.*sand|gravel)$/;
+const SHELTER_BLOCK = /^minecraft:(?:dirt|grass_block|stone|cobblestone|granite|diorite|andesite|deepslate)$/;
 const MAX_WALK_SEGMENT = 10;
 
 function gap(id) {
@@ -86,6 +87,23 @@ export function leavesBlockingExit(cells, [x, y, z]) {
 
 function distance(a, b) {
   return Math.hypot(a[0] - b[0], a[2] - b[2]);
+}
+
+export function nearestCover(cells, start) {
+  const blocks = new Map(cells.map(({ x, y, z, b }) => [`${x},${y},${z}`, b]));
+  const at = (x, y, z) => blocks.get(`${x},${y},${z}`);
+  const solid = (x, y, z) => SHELTER_BLOCK.test(at(x, y, z) ?? '');
+  const candidates = [];
+  for (const { x, y, z, b } of cells) {
+    const feetY = y + 1;
+    if (!SHELTER_BLOCK.test(b) || Math.abs(feetY - start[1]) > 2
+        || !gap(at(x, feetY, z)) || !gap(at(x, feetY + 1, z)) || !solid(x, feetY + 2, z)) continue;
+    const walls = CARDINAL.filter(([dx, dz]) => solid(x + dx, feetY, z + dz) && solid(x + dx, feetY + 1, z + dz));
+    if (walls.length < 2 || walls.length === 4) continue;
+    const pos = [x, feetY, z];
+    candidates.push({ pos, travel: distance(start, pos) + Math.abs(feetY - start[1]) });
+  }
+  return candidates.sort((a, b) => a.travel - b.travel)[0]?.pos ?? null;
 }
 
 export function quarryStep(cells, [x, y, z], bed, walked) {
