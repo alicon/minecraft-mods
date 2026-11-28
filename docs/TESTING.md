@@ -160,6 +160,11 @@ Summarize the action logs and the native save/reopen evidence for comparison:
 python3 scripts/summarize-mushroom-expedition.py "$RUN_DIRECTORY" "$OTHER_RUN_DIRECTORY"
 ```
 
+The same command accepts a Bedrock `--play-seconds` log. It reports elapsed
+time, completed cases, input recovery, and the add-on and fixture checksums.
+A Bedrock soak passes only after the logged duration meets the requested
+duration and the fixture emits its final pass marker.
+
 Keep assisted runs out of unattended policy comparisons. Charge reported
 inference spend from failed attempts to the policy that made them.
 

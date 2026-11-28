@@ -1,7 +1,8 @@
-"""Summarize native Java expedition reports without running another game."""
+"""Summarize Java expedition reports and Bedrock gameplay soaks."""
 
 import argparse
 from collections import Counter
+from datetime import datetime
 import json
 from pathlib import Path
 import re
@@ -11,9 +12,74 @@ from statistics import median
 PASSED = re.compile(r"Expedition Survival (\w+) passed: dog=(\S+) owner=(\S+)")
 REOPENED = re.compile(r"Expedition Survival (\w+) reopened: dog=(\S+) owner=(\S+)")
 SEED = re.compile(r"Expedition Survival ready: seed=(-?\d+)")
+BEDROCK_LINE = re.compile(
+    r"^\[(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}):(\d{3}) (?:WARN|ERROR)] "
+    r"\[Scripting] MUSHROOM_(PLAY_\w+|TEST_FAIL) (\{.*\})"
+)
+
+
+def summarize_bedrock(path):
+    build = {}
+    started = last_event = None
+    completed = failed = None
+    counts = Counter()
+    side_steps = 0
+    round_number = 0
+    with path.open(encoding="utf-8", errors="replace") as stream:
+        for line in stream:
+            if not line.endswith("\n"):
+                break
+            if line.startswith("MUSHROOM_PLAY_BUILD "):
+                build = json.loads(line.partition(" ")[2])
+                continue
+            match = BEDROCK_LINE.match(line)
+            if not match:
+                continue
+            day, clock, millis, event, payload = match.groups()
+            when = datetime.fromisoformat(f"{day}T{clock}.{millis}")
+            data = json.loads(payload)
+            if event == "PLAY_START":
+                started = when
+            if started is not None:
+                last_event = when
+            if event == "PLAY_RESULT":
+                round_number = data["round"]
+                counts[data["case"]] += 1
+            elif event == "PLAY_INPUT_RETRY":
+                side_steps += data.get("sideSteps", 0)
+            elif event == "PLAY_PASS":
+                completed = data
+                break
+            elif event == "TEST_FAIL":
+                failed = data
+                break
+    seconds = (last_event - started).total_seconds() if started and last_event else 0
+    requested = build.get("seconds")
+    status = "running" if started else "starting"
+    if failed:
+        status = "failed"
+    elif completed:
+        seconds = completed["elapsedSeconds"]
+        status = "passed" if requested is not None and seconds >= requested else "incomplete"
+    return {
+        "run": str(path),
+        "edition": "bedrock",
+        "seed": build.get("seed"),
+        "status": status,
+        "requestedSeconds": requested,
+        "observedSeconds": seconds,
+        "completedRounds": round_number,
+        "completedCases": dict(counts),
+        "sidesteps": side_steps,
+        "addOnSha256": build.get("sha256"),
+        "fixtureSha256": build.get("fixtures", {}),
+        "failure": failed,
+    }
 
 
 def summarize(path):
+    if path.is_file():
+        return summarize_bedrock(path)
     game_log = (path / "game.log").read_text(encoding="utf-8", errors="replace")
     initial_seed = SEED.search(game_log)
     passed = PASSED.search(game_log)
@@ -76,7 +142,7 @@ def summarize(path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("run", nargs="+", type=Path, help="directories printed by run-mushroom-java-survival.sh")
+    parser.add_argument("run", nargs="+", type=Path, help="Java report directories or Bedrock soak logs")
     args = parser.parse_args()
     print(json.dumps([summarize(path) for path in args.run], indent=2))
 
