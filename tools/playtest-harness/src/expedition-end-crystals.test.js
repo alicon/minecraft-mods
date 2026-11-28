@@ -248,7 +248,7 @@ test('a crystal pillar descent checks the full water column and steers against s
 });
 
 test('a displaced climber pours below only when solid ground comes within reach', async () => {
-  const { catchCrystalFall } = await import('./expedition-end-cage.mjs');
+  const { catchEndFall } = await import('./expedition-end-cage.mjs');
   const bucket = { id: 'minecraft:water_bucket', slot: 3, count: 1 };
   const airborne = { inWorld: true, health: 18, onGround: false, inWater: false };
   const observations = [
@@ -271,9 +271,24 @@ test('a displaced climber pours below only when solid ground comes within reach'
       default: assert.fail(`Unexpected action: ${name}`);
     }
   };
-  assert.equal(await catchCrystalFall(action, airborne), true);
+  assert.equal(await catchEndFall(action, airborne), true);
   assert.equal(pours, 1);
   assert.equal(observations.length, 0);
+});
+
+test('landing on the client one tick before a lethal server hit is not a recovery', async () => {
+  const { catchEndFall } = await import('./expedition-end-cage.mjs');
+  const bucket = { id: 'minecraft:water_bucket', slot: 4 };
+  const airborne = { inWorld: true, health: 20, onGround: false, inWater: false };
+  const observations = [{ ...airborne, onGround: true }, { ...airborne, dead: true, health: 0 }];
+  const action = async name => {
+    if (name === 'look') return {};
+    if (name === 'get_inventory') return { slots: [bucket] };
+    if (name === 'select_slot') return { mainHand: bucket };
+    if (name === 'observe') return observations.shift();
+    assert.fail(name);
+  };
+  assert.equal(await catchEndFall(action, airborne), false);
 });
 
 test('a cleared cage can be shot from an alternate dry stance using current block observations', async () => {

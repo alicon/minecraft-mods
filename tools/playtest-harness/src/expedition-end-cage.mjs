@@ -119,7 +119,7 @@ export async function descendCrystalPillar(action, player, plan, line) {
   return false;
 }
 
-export async function catchCrystalFall(action, player) {
+export async function catchEndFall(action, player) {
   if (!player?.inWorld || player.dead) return false;
   if (player.onGround || player.inWater) return true;
   await action('look', { pitch: 90 });
@@ -131,15 +131,24 @@ export async function catchCrystalFall(action, player) {
     await hold(action, WATER_BUCKET);
   }
   let placedWater = false;
-  // At the end of a long fall, solid ground is in reach for only a few ticks.
-  for (let check = 0; check < 48; check++) {
+  // A dragon launch can last several seconds; at the very end the ground is
+  // within item reach for only a few ticks. Sample across the whole fall.
+  const deadline = performance.now() + 8_000;
+  while (performance.now() < deadline) {
     const landing = await action('observe');
     if (!landing?.inWorld || landing.dead) return false;
-    if (landing.inWater || landing.onGround) return true;
+    if (landing.inWater) return true;
+    if (landing.onGround) {
+      // The local collision can appear one tick before the server's fall damage.
+      await setTimeout(100);
+      const confirmed = await action('observe');
+      return Boolean(confirmed?.inWorld && !confirmed.dead && confirmed.health >= 4);
+    }
     const hit = landing.crosshair;
     if (!placedWater && hit?.type === 'block' && hit.face === 'up' && hasDrySupport(hit.block)) {
       placedWater = (await action('use_item'))?.success === true;
     }
+    await setTimeout(20);
   }
   return false;
 }
@@ -299,7 +308,7 @@ export async function openCrystalCage(action, player, crystal, dangerous) {
       returned = await descendCrystalPillar(action, player, plan, line);
       if (!returned) player = await action('observe');
     }
-    if (!returned && await catchCrystalFall(action, player)) {
+    if (!returned && await catchEndFall(action, player)) {
       const landing = await action('observe');
       if (landing?.position.y <= plan.base[1] + 3) {
         returned = (landing.onGround && !landing.inWater) || await leaveShallowWater(action, line);

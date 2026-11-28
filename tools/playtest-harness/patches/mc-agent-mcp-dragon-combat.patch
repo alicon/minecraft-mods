@@ -31,3 +31,73 @@
 +					}
 +					o.add("parts", parts);
 +				}
+diff --git a/src/client/java/com/mcagent/mcp/client/reflex/Reflexes.java b/src/client/java/com/mcagent/mcp/client/reflex/Reflexes.java
+index c6e24bc..61f6ee0 100644
+--- a/src/client/java/com/mcagent/mcp/client/reflex/Reflexes.java
++++ b/src/client/java/com/mcagent/mcp/client/reflex/Reflexes.java
+@@ -12,0 +13 @@ import net.minecraft.core.component.DataComponents;
++import net.minecraft.core.Direction;
+@@ -27,0 +29 @@ import net.minecraft.world.item.ItemStack;
++import net.minecraft.world.item.Items;
+@@ -28,0 +31,3 @@ import net.minecraft.world.item.equipment.Equippable;
++import net.minecraft.world.level.Level;
++import net.minecraft.world.phys.BlockHitResult;
++import net.minecraft.world.phys.HitResult;
+@@ -102,0 +108 @@ public final class Reflexes {
++		if (settings.waterLanding && catchWaterLanding(mc, p)) return;
+@@ -121,0 +128,32 @@ public final class Reflexes {
++	private boolean catchWaterLanding(Minecraft mc, LocalPlayer p) {
++		if (p.level().dimension().equals(Level.NETHER) || p.onGround() || p.isInWater() || p.isFallFlying()
++				|| p.getAbilities().flying || p.fallDistance < 4 || p.getDeltaMovement().y > -0.65
++				|| !allowed("look", ToolCategory.MOVEMENT) || !allowed("select_slot", ToolCategory.INVENTORY)
++				|| !allowed("use_item", ToolCategory.INTERACTION)) return false;
++		var inventory = p.getInventory();
++		int bucket = -1;
++		for (int slot = 0; slot < 9; slot++) {
++			if (inventory.getItem(slot).is(Items.WATER_BUCKET)) {
++				bucket = slot;
++				break;
++			}
++		}
++		if (bucket < 0) return false;
++		int previousSlot = inventory.getSelectedSlot();
++		float previousPitch = p.getXRot();
++		p.setXRot(90);
++		try {
++			var hit = p.pick(p.blockInteractionRange(), 1.0F, false);
++			if (!(hit instanceof BlockHitResult block) || hit.getType() != HitResult.Type.BLOCK
++					|| block.getDirection() != Direction.UP) return false;
++			inventory.setSelectedSlot(bucket);
++			if (!mc.gameMode.useItem(p, InteractionHand.MAIN_HAND).consumesAction()) return false;
++			p.swing(InteractionHand.MAIN_HAND);
++			events.add("reflex", null, "placed water beneath a dangerous fall");
++			return true;
++		} finally {
++			p.setXRot(previousPitch);
++			inventory.setSelectedSlot(previousSlot);
++		}
++	}
++
+diff --git a/src/client/java/com/mcagent/mcp/client/tools/SetReflexesTool.java b/src/client/java/com/mcagent/mcp/client/tools/SetReflexesTool.java
+index 669fd52..d76d90f 100644
+--- a/src/client/java/com/mcagent/mcp/client/tools/SetReflexesTool.java
++++ b/src/client/java/com/mcagent/mcp/client/tools/SetReflexesTool.java
+@@ -35 +35 @@ public final class SetReflexesTool implements McpTool {
+-				+ "eatBelowFood. All on by default; turn autoDefend off to fight manually. Call with no "
++				+ "eatBelowFood. Opt in to waterLanding for bucket landings. Turn autoDefend off to fight manually. Call with no "
+@@ -47,0 +48 @@ public final class SetReflexesTool implements McpTool {
++				.bool("waterLanding", "Use a hotbar water bucket when falling toward reachable ground.")
+@@ -57 +58 @@ public final class SetReflexesTool implements McpTool {
+-				"interruptOnDamage"}) {
++				"interruptOnDamage", "waterLanding"}) {
+diff --git a/src/main/java/com/mcagent/mcp/config/ReflexSettings.java b/src/main/java/com/mcagent/mcp/config/ReflexSettings.java
+index 789105d..3a4ab32 100644
+--- a/src/main/java/com/mcagent/mcp/config/ReflexSettings.java
++++ b/src/main/java/com/mcagent/mcp/config/ReflexSettings.java
+@@ -23,0 +24,2 @@ public final class ReflexSettings {
++	/** Use a hotbar water bucket when landing from a dangerous fall. */
++	public volatile boolean waterLanding = false;
+@@ -35,0 +38 @@ public final class ReflexSettings {
++		if (o.has("waterLanding")) waterLanding = o.get("waterLanding").getAsBoolean();
+@@ -47,0 +51 @@ public final class ReflexSettings {
++		o.addProperty("waterLanding", waterLanding);

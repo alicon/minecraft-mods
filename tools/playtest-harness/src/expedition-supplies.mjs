@@ -13,7 +13,7 @@ import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
 import { blazePowderCount, craftBlazePowder, earnBlazeRods } from './expedition-blaze-rods.mjs';
 import { clearGeneratedCrystals, readCrystalProgress, shootEndCrystal } from './expedition-end-crystals.mjs';
-import { fightEndDragon } from './expedition-dragon-fight.mjs';
+import { fightEndDragon, recallAndExitEnd } from './expedition-dragon-fight.mjs';
 import { craftEyes, crossEndPortal, enderEyeCount, findStrongholdPortalRoom } from './expedition-end-entry.mjs';
 import { earnEnderPearls } from './expedition-pearls.mjs';
 import {
@@ -240,10 +240,11 @@ await rpc('initialize', {
 try {
   const stage = process.env.MUSHROOM_EXPEDITION_STAGE ?? 'adoption';
   const policy = process.env.MUSHROOM_EXPEDITION_POLICY ?? 'rules';
-  const duel = stage === 'generated-end-crystals' && process.env.MUSHROOM_EXPEDITION_DUEL_ONLY === '1';
+  const archivedEnd = stage === 'end-return';
+  const duel = archivedEnd || (stage === 'generated-end-crystals' && process.env.MUSHROOM_EXPEDITION_DUEL_ONLY === '1');
   await narrate('Run', `${resume ? 'Reattached to the same save' : 'Started the Survival controller'}. Stage ${stage}, policy ${policy}.`);
   const start = await action('observe');
-  const startDimension = ['end-crystal', 'generated-end-crystals'].includes(stage) ? 'minecraft:the_end' : OVERWORLD;
+  const startDimension = ['end-crystal', 'generated-end-crystals', 'end-return'].includes(stage) ? 'minecraft:the_end' : OVERWORLD;
   assert.ok(start?.inWorld && !start.dead && (start.dimension === startDimension
     || (resume && ['nether', 'nether-powder', 'stronghold'].includes(stage) && start.dimension === NETHER)),
   'The controller was not in its expected starting dimension');
@@ -284,10 +285,12 @@ try {
       if (event === 'portal_room') await narrate('Result', 'Reached a dry position beside the generated End portal.');
     }) : undefined;
     await crossEndPortal(action, craft, companion, ring);
-  } else if (stage === 'end-crystal' || stage === 'generated-end-crystals') {
-    companion = (await readFile(join(dirname(statusFile), 'end-crystal-companion'), 'utf8')).trim();
+  } else if (stage === 'end-crystal' || stage === 'generated-end-crystals' || archivedEnd) {
+    const archive = archivedEnd
+      ? JSON.parse(await readFile(join(dirname(statusFile), 'archived-end-start.json'), 'utf8')) : null;
+    companion = archive?.dog ?? (await readFile(join(dirname(statusFile), 'end-crystal-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
-    const generated = stage === 'generated-end-crystals';
+    const generated = stage === 'generated-end-crystals' || archivedEnd;
     const endFile = join(dirname(statusFile), duel ? 'duel-checkpoint.json' : 'crystal-checkpoint.json');
     let camp;
     let progress;
@@ -302,17 +305,24 @@ try {
       const block = await action('get_blocks', { center: camp, size: [1, 1, 1], format: 'json' });
       assert.ok(block?.cells.some(cell => cell.b === 'mushroom_yorkie:camp_mat'), 'The marked End mat is missing');
       const dogs = await action('get_entities', { type: 'mushroom_yorkie:mushroom_yorkie', radius: 128 });
-      assert.ok(dogs?.entities.some(dog => dog.uuid === companion && dog.health > 0), 'The original End companion is missing');
+      const beyondTracking = archive && Math.hypot(start.position.x - archive.shelter[0],
+        start.position.z - archive.shelter[2]) > 48;
+      assert.ok(beyondTracking || dogs?.entities.some(dog => dog.uuid === companion && dog.health > 0),
+        'The original End companion is missing');
       await reportStatus('ready');
     } else {
-      camp = await markExpeditionCamp(action);
+      if (archive) assert.ok(blockPosition(archive.camp) && blockPosition(archive.shelter), 'The original End camp is missing');
+      camp = archive?.camp ?? await markExpeditionCamp(action);
       progress = { bridgeFingerprint, owner: start.name, dog: companion, camp, hits: 0 };
       if (generated) await writeFile(endFile, JSON.stringify(progress));
     }
     if (duel) {
-      await action('set_reflexes', { autoDefend: false });
-      await narrate('Objective', 'Fight the full-health dragon through native attacks while Mushroom stays in shelter.');
-      await fightEndDragon(action, async (kind, observation) => {
+      const reflexes = await action('set_reflexes', { autoDefend: false, waterLanding: true });
+      const fallOnly = !archive && process.env.MUSHROOM_EXPEDITION_FALL_ONLY === '1';
+      await narrate('Objective', archive
+        ? 'Defeat the original dragon with the gear carried from the crystal fight, then bring Mushroom home.'
+        : 'Fight the full-health dragon through native attacks while Mushroom stays in shelter.');
+      const report = async (kind, observation) => {
         console.log(JSON.stringify({ at: new Date().toISOString(), action: `dragon_${kind}`, observation, camp, dog: companion }));
         if (kind === 'strike') {
           Object.assign(progress, { dragon: observation.dragon, hits: observation.hits });
@@ -321,8 +331,25 @@ try {
           await rename(next, endFile);
           await narrate('Action', `Struck the perched dragon at ${observation.before} health.`, 4_000);
         }
+        if (kind === 'fall_recovery' && observation.landed) {
+          await narrate('Action', 'Recovered from dragon knockback and reached the ground.');
+        }
         if (kind === 'victory') await narrate('Result', 'The native End exit is open.');
-      }, progress);
+      };
+      const victory = fallOnly ? await replayBucketLanding(reflexes, start, report) : await fightEndDragon(action, report,
+        progress, { useCarriedPickaxe: archivedEnd, nativeWaterLanding: reflexes?.waterLanding === true });
+      if (archive) {
+        assert.equal(victory.dragon, archive.dragon, 'The controller must fight the original dragon from the crystal stage');
+        await reportStatus('victory');
+        const verified = join(dirname(statusFile), 'native-end-victory');
+        for (let attempt = 0; attempt < 60; attempt++) {
+          if ((await readFile(verified, 'utf8').catch(() => '')) === archive.dragon) break;
+          await setTimeout(200);
+        }
+        assert.equal(await readFile(verified, 'utf8'), archive.dragon);
+        await recallAndExitEnd(action, companion, archive.shelter, victory.portals, report);
+        await narrate('Result', 'The player and the original Mushroom reached the Overworld.');
+      }
     } else if (generated) {
       const observations = resume
         ? readCrystalProgress(await readFile(join(dirname(statusFile), 'actions.jsonl'), 'utf8')) : undefined;
@@ -824,6 +851,25 @@ function verifiedDeathSite(player, checkpoint) {
 
 async function reportStatus(status) {
   await replaceFile(statusFile, status);
+}
+
+async function replayBucketLanding(reflexes, start, report) {
+  assert.equal(reflexes?.waterLanding, true, 'This replay needs the native bucket landing reflex');
+  await hold(action, 'minecraft:water_bucket');
+  await reportStatus('fall-ready');
+  let fromY;
+  for (let attempt = 0; attempt < 240; attempt++) {
+    const player = await action('observe');
+    if (player?.inWorld && player.position.y >= start.position.y + 45) {
+      fromY = Math.max(fromY ?? player.position.y, player.position.y);
+    }
+    if (fromY && player?.inWater && player.health >= 15) {
+      await report('fall_recovery', { launchY: fromY, groundY: player.position.y, landed: true, inWater: true });
+      return;
+    }
+    await setTimeout(75);
+  }
+  throw new Error('The native bucket landing did not occur');
 }
 
 async function writeCheckpoint(checkpoint) {

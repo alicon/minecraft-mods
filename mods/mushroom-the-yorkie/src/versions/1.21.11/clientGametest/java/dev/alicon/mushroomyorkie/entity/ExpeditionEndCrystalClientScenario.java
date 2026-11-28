@@ -202,6 +202,10 @@ final class ExpeditionEndCrystalClientScenario {
 		UUID originalDragon = duelOnly ? beginDuel(server, camp, recordedCrystals) : null;
 		Files.writeString(status.resolveSibling("end-crystal-companion"), camp.dogId().toString());
 		Files.writeString(status, "ready");
+		if (duelOnly && "1".equals(System.getenv("MUSHROOM_EXPEDITION_FALL_ONLY"))) {
+			verifyWaterLanding(context, server, ownerId, status, camp);
+			return;
+		}
 		boolean controllerFinished = false;
 		for (int tick = 0; tick < (duelOnly ? 24_000 : 12_000); tick += 5) {
 			String result = Files.readString(status);
@@ -289,6 +293,41 @@ final class ExpeditionEndCrystalClientScenario {
 			return;
 		}
 		throw new AssertionError("The controller did not clear the generated End crystals");
+	}
+
+	private static void verifyWaterLanding(ClientGameTestContext context, TestServerContext server, UUID ownerId,
+			Path status, GeneratedCamp camp) throws IOException {
+		for (int tick = 0; tick < 200 && !"fall-ready".equals(Files.readString(status)); tick += 5) {
+			if ("failed".equals(Files.readString(status))) break;
+			context.waitTicks(5);
+		}
+		if (!"fall-ready".equals(Files.readString(status))) throw new AssertionError("The bucket reflex was not armed");
+		int bucketsBefore = server.computeOnServer(minecraft -> {
+			var owner = minecraft.getPlayerList().getPlayer(ownerId);
+			var end = minecraft.getLevel(Level.END);
+			var start = camp.start();
+			// Reproduce the landing window from the recorded dragon launch with vanilla gravity.
+			owner.teleportTo(end, start.getX() + 0.5, start.getY() + 110, start.getZ() + 0.5, Set.of(), 0, 0, false);
+			return owner.getInventory().countItem(Items.WATER_BUCKET);
+		});
+		for (int tick = 0; tick < 300 && !"finished".equals(Files.readString(status)); tick += 5) {
+			if ("failed".equals(Files.readString(status))) break;
+			context.waitTicks(5);
+		}
+		server.runOnServer(minecraft -> {
+			var owner = minecraft.getPlayerList().getPlayer(ownerId);
+			var end = minecraft.getLevel(Level.END);
+			if (bucketsBefore < 1 || !owner.isAlive() || owner.getHealth() < 15
+					|| owner.getInventory().countItem(Items.WATER_BUCKET) != bucketsBefore - 1
+					|| !end.getBlockState(camp.start()).is(Blocks.WATER)
+					|| !(end.getEntity(camp.dogId()) instanceof MushroomYorkieEntity dog) || !dog.isAlive()
+					|| dog.getHealth() < camp.dogHealth()) {
+				throw new AssertionError("Expected the native bucket landing to save the player and leave the original dog unharmed");
+			}
+			System.out.printf("Expedition native water landing passed: health=%.2f dog=%s%n", owner.getHealth(), dog.getUUID());
+		});
+		if (!"finished".equals(Files.readString(status))) throw new AssertionError("The client did not observe the water landing");
+		context.takeScreenshot("expedition-survival-dragon-water-landing");
 	}
 
 	private static UUID beginDuel(TestServerContext server, GeneratedCamp camp, Set<UUID> crystals) {

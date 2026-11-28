@@ -424,12 +424,31 @@ clears the crystals during setup, supplies a sword and rations, and
 verifies the generated vanilla dragon starts at 200 health. The controller
 finds the exit fountain, approaches the visible head on a perch, and
 attempts strikes through the native crosshair. It checks for active breath
-clouds before walking back toward the fountain or the head. The server verifies the
-dragon died, the sword shows use, and the original dog remains at shelter.
+clouds before walking back toward the fountain or the head. If dragon
+knockback sends it high into the air, it tries to land in water using a
+carried bucket. The patched bridge can place the water on the first
+game tick when the ground is in range. Set
+`MUSHROOM_EXPEDITION_FALL_ONLY=1` with the duel flag to reproduce the
+landing from a staged 110-block fall. The server checks the actual water
+block, the spent bucket, and the health of the player and original dog.
+In the full duel replay, the server verifies the dragon
+died, the sword shows use, and the original dog remains at shelter.
 The duel keeps a separate checkpoint with the marked mat, original dog,
 client identity, and strike count. A replacement controller with
 `MUSHROOM_EXPEDITION_RESUME=1` can take over a held duel in the same world,
 using the same status path and duel flag.
+
+Use `MUSHROOM_EXPEDITION_STAGE=end-return` with
+`MUSHROOM_EXPEDITION_RESTORE_MANIFEST` to continue a closed copy of the
+cleared crystal save. The JSON manifest needs the absolute world folder
+`source` under `build/playtest-reports/`, its `seed`, the `owner` UUID,
+and the original `dog` UUID. The game test opens a disposable copy and
+checks the original owner, living dragon, and sheltered dog. The pilot
+uses the carried equipment. When the exit opens, the server checks that
+the original dragon died and Mushroom is still at shelter before the
+pilot recalls him and enters the exit. The server checks both identities
+in the Overworld and again after reopening. This continuation starts
+with the equipment and world state from the crystal fixture.
 
 Set `MUSHROOM_EXPEDITION_STAGE=eye-route` to replay using an Eye of Ender
 to choose a route. The disposable fixture supplies one eye, Mushroom, and

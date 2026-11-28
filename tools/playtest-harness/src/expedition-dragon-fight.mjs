@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
-import { eatExpeditionMeal, hold, stepOut } from './expedition-home.mjs';
+import { eatExpeditionMeal, hold, regroupExpeditionCompanion, stepOut } from './expedition-home.mjs';
 import { dragonBreathThreat, retreatFromDragonThreat } from './expedition-end-crystals.mjs';
+import { catchEndFall } from './expedition-end-cage.mjs';
+import { useEmptyHandOnCompanion } from './expedition-gear.mjs';
 
 const END = 'minecraft:the_end';
 const DRAGON = 'minecraft:ender_dragon';
+const DOG = 'mushroom_yorkie:mushroom_yorkie';
 const APPLE = 'minecraft:golden_apple';
+const WATER_BUCKET = 'minecraft:water_bucket';
 const SWORDS = ['netherite', 'diamond', 'iron', 'stone'].map(tier => `minecraft:${tier}_sword`);
 const RATIONS = ['cooked_beef', 'cooked_porkchop', 'cooked_mutton', 'cooked_chicken', 'bread'].map(id => `minecraft:${id}`);
 const feet = ({ position }) => [position.x, position.y, position.z].map(Math.floor);
@@ -27,21 +31,28 @@ export function findEndFountain(positions) {
   return null;
 }
 
-export async function strikePerchedDragon(action, player, dragon, sword) {
+export async function strikePerchedDragon(action, player, dragon, weapon) {
   const head = dragon.perched && dragon.parts?.find(part => part.name === 'head' && part.inReach);
   if (!head || player.attackStrength < 0.95) return null;
-  if (player.mainHand?.id !== sword) await hold(action, sword);
+  if (player.mainHand?.id !== weapon) await hold(action, weapon);
   const [x, y, z] = head.center;
   const dx = x - player.position.x;
   const dy = y - player.position.y - 1.62;
   const dz = z - player.position.z;
-  await action('look', {
-    yaw: Math.atan2(-dx, dz) * 180 / Math.PI,
-    pitch: -Math.atan2(dy, Math.hypot(dx, dz)) * 180 / Math.PI,
-  });
-  const aimed = await action('observe');
-  if (!aimed?.onGround || aimed.crosshair?.id !== head.id || aimed.attackStrength < 0.95) return null;
-  return action('attack_entity', { entityId: head.id });
+  const horizontal = Math.hypot(dx, dz) || 1;
+  // The neck can occlude the head center even though part of it is in reach.
+  for (const [side, rise] of [[0, 0], [0, 0.35], [0.38, 0], [-0.38, 0]]) {
+    const offsetX = dx - side * dz / horizontal;
+    const offsetZ = dz + side * dx / horizontal;
+    await action('look', {
+      yaw: Math.atan2(-offsetX, offsetZ) * 180 / Math.PI,
+      pitch: -Math.atan2(dy + rise, Math.hypot(offsetX, offsetZ)) * 180 / Math.PI,
+    });
+    const aimed = await action('observe');
+    if (!aimed?.onGround || aimed.attackStrength < 0.95) return null;
+    if (aimed.crosshair?.id === head.id) return action('attack_entity', { entityId: head.id });
+  }
+  return null;
 }
 
 export function breathBlocksWalk(player, target, clouds) {
@@ -58,12 +69,29 @@ export function breathBlocksWalk(player, target, clouds) {
   });
 }
 
-export async function fightEndDragon(action, report, progress = {}) {
+export async function keepLandingBucketOnHotbar(action, stock) {
+  const buckets = stock.slots.filter(stack => stack.id === WATER_BUCKET);
+  if (!buckets.length || buckets.some(stack => stack.slot < 9)) return;
+  const hotbar = Array.from({ length: 9 }, (_, slot) => stock.slots.find(stack => stack.slot === slot));
+  const free = hotbar.findIndex(stack => !stack);
+  const replacement = free >= 0 ? free : hotbar.findIndex(stack =>
+    ['minecraft:bucket', 'minecraft:arrow', 'minecraft:cobblestone'].includes(stack.id));
+  const slot = replacement >= 0 ? replacement : stock.selectedSlot;
+  await action('select_slot', { slot });
+  await hold(action, WATER_BUCKET);
+  const workingSlot = slot === stock.selectedSlot ? (slot + 1) % 9 : stock.selectedSlot;
+  await action('select_slot', { slot: workingSlot });
+}
+
+export async function fightEndDragon(action, report, progress = {},
+    { useCarriedPickaxe = false, nativeWaterLanding = false } = {}) {
   const start = await action('observe');
   assert.equal(start?.dimension, END);
   const stock = await action('get_inventory');
-  const sword = SWORDS.find(id => stock.slots.some(stack => stack.id === id));
-  assert.ok(sword, 'The dragon fight requires a sword');
+  const options = useCarriedPickaxe ? [...SWORDS, 'minecraft:diamond_pickaxe'] : SWORDS;
+  const weapon = options.find(id => stock.slots.some(stack => stack.id === id));
+  assert.ok(weapon, 'The dragon fight requires a carried weapon');
+  if (nativeWaterLanding) await keepLandingBucketOnHotbar(action, stock);
   const view = await action('scan_blocks', { blocks: ['bedrock'], radius: 32, max: 128 });
   const fountain = findEndFountain(view?.matches?.find(group => group.name === 'minecraft:bedrock')?.positions ?? []);
   assert.ok(fountain, 'The native exit fountain was not found');
@@ -81,14 +109,37 @@ export async function fightEndDragon(action, report, progress = {}) {
   let seenDragon = progress.dragon;
   let hits = progress.hits ?? 0;
   let nextMeal = 0;
+  let groundY = start.onGround ? start.position.y : fountain[1] + 1;
+  let launchY;
   for (let attempt = 0; attempt < 1_200; attempt++) {
     const player = await action('observe');
     assert.ok(player?.inWorld && player.dimension === END && !player.dead && player.health >= 4,
       'The player became unsafe during the native dragon fight');
-    if (!player.onGround) {
+    if (!player.onGround && !player.inWater) {
+      if (Math.abs(player.position.y - groundY) >= 4) {
+        if (nativeWaterLanding) {
+          launchY = Math.max(launchY ?? player.position.y, player.position.y);
+        } else {
+          const landed = await catchEndFall(action, player);
+          await report('fall_recovery', { launchY: player.position.y, groundY, landed });
+          if (landed) continue;
+        }
+      }
       await setTimeout(200);
       continue;
     }
+    if (launchY !== undefined) {
+      if (!player.inWater) {
+        await setTimeout(100);
+        const confirmed = await action('observe');
+        assert.ok(confirmed?.inWorld && !confirmed.dead && confirmed.health >= 4,
+          'The player became unsafe on landing');
+      }
+      await report('fall_recovery', { launchY, groundY, landed: true, inWater: player.inWater });
+      launchY = undefined;
+      if (player.inWater) await keepLandingBucketOnHotbar(action, await action('get_inventory'));
+    }
+    groundY = player.position.y;
     // Vanilla's nearby scan can return the head, wings and tails under the
     // same type as their parent. Include all eight parts plus the dragon.
     const dragons = await action('get_entities', { type: DRAGON, radius: 128, max: 16 });
@@ -97,8 +148,9 @@ export async function fightEndDragon(action, report, progress = {}) {
       const exit = await action('scan_blocks', { blocks: ['end_portal'], center: fountain, radius: 5, max: 20 });
       const portals = exit?.matches?.find(group => group.name === 'minecraft:end_portal')?.positions ?? [];
       if (portals.length && hits) {
-        await report('victory', { dragon: seenDragon, fountain, portals, hits });
-        return;
+        const victory = { dragon: seenDragon, fountain, portals, hits };
+        await report('victory', victory);
+        return victory;
       }
     }
     if (dragon) {
@@ -132,7 +184,7 @@ export async function fightEndDragon(action, report, progress = {}) {
       }
     }
     if (dragon?.perched) {
-      const hit = await strikePerchedDragon(action, player, dragon, sword);
+      const hit = await strikePerchedDragon(action, player, dragon, weapon);
       if (hit) {
         hits++;
         await report('strike', { dragon: dragon.uuid, before: dragon.health, attackStrength: hit.attackStrength, hits });
@@ -168,4 +220,47 @@ export async function fightEndDragon(action, report, progress = {}) {
     await setTimeout(450);
   }
   throw new Error('The dragon fight did not reach a native open exit');
+}
+
+export async function recallAndExitEnd(action, uuid, shelter, portals, report) {
+  const dog = await regroupExpeditionCompanion(action, uuid, shelter);
+  await useEmptyHandOnCompanion(action, uuid);
+  await report('recalled', { previousPosition: dog.pos });
+  const visited = [];
+  const rejected = new Set();
+  let lastJump;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const player = await action('observe');
+    if (player?.dimension === 'minecraft:overworld') {
+      const companion = (await action('get_entities', { type: DOG, radius: 32 }))?.entities
+        .find(entity => entity.uuid === uuid && entity.health > 0);
+      if (companion) return;
+    }
+    if (!player?.inWorld || player.dimension !== END || player.screen || !player.onGround) {
+      await setTimeout(180);
+      continue;
+    }
+    const follower = (await action('get_entities', { type: DOG, radius: 32 }))?.entities
+      .find(entity => entity.uuid === uuid && entity.health > 0);
+    if (!follower || follower.distance > 8) {
+      await setTimeout(350);
+      continue;
+    }
+    const ordered = portals.map(pos => ({ pos, dx: pos[0] + 0.5 - player.position.x,
+      dz: pos[2] + 0.5 - player.position.z }))
+      .sort((first, second) => Math.hypot(first.dx, first.dz) - Math.hypot(second.dx, second.dz));
+    const { pos, dx, dz } = ordered.find(({ pos }) => pos !== lastJump) ?? ordered[0];
+    const distance = Math.hypot(dx, dz);
+    if (distance <= 3.2 && Math.abs(pos[1] - player.position.y) <= 2) {
+      lastJump = pos;
+      const yaw = Math.atan2(-dx, dz) * 180 / Math.PI;
+      await action('move', { yaw, forward: true, jump: true, ticks: 12 });
+      await setTimeout(350);
+      continue;
+    }
+    visited.push(feet(player));
+    await stepOut(action, player, visited.slice(-24), pos, distance < 8 ? 'elevation' : 'surface',
+      rejected, undefined, undefined, 36);
+  }
+  throw new Error('Could not reach the Overworld with the original Mushroom through the End exit');
 }
