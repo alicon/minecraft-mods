@@ -757,8 +757,7 @@ async function cookAtCamp(action, craft) {
   } finally {
     await action('stop', { closeScreen: true });
     await hold(action, STONE_PICKAXE);
-    assert.ok((await breakVisible(action, furnace))?.broken, 'Could not pack the camp furnace after cooking');
-    await action('go_to', { pos: furnace, stopDistance: 0.3, maxTicks: 55 });
+    assert.ok(await recoverPlacedFurnace(action, furnace), 'Could not pack the camp furnace after cooking');
   }
 }
 
@@ -1034,6 +1033,18 @@ export async function breakVisible(action, pos, aim = { at: pos }) {
   const hit = (await action('observe'))?.crosshair;
   if (hit?.pos?.join(',') !== pos.join(',') || !await selectBreakingTool(action, hit.block)) return null;
   return action('break_block', { pos, maxTicks: 115 });
+}
+
+export async function recoverPlacedFurnace(action, furnace) {
+  const before = count(await action('get_inventory'), FURNACE);
+  if (!(await breakVisible(action, furnace))?.broken) {
+    const hit = (await action('observe'))?.crosshair;
+    if (!hit?.pos || !/^minecraft:(?:short_grass|tall_grass|fern|large_fern)$/.test(hit.block ?? '')
+        || !(await breakVisible(action, hit.pos))?.broken || !(await breakVisible(action, furnace))?.broken) return false;
+  }
+  await action('go_to', { pos: furnace, stopDistance: 0.3, maxTicks: 55 });
+  await setTimeout(350);
+  return count(await action('get_inventory'), FURNACE) > before;
 }
 
 async function moveAwayFromFire(action, hazards) {
@@ -2056,10 +2067,7 @@ async function craftIronKit(action, craft, recipes, ore, inventory, visited, pac
     await smeltExpeditionIron(action, ore, plank ? plank.id : fuel);
     await action('stop', { closeScreen: true });
     if (packFurnace) {
-      assert.ok((await breakVisible(action, furnace))?.broken, 'Could not pack the furnace after smelting the first iron');
-      await action('go_to', { pos: furnace, stopDistance: 0.3, maxTicks: 55 });
-      await setTimeout(350);
-      assert.ok(count(await action('get_inventory'), FURNACE), 'Did not pick the furnace back up');
+      assert.ok(await recoverPlacedFurnace(action, furnace), 'Could not pack the furnace after smelting the first iron');
     }
   }
   if (!recipes.length) return;

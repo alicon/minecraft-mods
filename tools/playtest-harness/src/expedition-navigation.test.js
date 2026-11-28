@@ -1091,6 +1091,34 @@ test('a log cut from above is collected after it falls into reach', async () => 
   assert.ok(selected, 'use the owned axe for chopping timber');
 });
 
+test('the player clears tall grass from the crosshair before packing the camp furnace', async () => {
+  const { recoverPlacedFurnace } = await import('./expedition-home.mjs');
+  const furnace = [-226, 69, -120];
+  const grass = [-225, 70, -119];
+  const pickaxe = { id: 'minecraft:stone_pickaxe', slot: 0, maxDamage: 131 };
+  const broken = [];
+  let pickedUp = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'look': return {};
+      case 'observe':
+        return { crosshair: broken.length ? { pos: furnace, block: 'minecraft:furnace' }
+          : { pos: grass, block: 'minecraft:tall_grass' } };
+      case 'get_inventory': return { slots: pickedUp ? [pickaxe, { id: 'minecraft:furnace', count: 1 }] : [pickaxe],
+        mainHand: pickaxe };
+      case 'break_block': broken.push(args.pos); return { broken: true };
+      case 'go_to':
+        assert.deepEqual(args.pos, furnace);
+        assert.deepEqual(broken, [grass, furnace]);
+        pickedUp = true;
+        return { arrived: true };
+      default: assert.fail(name);
+    }
+  };
+  assert.equal(await recoverPlacedFurnace(action, furnace), true);
+  assert.ok(pickedUp);
+});
+
 test('a recovery forage keeps the chicken collected through ordinary play', async () => {
   const { forageExpeditionMeal } = await import('./expedition-home.mjs');
   const chicken = { id: 11, type: 'minecraft:chicken', distance: 2, pos: [2, 64, 0] };
