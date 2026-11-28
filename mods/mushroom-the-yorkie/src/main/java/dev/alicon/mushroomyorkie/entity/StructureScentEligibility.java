@@ -19,6 +19,7 @@ final class StructureScentEligibility {
 				&& yorkie.isTame()
 				&& player.level() == yorkie.level()
 				&& !player.isCreative()
+				&& !MushroomFoodPolicy.isHoldingPeacefulMobCalmingItem(player)
 				&& !yorkie.isOrderedToSit()
 				&& !yorkie.isMushroomSleeping()
 				&& !MushroomNightBehavior.shouldAskToGoOutside(yorkie, level)

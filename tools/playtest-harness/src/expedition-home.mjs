@@ -165,10 +165,14 @@ export async function eatExpeditionMeal(action, player, meal) {
   return (result.food ?? 0) > player.food || ((await action('observe'))?.food ?? 0) > player.food;
 }
 
-export async function visible(action, entityId) {
-  if (!await action('look', { entityId })) return false;
+async function aimAtEntity(action, entityId) {
+  if (!await action('look', { entityId })) return null;
   await setTimeout(110);
-  return (await action('observe'))?.crosshair?.id === entityId;
+  return action('observe');
+}
+
+export async function visible(action, entityId) {
+  return (await aimAtEntity(action, entityId))?.crosshair?.id === entityId;
 }
 
 export async function hunt(action, animal, dropMatches, canContinue) {
@@ -204,11 +208,13 @@ export async function hunt(action, animal, dropMatches, canContinue) {
       continue;
     }
     blockedApproaches = 0;
+    if (canContinue && !await canContinue()) return false;
     await action('attack_entity', { entityId: animal.id });
     hit++;
     await setTimeout(725);
     const { entities } = await action('get_entities', { type: animal.type, radius: 16 });
     if (!entities.some(entity => entity.id === animal.id)) {
+      if (canContinue && !await canContinue()) return false;
       const drops = await action('get_entities', { type: 'item', radius: 6 });
       for (const drop of drops.entities.filter(drop => dropMatches(drop.item?.id))) {
         await action('go_to', { entityId: drop.id, stopDistance: 0.3, maxTicks: 65 });
@@ -636,12 +642,26 @@ export async function feedAdoptedDog(action, uuid, bed, attempts = 120) {
       if (!meal) return false;
       const mealCount = count(inventory, meal);
       if (inventory.mainHand?.id !== meal) await hold(action, meal);
-      if (await visible(action, dog.id)) {
-        await action('interact_entity', { entityId: dog.id });
+      const aimed = await aimAtEntity(action, dog.id);
+      const hit = aimed?.crosshair;
+      if (hit?.id === dog.id) {
+        const fed = await action('interact_entity', { entityId: dog.id });
         await setTimeout(350);
         const remaining = count(await action('get_inventory'), meal);
-        if (remaining === mealCount - 1) return true;
+        if (remaining === mealCount - 1) {
+          if (fed?.success) return true;
+          continue;
+        }
         assert.equal(remaining, mealCount, 'A single feeding changed the raw meal count unexpectedly');
+      } else if (hit?.pos && /(?:_leaves|:(?:vine|short_grass|tall_grass|fern|large_fern))$/.test(hit.block) && clearedObstacles < 6
+          && !aimed.threats?.some(threat => threat.distance < 6)) {
+        const [x, y, z] = hit.pos;
+        const supports = ([px, py, pz]) => x === Math.floor(px) && y === Math.floor(py) - 1 && z === Math.floor(pz);
+        if (!supports(dog.pos) && !supports(feet(aimed)) && (await breakVisible(action, hit.pos))?.broken) {
+          clearedObstacles++;
+          await hold(action, meal);
+          continue;
+        }
       }
     }
     // Holding meat can interrupt barking at a peaceful mob. Let the dog

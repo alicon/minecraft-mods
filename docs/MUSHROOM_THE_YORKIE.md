@@ -33,6 +33,9 @@ safer route. He can warn the player holding his lead as well.
 In Java, Mushroom leaves neutral mobs such as zombified piglins alone until
 they target him or his owner.
 
+Hold meat, fish, or a Yorkie Treat to pause a scent trail and give Mushroom
+a chance to come close for feeding.
+
 ## Field Guide and Leave it
 
 The first Survival adoption gives the player a Field Guide. Craft a

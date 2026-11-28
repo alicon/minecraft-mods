@@ -439,6 +439,16 @@ async function runExpedition(start, stage) {
     }
     await reportStatus('ready');
     console.log(JSON.stringify({ at: new Date().toISOString(), action: 'controller_reattached', phase: checkpoint.phase }));
+  } else if (process.env.MUSHROOM_EXPEDITION_RESTORE_MANIFEST) {
+    const restored = JSON.parse(await readFile(join(dirname(statusFile), 'restored-checkpoint.json'), 'utf8'));
+    assert.ok(needsIron && start.dimension === OVERWORLD && /^[\da-f-]{36}$/i.test(restored.dog));
+    assert.ok(blockPosition(restored.camp?.bed) && blockPosition(restored.camp?.table));
+    checkpoint = { owner: start.name, gameTime: start.gameTime, bridgeFingerprint, stage, phase: 'iron',
+      camp: restored.camp, dog: restored.dog, fedDog: false };
+    companion = checkpoint.dog;
+    if (live) await writeCheckpoint(checkpoint);
+    console.log(JSON.stringify({ at: new Date().toISOString(), action: 'controller_restored_save', assisted: true,
+      dog: checkpoint.dog, phase: checkpoint.phase }));
   } else {
     assert.equal(inventory.slots.length, 0, 'Expected an empty expedition inventory');
     checkpoint = { owner: start.name, gameTime: start.gameTime, bridgeFingerprint, stage, phase: 'starter' };

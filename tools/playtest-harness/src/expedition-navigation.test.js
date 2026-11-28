@@ -481,6 +481,26 @@ test('a hunt routes around an obstruction before giving up a wounded cow', async
   assert.ok(detoured && struck && pickedUp);
 });
 
+test('a hunt rechecks safety after approaching and can cancel the swing', async () => {
+  const { hunt } = await import('./expedition-home.mjs');
+  const blaze = { id: 11, type: 'minecraft:blaze' };
+  let checks = 0;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_inventory': return { slots: [] };
+      case 'get_entities': return { entities: [blaze] };
+      case 'go_to':
+      case 'look':
+        assert.equal(args.entityId, blaze.id);
+        return { arrived: true };
+      case 'observe': return { crosshair: { id: blaze.id } };
+      default: assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  assert.equal(await hunt(action, blaze, item => item === 'minecraft:blaze_rod', async () => ++checks === 1), false);
+  assert.equal(checks, 2);
+});
+
 test('an uphill approach takes the stairs toward an animal above a shelf', async () => {
   const { dryWaypoint } = await import('./expedition-navigation.mjs');
   const cells = [];
@@ -592,7 +612,7 @@ test('the reserved recovery meal moves out of reach of automatic hotbar eating',
 
 test('feeding only succeeds when the original dog is reached and consumes one meal', async () => {
   const { feedAdoptedDog } = await import('./expedition-home.mjs');
-  for (const hit of [19, 22]) {
+  for (const [hit, accepted] of [[19, true], [22, true], [22, false]]) {
     let count = 2;
     const dog = { id: 22, uuid: 'original', distance: 2, pos: [2, 64, 0] };
     const decoy = { ...dog, id: 19, uuid: 'other' };
@@ -607,11 +627,11 @@ test('feeding only succeeds when the original dog is reached and consumes one me
         case 'interact_entity':
           assert.equal(args.entityId, dog.id);
           count--;
-          return {};
+          return { success: accepted };
         default: throw new Error(`Unexpected action: ${name}`);
       }
     };
-    assert.equal(await feedAdoptedDog(action, dog.uuid, [0, 64, 0], 1), hit === dog.id);
+    assert.equal(await feedAdoptedDog(action, dog.uuid, [0, 64, 0], 1), hit === dog.id && accepted);
     assert.equal(count, hit === dog.id ? 1 : 2);
   }
 });
@@ -638,13 +658,50 @@ test('a feeding approach that times out after moving does not backtrack from sta
       case 'interact_entity':
         assert.equal(args.entityId, 22);
         meals--;
-        return {};
+        return { success: true };
       default:
         assert.fail(`Unexpected action: ${name}`);
     }
   };
   assert.equal(await feedAdoptedDog(action, 'original', [0, 64, 0], 9), true);
   assert.equal(meals, 0);
+});
+
+test('grass in the feeding sightline can be cleared before using one meal on Mushroom', async () => {
+  const { feedAdoptedDog } = await import('./expedition-home.mjs');
+  const meat = 'minecraft:mutton';
+  const dog = { id: 22, uuid: 'original', pos: [3.5, 64, 0.5], distance: 3 };
+  const obstacle = [2, 64, 0];
+  let foliageCleared = false;
+  let meals = 2;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe':
+        return { inWorld: true, health: 20, position: { x: 0.5, y: 64, z: 0.5 },
+          crosshair: foliageCleared ? { id: dog.id } : { block: 'minecraft:short_grass', pos: obstacle } };
+      case 'get_entities':
+        return { entities: [dog] };
+      case 'get_inventory':
+        return { mainHand: { id: meat }, slots: [{ id: meat, slot: 0, count: meals }] };
+      case 'look':
+        return {};
+      case 'break_block':
+        assert.deepEqual(args.pos, obstacle);
+        foliageCleared = true;
+        return { broken: true };
+      case 'select_slot':
+        return { mainHand: { id: meat } };
+      case 'interact_entity':
+        assert.ok(foliageCleared);
+        assert.equal(args.entityId, dog.id);
+        meals--;
+        return { success: true };
+      default:
+        assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  assert.equal(await feedAdoptedDog(action, dog.uuid, [0, 64, 0], 2), true);
+  assert.equal(meals, 1);
 });
 
 test('a feeding attempt walks away from a zombie before offering the meal', async () => {
@@ -680,7 +737,7 @@ test('a feeding attempt walks away from a zombie before offering the meal', asyn
         assert.ok(retreated);
         assert.equal(args.entityId, dog.id);
         meals--;
-        return {};
+        return { success: true };
       default:
         assert.fail(`Unexpected action: ${name}`);
     }
@@ -732,7 +789,7 @@ test('a rock blocking the feeding approach is mined with a pickaxe before offeri
         assert.equal(args.entityId, dog.id);
         assert.equal(mainHand, meat);
         meals--;
-        return {};
+        return { success: true };
       default:
         assert.fail(`Unexpected action: ${name}`);
     }

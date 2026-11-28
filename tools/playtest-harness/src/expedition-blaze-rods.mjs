@@ -11,6 +11,7 @@ const BLAZE = 'minecraft:blaze';
 const BOW = 'minecraft:bow';
 const ARROW = 'minecraft:arrow';
 const DOG = 'mushroom_yorkie:mushroom_yorkie';
+const ZOMBIFIED_PIGLIN = 'minecraft:zombified_piglin';
 const FORTRESS = ['minecraft:nether_bricks', 'minecraft:nether_brick_fence'];
 const FOOD = ['minecraft:cooked_beef', 'minecraft:cooked_mutton', 'minecraft:cooked_porkchop', 'minecraft:bread'];
 const feet = ({ position: { x, y, z } }) => [x, y, z].map(Math.floor);
@@ -37,7 +38,7 @@ async function shootBlaze(action, player, blaze) {
   if (!aim) return false;
   const neighborhood = await action('get_entities', { radius: 28, max: 96 });
   if (!neighborhood) return false;
-  const bystanders = neighborhood.entities.filter(entity => entity.type === DOG || entity.type === 'minecraft:zombified_piglin');
+  const bystanders = neighborhood.entities.filter(entity => entity.type === DOG || entity.type === ZOMBIFIED_PIGLIN);
   if (bystanders.some(entity => distance(entity.pos, target) < 2.5)
       || !clearBowArc(player, target, ([x, y, z]) => bystanders.some(({ pos }) =>
         Math.abs(x + 0.5 - pos[0]) <= 1.5 && Math.abs(z + 0.5 - pos[2]) <= 1.5 && Math.abs(y - pos[1]) <= 2))) {
@@ -75,7 +76,13 @@ async function returnToShelter(action, landing, tolerance = 1, escortUuid) {
 }
 
 async function restAtShelter(action, landing) {
-  await returnToShelter(action, landing);
+  const restoreInterrupt = (await action('set_reflexes'))?.interruptOnDamage;
+  if (restoreInterrupt) await action('set_reflexes', { interruptOnDamage: false });
+  try {
+    await returnToShelter(action, landing);
+  } finally {
+    if (restoreInterrupt) await action('set_reflexes', { interruptOnDamage: true });
+  }
   for (let watch = 0; watch < 90; watch++) {
     const player = await action('observe');
     assert.ok(player?.inWorld && !player.dead, 'The player did not survive the retreat');
@@ -182,6 +189,11 @@ async function parkCompanion(action, uuid, opening, shelter) {
   throw new Error('Mushroom did not reach dry ground away from the Nether portal');
 }
 
+async function clearOfPiglins(action, target) {
+  const nearby = await action('get_entities', { type: ZOMBIFIED_PIGLIN, radius: 20, max: 32 });
+  return nearby && nearby.entities.every(piglin => distance(piglin.pos, target) >= 3);
+}
+
 export async function earnBlazeRods(action, uuid, exit, wanted) {
   if (rods(await action('get_inventory')) >= wanted) return;
   const { shelter, trail } = await scoutNetherFortress(action, uuid, exit);
@@ -207,14 +219,26 @@ export async function earnBlazeRods(action, uuid, exit, wanted) {
     const drops = await action('get_entities', { type: 'item', radius: 24 });
     const drop = drops?.entities.find(entity => entity.item?.id === ROD && Math.abs(entity.pos[1] - here[1]) <= 2);
     if (drop?.distance <= 6) {
-      await action('go_to', { entityId: drop.id, stopDistance: 0.3, maxTicks: 50 });
-      if (rods(await action('get_inventory')) > rods(stock)) continue;
+      if (await clearOfPiglins(action, drop.pos)) {
+        await action('go_to', { entityId: drop.id, stopDistance: 0.3, maxTicks: 50 });
+        if (rods(await action('get_inventory')) > rods(stock)) continue;
+      }
     }
     const ranged = hasItem(stock, BOW) && hasItem(stock, ARROW);
     if (!drop && ranged && blaze?.distance >= 6 && blaze.distance <= 16
         && await shootBlaze(action, player, blaze)) continue;
-    if (!drop && blaze?.distance <= (ranged ? 4 : 7) && Math.abs(blaze.pos[1] - here[1]) <= 2.5
-        && await hunt(action, blaze, item => item === ROD, async () => (await action('observe'))?.health >= 10)) continue;
+    if (!drop && blaze?.distance <= (ranged ? 4 : 7) && Math.abs(blaze.pos[1] - here[1]) <= 2.5) {
+      const safeToSwing = async () => {
+        const current = await action('observe');
+        if (!current?.inWorld || current.dead || current.health < 14 || current.onFire) return false;
+        // A sweep can hit a neutral mob near the sword's intended target.
+        const view = await action('get_entities', { radius: 16, max: 64 });
+        const currentBlaze = view?.entities.find(entity => entity.uuid === blaze.uuid);
+        return view && view.entities.every(entity => entity.type !== ZOMBIFIED_PIGLIN
+          || distance(entity.pos, currentBlaze?.pos ?? feet(current)) >= 3 && entity.distance >= 3);
+      };
+      if (await hunt(action, blaze, item => item === ROD, safeToSwing)) continue;
+    }
     if (!blaze && attempt >= nextSurvey) {
       nextSurvey = attempt + 5;
       fortress = await observedFortress(action, here);
@@ -223,7 +247,9 @@ export async function earnBlazeRods(action, uuid, exit, wanted) {
     const awayFromCamp = distance(here, shelter);
     if (awayFromCamp > 36 && !blaze) break;
     const scout = await action('observe');
-    await stepOut(action, scout, visited, drop?.pos ?? blaze?.pos ?? fortress, undefined, rejected);
+    const target = drop?.pos ?? blaze?.pos ?? fortress;
+    const onward = target && !await clearOfPiglins(action, target) ? shelter : target;
+    await stepOut(action, scout, visited, onward, undefined, rejected);
   }
   await returnToShelter(action, shelter);
   await useEmptyHandOnCompanion(action, uuid);

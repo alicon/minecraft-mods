@@ -191,6 +191,16 @@ MUSHROOM_EXPEDITION_STATUS="$RUN_DIRECTORY/status" MUSHROOM_EXPEDITION_RESUME=1 
   node tools/playtest-harness/src/expedition-supplies.mjs >> "$RUN_DIRECTORY/actions.jsonl"
 ```
 
+A closed test world can be continued at the iron phase with
+`MUSHROOM_EXPEDITION_RESTORE_MANIFEST`. Archive the closed save under
+`build/playtest-reports`. Make a JSON manifest containing the absolute
+`source` directory, the `seed`, the `owner` and `dog` UUIDs, and a `camp`
+object with the `bed` and `table` block coordinates. Start the ordinary
+runner with the manifest path and the `iron`, `nether`, or `nether-powder`
+stage. The client opens a copy, verifies the world, owner, camp, earned stone
+kit and original living dog, then hands control back at the iron phase. The
+trace records the recovery as assisted.
+
 Summarize the action logs and the native save/reopen evidence for comparison:
 
 ```shell

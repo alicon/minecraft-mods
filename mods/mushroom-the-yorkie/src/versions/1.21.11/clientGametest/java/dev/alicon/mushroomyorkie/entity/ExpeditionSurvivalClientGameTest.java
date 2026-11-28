@@ -11,6 +11,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
+import net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldBuilder;
 import net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldSave;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.minecraft.client.gui.screens.DeathScreen;
@@ -47,6 +49,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 		String stage = requestedStage == null ? "adoption" : requestedStage;
 		boolean powderTrip = "nether-powder".equals(stage);
 		boolean visitsNether = "nether".equals(stage) || powderTrip;
+		var recovery = recoveryFromManifest(status, stage);
 		int windowTicks = switch (stage) {
 			case "adoption" -> ADOPTION_WINDOW_TICKS;
 			case "stone" -> STONE_WINDOW_TICKS;
@@ -68,7 +71,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 				companionDeath.set(source.getLocalizedDeathMessage(dog).getString());
 			}
 		});
-		try (var world = context.worldBuilder().setUseConsistentSettings(false).adjustSettings(settings -> {
+		var builder = context.worldBuilder().setUseConsistentSettings(false).adjustSettings(settings -> {
 			settings.setName("Codex Expedition Survival");
 			settings.setDifficulty(Difficulty.NORMAL);
 			settings.setAllowCommands(false);
@@ -78,22 +81,28 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 			if (spawnRadius != null) {
 				settings.getGameRules().set(GameRules.RESPAWN_RADIUS, Integer.parseInt(spawnRadius), null);
 			}
-		}).create()) {
+		});
+		try (var world = openWorld(builder, recovery)) {
 			world.getClientWorld().waitForChunksRender();
 			save = world.getWorldSave();
 			ownerId = context.computeOnClient(client -> client.player.getUUID());
 			var server = world.getServer();
 			server.runOnServer(minecraft -> {
 				var owner = minecraft.getPlayerList().getPlayer(ownerId);
-				if (owner.isCreative() || owner.isSpectator() || !owner.getInventory().isEmpty()
+				if (owner == null || owner.isCreative() || owner.isSpectator() || (recovery == null && !owner.getInventory().isEmpty())
 						|| minecraft.getWorldData().getDifficulty() != Difficulty.NORMAL
 						|| minecraft.getWorldData().isAllowCommands()) {
-					throw new AssertionError("Expected a fresh Normal Survival player with an empty inventory");
+					throw new AssertionError("Expected a Normal Survival player with commands disabled");
 				}
 				System.out.printf("Expedition Survival ready: seed=%s world=%s owner=%s%n",
 						minecraft.overworld().getSeed(), minecraft.getWorldData().getLevelName(), ownerId);
 			});
 			try {
+				if (recovery != null) {
+					recovery.verifyAndWriteCheckpoint(world, ownerId, status);
+					originalDog.set(recovery.dog());
+					System.out.printf("Expedition restored at iron: dog=%s owner=%s%n", recovery.dog(), ownerId);
+				}
 				if ("defense".equals(stage)) {
 					ExpeditionCompanionClientScenario.run(context, server, ownerId, status);
 					return;
@@ -279,6 +288,27 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 				context.takeScreenshot("expedition-survival-reopen-failure");
 				throw failure;
 			}
+		}
+	}
+
+	private static ExpeditionSaveRecovery recoveryFromManifest(Path status, String stage) {
+		String manifest = System.getenv("MUSHROOM_EXPEDITION_RESTORE_MANIFEST");
+		if (manifest == null) return null;
+		if (!"iron".equals(stage) && !"nether".equals(stage) && !"nether-powder".equals(stage)) {
+			throw new AssertionError("An archived iron checkpoint requires an iron or Nether stage");
+		}
+		try {
+			return ExpeditionSaveRecovery.read(Path.of(manifest), status);
+		} catch (IOException failure) {
+			throw new UncheckedIOException(failure);
+		}
+	}
+
+	private static TestSingleplayerContext openWorld(TestWorldBuilder builder, ExpeditionSaveRecovery recovery) {
+		try {
+			return recovery == null ? builder.create() : recovery.openCopy(builder);
+		} catch (IOException failure) {
+			throw new UncheckedIOException(failure);
 		}
 	}
 
