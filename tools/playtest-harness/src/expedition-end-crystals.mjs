@@ -86,7 +86,14 @@ export async function clearGeneratedCrystals(action, uuid, report) {
         here[2] + 8 * Math.sign(player.position.z - danger.pos[2])];
       // The last dry route is useful cover when a fireball is inbound.
       // Ignore ordinary scouting repeat penalties while leaving its path.
-      if (await stepOut(action, player, [], retreat, 'surface', new Set(), undefined, danger.pos)) continue;
+      const restoreInterrupt = (await action('set_reflexes'))?.interruptOnDamage;
+      if (restoreInterrupt) await action('set_reflexes', { interruptOnDamage: false });
+      try {
+        await stepOut(action, player, [], retreat, 'surface', new Set(), undefined, danger.pos);
+      } finally {
+        if (restoreInterrupt) await action('set_reflexes', { interruptOnDamage: true });
+      }
+      continue;
     }
     if (player.health < 16 && player.gameTime >= nextRecovery) {
       const inventory = await action('get_inventory');

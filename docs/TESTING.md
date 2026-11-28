@@ -312,7 +312,8 @@ Set `MUSHROOM_EXPEDITION_STAGE=generated-end-crystals` to exercise the crystal
 phase on the generated island with the vanilla dragon active. The disposable
 fixture supplies a bow, arrows, armor, food, and a protected camp for Mushroom.
 The controller scouts the island, watches for incoming dragon breath, and
-shoots from observed positions. The server checks for the removal of all ten
+shoots from observed positions. It finishes its retreat through damage
+before shooting again. The server checks for the removal of all ten
 original crystals and verifies Mushroom's identity and health at camp. The
 summary reports shot attempts, observed breaks, and the native verdict.
 The fixture saves a server snapshot even when the controller fails. It

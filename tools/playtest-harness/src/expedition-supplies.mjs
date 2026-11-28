@@ -335,6 +335,7 @@ async function runExpedition(start, stage) {
     assert.equal(checkpoint.bridgeFingerprint, bridgeFingerprint, 'The recorded client is no longer listening');
     assert.ok(Number.isFinite(checkpoint.gameTime) && checkpoint.gameTime <= start.gameTime);
     assert.ok(['starter', 'provision', 'camp', 'adoption', 'stone', 'iron', 'nether'].includes(checkpoint.phase));
+    assert.ok(checkpoint.timberSite === undefined || blockPosition(checkpoint.timberSite), 'Invalid recorded timber site');
     assert.ok(start.dimension === OVERWORLD || checkpoint.phase === 'nether', 'Unexpected dimension before the Nether phase');
     const starterItems = ['crafting_table', 'wooden_sword', 'wooden_pickaxe'];
     if (checkpoint.phase === 'provision'
@@ -435,12 +436,14 @@ async function runExpedition(start, stage) {
   if (checkpoint.phase === 'starter') {
     await narrate('Objective', 'Collect wood and make the starter tools.');
     await gatherStarterTools(start);
+    const { x, y, z } = (await action('observe')).position;
+    checkpoint.timberSite = [x, y, z].map(Math.floor);
     checkpoint.phase = 'provision';
     if (live) await writeCheckpoint(checkpoint);
   }
   if (checkpoint.phase === 'provision') {
     await narrate('Objective', 'Find a sheltered bed, or gather wool to make one.');
-    checkpoint.camp = await prepareAdoptionCamp(action, craft, descendFromCanopy, policy);
+    checkpoint.camp = await prepareAdoptionCamp(action, craft, descendFromCanopy, { ...policy, timberSite: checkpoint.timberSite });
     checkpoint.phase = 'camp';
     if (live) await writeCheckpoint(checkpoint);
   }

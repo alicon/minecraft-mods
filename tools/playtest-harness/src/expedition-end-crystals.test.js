@@ -35,6 +35,7 @@ test('the crystal run takes a dry route away from an incoming dragon fireball be
   const dog = { uuid: 'original', health: 12, pos: [0, 60, 8] };
   const crystal = { uuid: 'distant-crystal', pos: [24, 80, 0] };
   const arrow = { distance: 12, pos: [12.5, 61, 0.5] };
+  const changes = [];
   const action = async (name, args) => {
     if (name === 'observe') return { inWorld: true, health: 20, dimension: 'minecraft:the_end', onGround: true,
       position: { x: 0.5, y: 60, z: 0.5 } };
@@ -49,12 +50,18 @@ test('the crystal run takes a dry route away from an incoming dragon fireball be
     if (name === 'get_blocks') {
       return { cells: Array.from({ length: 9 }, (_, x) => ({ x: -x, y: 59, z: 0, b: 'minecraft:end_stone' })) };
     }
+    if (name === 'set_reflexes') {
+      if (args && 'interruptOnDamage' in args) changes.push(args.interruptOnDamage);
+      return { interruptOnDamage: changes.at(-1) ?? true };
+    }
     if (name === 'go_to') {
       assert.ok(args.pos[0] < 0);
+      assert.deepEqual(changes, [false]);
       throw escape;
     }
     assert.fail(`Unexpected action before retreat: ${name}`);
   };
   await assert.rejects(clearGeneratedCrystals(action, dog.uuid, () => assert.fail('No crystal should be fired at')),
     error => error === escape);
+  assert.deepEqual(changes, [false, true]);
 });

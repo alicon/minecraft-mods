@@ -401,20 +401,41 @@ export async function placeBeside(action, item) {
   throw new Error(`No nearby supported position for ${item}`);
 }
 
-async function harvestReachableLog(action, camp) {
-  const { position } = await action('observe');
-  const wood = await action('scan_blocks', { blocks: WOOD_LOGS, radius: 12, max: 40 });
+async function harvestReachableLog(action, camp, timberSite) {
+  let player = await action('observe');
+  const visited = [];
+  const rejected = new Set();
+  const scan = { blocks: WOOD_LOGS, radius: 12, max: 40 };
+  let wood = await action('scan_blocks', scan);
+  for (let scouting = 0; !camp && !wood.matches.length && scouting < (timberSite ? 16 : 8); scouting++) {
+    if (!player?.inWorld || player.dead || player.health < 8) return;
+    if (!await retreatFromNearbyMob(action, player, visited, rejected)) {
+      const wider = await action('scan_blocks', { ...scan, radius: 32 });
+      const { x, z } = player.position;
+      const target = wider.matches.flatMap(match => match.positions)
+        .sort((a, b) => Math.hypot(a[0] - x, a[2] - z) - Math.hypot(b[0] - x, b[2] - z))[0]
+        ?? (timberSite && Math.hypot(timberSite[0] - x, timberSite[2] - z) > 8 ? timberSite : undefined);
+      visited.push(feet(player));
+      if (!await stepOut(action, player, visited, target, 'surface', rejected)) return;
+    }
+    player = await action('observe');
+    wood = await action('scan_blocks', scan);
+  }
+  const { position } = player;
   const candidates = wood.matches.flatMap(({ name, positions }) => positions.map(pos => ({ name, pos })))
     .filter(({ pos }) => Math.abs(pos[1] - position.y) < 2.5)
     .filter(({ pos }) => !camp || Math.hypot(...pos.map((axis, index) => axis - camp[index])) <= 9)
     .sort((a, b) => Math.hypot(a.pos[0] - position.x, a.pos[2] - position.z)
       - Math.hypot(b.pos[0] - position.x, b.pos[2] - position.z));
-  const visited = [];
-  const rejected = new Set();
   const detoured = new Set();
   for (const tree of candidates.slice(0, 8)) {
     const column = `${tree.pos[0]},${tree.pos[2]}`;
-    const approached = await action('go_to', { pos: tree.pos, stopDistance: 2.1, maxTicks: 65 });
+    const approach = () => action('go_to', { pos: tree.pos, stopDistance: 2.1, maxTicks: 65 });
+    let approached = await approach();
+    const leaves = approached?.reason?.match(/blocked by minecraft:\w+_leaves at (-?\d+),(-?\d+),(-?\d+)/);
+    if (leaves && (await action('break_block', { pos: leaves.slice(1).map(Number), maxTicks: 30 }))?.broken) {
+      approached = await approach();
+    }
     if (!approached?.arrived) {
       if (detoured.has(column)) continue;
       detoured.add(column);
@@ -427,9 +448,19 @@ async function harvestReachableLog(action, camp) {
         if (!await stepOut(action, player, visited, tree.pos, 'surface', rejected)) break;
       }
     }
-    await action('look', { at: tree.pos });
-    await setTimeout(80);
-    if ((await action('observe')).crosshair?.pos?.join(',') !== tree.pos.join(',')) continue;
+    let visibleLog = false;
+    for (let look = 0; look < 3; look++) {
+      await action('look', { at: tree.pos });
+      await setTimeout(80);
+      const target = (await action('observe'))?.crosshair;
+      if (target?.pos?.join(',') === tree.pos.join(',')) {
+        visibleLog = true;
+        break;
+      }
+      if (!target?.block?.endsWith('_leaves')
+          || !(await action('break_block', { pos: target.pos, maxTicks: 30 }))?.broken) break;
+    }
+    if (!visibleLog) continue;
     const stock = count(await action('get_inventory'), tree.name);
     if (!(await action('break_block', { pos: tree.pos, maxTicks: 100 }))?.broken) continue;
     const drops = await action('get_entities', { type: 'item', radius: 5 });
@@ -441,13 +472,13 @@ async function harvestReachableLog(action, camp) {
   }
 }
 
-export async function ensurePlanks(action, craft, needed) {
+export async function ensurePlanks(action, craft, needed, timberSite) {
   for (let batch = 0; batch <= Math.ceil(needed / 4); batch++) {
     const { slots } = await action('get_inventory');
     const planks = slots.filter(stack => stack.id.endsWith('_planks')).reduce((total, stack) => total + stack.count, 0);
     if (planks >= needed) return;
     if (batch === Math.ceil(needed / 4)) break;
-    const log = slots.find(stack => stack.id.endsWith('_log'))?.id ?? await harvestReachableLog(action);
+    const log = slots.find(stack => stack.id.endsWith('_log'))?.id ?? await harvestReachableLog(action, undefined, timberSite);
     assert.ok(log, 'Could not collect a reachable log for more planks');
     await craft(log.replace(/_log$/, '_planks'), 4);
   }
@@ -689,12 +720,12 @@ export async function forageExpeditionMeal(action, { camp, toward, minimum = 1 }
   return false;
 }
 
-export async function prepareAdoptionCamp(action, craft, descendFromCanopy, { chooseRoute, reportScouting } = {}) {
+export async function prepareAdoptionCamp(action, craft, descendFromCanopy, { chooseRoute, reportScouting, timberSite } = {}) {
   const bedding = await gatherWool(action, descendFromCanopy, chooseRoute, craft, reportScouting);
   if (typeof bedding !== 'string') {
     return { bed: bedding.bed, door: bedding.door, entrance: bedding.entrance };
   }
-  await ensurePlanks(action, craft, 3);
+  await ensurePlanks(action, craft, 3, timberSite);
   // Bring the first table to the flock so sleeping doesn't depend on retracing the route.
   const table = await placeBeside(action, 'minecraft:crafting_table');
   assert.equal((await action('interact_block', { pos: table }))?.screenOpened, 'CraftingScreen');
