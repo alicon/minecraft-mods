@@ -212,8 +212,9 @@ export async function hunt(action, animal, dropMatches, canContinue) {
     const present = (await action('get_entities', { type: animal.type, radius: 16 })).entities
       .find(entity => entity.id === animal.id);
     if (!present) return false;
-    const near = await action('go_to', { entityId: animal.id, stopDistance: 1.65, maxTicks: 40 });
-    if (!near?.arrived || !await visible(action, animal.id)) {
+    await action('go_to', { entityId: animal.id, stopDistance: 1.65, maxTicks: 40 });
+    // The movement tolerance is tighter than the native attack reach.
+    if (!await visible(action, animal.id)) {
       if (++blockedApproaches > 3 || !present.pos) return false;
       const player = await action('observe');
       if (!player?.inWorld || player.dead || player.health < 8) return false;
@@ -931,12 +932,12 @@ export async function feedAdoptedDog(action, uuid, bed, attempts = 120) {
   return false;
 }
 
-async function seekExpeditionFood(action, player, visited, rejectedSteps, tried, toward, sighting) {
+async function seekExpeditionFood(action, player, visited, rejectedSteps, attempts, toward, sighting) {
   const nearby = await action('get_entities', { radius: 32, max: 96 });
   const drop = nearby?.entities.find(entity => entity.item?.id && DOG_FOOD.includes(entity.item.id)
-    && !tried.has(entity.id) && entity.distance < 12 && Math.abs(entity.pos[1] - player.position.y) < 3);
+    && !attempts.drops.has(entity.id) && entity.distance < 12 && Math.abs(entity.pos[1] - player.position.y) < 3);
   if (drop) {
-    tried.add(drop.id);
+    attempts.drops.add(drop.id);
     if ((await action('go_to', { entityId: drop.id, stopDistance: 0.3, maxTicks: 50 }))?.arrived) return;
   }
   const hostiles = (nearby?.entities ?? []).filter(entity => entity.hostile);
@@ -944,8 +945,9 @@ async function seekExpeditionFood(action, player, visited, rejectedSteps, tried,
     axis - position[index])) < 8);
   const heightGap = animal => animal.pos[1] - player.position.y;
   const reachableAnimal = entities => entities?.filter(entity =>
-    (BACKUP_MEAT[entity.type] || entity.type === 'minecraft:sheep') && !tried.has(entity.id)
-    && heightGap(entity) >= -22 && heightGap(entity) <= 9 && safeAround(entity.pos))
+    (BACKUP_MEAT[entity.type] || entity.type === 'minecraft:sheep') && heightGap(entity) >= -22 && heightGap(entity) <= 9
+    && safeAround(entity.pos) && !(attempts.hunts.get(entity.id) ?? []).some(position =>
+      Math.hypot(...position.map((axis, index) => axis - entity.pos[index])) < 5))
     .sort((a, b) => a.distance - b.distance + 2 * (Math.abs(heightGap(a)) - Math.abs(heightGap(b))))[0];
   let animal = reachableAnimal(nearby?.entities);
   if (!animal && !toward && (sighting || visited.length % 4 === 0)) {
@@ -953,8 +955,11 @@ async function seekExpeditionFood(action, player, visited, rejectedSteps, tried,
     animal = reachableAnimal(scouting?.entities);
   }
   if (animal?.distance <= 6 && Math.abs(animal.pos[1] - player.position.y) < 3) {
-    tried.add(animal.id);
-    await hunt(action, animal, item => item === (BACKUP_MEAT[animal.type] ?? MUTTON));
+    if (!await hunt(action, animal, item => item === (BACKUP_MEAT[animal.type] ?? MUTTON))) {
+      const blocked = attempts.hunts.get(animal.id) ?? [];
+      blocked.push(animal.pos);
+      attempts.hunts.set(animal.id, blocked);
+    }
   } else {
     // Keep steering toward a distant observation between scans. A stale sighting can
     // guide movement but cannot authorize an attack.
@@ -973,7 +978,7 @@ async function seekExpeditionFood(action, player, visited, rejectedSteps, tried,
 export async function forageExpeditionMeal(action, { camp, toward, minimum = 1, regroup } = {}) {
   const visited = [];
   const rejectedSteps = new Set();
-  const tried = new Set();
+  const attempts = { drops: new Set(), hunts: new Map() };
   let returning = Boolean(camp);
   let searchToward = toward;
   let sighting;
@@ -997,7 +1002,7 @@ export async function forageExpeditionMeal(action, { camp, toward, minimum = 1, 
     if (searchToward && Math.hypot(searchToward[0] - player.position.x, searchToward[2] - player.position.z) <= 8) {
       searchToward = undefined;
     }
-    sighting = await seekExpeditionFood(action, player, visited, rejectedSteps, tried, searchToward, sighting);
+    sighting = await seekExpeditionFood(action, player, visited, rejectedSteps, attempts, searchToward, sighting);
   }
   return false;
 }

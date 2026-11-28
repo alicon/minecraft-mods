@@ -899,6 +899,29 @@ test('a hunt rechecks safety after approaching and can cancel the swing', async 
   assert.equal(checks, 2);
 });
 
+test('a hunt uses the native crosshair after an approach times out within reach', async () => {
+  const { hunt } = await import('./expedition-home.mjs');
+  const sheep = { id: 21, type: 'minecraft:sheep', pos: [2.3, 64, 0.5] };
+  let struck = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_inventory': return { slots: [] };
+      case 'get_entities': return { entities: struck ? [] : [sheep] };
+      case 'go_to': return { arrived: false, reason: 'timed out 1.77 blocks away' };
+      case 'look': return {};
+      case 'observe': return { inWorld: true, health: 20, position: { x: 0.5, y: 64, z: 0.5 },
+        crosshair: { id: sheep.id } };
+      case 'attack_entity':
+        assert.equal(args.entityId, sheep.id);
+        struck = true;
+        return {};
+      default: assert.fail(name);
+    }
+  };
+  assert.ok(await hunt(action, sheep, item => item === 'minecraft:mutton'));
+  assert.ok(struck);
+});
+
 test('an uphill approach takes the stairs toward an animal above a shelf', async () => {
   const { dryWaypoint } = await import('./expedition-navigation.mjs');
   const cells = [];
@@ -1265,6 +1288,46 @@ test('a brief long-range sheep sighting guides the next forage leg between scans
   };
   assert.equal(await forageExpeditionMeal(action), true);
   assert.equal(stride, 2);
+});
+
+test('foraging retries a wounded sheep after it leaves the blocked hillside', async () => {
+  const { forageExpeditionMeal } = await import('./expedition-home.mjs');
+  const sheep = { id: 31, type: 'minecraft:sheep', distance: 2, pos: [2.5, 64, 0.5] };
+  const drop = { id: 32, item: { id: 'minecraft:mutton' }, distance: 2, pos: [8.5, 64, 0.5] };
+  let sightings = 0;
+  let attempts = 0;
+  let moved = false;
+  let struck = false;
+  let collected = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe': return { inWorld: true, onGround: true, health: 20,
+        position: { x: moved ? 6.5 : 0.5, y: 64, z: 0.5 }, crosshair: moved ? { id: sheep.id } : { type: 'block' } };
+      case 'get_inventory': return { slots: collected ? [{ id: drop.item.id, count: 1 }] : [] };
+      case 'get_entities':
+        if (!args.type && args.radius === 32) sightings++;
+        return { entities: args.type === 'item' ? [drop] : struck ? [] : [moved ? { ...sheep, pos: drop.pos } : sheep] };
+      case 'get_blocks': return { cells: sightings < 2 ? [] : Array.from({ length: 8 }, (_, x) => cell(x, 63, 0)) };
+      case 'go_to':
+        if (args.entityId === sheep.id) {
+          attempts++;
+          assert.ok(attempts === 1 || moved, 'Do not retry unchanged blocked footing');
+          return { arrived: moved };
+        }
+        if (args.entityId === drop.id) collected = true;
+        else moved = true;
+        return { arrived: true, position: args.pos };
+      case 'look': return {};
+      case 'attack_entity':
+        assert.equal(args.entityId, sheep.id);
+        struck = true;
+        return {};
+      default: assert.fail(name);
+    }
+  };
+  assert.ok(await forageExpeditionMeal(action));
+  assert.equal(attempts, 2);
+  assert.ok(collected);
 });
 
 test('regrouping on a known trail takes short steps before a distant creeper can close', async () => {
