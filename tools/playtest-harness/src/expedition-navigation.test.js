@@ -1140,6 +1140,21 @@ test('companion meals do not erase the iron search history', async () => {
   assert.ok(meals >= 2);
 });
 
+test('the iron kit brings carried ore home before smelting it', async () => {
+  const { earnIronKit } = await import('./expedition-home.mjs');
+  const home = new Error('Recorded raw iron at camp');
+  const actions = [];
+  const action = async name => {
+    actions.push(name);
+    assert.equal(name, 'get_inventory');
+    return { slots: [{ id: 'minecraft:raw_iron', count: 1 }] };
+  };
+  await assert.rejects(earnIronKit(action, async () => assert.fail('Smelted before reaching camp'), { bed: [0, 1, 0] }, {
+    bringFirstIronHome: async () => { throw home; },
+  }), error => error === home);
+  assert.deepEqual(actions, ['get_inventory', 'get_inventory']);
+});
+
 test('the first earned ingot funds a shield before scouting for the rest of the kit', async () => {
   const { earnIronKit } = await import('./expedition-home.mjs');
   const slots = [

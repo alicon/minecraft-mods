@@ -113,6 +113,30 @@ export async function descendCrystalPillar(action, player, plan, line) {
   return false;
 }
 
+export async function dismantleCrystalPillar(action, player, base, material) {
+  const [x, floor, z] = base;
+  const safeStance = (view, height) => view?.inWorld && view.onGround && !view.dead && view.health >= 10
+    && String(feet(view)) === String([x, height, z]);
+  await action('look', { pitch: 90 });
+  for (let height = Math.floor(player.position.y); height > floor; height--) {
+    if (!safeStance(player, height)) return false;
+    const pos = [x, height - 1, z];
+    const view = await action('get_blocks', { center: pos, size: [1, 3, 1], format: 'json' });
+    if (!view?.cells.some(cell => cell.y === height - 1 && cell.b === material)
+        || !view.cells.some(cell => cell.y === height - 2 && hasDrySupport(cell.b))) return false;
+    const removed = await action('break_block', { pos, maxTicks: 75 });
+    if (!removed?.broken || removed.block !== material) return false;
+    for (let settle = 0; settle < 8; settle++) {
+      player = await action('observe');
+      if (safeStance(player, height - 1)) break;
+      if (!player?.inWorld || player.dead || player.health < 10) return false;
+      await setTimeout(100);
+    }
+    if (!safeStance(player, height - 1)) return false;
+  }
+  return safeStance(player, floor);
+}
+
 async function firingGround(action, crystal, plan) {
   const [x, y, z] = crystal.pos.map(Math.floor);
   const bottom = plan.base[1] - 6;
@@ -226,6 +250,14 @@ export async function openCrystalCage(action, player, crystal, dangerous) {
     }
   }
   player = await action('observe');
-  if (!await descendCrystalPillar(action, player, plan, line) || !opened) return null;
-  return { line, heights };
+  // Dismantling keeps the bow corridor dry. Water remains the way down
+  // if damage or a displaced stance makes it unsafe to keep mining.
+  let returned = await dismantleCrystalPillar(action, player, plan.base, blocks);
+  if (!returned) {
+    player = await action('observe');
+    if (feet(player)[0] === plan.base[0] && feet(player)[2] === plan.base[2]) {
+      returned = await descendCrystalPillar(action, player, plan, line);
+    }
+  }
+  return returned && opened ? { line, heights } : null;
 }

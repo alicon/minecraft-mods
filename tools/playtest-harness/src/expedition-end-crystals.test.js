@@ -141,3 +141,52 @@ test('a crystal pillar descent checks the full water column and steers against s
   assert.equal(moves[3].sneak, true);
   assert.deepEqual(moves[4], { sneak: true, ticks: 5 });
 });
+
+test('a cleared cage can be shot from an alternate dry stance using current block observations', async () => {
+  const { surveyedCageShot } = await import('./expedition-end-crystals.mjs');
+  const player = { inWorld: true, onGround: true, position: { x: -18.5, y: 57, z: 70.5 } };
+  const crystal = { uuid: 'guarded', pos: [-12.5, 83, 39.5] };
+  let blocks = [];
+  const action = async (name, args) => {
+    assert.equal(name, 'get_blocks');
+    assert.equal(args.format, 'json');
+    assert.ok(args.size[2] > 30);
+    return { cells: blocks, stats: { unloadedChunks: 0 } };
+  };
+  const available = await surveyedCageShot(action, player, crystal, [1, 1.5], new Set());
+  assert.ok(available?.aim);
+  const next = await surveyedCageShot(action, player, crystal, [1, 1.5], new Set([available.key]));
+  assert.ok(next?.aim);
+  assert.notEqual(next.key, available.key);
+  blocks = Array.from({ length: 32 }, (_, index) => 57 + index).flatMap(y =>
+    [-18, -17, -16].map(x => ({ x, y, z: 63, b: 'minecraft:obsidian' })));
+  assert.equal(await surveyedCageShot(action, player, crystal, [1, 1.5], new Set()), null);
+});
+
+test('the archer removes only his own pillar and stops on the original ground', async () => {
+  const { dismantleCrystalPillar } = await import('./expedition-end-cage.mjs');
+  const material = 'minecraft:cobblestone';
+  const base = [-7, 56, 39];
+  const state = y => ({ inWorld: true, onGround: true, health: 20, position: { x: -6.5, y, z: 39.5 } });
+  let height = 59;
+  const removed = [];
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_blocks':
+        return { cells: [args.center[1] - 1, args.center[1]].map(y =>
+          ({ x: -7, y, z: 39, b: y === 55 ? 'minecraft:end_stone' : material })) };
+      case 'look': assert.equal(args.pitch, 90); return {};
+      case 'observe': return state(height);
+      case 'break_block':
+        assert.deepEqual(args.pos, [-7, height - 1, 39]);
+        removed.push(height - 1);
+        height--;
+        return { broken: true, block: material };
+      default: assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  assert.equal(await dismantleCrystalPillar(action, state(height), base, material), true);
+  assert.deepEqual(removed, [58, 57, 56]);
+  assert.equal(height, 56);
+  assert.equal(await dismantleCrystalPillar(action, state(58), [-8, 56, 39], material), false);
+});

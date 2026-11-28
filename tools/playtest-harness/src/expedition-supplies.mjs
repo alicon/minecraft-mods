@@ -15,7 +15,7 @@ import { blazePowderCount, craftBlazePowder, earnBlazeRods } from './expedition-
 import { clearGeneratedCrystals, shootEndCrystal } from './expedition-end-crystals.mjs';
 import { craftEyes, crossEndPortal, enderEyeCount, findStrongholdPortalRoom } from './expedition-end-entry.mjs';
 import { earnEnderPearls } from './expedition-pearls.mjs';
-import { navigateToStronghold, scoutByEye } from './expedition-eye-route.mjs';
+import { firstIronOutboundTrail, navigateToStronghold, returnToCampWithCompanion, scoutByEye } from './expedition-eye-route.mjs';
 import { COMPANION_WEARABLES, markExpeditionCamp, practiceStayAndRecall, prepareCompanionGear } from './expedition-gear.mjs';
 import { expeditionPolicy } from './expedition-policy.mjs';
 import { NETHER, OVERWORLD, netherRoundTrip, prepareNetherPortal } from './expedition-nether.mjs';
@@ -391,6 +391,7 @@ async function runExpedition(start, stage) {
       || (Array.isArray(checkpoint.quarry) && checkpoint.quarry.length <= 44 && checkpoint.quarry.every(blockPosition)),
     'Invalid recorded quarry path');
     assert.ok(checkpoint.quarryLanding === undefined || blockPosition(checkpoint.quarryLanding), 'Invalid recorded landing');
+    assert.ok(checkpoint.firstIronHome === undefined || checkpoint.firstIronHome === true, 'Invalid first iron return');
     assert.ok(checkpoint.exhaustedQuarries === undefined || (Array.isArray(checkpoint.exhaustedQuarries)
       && checkpoint.exhaustedQuarries.length <= 6 && checkpoint.exhaustedQuarries.every(attempt =>
         blockPosition(attempt?.entrance) && blockPosition(attempt?.blockedAt) && /^[\da-f]{64}$/.test(attempt.footing))),
@@ -613,6 +614,27 @@ async function runExpedition(start, stage) {
         checkpoint.quarryLanding = landing;
         delete checkpoint.reenterQuarry;
         await writeCheckpoint(checkpoint);
+      };
+    }
+    if (!checkpoint.firstIronHome) {
+      policy.bringFirstIronHome = async () => {
+        await narrate('Objective', 'Bring the first mined iron back to camp with Mushroom.');
+        const trace = await readFile(join(dirname(statusFile), 'actions.jsonl'), 'utf8').catch(error => {
+          if (error.code !== 'ENOENT') throw error;
+          return '';
+        });
+        const trail = firstIronOutboundTrail(trace, checkpoint.camp.bed);
+        const { owner, dog } = await returnToCampWithCompanion(action, checkpoint.dog, checkpoint.camp.bed, trail);
+        const stock = await action('get_inventory');
+        const rawIron = stock.slots.filter(stack => stack.id === 'minecraft:raw_iron')
+          .reduce((total, stack) => total + stack.count, 0);
+        assert.ok(rawIron > 0, 'The first raw iron must still be in the player inventory at camp');
+        checkpoint.firstIronHome = true;
+        if (live) await writeCheckpoint(checkpoint);
+        console.log(JSON.stringify({ at: new Date().toISOString(), action: 'first_iron_home',
+          rawIron, dog: checkpoint.dog, dogHealth: dog.health, dogPosition: dog.pos,
+          player: owner.position, camp: checkpoint.camp.bed, gameTime: owner.gameTime }));
+        await narrate('Result', 'Returned to the bed with the first raw iron and the original living Mushroom.');
       };
     }
     const restoreAutoEat = (await action('set_reflexes'))?.autoEat;

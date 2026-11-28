@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
 import { hold, stepOut } from './expedition-home.mjs';
-import { bowAim } from './expedition-ballistics.mjs';
+import { bowAim, clearBowArc } from './expedition-ballistics.mjs';
 import { openCrystalCage } from './expedition-end-cage.mjs';
 
 const CRYSTAL = 'minecraft:end_crystal';
@@ -53,6 +53,30 @@ export async function shootEndCrystal(action, uuid) {
     .map(crystal => ({ crystal, aim: bowAim(player, [crystal.pos[0], crystal.pos[1] + 1, crystal.pos[2]]) }))
     .find(candidate => candidate.aim);
   return shot ? fireAtCrystal(action, shot, 80) : null;
+}
+
+export async function surveyedCageShot(action, player, crystal, heights, tried) {
+  const origin = [player.position.x, player.position.y, player.position.z];
+  if (!player.onGround || player.inWater || distance(origin, crystal.pos) < 14) return null;
+  const stance = origin.map(value => Math.floor(value * 2)).join(',');
+  const shots = [...new Set([...heights, 1, 1.5, 0.65, 1.75])].flatMap(height => {
+    const key = `${crystal.uuid}:${stance}:${height}`;
+    const target = [crystal.pos[0], crystal.pos[1] + height, crystal.pos[2]];
+    const aim = bowAim(player, target);
+    return !tried.has(key) && aim ? [{ crystal, target, aim, key }] : [];
+  });
+  if (!shots.length) return null;
+  const low = origin.map((value, axis) => Math.floor(Math.min(value, crystal.pos[axis])) - 1);
+  // At a forty-five tick flight the lower arc can rise above both endpoints.
+  const high = origin.map((value, axis) => Math.ceil(Math.max(value, crystal.pos[axis])) + (axis === 1 ? 16 : 1));
+  const size = high.map((value, axis) => value - low[axis] + 1);
+  if (size.some(length => length > 96)) return null;
+  const center = low.map((value, axis) => value + Math.floor(size[axis] / 2));
+  const view = await action('get_blocks', { center, size, format: 'json' });
+  if (!view || view.stats?.unloadedChunks) return null;
+  const solid = new Set(view.cells.filter(cell => !/:(?:air|cave_air|void_air|fire|soul_fire)$/.test(cell.b))
+    .map(cell => String([cell.x, cell.y, cell.z])));
+  return shots.find(shot => clearBowArc(player, shot.target, pos => solid.has(String(pos)))) ?? null;
 }
 
 export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = false } = {}) {
@@ -138,20 +162,13 @@ export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = 
     const activeWindow = candidates.find(({ crystal }) => openedCages.has(crystal.uuid));
     const firing = activeWindow && openedCages.get(activeWindow.crystal.uuid);
     const vantage = firing?.line;
-    const shot = candidates.find(candidate => {
-      const id = candidate.crystal.uuid;
-      if (!candidate.aim || candidate.range < 14) return false;
-      if (!cageStatus.get(id)) return !activeWindow && !positionsTried.has(candidate.key);
-      return id === activeWindow?.crystal.uuid && (misses.get(id) ?? 0) < 4
-        && Math.abs(player.position.y - vantage[1]) <= 0.2
-        && Math.hypot(player.position.x - vantage[0] - 0.5, player.position.z - vantage[2] - 0.5) <= 0.65;
-    });
+    const xzToLine = vantage ? Math.hypot(vantage[0] + 0.5 - player.position.x,
+      vantage[2] + 0.5 - player.position.z) : Infinity;
+    const shot = firing
+      ? xzToLine <= 12 && await surveyedCageShot(action, player, activeWindow.crystal, firing.heights, positionsTried)
+      : candidates.find(candidate => !cageStatus.get(candidate.crystal.uuid) && candidate.aim
+        && candidate.range >= 14 && !positionsTried.has(candidate.key));
     if (shot && (firing || detourSteps === 0)) {
-      if (firing) {
-        const height = firing.heights[(misses.get(shot.crystal.uuid) ?? 0) % firing.heights.length];
-        shot.aim = bowAim(player, [shot.crystal.pos[0], shot.crystal.pos[1] + height, shot.crystal.pos[2]]);
-        assert.ok(shot.aim, 'The surveyed crystal shot is out of range');
-      }
       const destroyed = await fireAtCrystal(action, shot, 128, player.health);
       if (destroyed === undefined) continue;
       positionsTried.add(shot.key);
@@ -179,7 +196,7 @@ export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = 
     }
 
     const next = candidates[0]?.crystal;
-    if (vantage && (misses.get(activeWindow.crystal.uuid) ?? 0) >= 4) {
+    if (vantage && (misses.get(activeWindow.crystal.uuid) ?? 0) >= 10) {
       throw new Error('The prepared firing line did not reach the opened crystal');
     }
     if (detourSteps === 0 || !destination) {

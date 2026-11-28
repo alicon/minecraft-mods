@@ -1398,8 +1398,17 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   let returningAfterCare = false;
   const triedFoodSources = new Set();
   let exhaustedQuarries = policy.exhaustedQuarries ?? [];
+  let bringFirstIronHome = policy.bringFirstIronHome;
   for (let attempt = 0; attempt < 190; attempt++) {
     const inventory = await action('get_inventory');
+    if (bringFirstIronHome && count(inventory, RAW_IRON)) {
+      await leaveQuarry(action, stairs, policy);
+      stairs.length = 0;
+      await policy.saveQuarry?.([]);
+      await bringFirstIronHome();
+      bringFirstIronHome = undefined;
+      continue;
+    }
     const wanted = new Set();
     const { requiredOre } = plan;
     if (count(inventory, RAW_IRON) < requiredOre) {
@@ -1574,6 +1583,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   await leaveQuarry(action, stairs, policy);
   await policy.saveQuarry?.([]);
   const materials = await action('get_inventory');
+  if (bringFirstIronHome && count(materials, RAW_IRON)) await bringFirstIronHome();
   assert.ok(count(materials, RAW_IRON) >= plan.requiredOre, 'Could not earn enough reachable iron ore for the expedition kit');
   await craftIronKit(action, craft, plan.recipes, plan.requiredOre, materials, visited, false);
 }

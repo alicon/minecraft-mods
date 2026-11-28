@@ -57,3 +57,44 @@ test('End entry requires all nine vanilla portal blocks when deciding if it can 
   assert.equal(findEndRing([...frame, ...dryFloor, ...portal.slice(1)], player), undefined);
   assert.equal(findEndRing([...frame, ...dryFloor, ...portal], player).lit, true);
 });
+
+test('the ore return trail contains grounded outbound observations and ends at the first ore pickup', async () => {
+  const { firstIronOutboundTrail } = await import('./expedition-eye-route.mjs');
+  const home = [0, 64, 0];
+  const point = (x, changes = {}) => ({ action: 'observe', observation: {
+    dimension: 'minecraft:overworld', onGround: true, position: { x, y: 64, z: 0.5 }, ...changes,
+  } });
+  const events = [point(0.5), point(6.5), point(12.5, { inWater: true }), point(16.5), point(6.5), point(13.5),
+    { action: 'get_inventory', observation: { slots: [{ id: 'minecraft:raw_iron', count: 1 }] } }, point(88.5)];
+  const trace = events.map(row => JSON.stringify(row)).join('\n{partial row\n') + '\n{"unfinished":';
+  assert.deepEqual(firstIronOutboundTrail(trace, home), [[0, 64, 0], [6, 64, 0], [13, 64, 0]]);
+});
+
+test('the return to an expedition bed verifies the original living dog nearby', async () => {
+  const { returnToCampWithCompanion } = await import('./expedition-eye-route.mjs');
+  const home = [0, 64, 0];
+  let position = { x: 8.5, y: 64, z: 0.5 };
+  const moved = [];
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe': return { inWorld: true, dimension: 'minecraft:overworld',
+        onGround: true, health: 20, gameTime: 100, position };
+      case 'get_entities': return { entities: [
+        { uuid: 'different', health: 12, distance: 1, pos: [0.5, 64, 0.5] },
+        { uuid: 'original', health: 9, distance: 2, pos: [position.x + 2, 64, 0.5] },
+      ] };
+      case 'get_blocks': return { cells: Array.from({ length: 12 }, (_, x) =>
+        ({ x, y: 63, z: 0, b: 'minecraft:grass_block' })) };
+      case 'go_to':
+        moved.push(args.pos);
+        position = { x: args.pos[0] + 0.5, y: args.pos[1], z: args.pos[2] + 0.5 };
+        return { arrived: true, position: [position.x, position.y, position.z] };
+      default: assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  const returned = await returnToCampWithCompanion(action, 'original', home);
+  assert.ok(moved.length > 0);
+  assert.equal(returned.dog.uuid, 'original');
+  assert.equal(returned.dog.health, 9);
+  assert.ok(Math.abs(returned.owner.position.x - 0.5) <= 4);
+});

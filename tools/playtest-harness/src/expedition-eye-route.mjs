@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
-import { dogMealCount, feedAdoptedDog, hold, retreatFromNearbyMob, stepOut } from './expedition-home.mjs';
+import { dogMealCount, feedAdoptedDog, hold, regroupExpeditionCompanion, retreatFromNearbyMob, stepOut } from './expedition-home.mjs';
 import { OVERWORLD, withCompanion } from './expedition-nether.mjs';
 
 const EYE = 'minecraft:ender_eye';
@@ -98,9 +98,15 @@ async function travelToward(action, target, arrived, maxSteps, travel) {
     }
     if (await retreatFromNearbyMob(action, player, travel.visited, travel.rejected)) continue;
     if (player.gameTime >= travel.nextCareCheck) {
-      travel.nextCareCheck = player.gameTime + 200;
+      travel.nextCareCheck = player.gameTime + (travel.returning ? 45 : 200);
       const dogs = await action('get_entities', { type: DOG, radius: 24 });
       const dog = dogs?.entities.find(entity => entity.uuid === travel.uuid && entity.health > 0);
+      if (dog) travel.lastDog = dog.pos;
+      if (travel.returning && (!dog || dog.distance > 10)) {
+        const together = await regroupExpeditionCompanion(action, travel.uuid, travel.lastDog);
+        travel.lastDog = together.pos;
+        continue;
+      }
       if (!dog) {
         await withCompanion(action, OVERWORLD, travel.uuid);
         continue;
@@ -130,10 +136,71 @@ async function travelToward(action, target, arrived, maxSteps, travel) {
     }
     travel.visited.push(feet(player));
     const destination = detour ?? target;
-    await stepOut(action, player, travel.visited,
-      [Math.floor(destination.x), Math.floor(player.position.y), Math.floor(destination.z)], 'surface', travel.rejected);
+    const approachKnownHeight = !detour && travel.returning && Number.isFinite(target.y) && remaining <= 12;
+    await stepOut(action, player, travel.visited, [
+      Math.floor(destination.x), Math.floor(approachKnownHeight ? target.y : player.position.y), Math.floor(destination.z),
+    ], approachKnownHeight ? 'elevation' : 'surface', travel.rejected);
   }
   return null;
+}
+
+export function firstIronOutboundTrail(trace, bed) {
+  const trail = [];
+  // The final line can still be in flight while the launcher appends to the trace.
+  for (const line of trace.split('\n').slice(0, -1)) {
+    if (!line.startsWith('{')) continue;
+    let row;
+    try {
+      row = JSON.parse(line);
+    } catch {
+      // A controller interrupted during logging can leave a partial row.
+      continue;
+    }
+    const { action, observation } = row;
+    if (action === 'get_inventory' && observation?.slots?.some(stack => stack.id === 'minecraft:raw_iron')) break;
+    if (action !== 'observe' || !observation?.onGround || observation.inWater || observation.dead
+        || observation.dimension !== OVERWORLD) continue;
+    const point = feet(observation);
+    if (Math.hypot(...point.map((value, index) => value - bed[index])) <= 4) {
+      trail.splice(0, trail.length, point);
+      continue;
+    }
+    if (!trail.length) continue;
+    const previous = trail.findIndex(pos => String(pos) === String(point));
+    if (previous >= 0) trail.splice(previous + 1);
+    else if (Math.hypot(...point.map((value, index) => value - trail.at(-1)[index])) >= 5) trail.push(point);
+  }
+  return trail;
+}
+
+export async function returnToCampWithCompanion(action, uuid, bed, trail = []) {
+  const start = await withCompanion(action, OVERWORLD, uuid);
+  const camp = { x: bed[0] + 0.5, y: bed[1], z: bed[2] + 0.5 };
+  const atCamp = pos => horizontalDistance(pos, camp) <= 4 && Math.abs(pos.y - bed[1]) <= 2;
+  const travel = { visited: [], rejected: new Set(), uuid, nextCareCheck: 0, returning: true };
+  const nearby = trail.map(([x, y, z], index) => ({ index,
+    range: Math.hypot(start.position.x - x - 0.5, start.position.y - y, start.position.z - z - 0.5) }))
+    .filter(point => point.range <= 14).sort((a, b) => a.range - b.range)[0];
+  if (nearby && !atCamp(start.position)) {
+    for (const [x, y, z] of trail.slice(0, nearby.index + 1).reverse()) {
+      const point = { x: x + 0.5, y, z: z + 0.5 };
+      await travelToward(action, point, pos => horizontalDistance(pos, point) <= 2.5 && Math.abs(pos.y - y) <= 1,
+        18, travel);
+    }
+  }
+  const steps = Math.min(180, Math.ceil(horizontalDistance(start.position, camp)) + 35);
+  const reached = await travelToward(action, camp, atCamp, steps, travel);
+  assert.ok(reached, 'The player could not find a dry route back to the expedition bed');
+  for (let check = 0; check < 16; check++) {
+    const owner = await action('observe');
+    assert.ok(owner?.inWorld && owner.dimension === OVERWORLD && !owner.dead && atCamp(owner.position),
+      'The player moved away from the camp during reunification');
+    const dogs = await action('get_entities', { type: DOG, radius: 24 });
+    const dog = dogs?.entities.find(entity => entity.uuid === uuid && entity.health > 0 && entity.distance <= 6);
+    if (dog && Math.hypot(dog.pos[0] - camp.x, dog.pos[1] - bed[1], dog.pos[2] - camp.z) <= 8) return { owner, dog };
+    await setTimeout(250);
+  }
+  throw new Error('The original Mushroom did not arrive beside the expedition bed');
 }
 
 export async function navigateToStronghold(action, uuid, report = async () => {}) {

@@ -190,7 +190,11 @@ verified landing or use the recorded route to climb out. A quarry that ends
 without enough ore records its entrance and the observed blocks at the last
 landing. If the same footing remains after reattachment, the controller
 scouts another opening. On the surface it offers Mushroom an earned portion
-if his first meal is still pending.
+if his first meal is still pending. The first mined iron goes back to the
+camp bed before smelting. When the outbound path is in the local action
+trace, the controller retraces grounded positions it observed before the
+first ore pickup. The trace records the original living dog, the raw ore
+still in inventory and their positions at the bed.
 
 ```shell
 MUSHROOM_EXPEDITION_STATUS="$RUN_DIRECTORY/status" MUSHROOM_EXPEDITION_RESUME=1 \
@@ -375,8 +379,11 @@ shoots from observed positions. The bridge's automatic melee is disabled
 to keep it from attacking neutral Endermen. It finishes its retreat
 through damage before shooting again. For a guarded crystal, it surveys
 a dry pillar, water landing, and clear bow trajectory around nearby towers.
-It opens a side with a pickaxe and checks that water has reached the
-landing. It steers back toward the column if the current pushes it sideways.
+It opens a side with a pickaxe and removes the pillar one supported block
+at a time to keep the area dry for the arrow. If it needs the water exit,
+it checks the whole column and steers back toward it when the current
+pushes sideways. From the ground it checks the bow arc from nearby dry
+footing, including any water or blocks obstructing the opened cage.
 The fixture
 supplies the blocks, pickaxe, and buckets. The server checks for the removal of all ten
 original crystals and verifies Mushroom's identity and health at camp. The
