@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { setTimeout } from 'node:timers/promises';
 import {
   bedSpotsWithGroundCover, dryStepKey, dryWaypoint, exitObstruction, hasDrySupport, hasPlacedBed, nearbyBuildingSpots,
-  missingQuarryExitSupport, nearestCover, quarryLandingIsClear, quarryStep, uphillScoutingStep,
+  missingQuarryExitSupport, nearestCover, quarryLandingIsClear, quarryStep, uphillScoutingStep, waterExitWaypoint,
 } from './expedition-navigation.mjs';
 import { cookExpeditionMutton, makeExpeditionCharcoal, smeltExpeditionIron } from './expedition-furnace.mjs';
 import { enterShelter, findShelteredBed, useShelterDoor } from './expedition-shelter.mjs';
@@ -378,6 +378,32 @@ async function cutScoutingFoothold(action, player, detour) {
   return climbQuarry(action, step.landing);
 }
 
+export async function swimToDryGround(action, player) {
+  for (let pulse = 0; pulse < 24; pulse++) {
+    if (!player?.inWorld || player.dead || player.health <= 0) return false;
+    if (!player.inWater && player.onGround) return true;
+    if (player.inWater) {
+      const center = feet(player);
+      const volume = await action('get_blocks', { center, size: [23, 13, 23], format: 'json' });
+      const route = volume && waterExitWaypoint(volume.cells, center, center[1] + 6);
+      const waypoint = route?.waypoint && player.air >= 270 && player.position.y >= route.surface - 0.6
+        ? route.waypoint : null;
+      if (waypoint) {
+        const dx = waypoint[0] + 0.5 - player.position.x;
+        const dz = waypoint[1] + 0.5 - player.position.z;
+        const yaw = Math.atan2(-dx, dz) * 180 / Math.PI;
+        await action('move', { yaw, forward: true, jump: true, ticks: 14 });
+      } else {
+        await action('move', { jump: true, ticks: 18 });
+      }
+    } else {
+      await setTimeout(150);
+    }
+    player = await action('observe');
+  }
+  return Boolean(player?.inWorld && !player.dead && !player.inWater && player.onGround);
+}
+
 export async function gatherWool(action, descendFromCanopy, chooseRoute, craft, reportScouting, observedTrail = []) {
   const visited = [];
   const rejectedSteps = new Set();
@@ -400,6 +426,14 @@ export async function gatherWool(action, descendFromCanopy, chooseRoute, craft, 
 
     const player = await action('observe');
     assert.ok(player?.inWorld && !player.dead && player.health > 4, 'Sheep search ran out of safe health');
+    if (player.inWater) {
+      await reportScouting?.('In water. Swim up for air and find a dry bank before scouting again.');
+      assert.ok(await swimToDryGround(action, player), 'Could not swim to a verified dry bank while looking for sheep');
+      stalls = 0;
+      detour = undefined;
+      scoutingTrail.length = 0;
+      continue;
+    }
     if (await retreatFromNearbyMob(action, player, visited, rejectedSteps)) continue;
     const meal = BACKUP_FOOD.find(item => count(inventory, item) > 0)
       ?? (count(inventory, MUTTON) > (player.food <= 8 ? 0 : 1) ? MUTTON : undefined);

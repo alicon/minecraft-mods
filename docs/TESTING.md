@@ -128,7 +128,9 @@ walks through the door and closes it before sleeping. If it cannot find a
 reachable sheltered bed, it crafts a bed once it has collected matching wool.
 When food runs low, it can route toward nearby pigs or cows while scouting for
 wool. The scout can dye mixed wool when it has enough materials and takes a dry
-retreat from nearby danger. When scouting repeatedly returns to the same tiles,
+retreat from nearby danger. If it falls into water, it swims up for air, checks
+for a supported bank, and waits for a grounded observation before scouting
+again. When scouting repeatedly returns to the same tiles,
 it interrupts the chase and retraces grounded observations. If a ledge blocks
 the return, it can cut a supported one-block foothold away from fluids and
 falling blocks before looking for a different sheep. It uses remaining daylight

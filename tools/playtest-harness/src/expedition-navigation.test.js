@@ -33,6 +33,34 @@ test('camp placement and foot travel accept solid End terrain but reject the voi
   assert.deepEqual(dryWaypoint(rocks, [0, 65, 0], [], [3, 65, 0]), [2, 65, 0]);
 });
 
+test('a water exit follows the surface around a cliff to a dry supporting block', async () => {
+  const { waterExitWaypoint } = await import('./expedition-navigation.mjs');
+  const basin = [cell(0, 59, 0, 'water'), cell(0, 60, 0, 'water'), cell(0, 61, 0, 'water'), cell(0, 62, 0, 'water'),
+    cell(1, 62, 0, 'stone'), cell(1, 63, 0, 'stone'),
+    cell(0, 62, 1, 'water'), cell(1, 62, 1, 'kelp'), cell(2, 62, 1, 'dirt')];
+  assert.deepEqual(waterExitWaypoint(basin, [0, 59, 0], 65), { surface: 62, waypoint: [0, 1] });
+  assert.equal(waterExitWaypoint(basin, [0, 59, 0], 62), null);
+  assert.deepEqual(waterExitWaypoint(basin.slice(0, -1), [0, 59, 0], 65), { surface: 62, waypoint: null });
+});
+
+test('a submerged wool scout rises for air before aiming and returning to dry ground', async () => {
+  const { swimToDryGround } = await import('./expedition-home.mjs');
+  const start = { inWorld: true, health: 10, onGround: false, air: 214, inWater: true,
+    position: { x: 0.5, y: 59.8, z: 0.5 } };
+  const surface = { ...start, air: 300, position: { ...start.position, y: 62.2 } };
+  const land = { ...surface, inWater: false, onGround: true, position: { x: 1.5, y: 63, z: 0.5 } };
+  const basin = [59, 60, 61, 62].map(y => cell(0, y, 0, 'water')).concat(cell(1, 62, 0, 'dirt'));
+  const moves = [];
+  const action = async (name, args) => {
+    if (name === 'get_blocks') return { cells: basin };
+    if (name === 'move') { moves.push(args); return {}; }
+    if (name === 'observe') return moves.length === 1 ? surface : land;
+    assert.fail(name);
+  };
+  assert.equal(await swimToDryGround(action, start), true);
+  assert.deepEqual(moves, [{ jump: true, ticks: 18 }, { yaw: -90, forward: true, jump: true, ticks: 14 }]);
+});
+
 test('a quarry stair skips leaf litter above headroom and still removes the solid face', async () => {
   const { quarryStep } = await import('./expedition-navigation.mjs');
   const start = [318, 69, 289];
