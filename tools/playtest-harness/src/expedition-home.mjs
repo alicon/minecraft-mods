@@ -838,7 +838,7 @@ async function clearFeedingObstruction(action, pos, owner, dog) {
     && (await breakVisible(action, pos))?.broken);
 }
 
-export async function feedAdoptedDog(action, uuid, bed, attempts = 120) {
+export async function feedAdoptedDog(action, uuid, bed, attempts = 120, { inPlace = false } = {}) {
   const startingStock = await action('get_inventory');
   const offered = DOG_FOOD.find(item => count(startingStock, item));
   if (!offered) return false;
@@ -850,7 +850,8 @@ export async function feedAdoptedDog(action, uuid, bed, attempts = 120) {
   for (let attempt = 0; attempt < attempts; attempt++) {
     let player = await action('observe');
     if (!player || player.dead) return false;
-    if (await retreatFromNearbyMob(action, player, visited, rejectedSteps)) continue;
+    if (inPlace && (!player.onGround || player.inWater || player.threats?.some(threat => threat.distance < 7))) return false;
+    if (!inPlace && await retreatFromNearbyMob(action, player, visited, rejectedSteps)) continue;
     if (player.health < 8 || player.threats?.some(threat => threat.distance <= 3)) return false;
     const observed = await action('get_entities', { type: DOG, radius: FEEDING_SEARCH_RADIUS });
     const dog = observed?.entities.find(entity => entity.uuid === uuid && entity.health !== 0);
@@ -871,7 +872,7 @@ export async function feedAdoptedDog(action, uuid, bed, attempts = 120) {
           continue;
         }
         assert.equal(remaining, mealCount, 'A single feeding changed the raw meal count unexpectedly');
-      } else if (hit?.pos && /(?:_leaves|:(?:vine|short_grass|tall_grass|fern|large_fern))$/.test(hit.block) && clearedObstacles < 6
+      } else if (!inPlace && hit?.pos && /(?:_leaves|:(?:vine|short_grass|tall_grass|fern|large_fern))$/.test(hit.block) && clearedObstacles < 6
           && !aimed.threats?.some(threat => threat.distance < 6)) {
         const [x, y, z] = hit.pos;
         const supports = ([px, py, pz]) => x === Math.floor(px) && y === Math.floor(py) - 1 && z === Math.floor(pz);
@@ -881,13 +882,14 @@ export async function feedAdoptedDog(action, uuid, bed, attempts = 120) {
           continue;
         }
       }
-      if (hit?.pos && FEEDING_OBSTRUCTION.test(hit.block) && aimed.onGround && !aimed.inWater
+      if (!inPlace && hit?.pos && FEEDING_OBSTRUCTION.test(hit.block) && aimed.onGround && !aimed.inWater
           && clearedObstacles < 6 && await clearFeedingObstruction(action, hit.pos, aimed, dog)) {
         clearedObstacles++;
         await hold(action, meal);
         continue;
       }
     }
+    if (inPlace) return false;
     // Holding meat can interrupt barking at a peaceful mob. Let the dog
     // return on his own while the offer is fresh or he is coming closer.
     const returning = dog && offered !== 'minecraft:apple'
@@ -1963,13 +1965,17 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       const dogStatus = await policy.checkCompanion(player, !stairs.length);
       if (dogStatus === 'regrouped') continue;
       if (dogStatus === 'care') {
+        // A carried meal can avoid sending the player up the quarry and back to the same dog.
+        const localReturn = stairs.length && dogMealCount(inventory) > 0
+          ? await policy.tendCompanion({ inQuarry: true }) : undefined;
+        if (localReturn === false) continue;
         const paused = stairs.length && quarryLanding ? { stairs: [...stairs], landing: quarryLanding } : undefined;
         if (stairs.length) {
           await leaveQuarry(action, stairs, policy);
           stairs.length = 0;
           await policy.saveQuarry?.([]);
         }
-        if (await policy.tendCompanion()) {
+        if (localReturn ?? await policy.tendCompanion()) {
           await policy.returnAfterCare();
         } else if (paused) {
           await policy.reportScouting?.('Mushroom ate and it is safe to continue. Returning to the known quarry stairs.');

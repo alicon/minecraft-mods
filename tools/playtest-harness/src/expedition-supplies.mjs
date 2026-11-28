@@ -130,8 +130,8 @@ async function action(name, args = {}) {
   return result;
 }
 
-async function feedMushroom(uuid, position, attempts) {
-  const fed = await feedAdoptedDog(action, uuid, position, attempts);
+async function feedMushroom(uuid, position, attempts, options) {
+  const fed = await feedAdoptedDog(action, uuid, position, attempts, options);
   if (fed) console.log(JSON.stringify({ at: new Date().toISOString(), action: 'companion_meal_consumed', dog: uuid }));
   return fed;
 }
@@ -817,15 +817,20 @@ async function runExpedition(start, stage) {
         await waitForDaylightRecovery(action, checkpoint.camp.bed, message => narrate('Decision', message));
       },
     };
-    policy.tendCompanion = async () => {
-      await narrate('Objective', 'Pause the iron search and feed the original Mushroom.');
-      await regroupForCare(await action('observe'));
-      assert.ok(await forageExpeditionMeal(action, companionForage),
-        'Could not gather a meal near the original dog');
+    policy.tendCompanion = async ({ inQuarry = false } = {}) => {
+      if (inQuarry) {
+        await narrate('Objective', 'Offer Mushroom a carried meal at the quarry landing.');
+      } else {
+        await narrate('Objective', 'Pause the iron search and feed the original Mushroom.');
+        await regroupForCare(await action('observe'));
+        assert.ok(await forageExpeditionMeal(action, companionForage),
+          'Could not gather a meal near the original dog');
+      }
       const player = await action('observe');
-      assert.ok(await feedMushroom(checkpoint.dog,
-        [player.position.x, player.position.y, player.position.z].map(Math.floor), 30),
-      'Could not feed the original dog before returning to the quarry');
+      const fed = await feedMushroom(checkpoint.dog,
+        [player.position.x, player.position.y, player.position.z].map(Math.floor), inQuarry ? 1 : 30, { inPlace: inQuarry });
+      if (inQuarry && !fed) return undefined;
+      assert.ok(fed, 'Could not feed the original dog before returning to the quarry');
       checkpoint.fedDog = true;
       const afterMeal = await action('observe');
       checkpoint.lastDogMealAt = afterMeal.gameTime;

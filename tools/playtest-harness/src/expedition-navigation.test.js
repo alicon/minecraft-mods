@@ -1465,13 +1465,14 @@ test('the reserved recovery meal moves out of reach of automatic hotbar eating',
 
 test('feeding only succeeds when the original dog is reached and consumes one meal', async () => {
   const { feedAdoptedDog } = await import('./expedition-home.mjs');
-  for (const [hit, accepted] of [[19, true], [22, true], [22, false]]) {
+  for (const [hit, accepted, inPlace] of [[19, true], [22, true], [22, false], [22, true, true], [null, true, true]]) {
     let count = 2;
     const dog = { id: 22, uuid: 'original', distance: 2, pos: [2, 64, 0] };
     const decoy = { ...dog, id: 19, uuid: 'other' };
     const action = async (name, args) => {
       switch (name) {
-        case 'observe': return { position: { x: 0, y: 64, z: 0 }, crosshair: { id: hit } };
+        case 'observe': return { onGround: true, position: { x: 0, y: 64, z: 0 },
+          crosshair: hit === null ? { pos: [1, 64, 0], block: 'minecraft:stone' } : { id: hit } };
         case 'get_entities': return { entities: [decoy, dog] };
         case 'get_inventory': return { mainHand: { id: 'minecraft:mutton' }, slots: [{ id: 'minecraft:mutton', count }] };
         case 'look':
@@ -1484,7 +1485,7 @@ test('feeding only succeeds when the original dog is reached and consumes one me
         default: throw new Error(`Unexpected action: ${name}`);
       }
     };
-    assert.equal(await feedAdoptedDog(action, dog.uuid, [0, 64, 0], 1), hit === dog.id && accepted);
+    assert.equal(await feedAdoptedDog(action, dog.uuid, [0, 64, 0], 1, { inPlace }), hit === dog.id && accepted);
     assert.equal(count, hit === dog.id ? 1 : 2);
   }
 });
@@ -2058,6 +2059,62 @@ test('daylight feeding reuses the quarry while a care trip home takes priority',
     assert.deepEqual(walks, returnHome ? [entry] : [entry, landing]);
     assert.deepEqual(saves, returnHome ? [[[], undefined, false]]
       : [[[], undefined, false], [[entry], landing, true], [[entry], landing, false]]);
+  }
+});
+
+test('a reachable Mushroom eats at the quarry landing before any return climb', async () => {
+  const { earnIronKit } = await import('./expedition-home.mjs');
+  const entry = [0, 64, 0];
+  const landing = [1, 63, 0];
+  const pickaxe = { id: 'minecraft:stone_pickaxe', slot: 0, count: 1, maxDamage: 131 };
+  const meal = { id: 'minecraft:mutton', slot: 1, count: 1 };
+  for (const fedInPlace of [false, true]) {
+    for (const returnHome of [false, true]) {
+      const endpoint = new Error('Reached the next care decision');
+      const events = [];
+      let position = landing;
+      let cared = false;
+      let gameTime = 0;
+      const action = async (name, args) => {
+        if (name === 'observe') {
+          const [x, y, z] = position;
+          return { inWorld: true, onGround: true, health: 20, food: 20, gameTime: gameTime += 50,
+            position: { x: x + 0.5, y, z: z + 0.5 } };
+        }
+        if (name === 'get_inventory') return { slots: [pickaxe, meal], mainHand: pickaxe };
+        if (name === 'get_blocks') return { cells: [cell(0, 63, 0, 'stone'), cell(1, 62, 0, 'granite')] };
+        assert.equal(name, 'go_to');
+        position = args.pos;
+        events.push(position[1] === entry[1] ? 'climb' : 'descend');
+        return { arrived: true, position };
+      };
+      await assert.rejects(earnIronKit(action, () => assert.fail('No ore to smelt'), { bed: [-20, 64, 0] }, {
+        resumeQuarry: [entry],
+        resumeQuarryLanding: landing,
+        checkCompanion: async () => {
+          if (cared) throw endpoint;
+          return 'care';
+        },
+        tendCompanion: async ({ inQuarry } = {}) => {
+          if (inQuarry) {
+            assert.deepEqual(position, landing);
+            events.push('offer');
+            if (!fedInPlace) return undefined;
+          } else {
+            assert.deepEqual(position, entry);
+            events.push('forage');
+          }
+          cared = true;
+          return returnHome;
+        },
+        returnAfterCare: async () => { events.push('return'); throw endpoint; },
+      }), error => error === endpoint);
+      const expected = ['offer'];
+      if (!fedInPlace) expected.push('climb', 'forage');
+      if (returnHome) expected.push(...(fedInPlace ? ['climb', 'return'] : ['return']));
+      else if (!fedInPlace) expected.push('descend');
+      assert.deepEqual(events, expected);
+    }
   }
 });
 
