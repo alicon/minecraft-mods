@@ -2,6 +2,7 @@ const CARDINAL = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 const HEADROOM = /:(?:air|cave_air|void_air|short_grass|tall_grass|fern|large_fern|dead_bush|dandelion|poppy|leaf_litter|wildflowers|\w+_button|torch|wall_torch)$/;
 const SUPPORT = /:(?:grass_block|dirt|dirt_path|coarse_dirt|podzol|stone|granite|andesite|diorite|deepslate|tuff|(?:deepslate_)?(?:coal|iron|copper)_ore|cobblestone|(?:mossy_|cracked_)?stone_bricks|end_stone|end_stone_bricks|obsidian|bedrock|netherrack|blackstone|basalt|smooth_basalt|soul_soil|soul_sand|crimson_nylium|warped_nylium|nether_bricks|sandstone|terracotta|sand|gravel|snow_block|\w+_leaves|\w+_log|\w+_planks)$/;
 const LEAVES = /_leaves$/;
+const TABLE_COVER = /:(?:short_grass|tall_grass|fern|large_fern|dead_bush|dandelion|poppy|leaf_litter|wildflowers|\w+_leaves)$/;
 const QUARRY_BLOCK = /^minecraft:(?:grass_block|dirt|coarse_dirt|podzol|stone|andesite|diorite|granite|deepslate|(?:deepslate_)?(?:coal|iron)_ore)$/;
 const QUARRY_HAZARD = /^minecraft:(?:water|lava|powder_snow|.*sand|gravel)$/;
 const SHELTER_BLOCK = /^minecraft:(?:dirt|grass_block|stone|cobblestone|granite|diorite|andesite|deepslate|end_stone|end_stone_bricks|obsidian|netherrack|blackstone|nether_bricks)$/;
@@ -116,11 +117,12 @@ export function nearbyBuildingSpots(cells, player, bed) {
   return buildingSpots(cells, player, bed, id => id === undefined).map(({ pos }) => pos);
 }
 
-export function bedSpotsWithGroundCover(cells, player) {
-  const cover = new Set(cells.filter(({ b }) => HEADROOM.test(b)).map(({ x, y, z }) => `${x},${y},${z}`));
-  return buildingSpots(cells, player, true, gap).flatMap(({ pos, head, adjacent }) => {
-    const covered = new Map([pos, head, ...adjacent].flatMap(([x, y, z]) => [[x, y, z], [x, y + 1, z]])
-      .filter(point => cover.has(point.join(','))).map(point => [point.join(','), point]));
+export function buildingSpotsWithGroundCover(cells, player, bed) {
+  const coverType = bed ? HEADROOM : TABLE_COVER;
+  const cover = new Set(cells.filter(({ b }) => coverType.test(b)).map(({ x, y, z }) => `${x},${y},${z}`));
+  return buildingSpots(cells, player, bed, id => id === undefined || coverType.test(id)).flatMap(({ pos, head, adjacent }) => {
+    const space = bed ? [pos, head, ...adjacent].flatMap(([x, y, z]) => [[x, y, z], [x, y + 1, z]]) : [pos];
+    const covered = new Map(space.filter(point => cover.has(point.join(','))).map(point => [point.join(','), point]));
     return covered.size ? [{ pos, clear: [...covered.values()] }] : [];
   });
 }

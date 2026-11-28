@@ -1541,12 +1541,12 @@ test('a rock blocking the feeding approach is mined with a pickaxe before offeri
 });
 
 test('forest-floor litter can be cleared for a bed with two dry supports', async () => {
-  const { bedSpotsWithGroundCover, nearbyBuildingSpots } = await import('./expedition-navigation.mjs');
+  const { buildingSpotsWithGroundCover, nearbyBuildingSpots } = await import('./expedition-navigation.mjs');
   const position = { x: 0.15, y: 1, z: 0.5 };
   const blocks = [cell(1, 0, 0), cell(2, 0, 0), cell(1, 1, 0, 'leaf_litter'),
     cell(2, 1, 0, 'short_grass'), cell(1, 0, 1), cell(1, 1, 1, 'water')];
   assert.deepEqual(nearbyBuildingSpots(blocks, position, true), []);
-  assert.deepEqual(bedSpotsWithGroundCover(blocks, position), [
+  assert.deepEqual(buildingSpotsWithGroundCover(blocks, position, true), [
     { pos: [1, 1, 0], clear: [[1, 1, 0], [2, 1, 0]] },
   ]);
 });
@@ -1977,6 +1977,33 @@ test('a crafting table can be packed when it blocks a dry step toward camp', asy
   assert.equal(exitObstruction(blocks, here), null);
   assert.equal(exitObstruction(blocks, here, [-5, 2, 0]), null);
   assert.deepEqual(exitObstruction(blocks, here, [5, 2, 0]), table);
+});
+
+test('starter crafting finds a higher terrace and clears the plant above its support', async () => {
+  const { placeBeside } = await import('./expedition-home.mjs');
+  const table = 'minecraft:crafting_table';
+  const position = { x: 1.09, y: 118, z: 8.11 };
+  const spot = [2, 119, 6];
+  const cleared = [];
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_inventory': return { slots: [{ id: table, slot: 1, count: 1 }] };
+      case 'select_slot': return { mainHand: { id: table } };
+      case 'observe': return { position };
+      case 'get_blocks': return { cells: [
+        cell(1, 117, 8), cell(1, 117, 7), cell(2, 118, 6), cell(...spot, 'wildflowers'),
+      ] };
+      case 'break_block':
+        cleared.push(args.pos);
+        return { broken: true };
+      case 'place_block':
+        assert.deepEqual(args.pos, spot);
+        assert.deepEqual(cleared, [spot]);
+        return { placed: true, blockAtPos: table };
+      default: assert.fail(name);
+    }
+  };
+  assert.deepEqual(await placeBeside(action, table), spot);
 });
 
 test('bed placement finds a supported pair beyond a crowded immediate neighbor', async () => {

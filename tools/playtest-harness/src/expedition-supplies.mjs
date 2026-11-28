@@ -9,7 +9,7 @@ import {
   regroupExpeditionCompanion, retreatFromNearbyMob,
   settleOnDryStep, sleepNearby, stepOut, waitForDaylightRecovery, WOOD_LOGS,
 } from './expedition-home.mjs';
-import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
+import { canopyLanding } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
 import { shelterAtEndArrival } from './expedition-end-camp.mjs';
 import { reachEndIslandSurface } from './expedition-end-route.mjs';
@@ -1343,29 +1343,10 @@ async function gatherStarterTools(start, { combatOnly = false, timberToward } = 
   if (stickBatches) await craft('stick', stickBatches * 4);
   if (needsTable) await craft('crafting_table', 1);
   if (!tools.length) return;
-  await hold(action, 'minecraft:crafting_table');
-
-  const { position } = await action('observe');
-  const { x, y, z } = position;
-  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-    const pos = [Math.floor(x) + dx, Math.floor(y), Math.floor(z) + dz];
-    const ground = await action('get_blocks', { center: [pos[0], pos[1] - 1, pos[2]], size: [1, 1, 1], format: 'json' });
-    if (!hasDrySupport(ground?.cells[0]?.b)) continue;
-    let placed = await action('place_block', { pos });
-    if (!placed?.placed) {
-      const cell = await action('get_blocks', { center: pos, size: [1, 1, 1], format: 'json' });
-      if (!cell?.cells[0]?.b.endsWith('_leaves')) continue;
-      const cleared = await action('break_block', { pos, maxTicks: 30 });
-      if (!cleared?.broken) continue;
-      placed = await action('place_block', { pos });
-    }
-    if (!placed?.placed || placed.blockAtPos !== 'minecraft:crafting_table') continue;
-    const opened = await action('interact_block', { pos });
-    assert.equal(opened?.screenOpened, 'CraftingScreen');
-    for (const [item] of tools) await craft(item, 1);
-    await action('stop', { closeScreen: true });
-    await packStarterTable(pos);
-    return;
-  }
-  throw new Error('No nearby location accepted the crafting table');
+  const pos = await placeBeside(action, 'minecraft:crafting_table');
+  const opened = await action('interact_block', { pos });
+  assert.equal(opened?.screenOpened, 'CraftingScreen');
+  for (const [item] of tools) await craft(item, 1);
+  await action('stop', { closeScreen: true });
+  await packStarterTable(pos);
 }

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { setTimeout } from 'node:timers/promises';
 import {
-  bedSpotsWithGroundCover, dryStepKey, dryWaypoint, exitObstruction, hasDrySupport, hasPlacedBed, nearbyBuildingSpots,
+  buildingSpotsWithGroundCover, dryStepKey, dryWaypoint, exitObstruction, hasDrySupport, hasPlacedBed, nearbyBuildingSpots,
   missingQuarryExitSupport, nearestCover, planEmergencyDugout, quarryLandingIsClear, quarryStep, uphillScoutingStep, waterExitWaypoint,
 } from './expedition-navigation.mjs';
 import { cookExpeditionMutton, makeExpeditionCharcoal, smeltExpeditionIron } from './expedition-furnace.mjs';
@@ -566,7 +566,9 @@ export async function placeBeside(action, item) {
   const { cells } = await action('get_blocks', { center: feet(player), size: [11, 5, 11], format: 'json' });
   const bed = item.endsWith('_bed');
   const spots = nearbyBuildingSpots(cells, player.position, bed).map(pos => ({ pos, clear: [] }));
-  if (bed) spots.push(...bedSpotsWithGroundCover(cells, player.position));
+  if (bed || item === 'minecraft:crafting_table') {
+    spots.push(...buildingSpotsWithGroundCover(cells, player.position, bed));
+  }
   for (const { pos, clear } of spots) {
     for (const cover of clear) await action('break_block', { pos: cover, maxTicks: 25 });
     if (bed) {
