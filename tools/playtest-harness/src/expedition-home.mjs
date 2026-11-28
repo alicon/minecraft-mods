@@ -660,8 +660,8 @@ async function selectBreakingTool(action, block) {
   return Boolean(await action('select_slot', { slot }));
 }
 
-export async function breakVisible(action, pos) {
-  await action('look', { at: pos });
+export async function breakVisible(action, pos, aim = { at: pos }) {
+  await action('look', aim);
   await setTimeout(80);
   const hit = (await action('observe'))?.crosshair;
   if (hit?.pos?.join(',') !== pos.join(',') || !await selectBreakingTool(action, hit.block)) return null;
@@ -784,10 +784,20 @@ export async function descendQuarry(action, player, bed, stairs, protectedGround
   const { cells } = await action('get_blocks', { center: start, size: [7, 7, 7], format: 'json' });
   const step = quarryStep(cells, start, bed, stairs);
   if (!step) return 'unavailable';
+  const [tx, ty, tz] = step.landing;
+  const overhang = [tx, ty + 2, tz];
   let opened = false;
   for (const pos of step.clear) {
     let result = await breakVisible(action, pos);
-    if (!result && await settleOnDryStep(action, start)) result = await breakVisible(action, pos);
+    if (!result && await settleOnDryStep(action, start)) {
+      const hit = (await action('observe'))?.crosshair;
+      if (hit?.block === 'minecraft:leaf_litter' && String(hit.pos) === String(overhang)) {
+        // The ray to the solid face can hit litter that a center aim missed.
+        const cover = await action('break_block', { pos: overhang, maxTicks: 25 });
+        opened ||= Boolean(cover?.broken);
+      }
+      result = await breakVisible(action, pos);
+    }
     if (/took damage from (?:lava|.*fire)/i.test(result?.reason ?? '')) {
       await moveAwayFromFire(action, cells.filter(({ b }) => /:(?:lava|fire|soul_fire)$/.test(b)));
       return 'blocked';
@@ -797,7 +807,6 @@ export async function descendQuarry(action, player, bed, stairs, protectedGround
   }
   if (!await reachQuarryLanding(action, step.landing)) return 'blocked';
   const [x, y, z] = start;
-  const [tx, ty, tz] = step.landing;
   for (const support of [[x, y - 1, z], [tx, ty - 1, tz]]) protectedGround.add(support.join(','));
   stairs.push(start);
   return step.landing;

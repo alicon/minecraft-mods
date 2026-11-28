@@ -12,6 +12,7 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -40,7 +41,8 @@ final class MushroomCampRetreatGoal extends Goal {
 			return false;
 		}
 		var camp = this.dog.expeditionCamp;
-		boolean danger = camp.anchor() != null && this.dog.hurtTime > 0
+		boolean onMagma = this.dog.onGround() && level.getBlockState(this.dog.getOnPos()).is(Blocks.MAGMA_BLOCK);
+		boolean danger = onMagma || (camp.anchor() != null && this.dog.hurtTime > 0)
 				|| inBreath(this.breathAt(level), this.dog.position());
 		if (!camp.holding()) {
 			return danger;

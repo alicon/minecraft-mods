@@ -21,7 +21,9 @@ time, even when you quit or travel.
 
 When he retreats, he looks for a safe path to the marked mat. If the mat has
 been moved or the path is unsafe, he tries to stop on safe ground. He waits for
-you to come back. In Bedrock, build his retreat path on one level. Return to
+you to come back. In Java, a following Mushroom also tries to step off magma
+and wait on safe ground before you have marked a mat. Magma can still hurt him.
+In Bedrock, build his retreat path on one level. Return to
 within two blocks to call him back when it is safe. In Java, you can also use
 an empty hand to recall him from a few steps away.
 

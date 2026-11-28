@@ -27,15 +27,16 @@ final class ExpeditionQuarryToolsClientScenario {
 				level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
 			}
 			level.setBlockAndUpdate(start.north(2), Blocks.DIRT.defaultBlockState());
-			level.setBlockAndUpdate(start.east(2), Blocks.STONE.defaultBlockState());
-			owner.teleportTo(start.getX() + 0.5, start.getY(), start.getZ() + 0.5);
+			level.setBlockAndUpdate(start.west(2), Blocks.STONE.defaultBlockState());
+			level.setBlockAndUpdate(start.east().above(), Blocks.OAK_LOG.defaultBlockState());
+			owner.teleportTo(start.getX() + 0.69, start.getY(), start.getZ() + 0.5);
 			owner.getInventory().add(new ItemStack(Items.OAK_LOG, 4));
 			return start;
 		});
 		context.waitFor(client -> client.player.blockPosition().equals(origin)
 				&& client.player.getInventory().contains(stack -> stack.is(Items.OAK_LOG)));
 		var dirt = origin.north(2);
-		var stone = origin.east(2);
+		var stone = origin.west(2);
 		Files.writeString(status.resolveSibling("quarry-tool-targets"),
 				"[[%d,%d,%d],[%d,%d,%d]]".formatted(dirt.getX(), dirt.getY(), dirt.getZ(), stone.getX(), stone.getY(), stone.getZ()));
 		Files.writeString(status, "ready");
@@ -44,7 +45,11 @@ final class ExpeditionQuarryToolsClientScenario {
 			if ("finished".equals(result)) {
 				server.runOnServer(minecraft -> {
 					var inventory = minecraft.getPlayerList().getPlayer(ownerId).getInventory();
-					if (!minecraft.overworld().getBlockState(dirt).isAir() || !minecraft.overworld().getBlockState(stone).isAir()
+					var level = minecraft.overworld();
+					if (inventory.countItem(Items.CRAFTING_TABLE) != 1) {
+						throw new AssertionError("Expected to recover the table placed under the overhanging log");
+					}
+					if (!level.getBlockState(dirt).isAir() || !level.getBlockState(stone).isAir()
 							|| !inventory.contains(stack -> stack.is(Items.WOODEN_SHOVEL) && stack.getDamageValue() == 1)
 							|| !inventory.contains(stack -> stack.is(Items.WOODEN_PICKAXE) && stack.getDamageValue() == 1)
 							|| !inventory.contains(stack -> stack.is(Items.WOODEN_SWORD))) {

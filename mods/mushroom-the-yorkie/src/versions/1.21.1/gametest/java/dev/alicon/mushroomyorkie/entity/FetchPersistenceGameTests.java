@@ -3,6 +3,7 @@ package dev.alicon.mushroomyorkie.entity;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.level.block.Blocks;
 
 /** Native serialization adapters for the shared carried-toy lifecycle regressions. */
 public final class FetchPersistenceGameTests {
@@ -109,6 +110,12 @@ public final class FetchPersistenceGameTests {
 	@GameTest(template = "fabric-gametest-api-v1:empty", timeoutTicks = 180)
 	public void expeditionCrossesAfterWideningBridge(GameTestHelper helper) {
 		ExpeditionCampScenarios.narrowCrossing(helper);
+	}
+
+	/** Leave hot footing even before the owner has a camp mat. */
+	@GameTest(template = "fabric-gametest-api-v1:empty", timeoutTicks = 120)
+	public void expeditionStepsOffMagmaWithoutMat(GameTestHelper helper) {
+		ExpeditionCampScenarios.stepOffMagmaWithoutMat(helper, Blocks.AIR);
 	}
 
 	/** Warning at an unsafe crossing preserves a guest's lead and the dog's owner. */

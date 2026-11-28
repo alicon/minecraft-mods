@@ -353,6 +353,7 @@ async function runExpedition(start, stage) {
   } else {
     assert.equal(inventory.slots.length, 0, 'Expected an empty expedition inventory');
     checkpoint = { owner: start.name, gameTime: start.gameTime, bridgeFingerprint, stage, phase: 'starter' };
+    if (live) await writeCheckpoint(checkpoint);
   }
   await action('set_reflexes', { chargeRanged: false });
   if (checkpoint.phase === 'starter') {
@@ -525,12 +526,55 @@ async function recoverLooseLogs() {
   }
 }
 
+async function packStarterTable(pos) {
+  let removed = await breakVisible(action, pos);
+  if (!removed?.broken) {
+    const { position } = await action('observe');
+    const [x, y, z] = pos;
+    // A hanging log can hide the table's center while leaving its near face open.
+    const near = (player, block) => Math.max(block + 0.02, Math.min(player, block + 0.98));
+    const dx = near(position.x, x) - position.x;
+    const dy = y + 0.55 - (position.y + 1.62);
+    const dz = near(position.z, z) - position.z;
+    removed = await breakVisible(action, pos, {
+      yaw: Math.atan2(-dx, dz) * 180 / Math.PI,
+      pitch: -Math.atan2(dy, Math.hypot(dx, dz)) * 180 / Math.PI,
+    });
+  }
+  assert.ok(removed?.broken, 'Could not pack up the crafting table');
+  await setTimeout(400);
+  const hasTable = stock => stock.slots.some(stack => stack.id === 'minecraft:crafting_table');
+  if (hasTable(await action('get_inventory'))) return;
+  const approach = await action('go_to', { pos, stopDistance: 0.3, maxTicks: 55 });
+  const overhead = [pos[0], pos[1] + 1, pos[2]];
+  if (approach?.reason?.includes(`at ${overhead.join(',')} (head)`)) {
+    const view = await action('get_blocks', { center: overhead, size: [1, 1, 1], format: 'json' });
+    if (WOOD_LOGS.includes(view?.cells[0]?.b.replace(/^minecraft:/, ''))
+        && (await breakVisible(action, overhead))?.broken) {
+      await walk(pos, 0.3);
+    }
+  }
+  await setTimeout(400);
+  assert.ok(hasTable(await action('get_inventory')), 'The player did not pick up the crafting table');
+}
+
 async function gatherStarterTools(start) {
   const stock = await action('get_inventory');
   const amount = item => stock.slots.reduce((total, stack) => total + (stack.id === item ? stack.count : 0), 0);
   const tools = [['wooden_pickaxe', 3, 2], ['wooden_sword', 2, 1], ['wooden_shovel', 1, 2]]
     .filter(([item]) => !amount(`minecraft:${item}`));
   const needsTable = !amount('minecraft:crafting_table');
+  if (!tools.length && needsTable) {
+    const { x, y, z } = (await action('observe')).position;
+    const center = [x, y, z].map(Math.floor);
+    const area = await action('get_blocks', { center, size: [7, 5, 7], format: 'json' });
+    const table = area?.cells.find(cell => cell.b === 'minecraft:crafting_table'
+      && Math.hypot(cell.x + 0.5 - x, cell.y - y, cell.z + 0.5 - z) <= 2);
+    if (table) {
+      await packStarterTable([table.x, table.y, table.z]);
+      return;
+    }
+  }
   const sticksNeeded = tools.reduce((total, [, , cost]) => total + cost, 0) - amount('minecraft:stick');
   const stickBatches = Math.max(0, Math.ceil(sticksNeeded / 4));
   const planks = tools.reduce((total, [, cost]) => total + cost, 0) + (needsTable ? 4 : 0) + stickBatches * 2;
@@ -571,11 +615,7 @@ async function gatherStarterTools(start) {
     assert.equal(opened?.screenOpened, 'CraftingScreen');
     for (const [item] of tools) await craft(item, 1);
     await action('stop', { closeScreen: true });
-    assert.ok((await breakVisible(action, pos))?.broken, 'Could not pack up the crafting table');
-    await walk(pos, 0.3);
-    await setTimeout(400);
-    assert.ok((await action('get_inventory')).slots.some(stack => stack.id === 'minecraft:crafting_table'),
-      'The player did not pick up the crafting table');
+    await packStarterTable(pos);
     return;
   }
   throw new Error('No nearby location accepted the crafting table');

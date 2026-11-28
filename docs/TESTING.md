@@ -222,7 +222,8 @@ checks the earned iron pickaxe, bucket, shield, and original dog.
 Set `MUSHROOM_EXPEDITION_STAGE=quarry-iron` to replay the iron portion in a
 disposable native client. The fixture supplies the stone kit, fuel, timber
 and an ore pocket beside a one-block quarry stair. The run digs and descends
-the stair, collects and smelts seven raw iron, crafts the iron pickaxe, bucket,
+the stair, clears any leaf litter that blocks the mining crosshair, collects
+and smelts seven raw iron, crafts the iron pickaxe, bucket,
 and shield, and returns to the same seated Mushroom. The server
 checks that the ore is gone, the player returned above the stair, and the
 original dog stayed alive with its original owner and sit order.
@@ -293,7 +294,7 @@ the direction from the thrown eye.
 Set `MUSHROOM_EXPEDITION_STAGE=quarry-tools` to verify tool selection at
 the dirt-to-stone boundary. The disposable native fixture supplies four logs
 and two reachable blocks. The controller crafts the starter kit, packs the
-crafting table, uses the shovel on dirt, and switches to the pickaxe for stone.
+crafting table from under a log, uses the shovel on dirt, and switches to the pickaxe for stone.
 The server checks that both blocks broke and that each tool took one point of wear.
 
 Set `MUSHROOM_EXPEDITION_STAGE=shelter` to replay the Java sheltered adoption.
@@ -414,6 +415,10 @@ intentional for below-platform returns. A deliberately small-template native con
 original pet, toy and fake owner. This changes test setup, not gameplay.
 
 Crafting GameTests load every Mushroom recipe and check exact output/count through both native recipe matching and the crafting menu. Vanilla lime/yellow wool and modern copper-nugget controls protect the recipes that previously overlapped the mod. The 1.21.1 build converts modern ingredient strings to the older object schema from the same source definitions; native crafting runs in CI for both targets.
+
+The Java expedition magma test starts the original owned dog on a hot
+block beside usable footing, before the player has a mat. It checks that
+the same dog steps off and waits alive while his owner is away.
 
 Water GameTests check clearing existing sleep/pose on entering water, refusing new wet sleep/sit requests, refusing airborne or overhanging-edge sleep/nap until supported landing, retaining sleep on thin dog beds/slabs and the supported doghouse visual bed, resuming dry nighttime sleep, preventing synthetic fall accumulation during supported doghouse sleep without protecting an awake falling pet, requiring the low-bed approach path to end on the bed rather than adjacent floor, and reaching a dry bank with the grounded creative recovery controller and native collision movement. Night recovery controls keep the sheltered routine quiet while wet or airborne, preserve daytime/outdoor trips and daily limits, and exercise doghouse priority and dusk cancellation. The live water group adds full entity ticks, day/night, hunger, real wet interactions, and creative naps triggered by actual block placement.
 

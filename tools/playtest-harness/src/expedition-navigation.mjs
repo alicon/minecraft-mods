@@ -131,7 +131,10 @@ export function quarryStep(cells, [x, y, z], bed, walked) {
     if (Math.max(Math.abs(tx - bed[0]), Math.abs(tz - bed[2])) <= 2
         || walked.some(([px, , pz]) => px === tx && pz === tz)
         || !QUARRY_BLOCK.test(at([tx, y - 2, tz]) ?? '')) continue;
-    const clear = [y + 1, y, y - 1].map(by => [tx, by, tz]).filter(pos => at(pos));
+    // Non-colliding plants above the landing are not in the player's way.
+    // Aiming at the middle of a leaf-litter block misses its thin top face.
+    const clear = [y + 1, y, y - 1].map(by => [tx, by, tz])
+      .filter(pos => at(pos) && (pos[1] !== y + 1 || !gap(at(pos))));
     if (!clear.every(pos => gap(at(pos)) || QUARRY_BLOCK.test(at(pos)))) continue;
     const exposed = [[tx, y + 2, tz], ...CARDINAL.flatMap(([sx, sz]) =>
       [y - 1, y, y + 1].map(by => [tx + sx, by, tz + sz]))];

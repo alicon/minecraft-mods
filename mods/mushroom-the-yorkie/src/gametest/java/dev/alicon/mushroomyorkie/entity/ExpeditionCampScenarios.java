@@ -7,6 +7,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 
@@ -89,6 +90,39 @@ final class ExpeditionCampScenarios {
 				})
 				.thenWaitUntil(() -> helper.assertTrue(dog.distanceToSqr(owner) <= 4, "Mushroom did not use the widened path"))
 				.thenExecute(() -> {
+					dog.discard();
+					level.getServer().getPlayerList().remove(owner);
+					helper.succeed();
+				});
+	}
+
+	static void stepOffMagmaWithoutMat(GameTestHelper helper, Block cover) {
+		int floor = 2;
+		int feet = floor + 1;
+		for (int x = 1; x <= 7; x++) {
+			for (int z = 1; z <= 7; z++) {
+				helper.setBlock(x, floor, z, Blocks.NETHERRACK);
+			}
+		}
+		helper.setBlock(4, floor, 4, Blocks.MAGMA_BLOCK);
+		helper.setBlock(4, feet, 4, cover);
+		helper.setBlock(5, feet, 4, Blocks.GRASS_BLOCK);
+		var level = helper.getLevel();
+		var owner = SurvivalGameTestPlayers.createWithoutToyCleanup(helper);
+		owner.setPos(Vec3.atBottomCenterOf(helper.absolutePos(new BlockPos(7, feet, 7))));
+		var dog = helper.spawn(ModEntities.MUSHROOM_YORKIE, 4, feet, 4);
+		dog.claimFor(owner);
+		dog.setHealth(4.0F);
+		var identity = dog.getUUID();
+		helper.startSequence()
+				.thenWaitUntil(() -> helper.assertTrue(dog.isHoldingExpeditionShelter()
+						&& MushroomExpeditionFooting.standable(level, dog, dog.blockPosition()),
+						"Mushroom did not leave hot footing and find shelter before owning a mat"))
+				.thenExecuteAfter(35, () -> {
+					helper.assertTrue(dog.isAlive() && dog.isOwnedBy(owner) && dog.getUUID().equals(identity)
+							&& !dog.isOrderedToSit() && dog.expeditionCamp.anchor() == null
+							&& MushroomExpeditionFooting.standable(level, dog, dog.blockPosition()),
+							"The original dog did not stay alive off the magma while the owner was away");
 					dog.discard();
 					level.getServer().getPlayerList().remove(owner);
 					helper.succeed();

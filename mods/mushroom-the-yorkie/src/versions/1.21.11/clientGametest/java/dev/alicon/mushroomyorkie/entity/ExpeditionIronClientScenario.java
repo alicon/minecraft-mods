@@ -33,6 +33,7 @@ final class ExpeditionIronClientScenario {
 			for (BlockPos pos : BlockPos.betweenClosed(start.east().below(2), start.east().above())) {
 				level.setBlockAndUpdate(pos, Blocks.STONE.defaultBlockState());
 			}
+			level.setBlockAndUpdate(start.east().above(), Blocks.LEAF_LITTER.defaultBlockState());
 			// The pocket is beside the stair. The lookahead beyond the stair
 			// sees open air, so the controller must stay over the checked floor.
 			for (BlockPos pos : BlockPos.betweenClosed(start.offset(1, -2, -4), start.offset(6, -2, 5))) {

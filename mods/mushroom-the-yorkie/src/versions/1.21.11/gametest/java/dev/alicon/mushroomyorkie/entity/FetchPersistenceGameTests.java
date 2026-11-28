@@ -5,6 +5,7 @@ import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.level.storage.TagValueOutput;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.level.block.Blocks;
 
 /** Native serialization adapters for the shared carried-toy lifecycle regressions. */
 public final class FetchPersistenceGameTests {
@@ -111,6 +112,12 @@ public final class FetchPersistenceGameTests {
 	@GameTest(maxTicks = 180)
 	public void expeditionCrossesAfterWideningBridge(GameTestHelper helper) {
 		ExpeditionCampScenarios.narrowCrossing(helper);
+	}
+
+	/** Leave hot footing even before the owner has a camp mat. */
+	@GameTest(maxTicks = 120)
+	public void expeditionStepsOffMagmaWithoutMat(GameTestHelper helper) {
+		ExpeditionCampScenarios.stepOffMagmaWithoutMat(helper, Blocks.LEAF_LITTER);
 	}
 
 	/** Warning at an unsafe crossing preserves a guest's lead and the dog's owner. */

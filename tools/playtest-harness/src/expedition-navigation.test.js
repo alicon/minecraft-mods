@@ -13,6 +13,18 @@ test('camp placement and foot travel accept solid End terrain but reject the voi
   assert.deepEqual(dryWaypoint(rocks, [0, 65, 0], [], [3, 65, 0]), [2, 65, 0]);
 });
 
+test('a quarry stair skips leaf litter above headroom and still removes the solid face', async () => {
+  const { quarryStep } = await import('./expedition-navigation.mjs');
+  const start = [318, 69, 289];
+  const bed = [298, 69, 251];
+  const forest = [
+    cell(318, 70, 288, 'leaf_litter'), cell(318, 69, 288), cell(318, 68, 288, 'dirt'),
+    cell(318, 67, 288, 'dirt'), cell(317, 69, 289),
+  ];
+  assert.deepEqual(quarryStep(forest, start, bed, [[317, 70, 289]]),
+    { landing: [318, 68, 288], clear: [[318, 69, 288], [318, 68, 288]] });
+});
+
 test('canopy drops are measured to the top of the landing block and reject hazardous floors', async () => {
   const { canopyLanding } = await import('./expedition-navigation.mjs');
   const start = [160, 78, 161];
