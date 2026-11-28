@@ -1,6 +1,18 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
+test('stronghold triangulation accepts forward intersections and rejects unstable bearings', async () => {
+  const { intersectEyeBearings } = await import('./expedition-eye-route.mjs');
+  const first = { origin: { x: 0, z: 0 }, bearing: { x: 0, z: 1 } };
+  const normal = Math.hypot(16, 48);
+  const second = { origin: { x: 16, z: 0 }, bearing: { x: -16 / normal, z: 48 / normal } };
+  const result = intersectEyeBearings(first, second);
+  assert.equal(result.x, 0);
+  assert.ok(Math.abs(result.z - 48) < 0.001);
+  assert.equal(intersectEyeBearings(first, { ...second, bearing: { x: 0.01, z: 1 } }), null);
+  assert.equal(intersectEyeBearings(first, { ...second, bearing: { x: 16 / normal, z: -48 / normal } }), null);
+});
+
 const cell = (x, y, z, block) => ({ x, y, z, b: `minecraft:${block}` });
 const frame = [-1, 0, 1].flatMap(i => [
   cell(-2, 64, i, 'end_portal_frame'), cell(2, 64, i, 'end_portal_frame'),

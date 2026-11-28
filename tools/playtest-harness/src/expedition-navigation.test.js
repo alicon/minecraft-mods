@@ -536,6 +536,15 @@ test('an open stretch can run ten blocks while a trunk interrupts the segment', 
   assert.deepEqual(dryWaypoint(trees, start, [], destination), [6, 1, 0]);
 });
 
+test('an overland bearing crosses a slope without climbing the nearby canopy', async () => {
+  const { dryWaypoint } = await import('./expedition-navigation.mjs');
+  const terrain = [
+    cell(0, 0, 0), cell(1, 0, 0), cell(2, 1, 0, 'oak_leaves'), cell(3, 1, 0, 'oak_leaves'),
+    cell(3, 2, 0), cell(0, 1, 1), cell(1, 2, 1), cell(2, 3, 1), cell(3, 3, 1),
+  ];
+  assert.deepEqual(dryWaypoint(terrain, [0, 1, 0], [], [3, 1, 0], 'surface'), [0, 2, 1]);
+});
+
 test('a two-block sand bank and a low ceiling both block the direct step', async () => {
   const { dryWaypoint } = await import('./expedition-navigation.mjs');
   const start = [0, 1, 0];

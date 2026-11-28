@@ -12,7 +12,7 @@ import { defendCompanion } from './expedition-companion.mjs';
 import { earnBlazeRods } from './expedition-blaze-rods.mjs';
 import { shootEndCrystal } from './expedition-end-crystals.mjs';
 import { crossEndPortal } from './expedition-end-entry.mjs';
-import { scoutByEye } from './expedition-eye-route.mjs';
+import { navigateToStronghold, scoutByEye } from './expedition-eye-route.mjs';
 import { COMPANION_WEARABLES, markExpeditionCamp, practiceStayAndRecall, prepareCompanionGear } from './expedition-gear.mjs';
 import { expeditionPolicy } from './expedition-policy.mjs';
 import { NETHER, OVERWORLD, netherRoundTrip, prepareNetherPortal } from './expedition-nether.mjs';
@@ -65,6 +65,7 @@ const milestoneObjectives = {
   'end-entry': 'Craft Eyes of Ender and bring Mushroom through the active portal.',
   'end-crystal': 'Mark Mushroom’s shelter and break an End crystal from a safe bow position.',
   'eye-route': 'Throw an Eye of Ender and follow its visible flight with Mushroom.',
+  'stronghold-approach': 'Measure two Eye of Ender bearings and reach the stronghold area with Mushroom.',
   'quarry-tools': 'Craft the starter kit, shovel soil, and switch to a pickaxe for stone.',
   'quarry-iron': 'Mine the iron below camp, return up the stairs, and make the expedition kit.',
 };
@@ -254,10 +255,16 @@ try {
     for (let shot = 0; shot < 3 && !crystal; shot++) crystal = await shootEndCrystal(action, companion);
     assert.ok(crystal, 'The crystal in bow range survived all shots');
     console.log(JSON.stringify({ at: new Date().toISOString(), action: 'end_crystal_destroyed', crystal, camp, dog: companion }));
-  } else if (stage === 'eye-route') {
+  } else if (stage === 'eye-route' || stage === 'stronghold-approach') {
     companion = (await readFile(join(dirname(statusFile), 'eye-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
-    await scoutByEye(action, companion, async bearing => {
+    if (stage === 'stronghold-approach') {
+      await navigateToStronghold(action, companion, async (kind, observation) => {
+        console.log(JSON.stringify({ at: new Date().toISOString(), action: `stronghold_${kind}`, observation }));
+        if (kind === 'fix') await narrate('Decision',
+          `The bearings cross near ${Math.round(observation.x)}, ${Math.round(observation.z)}. Walking there with Mushroom.`);
+      });
+    } else await scoutByEye(action, companion, async bearing => {
       console.log(JSON.stringify({ at: new Date().toISOString(), action: 'eye_bearing', bearing }));
       const yaw = Math.round(Math.atan2(-bearing.x, bearing.z) * 180 / Math.PI);
       await narrate('Decision', `Saw the eye travel ${bearing.distance.toFixed(1)} blocks. Heading toward its bearing at yaw ${yaw}° on dry ground.`);
@@ -406,6 +413,19 @@ async function runExpedition(start, stage) {
     if (live && ['iron', 'nether'].includes(stage)) await writeCheckpoint(checkpoint);
   }
   if (['iron', 'nether'].includes(stage) && checkpoint.phase === 'iron') {
+    if (checkpoint.fedDog === false && !checkpoint.quarry?.length) {
+      const player = await action('observe');
+      if (player?.onGround && !player.inWater) {
+        await narrate('Objective', 'Offer the original Mushroom our food before leaving for iron.');
+        checkpoint.fedDog = await feedAdoptedDog(action, checkpoint.dog,
+          [player.position.x, player.position.y, player.position.z].map(Math.floor), 24)
+          || await feedAdoptedDog(action, checkpoint.dog, checkpoint.camp.bed, 48);
+        if (checkpoint.fedDog) {
+          await narrate('Result', 'The original Mushroom ate one portion.');
+          if (live) await writeCheckpoint(checkpoint);
+        }
+      }
+    }
     await narrate('Objective', 'Mine and smelt iron for a pickaxe, bucket, and shield.');
     if (live) {
       policy.resumeQuarry = checkpoint.quarry;

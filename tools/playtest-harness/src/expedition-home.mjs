@@ -194,7 +194,8 @@ export async function hunt(action, animal, dropMatches, canContinue) {
 export async function stepOut(action, player, visited, destination, preferredGround, rejectedSteps = new Set(), chooseRoute, avoid) {
   const center = feet(player);
   const width = preferredGround || chooseRoute ? 23 : 17;
-  const volume = await action('get_blocks', { center, size: [width, 9, width], format: 'json' });
+  const height = preferredGround === 'surface' ? 15 : 9;
+  const volume = await action('get_blocks', { center, size: [width, height, width], format: 'json' });
   let pos = dryWaypoint(volume.cells, center, visited, destination, preferredGround, rejectedSteps, avoid);
   if (avoid && !pos) return false;
   const repeated = visited.filter(tile => tile.every((coordinate, axis) => coordinate === center[axis])).length > 2;
@@ -221,8 +222,12 @@ export async function stepOut(action, player, visited, destination, preferredGro
   const result = await action('go_to', { pos, stopDistance: 0.3, maxTicks: 90 });
   const wrongHeight = result?.arrived && Math.abs(result.position?.[1] - pos[1]) >= 0.9
     && !await settleOnDryStep(action, pos);
-  const moved = result?.arrived || Math.hypot(result?.position?.[0] - player.position.x,
-    result?.position?.[2] - player.position.z) >= 0.6;
+  const displacement = Math.hypot(result?.position?.[0] - player.position.x,
+    result?.position?.[2] - player.position.z);
+  // Downhill momentum can carry an overland walker past the exact tile.
+  // Replan from the grounded observation instead of banning a usable exit.
+  if (wrongHeight && preferredGround === 'surface' && displacement >= 0.6) return true;
+  const moved = result?.arrived || displacement >= 0.6;
   if (wrongHeight || (!moved && result?.reason)) rejectedSteps.add(dryStepKey(center, pos));
   return !wrongHeight && moved;
 }

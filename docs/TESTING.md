@@ -173,7 +173,8 @@ and owner must match the recorded checkpoint. A player with the earned starter
 tools can resume searching for food and wool before a camp has been built.
 An interrupted iron quarry
 retains its grounded steps. The resumed controller can continue from the
-verified landing or use the recorded route to climb out.
+verified landing or use the recorded route to climb out. On the surface it
+offers Mushroom an earned portion if his first meal is still pending.
 
 ```shell
 MUSHROOM_EXPEDITION_STATUS="$RUN_DIRECTORY/status" MUSHROOM_EXPEDITION_RESUME=1 \
@@ -300,6 +301,14 @@ the client, and follows that bearing. The server independently checks that
 the player moved closer to the world's actual stronghold with the same
 living dog nearby. The controller receives the dog's identity and learns
 the direction from the thrown eye.
+
+Set `MUSHROOM_EXPEDITION_STAGE=stronghold-approach` to check a longer
+route over generated terrain. The fixture starts the player about 54 blocks
+from a real stronghold, with eyes in the inventory and Mushroom nearby. The
+controller observes one throw, moves sideways to take a second reading,
+intersects the bearings, and walks to the estimate. The integrated server
+checks two ordinary throws, the position independently of the estimate, and
+the original living dog. This stage stops at the surface approach.
 
 Set `MUSHROOM_EXPEDITION_STAGE=quarry-tools` to verify tool selection at
 the dirt-to-stone boundary. The disposable native fixture supplies four logs

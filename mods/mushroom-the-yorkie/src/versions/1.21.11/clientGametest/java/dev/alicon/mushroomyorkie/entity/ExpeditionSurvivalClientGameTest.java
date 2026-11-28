@@ -47,7 +47,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 			case "iron" -> IRON_WINDOW_TICKS;
 			case "nether" -> NETHER_WINDOW_TICKS;
 			case "defense", "feeding", "portal", "nether-supplies", "shelter", "equipment", "end-entry", "end-crystal",
-					"eye-route", "quarry-tools", "quarry-iron" -> 0;
+					"eye-route", "stronghold-approach", "quarry-tools", "quarry-iron" -> 0;
 			default -> throw new AssertionError("Unknown expedition stage " + stage);
 		};
 		TestWorldSave save;
@@ -115,8 +115,8 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 					ExpeditionEndCrystalClientScenario.run(context, server, ownerId, status);
 					return;
 				}
-				if ("eye-route".equals(stage)) {
-					ExpeditionEyeRouteClientScenario.run(context, server, ownerId, status);
+				if ("eye-route".equals(stage) || "stronghold-approach".equals(stage)) {
+					ExpeditionEyeRouteClientScenario.run(context, server, ownerId, status, "stronghold-approach".equals(stage));
 					return;
 				}
 				if ("quarry-tools".equals(stage)) {

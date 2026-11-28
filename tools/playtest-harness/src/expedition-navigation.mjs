@@ -180,7 +180,9 @@ export function dryWaypoint(cells, start, visited, destination, preferredGround,
       for (const ty of [y, y + 1, y - 1]) {
         const step = [tx, ty, tz];
         const key = step.join(',');
-        if (seen.has(key) || rejectedSteps.has(dryStepKey(pos, step)) || !hasDrySupport(block(tx, ty - 1, tz))
+        const support = block(tx, ty - 1, tz);
+        if (seen.has(key) || rejectedSteps.has(dryStepKey(pos, step)) || !hasDrySupport(support)
+            || (preferredGround === 'surface' && /_(?:leaves|log)$/.test(support))
             || (avoid && distance(avoid, step) <= distance(avoid, pos))
             || !gap(block(tx, ty, tz)) || !gap(block(tx, ty + 1, tz))
             || (ty > y && !gap(block(x, ty + 1, z)))
@@ -203,7 +205,8 @@ export function dryWaypoint(cells, start, visited, destination, preferredGround,
             && gap(block(px, ty, pz)) && gap(block(px, ty + 1, pz));
         }).length : 0;
         const score = (destination
-          ? -2 * distance(destination, step) - 1.25 * Math.abs(destination[1] - ty)
+          ? -2 * distance(destination, step)
+            - (preferredGround === 'surface' ? 0 : 1.25 * Math.abs(destination[1] - ty))
             - route.length * 0.25 + fresh * 0.1
           : fresh + 0.3 * distance(start, step) - route.length * 0.12 + pasture * 0.65
             + exposedRock * 0.9) - routeRepeatCost * 1.5;
