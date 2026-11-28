@@ -20,6 +20,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.NetherPortalBlock;
+import net.minecraft.world.level.block.entity.ChestBlockEntity;
 
 final class ExpeditionPortalClientScenario {
 	private ExpeditionPortalClientScenario() {
@@ -35,17 +36,22 @@ final class ExpeditionPortalClientScenario {
 			preparePortal(home, origin, false);
 			preparePortal(nether, destination, true);
 			var landing = origin.south(3);
+			var chestPos = landing.east(2);
+			home.setBlockAndUpdate(chestPos, Blocks.CHEST.defaultBlockState());
+			var chest = (ChestBlockEntity) Objects.requireNonNull(home.getBlockEntity(chestPos));
+			chest.setItem(0, new ItemStack(Items.OBSIDIAN));
+			chest.setItem(1, new ItemStack(Items.FLINT));
+			chest.setItem(2, new ItemStack(Items.COBBLESTONE));
 			owner.teleportTo(landing.getX() + 0.5, landing.getY(), landing.getZ() + 0.5);
-			owner.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.FLINT_AND_STEEL));
-			owner.getInventory().add(new ItemStack(Items.OBSIDIAN));
+			owner.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.IRON_INGOT));
 			var dog = Objects.requireNonNull(ModEntities.MUSHROOM_YORKIE.create(home, EntitySpawnReason.TRIGGERED));
 			dog.claimFor(owner);
 			dog.setPos(landing.getX() + 1.5, landing.getY(), landing.getZ() + 0.5);
 			home.addFreshEntity(dog);
-			return new Fixture(origin, landing, dog.getUUID(), dog.getId());
+			return new Fixture(origin, landing, chestPos, dog.getUUID(), dog.getId());
 		});
 		context.waitFor(client -> client.player.blockPosition().equals(fixture.landing())
-				&& client.player.getMainHandItem().is(Items.FLINT_AND_STEEL)
+				&& client.player.getMainHandItem().is(Items.IRON_INGOT)
 				&& client.level.getEntity(fixture.runtimeId()) instanceof MushroomYorkieEntity);
 		Files.writeString(status.resolveSibling("portal-companion"), fixture.dogId().toString());
 		Files.writeString(status, "ready");
@@ -62,11 +68,14 @@ final class ExpeditionPortalClientScenario {
 				server.runOnServer(minecraft -> {
 					var owner = minecraft.getPlayerList().getPlayer(ownerId);
 					var home = minecraft.overworld();
+					var chest = (ChestBlockEntity) home.getBlockEntity(fixture.chest());
 					if (!owner.level().dimension().equals(Level.OVERWORLD)
 							|| !validDog(owner, home.getEntity(fixture.dogId()))
 							|| !home.getBlockState(fixture.origin().west().above(2)).is(Blocks.OBSIDIAN)
 							|| !home.getBlockState(fixture.origin()).is(Blocks.NETHER_PORTAL)
-							|| !owner.getInventory().contains(stack -> stack.is(Items.FLINT_AND_STEEL) && stack.isDamaged())) {
+							|| !owner.getInventory().contains(stack -> stack.is(Items.FLINT_AND_STEEL) && stack.isDamaged())
+							|| chest == null || !chest.getItem(0).isEmpty() || !chest.getItem(1).isEmpty()
+							|| !chest.getItem(2).is(Items.COBBLESTONE)) {
 						throw new AssertionError("Expected the repaired, lit frame and the same living dog and owner back home");
 					}
 				});
@@ -107,6 +116,6 @@ final class ExpeditionPortalClientScenario {
 		}
 	}
 
-	private record Fixture(BlockPos origin, BlockPos landing, UUID dogId, int runtimeId) {
+	private record Fixture(BlockPos origin, BlockPos landing, BlockPos chest, UUID dogId, int runtimeId) {
 	}
 }

@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -15,6 +16,7 @@ import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.minecraft.client.gui.screens.DeathScreen;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.entity.EntityTypeTest;
 
@@ -22,6 +24,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 	private static final int ADOPTION_WINDOW_TICKS = 26_000;
 	private static final int STONE_WINDOW_TICKS = 38_000;
 	private static final int IRON_WINDOW_TICKS = 56_000;
+	private static final int NETHER_WINDOW_TICKS = 96_000;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -42,12 +45,14 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 			case "adoption" -> ADOPTION_WINDOW_TICKS;
 			case "stone" -> STONE_WINDOW_TICKS;
 			case "iron" -> IRON_WINDOW_TICKS;
+			case "nether" -> NETHER_WINDOW_TICKS;
 			case "defense", "portal", "shelter" -> 0;
 			default -> throw new AssertionError("Unknown expedition stage " + stage);
 		};
 		TestWorldSave save;
 		UUID ownerId;
 		var originalDog = new AtomicReference<UUID>();
+		var togetherInNether = new AtomicBoolean();
 		var companionDeath = new AtomicReference<String>();
 		ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
 			if (entity instanceof MushroomYorkieEntity dog && dog.getUUID().equals(originalDog.get())) {
@@ -141,6 +146,11 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 						if (dogs.size() == 1) {
 							originalDog.compareAndSet(null, dogs.getFirst().getUUID());
 						}
+						if ("nether".equals(stage) && owner.level().dimension().equals(Level.NETHER) && originalDog.get() != null
+								&& owner.level().getEntity(originalDog.get()) instanceof MushroomYorkieEntity living
+								&& living.isAlive() && living.belongsTo(owner)) {
+							togetherInNether.set(true);
+						}
 						if (!finished) {
 							return null;
 						}
@@ -156,10 +166,13 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 								|| !owner.getInventory().contains(stack -> stack.is(Items.FURNACE)))) {
 							throw new AssertionError("The player did not finish with the earned stone pickaxe and furnace");
 						}
-						if ("iron".equals(stage) && (!owner.getInventory().contains(stack -> stack.is(Items.IRON_PICKAXE))
+						if (("iron".equals(stage) || "nether".equals(stage)) && (!owner.getInventory().contains(stack -> stack.is(Items.IRON_PICKAXE))
 								|| !owner.getInventory().contains(stack -> stack.is(Items.BUCKET))
 								|| !owner.getInventory().contains(stack -> stack.is(Items.SHIELD)))) {
 							throw new AssertionError("The player did not finish with the earned iron pickaxe, bucket and shield");
+						}
+						if ("nether".equals(stage) && (!togetherInNether.get() || !owner.level().dimension().equals(Level.OVERWORLD))) {
+							throw new AssertionError("The owner and original dog did not make a complete Nether round trip");
 						}
 						return dogs.getFirst().getUUID().toString();
 					});

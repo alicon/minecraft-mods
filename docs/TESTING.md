@@ -206,13 +206,20 @@ the native client, and the same injured dog survives. The staged encounter
 provides companion-defense coverage separately from fresh Survival progress.
 
 Set `MUSHROOM_EXPEDITION_STAGE=portal` to replay the Java Nether round trip.
-The disposable world stages an incomplete portal with a dry landing and gives
-the owner one obsidian and flint and steel. The controller recognizes and
-repairs the frame, lights it, and walks in. It walks clear in the Nether,
+The disposable world stages an incomplete portal with a dry landing and a
+chest with obsidian and flint. The owner starts with an iron ingot. The
+controller loots the chest, crafts flint and steel, repairs the frame, lights
+it, and walks in. It walks clear in the Nether,
 waits out the portal cooldown, and returns with the same dog. The integrated
 server verifies the repaired frame and the living original dog with its owner
-in both dimensions. This stage provides native interaction coverage while
-the fresh Survival expedition still has to earn its supplies and find a route.
+in both dimensions.
+
+Set `MUSHROOM_EXPEDITION_STAGE=nether` to play from a fresh Survival spawn
+through the iron stage and a round trip. The controller can reserve a smelted
+ingot for ignition and scout for a repairable ruined portal and usable chest.
+It can also look for accessible gravel to supply flint. The integrated server
+requires the original living dog with its owner in each dimension and again
+after reopening the save.
 
 Set `MUSHROOM_EXPEDITION_STAGE=shelter` to replay the Java sheltered adoption.
 The disposable world provides a furnished house at night. The player

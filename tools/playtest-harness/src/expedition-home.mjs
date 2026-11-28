@@ -172,11 +172,12 @@ async function hunt(action, animal, dropMatches) {
   return false;
 }
 
-async function stepOut(action, player, visited, destination, preferredGround, rejectedSteps = new Set(), chooseRoute) {
+export async function stepOut(action, player, visited, destination, preferredGround, rejectedSteps = new Set(), chooseRoute, avoid) {
   const center = feet(player);
   const width = preferredGround || chooseRoute ? 23 : 17;
   const volume = await action('get_blocks', { center, size: [width, 9, width], format: 'json' });
-  let pos = dryWaypoint(volume.cells, center, visited, destination, preferredGround, rejectedSteps);
+  let pos = dryWaypoint(volume.cells, center, visited, destination, preferredGround, rejectedSteps, avoid);
+  if (avoid && !pos) return false;
   const repeated = visited.filter(tile => tile.every((coordinate, axis) => coordinate === center[axis])).length > 2;
   if (!pos || repeated) {
     const leaf = leavesBlockingExit(volume.cells, center);
@@ -194,7 +195,7 @@ async function stepOut(action, player, visited, destination, preferredGround, re
         surface: volume.cells.find(cell => cell.x === x && cell.y === y - 1 && cell.z === z)?.b,
       });
       exits.add(dryStepKey(center, route));
-      route = dryWaypoint(volume.cells, center, visited, destination, preferredGround, exits);
+      route = dryWaypoint(volume.cells, center, visited, destination, preferredGround, exits, avoid);
     }
     pos = (await chooseRoute(player, routes, destination)).pos;
   }
@@ -207,17 +208,22 @@ async function stepOut(action, player, visited, destination, preferredGround, re
 }
 
 export async function retreatFromNearbyMob(action, player, visited, rejectedSteps) {
-  const threat = player.threats?.find(entity => entity.distance <= 7
+  // A scouting walk can cover ten blocks before the next observation.
+  const threat = player.threats?.find(entity => entity.distance <= (entity.type === 'minecraft:creeper' ? 16 : 7)
     && (entity.type !== 'minecraft:spider' || isBedtime(player)));
   if (!threat) return false;
-  const nearby = await action('get_entities', { radius: 10, max: 64 });
+  const nearby = await action('get_entities', { type: threat.type, radius: 18, max: 16 });
   const danger = nearby?.entities.find(entity => entity.id === threat.id && entity.hostile);
   if (!danger) return false;
   const here = feet(player);
   const away = [here[0] + 8 * Math.sign(player.position.x - danger.pos[0]), here[1],
     here[2] + 8 * Math.sign(player.position.z - danger.pos[2])];
   visited.push(here);
-  return stepOut(action, player, visited, away, undefined, rejectedSteps);
+  if (await stepOut(action, player, visited, away, undefined, rejectedSteps, undefined, danger.pos)) return true;
+  if (threat.type !== 'minecraft:creeper') return false;
+  await action('stop');
+  await setTimeout(250);
+  return true;
 }
 
 export async function gatherWool(action, descendFromCanopy, chooseRoute, craft) {
@@ -1018,13 +1024,15 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   }
   const startingStock = await action('get_inventory');
   const recipes = IRON_RECIPES.filter(([item]) => !count(startingStock, item));
-  if (!recipes.length) {
+  const needsIgnitionIngot = policy.reserveIgnitionIron && !count(startingStock, 'minecraft:flint_and_steel')
+    && !count(startingStock, 'minecraft:fire_charge');
+  const wantedIngots = recipes.reduce((amount, [, cost]) => amount + cost, Number(Boolean(needsIgnitionIngot)));
+  const requiredOre = Math.max(0, wantedIngots - count(startingStock, IRON_INGOT));
+  if (!recipes.length && !requiredOre) {
     await leaveQuarry(action, stairs, policy);
     if (stairs.length) await policy.saveQuarry?.([]);
     return;
   }
-  const wantedIngots = recipes.reduce((amount, [, cost]) => amount + cost, 0);
-  const requiredOre = Math.max(0, wantedIngots - count(startingStock, IRON_INGOT));
   const visited = [];
   const rejectedSteps = new Set();
   const mined = new Set();
@@ -1133,7 +1141,8 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   assert.ok(count(materials, RAW_IRON) >= requiredOre, 'Could not earn enough reachable iron ore for the expedition kit');
   const fuel = count(materials, COAL) ? COAL : CHARCOAL;
   const needsCharcoal = requiredOre > 0 && !count(materials, fuel);
-  const planks = (recipes.some(([item]) => item === 'minecraft:shield') ? 10 : 4) + Number(needsCharcoal);
+  const tablePlanks = recipes.some(([item]) => item === 'minecraft:shield') ? 10 : recipes.length ? 4 : 0;
+  const planks = tablePlanks + Number(needsCharcoal);
   await ensurePlanks(action, craft, planks);
   if (recipes.some(([item]) => item === 'minecraft:iron_pickaxe')
       && count(await action('get_inventory'), 'minecraft:stick') < 2) {
@@ -1143,8 +1152,6 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   if (needsCharcoal && !(await action('get_inventory')).slots.some(stack => stack.id.endsWith('_log'))) {
     assert.ok(await harvestReachableLog(action), 'Could not collect a reachable log for charcoal');
   }
-  await craft('minecraft:crafting_table', 1);
-  const table = await placeBeside(action, 'minecraft:crafting_table');
   if (requiredOre) {
     const furnace = await placeBeside(action, FURNACE);
     await action('interact_block', { pos: furnace });
@@ -1152,6 +1159,9 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
     await smeltExpeditionIron(action, requiredOre, fuel);
     await action('stop', { closeScreen: true });
   }
+  if (!recipes.length) return;
+  await craft('minecraft:crafting_table', 1);
+  const table = await placeBeside(action, 'minecraft:crafting_table');
   await openCampTable(action, table, visited);
   for (const [item] of recipes) {
     await craft(item, 1);

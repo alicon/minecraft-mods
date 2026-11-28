@@ -82,6 +82,36 @@ test('an unarmored scout runs away from a close skeleton along native dry waypoi
   assert.ok(stepped);
 });
 
+test('a creeper at fourteen blocks diverts the next scouting walk before the fuse', async () => {
+  const { retreatFromNearbyMob } = await import('./expedition-home.mjs');
+  const player = { position: { x: 0.5, y: 64, z: 0.5 }, timeOfDay: 5_850, health: 16,
+    threats: [{ id: 8721, type: 'minecraft:creeper', distance: 14.5 }] };
+  const ground = Array.from({ length: 17 }, (_, i) => cell(i - 8, 63, 0));
+  const action = async (name, args) => {
+    if (name === 'get_entities') {
+      assert.ok(args.radius >= 15);
+      return { entities: [{ id: 8721, hostile: true, pos: [15, 64, 0.5] }] };
+    }
+    if (name === 'get_blocks') return { cells: ground };
+    if (name === 'go_to') {
+      assert.ok(args.pos[0] < 0);
+      return { arrived: true, position: args.pos };
+    }
+    assert.fail(name);
+  };
+  assert.equal(await retreatFromNearbyMob(action, player, [], new Set()), true);
+});
+
+test('retreat navigation rejects a route whose first step would approach the threat', async () => {
+  const { dryWaypoint } = await import('./expedition-navigation.mjs');
+  const floor = [cell(0, 63, 0), cell(1, 63, 0), cell(2, 63, 0)];
+  const here = [0, 64, 0];
+  const threat = [3, 64, 0];
+  assert.equal(dryWaypoint(floor, here, [], [-4, 64, 0], undefined, new Set(), threat), null);
+  floor.push(cell(0, 63, -1), cell(0, 63, -2));
+  assert.deepEqual(dryWaypoint(floor, here, [], [-4, 64, 0], undefined, new Set(), threat), [0, 64, -1]);
+});
+
 test('after adoption the player can sleep in a nearby vanilla bed at night', async () => {
   const { sleepNearby } = await import('./expedition-home.mjs');
   const player = { inWorld: true, dimension: 'minecraft:overworld', timeOfDay: 15_000,

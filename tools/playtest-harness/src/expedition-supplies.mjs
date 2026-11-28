@@ -10,7 +10,7 @@ import {
 import { hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
 import { expeditionPolicy } from './expedition-policy.mjs';
-import { netherRoundTrip } from './expedition-nether.mjs';
+import { NETHER, OVERWORLD, netherRoundTrip, prepareNetherPortal } from './expedition-nether.mjs';
 
 const configFile = new URL(
   '../../../mods/mushroom-the-yorkie/build/run/clientGameTest/config/mcagent.json',
@@ -165,14 +165,15 @@ await rpc('initialize', {
   clientInfo: { name: 'mushroom-expedition-pilot', version: '1' },
 });
 try {
-  const start = await action('observe');
-  assert.ok(start?.inWorld && start.dimension === 'minecraft:overworld' && !start.dead);
   const stage = process.env.MUSHROOM_EXPEDITION_STAGE ?? 'adoption';
+  const start = await action('observe');
+  assert.ok(start?.inWorld && !start.dead && (start.dimension === OVERWORLD
+    || (resume && stage === 'nether' && start.dimension === NETHER)));
   if (stage === 'defense') await runCompanionDrill();
   else if (stage === 'portal') {
     companion = (await readFile(join(dirname(statusFile), 'portal-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
-    await netherRoundTrip(action, companion, hold);
+    await netherRoundTrip(action, companion, hold, () => prepareNetherPortal(action, craft));
   } else if (stage === 'shelter') {
     const camp = await prepareAdoptionCamp(action, craft, descendFromCanopy);
     assert.ok(camp.door, 'Expected to find a furnished house in the shelter replay');
@@ -212,7 +213,8 @@ async function runExpedition(start, stage) {
     assert.equal(checkpoint.owner, start.name);
     assert.equal(checkpoint.bridgeFingerprint, bridgeFingerprint, 'The recorded client is no longer listening');
     assert.ok(Number.isFinite(checkpoint.gameTime) && checkpoint.gameTime <= start.gameTime);
-    assert.ok(['starter', 'provision', 'camp', 'adoption', 'stone', 'iron'].includes(checkpoint.phase));
+    assert.ok(['starter', 'provision', 'camp', 'adoption', 'stone', 'iron', 'nether'].includes(checkpoint.phase));
+    assert.ok(start.dimension === OVERWORLD || checkpoint.phase === 'nether', 'Unexpected dimension before the Nether phase');
     if (checkpoint.phase === 'provision' && inventory.slots.length === 0) {
       verifiedDeathSite(start, checkpoint);
       checkpoint.phase = 'starter';
@@ -240,7 +242,7 @@ async function runExpedition(start, stage) {
     assert.ok(checkpoint.dog === undefined || /^[\da-f-]{36}$/i.test(String(checkpoint.dog)), 'Invalid recorded dog UUID');
     companion = checkpoint.dog;
     await action('stop', { closeScreen: true });
-    if (['stone', 'iron'].includes(checkpoint.phase)
+    if (['stone', 'iron', 'nether'].includes(checkpoint.phase)
         && !inventory.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide')) {
       const destination = verifiedDeathSite(start, checkpoint);
       console.log(JSON.stringify({ at: new Date().toISOString(), action: 'recover_dropped_loadout', destination }));
@@ -292,9 +294,9 @@ async function runExpedition(start, stage) {
     }
     await earnStoneKit(action, craft, checkpoint.camp, policy);
     checkpoint.phase = 'iron';
-    if (live && stage === 'iron') await writeCheckpoint(checkpoint);
+    if (live && ['iron', 'nether'].includes(stage)) await writeCheckpoint(checkpoint);
   }
-  if (stage === 'iron') {
+  if (['iron', 'nether'].includes(stage) && checkpoint.phase === 'iron') {
     if (live) {
       policy.resumeQuarry = checkpoint.quarry;
       policy.resumeQuarryLanding = checkpoint.quarryLanding;
@@ -306,7 +308,7 @@ async function runExpedition(start, stage) {
         await writeCheckpoint(checkpoint);
       };
     }
-    await earnIronKit(action, craft, checkpoint.camp, policy);
+    await earnIronKit(action, craft, checkpoint.camp, { ...policy, reserveIgnitionIron: stage === 'nether' });
   }
   if (checkpoint.fedDog === false) {
     assert.ok(await forageExpeditionMeal(action), 'Could not earn a meal for the original dog');
@@ -315,6 +317,11 @@ async function runExpedition(start, stage) {
     assert.ok(await feedAdoptedDog(action, checkpoint.dog, position), 'Could not feed the original dog before finishing');
     checkpoint.fedDog = true;
     if (live) await writeCheckpoint(checkpoint);
+  }
+  if (stage === 'nether') {
+    checkpoint.phase = 'nether';
+    if (live) await writeCheckpoint(checkpoint);
+    await netherRoundTrip(action, checkpoint.dog, hold, () => prepareNetherPortal(action, craft, checkpoint.camp), start.dimension);
   }
 }
 
