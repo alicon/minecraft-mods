@@ -200,11 +200,12 @@ export async function stepOut(action, player, visited, destination, preferredGro
     pos = (await chooseRoute(player, routes, destination)).pos;
   }
   const result = await action('go_to', { pos, stopDistance: 0.3, maxTicks: 90 });
-  const wrongHeight = result?.arrived && Math.abs(result.position?.[1] - pos[1]) >= 0.9;
-  const moved = (result?.arrived && !wrongHeight) || Math.hypot(result?.position?.[0] - player.position.x,
+  const wrongHeight = result?.arrived && Math.abs(result.position?.[1] - pos[1]) >= 0.9
+    && !await settleOnDryStep(action, pos);
+  const moved = result?.arrived || Math.hypot(result?.position?.[0] - player.position.x,
     result?.position?.[2] - player.position.z) >= 0.6;
   if (wrongHeight || (!moved && result?.reason)) rejectedSteps.add(dryStepKey(center, pos));
-  return moved;
+  return !wrongHeight && moved;
 }
 
 export async function retreatFromNearbyMob(action, player, visited, rejectedSteps) {
@@ -678,7 +679,7 @@ export async function mineVisible(action, bed, alreadyMined, wanted, drops, prot
   return false;
 }
 
-export async function settleQuarryStep(action, landing, wait = setTimeout) {
+export async function settleOnDryStep(action, landing, wait = setTimeout) {
   const target = landing.join(',');
   for (let attempt = 0; attempt < 8; attempt++) {
     const player = await action('observe');
@@ -714,7 +715,7 @@ async function descendQuarry(action, player, bed, stairs, protectedGround) {
     opened = true;
   }
   const outcome = await action('go_to', { pos: step.landing, stopDistance: 0.3, maxTicks: 45 });
-  if (!outcome?.arrived || !await settleQuarryStep(action, step.landing)) return 'blocked';
+  if (!outcome?.arrived || !await settleOnDryStep(action, step.landing)) return 'blocked';
   const [x, y, z] = start;
   const [tx, ty, tz] = step.landing;
   for (const support of [[x, y - 1, z], [tx, ty - 1, tz]]) protectedGround.add(support.join(','));
@@ -727,7 +728,7 @@ async function climbQuarry(action, pos, chooseEscape) {
   const rejectedSteps = new Set();
   for (let attempt = 0; attempt < 8; attempt++) {
     const result = await action('go_to', { pos, stopDistance: 0.3, maxTicks: 35 });
-    if (result?.arrived && await settleQuarryStep(action, pos)) return true;
+    if (result?.arrived && await settleOnDryStep(action, pos)) return true;
     const player = await action('observe');
     if (!player?.inWorld || player.dead || player.health < 8) return false;
     const here = feet(player);
@@ -760,7 +761,7 @@ async function climbQuarry(action, pos, chooseEscape) {
     } else if (choice === 'jump_step') {
       const yaw = Math.atan2(player.position.x - pos[0] - 0.5, pos[2] + 0.5 - player.position.z) * 180 / Math.PI;
       await action('move', { yaw, forward: true, jump: true, ticks: 6 });
-      if (await settleQuarryStep(action, pos)) return true;
+      if (await settleOnDryStep(action, pos)) return true;
     }
     visited.push(here);
     await stepOut(action, player, visited, pos, false, rejectedSteps);
@@ -802,7 +803,7 @@ async function reenterQuarry(action, stairs, landing) {
     const step = dryWaypoint(cells, here, [], tile);
     if (step?.join(',') !== tile.join(',')) break;
     const walked = await action('go_to', { pos: tile, stopDistance: 0.3, maxTicks: 45 });
-    if (!walked?.arrived || !await settleQuarryStep(action, tile)) break;
+    if (!walked?.arrived || !await settleOnDryStep(action, tile)) break;
     retraced.push(stairs[index]);
   }
   return retraced;

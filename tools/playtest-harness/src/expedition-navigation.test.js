@@ -302,7 +302,7 @@ test('a soil-covered quarry has a dry descending step without undermining camp',
 });
 
 test('a horizontal arrival still waits for the player to land one block lower', async () => {
-  const { settleQuarryStep } = await import('./expedition-home.mjs');
+  const { settleOnDryStep } = await import('./expedition-home.mjs');
   const landing = [410, 68, 235];
   const reports = [
     { position: { x: 410.5, y: 69, z: 235.29 }, onGround: true, inWorld: true, health: 20 },
@@ -313,8 +313,32 @@ test('a horizontal arrival still waits for the player to land one block lower', 
     assert.equal(name, 'observe');
     return reports.shift();
   };
-  assert.equal(await settleQuarryStep(action, landing, async () => {}), true);
+  assert.equal(await settleOnDryStep(action, landing, async () => {}), true);
   assert.equal(reports.length, 0);
+});
+
+test('the sheep scout waits for its only dry descent instead of rejecting it at the rim', async () => {
+  const { stepOut } = await import('./expedition-home.mjs');
+  const start = { x: 306.65, y: 67, z: 438.5 };
+  const landing = [307, 66, 438];
+  const ground = [cell(306, 66, 438), cell(307, 65, 438), cell(306, 64, 439)];
+  const player = { position: start, onGround: true, inWorld: true, health: 11 };
+  const observations = [
+    { ...player, position: { x: 307.34, y: 67, z: 438.54 } },
+    { ...player, onGround: false, position: { x: 307.43, y: 66.77, z: 438.55 } },
+    { ...player, position: { x: 307.5, y: 66, z: 438.55 } },
+  ];
+  const rejected = new Set();
+  const action = async (name, args) => {
+    if (name === 'get_blocks') return { cells: ground };
+    if (name === 'observe') return observations.shift();
+    assert.equal(name, 'go_to');
+    assert.deepEqual(args.pos, landing);
+    return { arrived: true, position: [307.23, 67, 438.54] };
+  };
+  assert.equal(await stepOut(action, player, [], [335.31, 65, 464.24], undefined, rejected), true);
+  assert.equal(observations.length, 0);
+  assert.equal(rejected.size, 0);
 });
 
 test('reattaching after the iron kit was earned does not start mining again', async () => {
