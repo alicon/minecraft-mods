@@ -26,13 +26,17 @@ final class ExpeditionEyeRouteClientScenario {
 	}
 
 	static void run(ClientGameTestContext context, TestServerContext server, UUID ownerId, Path status, boolean locate) throws IOException {
+		int distance = locate ? Integer.parseInt(System.getenv().getOrDefault("MUSHROOM_EXPEDITION_STRONGHOLD_DISTANCE", "54")) : 0;
+		if (locate && (distance < 36 || distance > 600)) {
+			throw new AssertionError("Set the stronghold fixture distance between 36 and 600 blocks");
+		}
 		var fixture = server.computeOnServer(minecraft -> {
 			var owner = Objects.requireNonNull(minecraft.getPlayerList().getPlayer(ownerId));
 			var level = minecraft.overworld();
 			// Independently verify the direction against the world's real structure.
 			// Only the dog's UUID is passed to the player controller.
 			var origin = owner.blockPosition().immutable();
-			var approach = locate ? findLandApproach(level, origin) : new Approach(origin.above(8), Objects.requireNonNull(
+			var approach = locate ? findLandApproach(level, origin, distance) : new Approach(origin.above(8), Objects.requireNonNull(
 					level.findNearestMapStructure(StructureTags.EYE_OF_ENDER_LOCATED, origin, 100, false)));
 			var stronghold = approach.stronghold();
 			var start = approach.start();
@@ -46,7 +50,8 @@ final class ExpeditionEyeRouteClientScenario {
 			}
 			if (locate) level.setDayTime(1_000);
 			owner.teleportTo(start.getX() + 0.5, start.getY(), start.getZ() + 0.5);
-			owner.getInventory().add(new ItemStack(Items.ENDER_EYE, locate ? 8 : 1));
+			owner.getInventory().add(new ItemStack(Items.ENDER_EYE, locate ? 12 : 1));
+			if (locate) owner.getInventory().add(new ItemStack(Items.COOKED_MUTTON, 8));
 			var dog = Objects.requireNonNull(ModEntities.MUSHROOM_YORKIE.create(level, EntitySpawnReason.TRIGGERED));
 			dog.claimFor(owner);
 			dog.setPos(start.getX() + 1.5, start.getY(), start.getZ() + 0.5);
@@ -58,7 +63,7 @@ final class ExpeditionEyeRouteClientScenario {
 				&& client.level.getEntity(fixture.runtimeId()) instanceof MushroomYorkieEntity);
 		Files.writeString(status.resolveSibling("eye-companion"), fixture.dogId().toString());
 		Files.writeString(status, "ready");
-		for (int tick = 0; tick < (locate ? 5_000 : 1_600); tick += 5) {
+		for (int tick = 0; tick < (locate ? Math.max(5_000, 34 * distance) : 1_600); tick += 5) {
 			String result = Files.readString(status);
 			if ("finished".equals(result)) {
 				server.runOnServer(minecraft -> {
@@ -89,14 +94,14 @@ final class ExpeditionEyeRouteClientScenario {
 		throw new AssertionError("The controller did not advance toward the observed Eye of Ender bearing");
 	}
 
-	private static Approach findLandApproach(ServerLevel level, BlockPos origin) {
+	private static Approach findLandApproach(ServerLevel level, BlockPos origin, int distance) {
 		var examined = new HashSet<BlockPos>();
 		for (BlockPos probe : List.of(origin, origin.east(2500), origin.south(2500), origin.west(2500), origin.north(2500))) {
 			var stronghold = level.findNearestMapStructure(StructureTags.EYE_OF_ENDER_LOCATED, probe, 100, false);
 			if (stronghold == null || !examined.add(stronghold.immutable()) || drySurface(level, stronghold) == null) continue;
 			for (Direction direction : Direction.Plane.HORIZONTAL) {
 				for (int side : new int[] { 0, 12, -12 }) {
-					var column = stronghold.relative(direction, 54).relative(direction.getClockWise(), side);
+					var column = stronghold.relative(direction, distance).relative(direction.getClockWise(), side);
 					var start = drySurface(level, column);
 					if (start != null) return new Approach(start, stronghold);
 				}

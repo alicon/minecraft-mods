@@ -367,11 +367,14 @@ the direction from the thrown eye.
 
 Set `MUSHROOM_EXPEDITION_STAGE=stronghold-approach` to check a longer
 route over generated terrain. The fixture starts the player about 54 blocks
-from a real stronghold, with eyes in the inventory and Mushroom nearby. The
-controller observes one throw, moves sideways to take a second reading,
-intersects the bearings, and walks to the estimate. The integrated server
-checks two ordinary throws, the position independently of the estimate, and
-the original living dog. This stage stops at the surface approach.
+from a real stronghold, with eyes, food, and Mushroom nearby. Set
+`MUSHROOM_EXPEDITION_STRONGHOLD_DISTANCE=224` to exercise a longer approach.
+The controller observes one throw, moves sideways for a second reading,
+and intersects the bearings. It takes another pair of readings after walking
+toward a distant estimate and checks on Mushroom during the journey. The
+integrated server verifies ordinary throws, the final position relative to
+the actual stronghold, and the original living dog. This stage stops at the
+surface approach.
 
 Set `MUSHROOM_EXPEDITION_STAGE=quarry-tools` to verify tool selection at
 the dirt-to-stone boundary. The disposable native fixture supplies four logs

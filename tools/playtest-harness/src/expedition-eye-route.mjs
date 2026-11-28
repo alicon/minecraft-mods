@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
-import { hold, retreatFromNearbyMob, stepOut } from './expedition-home.mjs';
+import { dogMealCount, feedAdoptedDog, hold, retreatFromNearbyMob, stepOut } from './expedition-home.mjs';
 import { OVERWORLD, withCompanion } from './expedition-nether.mjs';
 
 const EYE = 'minecraft:ender_eye';
 const FLYING_EYE = 'minecraft:eye_of_ender';
+const DOG = 'mushroom_yorkie:mushroom_yorkie';
 const feet = ({ position: { x, y, z } }) => [x, y, z].map(Math.floor);
 const horizontalDistance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
@@ -96,6 +97,20 @@ async function travelToward(action, target, arrived, maxSteps, travel) {
       continue;
     }
     if (await retreatFromNearbyMob(action, player, travel.visited, travel.rejected)) continue;
+    if (player.gameTime >= travel.nextCareCheck) {
+      travel.nextCareCheck = player.gameTime + 200;
+      const dogs = await action('get_entities', { type: DOG, radius: 24 });
+      const dog = dogs?.entities.find(entity => entity.uuid === travel.uuid && entity.health > 0);
+      if (!dog) {
+        await withCompanion(action, OVERWORLD, travel.uuid);
+        continue;
+      }
+      if (dog.health <= 8) {
+        assert.ok(dogMealCount(await action('get_inventory')) > 0, 'Mushroom needs food before continuing the stronghold route');
+        assert.ok(await feedAdoptedDog(action, travel.uuid, feet(player), 24), 'Could not feed Mushroom on the stronghold route');
+        continue;
+      }
+    }
     const remaining = horizontalDistance(player.position, target);
     if (remaining < closest - 1) {
       closest = remaining;
@@ -123,19 +138,19 @@ async function travelToward(action, target, arrived, maxSteps, travel) {
 
 export async function navigateToStronghold(action, uuid, report = async () => {}) {
   const player = await withCompanion(action, OVERWORLD, uuid);
-  const travel = { visited: [], rejected: new Set() };
+  const travel = { visited: [], rejected: new Set(), uuid, nextCareCheck: 0 };
   let first = { origin: player.position, bearing: await watchThrownEye(action) };
-  for (let sight = 0; sight < 3; sight++) {
+  for (let sight = 0; sight < 4; sight++) {
     await report('bearing', first);
     const sideways = { x: -first.bearing.z, z: first.bearing.x };
-    const baseline = Math.min(28, 16 + sight * 6);
+    const baseline = [16, 32, 56, 96][sight];
     let origin;
     for (const side of [1, -1]) {
       const target = { x: first.origin.x + side * sideways.x * baseline,
         z: first.origin.z + side * sideways.z * baseline };
       origin = await travelToward(action, target, pos =>
         side * ((pos.x - first.origin.x) * sideways.x + (pos.z - first.origin.z) * sideways.z) >= baseline - 3,
-      18, travel);
+      16 + baseline, travel);
       if (origin) break;
     }
     assert.ok(origin, 'Could not form a dry baseline for a second Eye of Ender bearing');
@@ -143,16 +158,22 @@ export async function navigateToStronghold(action, uuid, report = async () => {}
     const second = { origin, bearing: await watchThrownEye(action) };
     await report('bearing', second);
     const estimate = intersectEyeBearings(first, second);
-    if (estimate && horizontalDistance(origin, estimate) < 144) {
+    const distance = estimate ? horizontalDistance(origin, estimate) : Infinity;
+    if (distance < 3_000) {
       await report('fix', estimate);
-      const reached = await travelToward(action, estimate, pos => horizontalDistance(pos, estimate) <= 6, 80, travel);
+      const coarse = distance >= 180;
+      const reached = await travelToward(action, estimate, pos => horizontalDistance(pos, estimate) <= (coarse ? 40 : 6),
+        Math.min(700, 80 + Math.ceil(distance * 0.7)), travel);
       if (reached) {
         await withCompanion(action, OVERWORLD, uuid);
-        return estimate;
+        if (!coarse) return estimate;
+        first = { origin: reached, bearing: await watchThrownEye(action) };
+        continue;
       }
     }
-    const ahead = { x: origin.x + second.bearing.x * 64, z: origin.z + second.bearing.z * 64 };
-    const reached = await travelToward(action, ahead, pos => horizontalDistance(pos, ahead) <= 12, 24, travel);
+    const advance = 64 + sight * 48;
+    const ahead = { x: origin.x + second.bearing.x * advance, z: origin.z + second.bearing.z * advance };
+    const reached = await travelToward(action, ahead, pos => horizontalDistance(pos, ahead) <= 12, 30 + sight * 28, travel);
     assert.ok(reached, 'Could not get closer to refine the stronghold bearing');
     first = { origin: reached, bearing: await watchThrownEye(action) };
   }
