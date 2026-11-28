@@ -130,6 +130,12 @@ async function action(name, args = {}) {
   return result;
 }
 
+async function feedMushroom(uuid, position, attempts) {
+  const fed = await feedAdoptedDog(action, uuid, position, attempts);
+  if (fed) console.log(JSON.stringify({ at: new Date().toISOString(), action: 'companion_meal_consumed', dog: uuid }));
+  return fed;
+}
+
 async function checkCompanion(player) {
   if (!player?.inWorld || !Number.isFinite(player.gameTime)) return false;
   if (player.gameTime - checkedCompanionAt < 6) return companionEmergency;
@@ -276,7 +282,7 @@ try {
     companion = (await readFile(join(dirname(statusFile), 'feeding-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
     const camp = [start.position.x, start.position.y, start.position.z].map(Math.floor);
-    assert.ok(await feedAdoptedDog(action, companion, camp, 24), 'The original Mushroom was not fed at camp');
+    assert.ok(await feedMushroom(companion, camp, 24), 'The original Mushroom was not fed at camp');
   }
   else if (['portal', 'nether-supplies', 'nether-distant-supplies'].includes(stage)) {
     companion = (await readFile(join(dirname(statusFile), 'portal-companion'), 'utf8')).trim();
@@ -505,7 +511,7 @@ async function runReunion(start) {
   await waitForDaylight();
   await narrate('Objective', 'Return to the last sighting with a meal reserved for Mushroom.');
   const dog = await regroupExpeditionCompanion(action, saved.dog, saved.lastSeen);
-  assert.ok(await feedAdoptedDog(action, saved.dog, dog.pos.map(Math.floor), 24), 'The original dog did not accept an earned meal');
+  assert.ok(await feedMushroom(saved.dog, dog.pos.map(Math.floor), 24), 'The original dog did not accept an earned meal');
   console.log(JSON.stringify({ at: new Date().toISOString(), action: 'reunion_fed', dog: saved.dog,
     lastSeen: saved.lastSeen, beforeHealth: dog.health, startedAt: start.gameTime }));
   await narrate('Result', 'Reunited with the original Mushroom and fed him.');
@@ -737,7 +743,7 @@ async function runExpedition(start, stage) {
     await narrate('Objective', 'Sleep at camp, meet Mushroom, and feed him.');
     checkpoint.dog = await adoptAtNight(action, checkpoint.camp, craft);
     companion = checkpoint.dog;
-    checkpoint.fedDog = await feedAdoptedDog(action, checkpoint.dog, checkpoint.camp.bed, stage === 'adoption' ? 120 : 24);
+    checkpoint.fedDog = await feedMushroom(checkpoint.dog, checkpoint.camp.bed, stage === 'adoption' ? 120 : 24);
     if (checkpoint.fedDog) checkpoint.lastDogMealAt = (await action('observe')).gameTime;
     checkpoint.phase = 'stone';
     if (live && stage !== 'adoption') await writeCheckpoint(checkpoint);
@@ -761,9 +767,9 @@ async function runExpedition(start, stage) {
       const player = await action('observe');
       if (player?.onGround && !player.inWater) {
         await narrate('Objective', 'Offer the original Mushroom our food before leaving for iron.');
-        checkpoint.fedDog = await feedAdoptedDog(action, checkpoint.dog,
+        checkpoint.fedDog = await feedMushroom(checkpoint.dog,
           [player.position.x, player.position.y, player.position.z].map(Math.floor), 24)
-          || await feedAdoptedDog(action, checkpoint.dog, checkpoint.camp.bed, 48);
+          || await feedMushroom(checkpoint.dog, checkpoint.camp.bed, 48);
         if (checkpoint.fedDog) {
           checkpoint.lastDogMealAt = (await action('observe')).gameTime;
           await narrate('Result', 'The original Mushroom ate one portion.');
@@ -810,7 +816,7 @@ async function runExpedition(start, stage) {
       assert.ok(await forageExpeditionMeal(action, { regroup: regroupForCare }),
         'Could not gather a meal near the original dog');
       const player = await action('observe');
-      assert.ok(await feedAdoptedDog(action, checkpoint.dog,
+      assert.ok(await feedMushroom(checkpoint.dog,
         [player.position.x, player.position.y, player.position.z].map(Math.floor), 30),
       'Could not feed the original dog before returning to the quarry');
       checkpoint.fedDog = true;
@@ -925,7 +931,7 @@ async function runExpedition(start, stage) {
     assert.ok(await forageExpeditionMeal(action), 'Could not earn a meal for the original dog');
     const player = await action('observe');
     const position = [player.position.x, player.position.y, player.position.z].map(Math.floor);
-    assert.ok(await feedAdoptedDog(action, checkpoint.dog, position), 'Could not feed the original dog before finishing');
+    assert.ok(await feedMushroom(checkpoint.dog, position), 'Could not feed the original dog before finishing');
     checkpoint.fedDog = true;
     checkpoint.lastDogMealAt = (await action('observe')).gameTime;
     if (live) await writeCheckpoint(checkpoint);

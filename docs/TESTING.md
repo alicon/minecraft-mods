@@ -298,8 +298,11 @@ held-out reports in separate invocations. Only a native dragon victory followed
 by a return and reopen with the original dog counts as a win. The cost per win
 includes failed terminal attempts. It stays unset when there are no verified
 wins or when billable usage is unknown. Live attempts remain visible without
-being counted as finished. When a run is stopped to replace its build, record
-the reason in `retired-for-build` before shutting down the client. The report
+being counted as finished. The summary counts recorded feeding interactions
+where the original dog accepted the item and the player's inventory lost one
+portion. Older reports may lack this marker. Controller holds and stops count
+the respective results in the playtest log. When a run is stopped to replace
+its build, record the reason in `retired-for-build` before shutting down the client. The report
 retains its usage and excludes it from the matched comparison.
 
 When an experiment's controller exits with a failure and the test keeps

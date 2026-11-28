@@ -10,7 +10,7 @@ API = runpy.run_path(str(Path(__file__).resolve().parents[1] / "summarize-mushro
 
 class ExpeditionComparisonTests(unittest.TestCase):
     def make_run(self, policy, game_log="", actions=(), seed=71, reopen="original", stage="expedition",
-                 held_reason=None, archive_reason=None, reattached=False, retired_reason=None):
+                 held_reason=None, archive_reason=None, reattached=False, retired_reason=None, stopped_reason=None):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         path = Path(directory.name)
@@ -21,6 +21,9 @@ class ExpeditionComparisonTests(unittest.TestCase):
         if held_reason:
             narration += f"Result | Run held. {held_reason}\n"
             (path / "status").write_text("held", encoding="utf-8")
+        if stopped_reason:
+            narration += f"Result | Run stopped. {stopped_reason}\n"
+            (path / "status").write_text("failed", encoding="utf-8")
         if archive_reason:
             (path / "archived-controller-failure.txt").write_text(archive_reason, encoding="utf-8")
         if retired_reason:
@@ -67,6 +70,16 @@ class ExpeditionComparisonTests(unittest.TestCase):
         result = API["compare_policies"]([rules, jev])["pairedByRevision"]["verified-build"]["jev"]
         self.assertEqual(result["requestsWithUnknownCost"], 1)
         self.assertIsNone(result["reportedCostPerWinUsd"])
+
+    def test_a_failed_attempt_can_verify_meals_and_report_a_controller_stop(self):
+        meal = {"action": "companion_meal_consumed", "dog": "original"}
+        rules = self.make_run("rules", "BUILD FAILED\n", [meal], stopped_reason="Ran out of provisions")
+        jev = self.make_run("jev", self.winning_log, [meal, meal])
+        comparison = API["compare_policies"]([rules, jev])["pairedByRevision"]["verified-build"]
+        self.assertEqual(comparison["rules"]["controllerStops"], 1)
+        self.assertEqual(comparison["rules"]["observedCompanionMeals"], 1)
+        self.assertEqual(comparison["jev"]["controllerStops"], 0)
+        self.assertEqual(comparison["jev"]["observedCompanionMeals"], 2)
 
     def test_only_an_archived_controller_failure_can_close_a_held_attempt(self):
         reason = "The wool search exhausted its rounds"

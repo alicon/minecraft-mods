@@ -188,6 +188,8 @@ def summarize(path):
         "controllerReattachments": reattachments,
         "nativeRespawns": game_log.count("Expedition Survival owner respawned in the same save"),
         "controllerHolds": playtest_log.count("Result | Run held."),
+        "controllerStops": playtest_log.count("Result | Run stopped."),
+        "observedCompanionMeals": actions["companion_meal_consumed"],
         "careReturns": actions["companion_care_return"],
         "companionRegroups": actions["companion_regrouped"],
         "gearRecoveryAttempts": actions["recover_dropped_loadout"],
@@ -231,6 +233,8 @@ def compare_policies(runs):
                 "originalDogDeaths": sum(r["originalDogLost"] for r in finished),
                 "playerRespawns": sum(r["nativeRespawns"] for r in finished),
                 "controllerHolds": sum(r["controllerHolds"] for r in finished),
+                "controllerStops": sum(r["controllerStops"] for r in finished),
+                "observedCompanionMeals": sum(r["observedCompanionMeals"] for r in finished),
                 "careReturns": sum(r["careReturns"] for r in finished),
                 "companionRegroups": sum(r["companionRegroups"] for r in finished),
             }
