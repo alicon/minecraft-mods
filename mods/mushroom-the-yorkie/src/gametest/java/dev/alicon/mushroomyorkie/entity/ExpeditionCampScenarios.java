@@ -241,6 +241,53 @@ final class ExpeditionCampScenarios {
 				});
 	}
 
+	static void airborneStrideBelowOverhang(GameTestHelper helper) {
+		for (int x = 1; x <= 7; x++) {
+			for (int z = 2; z <= 4; z++) {
+				helper.setBlock(x, 0, z, Blocks.STONE);
+				if (x <= 2 || x >= 5) {
+					helper.setBlock(x, 4, z, Blocks.STONE);
+				}
+			}
+		}
+		helper.setBlock(3, 6, 3, Blocks.STONE);
+		var level = helper.getLevel();
+		var owner = SurvivalGameTestPlayers.createWithoutToyCleanup(helper);
+		var dog = helper.spawn(ModEntities.MUSHROOM_YORKIE, 1, 5, 3);
+		dog.claimFor(owner);
+		var identity = dog.getUUID();
+		float startingHealth = dog.getHealth();
+		owner.setPos(helper.absoluteVec(new Vec3(6.5, 5, 3.5)));
+		var brink = helper.absoluteVec(new Vec3(2.84, 5.2, 3.5));
+		var underOverhang = helper.absoluteVec(new Vec3(3.45, 5.1, 3.5));
+		helper.startSequence().thenExecute(() -> {
+					// The previous step has already lifted the feet above the bank.
+					dog.setPos(brink);
+					dog.setOnGround(false);
+					dog.move(MoverType.SELF, underOverhang.subtract(brink));
+					var horizontalStride = dog.position().subtract(brink).horizontalDistanceSqr();
+					helper.assertTrue(horizontalStride < 0.01 && dog.lastWarnedTrailStep != null,
+							"Mushroom followed an overhang instead of checking for a landing below his feet");
+				})
+				.thenExecuteAfter(12, () -> {
+					helper.assertTrue(dog.isAlive() && dog.getHealth() == startingHealth && dog.getY() >= brink.y - 0.25,
+							"Mushroom fell after braking below the overhang");
+					for (int z = 2; z <= 4; z++) {
+						helper.setBlock(3, 4, z, Blocks.STONE);
+						helper.setBlock(4, 4, z, Blocks.STONE);
+					}
+				})
+				.thenWaitUntil(() -> helper.assertTrue(dog.isAlive() && dog.getUUID().equals(identity)
+						&& dog.isOwnedBy(owner) && dog.distanceToSqr(owner) <= 4,
+						"The original Mushroom did not rejoin after the ledge was supported, dog=" + dog.position()
+								+ ", owner=" + owner.position() + ", warning=" + dog.lastWarnedTrailStep))
+				.thenExecute(() -> {
+					dog.discard();
+					level.getServer().getPlayerList().remove(owner);
+					helper.succeed();
+				});
+	}
+
 	static void borrowedLeadCrossing(GameTestHelper helper) {
 		int floor = 4;
 		int feet = floor + 1;

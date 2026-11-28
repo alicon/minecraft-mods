@@ -714,6 +714,11 @@ This fixture confirms the squirrel has started down the original path and its bo
 
 Fetch GameTests cover active flight steering, interruption returning to normal following, toy returns from below a platform, fractional owner heights, landing during chase/return, airborne return across native save/load, and shoreline path endpoints within pickup reach. Flight fixtures run the real fetch goal, flight controller, and native collision movement in server order. Live terrain cases additionally exercise full entity ticks, all three toys, and independent survival/creative walking/creative flying owner states.
 
+The expedition footing tests include a suspended block above a gap on a
+quarry bend. They drive an airborne stride below it, verify that the dog
+brakes on the bank, and check that the same living dog rejoins once there is
+a supported route.
+
 Flight and airborne-reload fetch tests declare a 16×16 horizontal arena. Their
 toys at relative x8 and cliff floor through x10 extend past Fabric's default
 8×8 template. Each flight fixture checks that the pet, owner, toy and cliff footprint are inside

@@ -124,6 +124,11 @@ public final class FetchPersistenceGameTests {
 		ExpeditionCampScenarios.cliffMomentumStopsOnFooting(helper);
 	}
 
+	@GameTest(structure = "mushroom_yorkie_gametest:fetch_arena", maxTicks = 180)
+	public void expeditionChecksLandingBelowOverhang(GameTestHelper helper) {
+		ExpeditionCampScenarios.airborneStrideBelowOverhang(helper);
+	}
+
 	/** Leave hot footing even before the owner has a camp mat. */
 	@GameTest(maxTicks = 120)
 	public void expeditionStepsOffMagmaWithoutMat(GameTestHelper helper) {

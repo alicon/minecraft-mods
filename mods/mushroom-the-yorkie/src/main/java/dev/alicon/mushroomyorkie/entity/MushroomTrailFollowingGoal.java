@@ -83,7 +83,9 @@ final class MushroomTrailFollowingGoal extends FollowOwnerGoal {
 		if (owner == null) {
 			return movement;
 		}
-		double footY = Math.ceil(this.dog.getY() - 1.0E-4);
+		double y = this.dog.getY();
+		// An airborne dog can pass under the block above its feet. That block cannot catch the fall.
+		double footY = this.dog.onGround() ? Math.ceil(y - 1.0E-4) : Math.floor(y);
 		BlockPos here = BlockPos.containing(this.dog.getX(), footY, this.dog.getZ());
 		BlockPos ahead = BlockPos.containing(this.dog.getX() + movement.x, footY, this.dog.getZ() + movement.z);
 		if (here.equals(ahead) || MushroomExpeditionFooting.hasSafeLanding(level, ahead)
