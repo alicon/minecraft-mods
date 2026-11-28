@@ -99,8 +99,9 @@ async function travelToward(action, target, arrived, maxSteps, travel) {
       await setTimeout(150);
       continue;
     }
+    if (await travel.protectCompanion?.(player)) continue;
     if (await retreatFromNearbyMob(action, player, travel.visited, travel.rejected)) continue;
-    if (player.gameTime >= travel.nextCareCheck) {
+    if (!travel.protectCompanion && player.gameTime >= travel.nextCareCheck) {
       travel.nextCareCheck = player.gameTime + (travel.returning ? 45 : 200);
       const dogs = await action('get_entities', { type: DOG, radius: 24 });
       const dog = dogs?.entities.find(entity => entity.uuid === travel.uuid && entity.health > 0);
@@ -116,11 +117,9 @@ async function travelToward(action, target, arrived, maxSteps, travel) {
       }
       if (dog.health <= 8) {
         const portions = dogMealCount(await action('get_inventory'));
-        if (portions > 0) {
-          assert.ok(await feedAdoptedDog(action, travel.uuid, feet(player), 24), 'Could not feed Mushroom on the route');
-          continue;
-        }
-        assert.ok(travel.careReturn, 'Mushroom needs food before continuing the expedition route');
+        assert.ok(portions > 0, 'Mushroom needs food before continuing the expedition route');
+        assert.ok(await feedAdoptedDog(action, travel.uuid, feet(player), 24), 'Could not feed Mushroom on the route');
+        continue;
       }
     }
     const remaining = horizontalDistance(player.position, target);
@@ -225,17 +224,37 @@ export function companionRegroupTrail(trace, uuid) {
   return trail;
 }
 
-export async function returnToCampWithCompanion(action, uuid, bed, trail = [], reportCareReturn) {
+export async function returnToCampWithCompanion(action, uuid, bed, trail = [], { report, regroupTrail = [] } = {}) {
+  let lastSeen;
+  const protectCompanion = report && (async player => {
+    const dogs = await action('get_entities', { type: DOG, radius: 128 });
+    const dog = dogs?.entities.find(entity => entity.uuid === uuid && entity.health > 0);
+    if (dog) lastSeen = dog.pos;
+    if (!dog || dog.distance > 10 || Math.abs(dog.pos[1] - player.position.y) > 4) {
+      await report('Lost contact with the original Mushroom. Regroup before continuing the return.');
+      const together = await regroupExpeditionCompanion(action, uuid, lastSeen ?? regroupTrail[0], regroupTrail);
+      lastSeen = together.pos;
+      await report('The original Mushroom is back within reach.');
+      return true;
+    }
+    if (dog.health <= 8 && dogMealCount(await action('get_inventory')) > 0
+        && await feedAdoptedDog(action, uuid, feet(player), 24)) {
+      await report('Fed the original Mushroom during the return.');
+      return true;
+    }
+    return false;
+  });
+  if (protectCompanion) await protectCompanion(await action('observe'));
   let start = await withCompanion(action, OVERWORLD, uuid);
-  if (reportCareReturn && careReturnNeedsCover(start, bed)) {
-    await reportCareReturn('The route back is long and it is getting dark. Wait for daylight before travelling with Mushroom.');
-    await waitForDaylightRecovery(action, bed, reportCareReturn);
+  if (report && careReturnNeedsCover(start, bed)) {
+    await report('The route back is long and it is getting dark. Wait for daylight before travelling with Mushroom.');
+    await waitForDaylightRecovery(action, bed, report, protectCompanion);
     start = await withCompanion(action, OVERWORLD, uuid);
   }
   const camp = { x: bed[0] + 0.5, y: bed[1], z: bed[2] + 0.5 };
   const atCamp = pos => horizontalDistance(pos, camp) <= 4 && Math.abs(pos.y - bed[1]) <= 2;
   const travel = { visited: [], rejected: new Set(), uuid, nextCareCheck: 0, returning: true,
-    careReturn: Boolean(reportCareReturn) };
+    careReturn: Boolean(report), protectCompanion };
   const nearby = trail.map(([x, y, z], index) => ({ index,
     range: Math.hypot(start.position.x - x - 0.5, start.position.y - y, start.position.z - z - 0.5) }))
     .filter(point => point.range <= 14).sort((a, b) => a.range - b.range)[0];

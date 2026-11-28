@@ -1394,7 +1394,7 @@ async function sleepInField(action, player, bed) {
   return Boolean(landing && await sleepNearby(action, await action('observe')));
 }
 
-export async function waitForDaylightRecovery(action, bed, report) {
+export async function waitForDaylightRecovery(action, bed, report, protectCompanion) {
   const visited = [];
   const rejected = new Set();
   let nextShelter = 0;
@@ -1404,6 +1404,7 @@ export async function waitForDaylightRecovery(action, bed, report) {
   for (let check = 0; check < 500; check++) {
     const player = await action('observe');
     assert.ok(player?.inWorld && !player.dead, 'The player did not survive the night before the reunion');
+    if (await protectCompanion?.(player)) continue;
     if (player.timeOfDay < 12_000) return;
     if (player.gameTime >= nextSleep) {
       nextSleep = player.gameTime + 70;
@@ -1433,12 +1434,34 @@ export async function regroupExpeditionCompanion(action, uuid, lastPosition, tra
   const rejected = new Set();
   let waypointIndex;
   let blocked = 0;
-  for (let approach = 0; approach < 36; approach++) {
+  let heldShieldTicks = 0;
+  for (let approach = 0; approach < 36;) {
     const player = await action('observe');
-    assert.ok(player?.inWorld && !player.dead && player.health >= 8, 'The player became unsafe during regrouping');
+    assert.ok(player?.inWorld && !player.dead && player.health > 0, 'The player did not survive regrouping');
     const dogs = await action('get_entities', { type: DOG, radius: 128 });
     const dog = dogs?.entities.find(entity => entity.uuid === uuid && entity.health > 0);
     if (dog?.distance <= 6 && Math.abs(dog.pos[1] - player.position.y) <= 3) return dog;
+    const archer = player.threats?.find(threat => threat.distance <= 18
+      && /:(?:skeleton|stray|bogged|parched)$/.test(threat.type));
+    if (player.health < 12 && archer && !player.threats.some(threat => threat.distance < 6)) {
+      const shieldPulse = 96;
+      assert.ok(heldShieldTicks + shieldPulse <= 6_000, 'The archer kept the regroup route under fire');
+      const inventory = await action('get_inventory');
+      const usableShield = inventory?.slots.some(stack => stack.slot === 40 && stack.id === SHIELD && durability(stack) > 0);
+      const freeUseSlot = Array.from({ length: 9 }, (_, slot) => slot).find(slot =>
+        !inventory?.slots.some(stack => stack.slot === slot && !/_(?:sword|pickaxe|shovel|axe|hoe)$/.test(stack.id)));
+      if (usableShield && freeUseSlot !== undefined) {
+        if (inventory.selectedSlot !== freeUseSlot) await action('select_slot', { slot: freeUseSlot });
+        assert.ok(await action('look', { entityId: archer.id }), 'Could not face the archer before raising the shield');
+        const blockedShot = await action('use_item', { ticks: shieldPulse });
+        assert.ok(blockedShot?.completed && blockedShot.health >= player.health, 'The shield did not keep the player safe during regrouping');
+        heldShieldTicks += shieldPulse;
+        continue;
+      }
+    }
+    assert.ok(player.health >= 8 || !player.threats?.some(threat => threat.distance <= 18),
+      'The player became unsafe during regrouping');
+    approach++;
     lastPosition = dog?.pos ?? lastPosition;
     assert.ok(lastPosition, 'The original Mushroom is out of sight and has no recorded position');
     const here = feet(player);

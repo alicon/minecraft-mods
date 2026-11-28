@@ -810,10 +810,13 @@ async function runExpedition(start, stage) {
     };
     policy.returnAfterCare = async () => {
       const bed = checkpoint.camp.bed;
-      const trail = campOutboundTrail(await recentActions(), bed);
+      const trace = await recentActions();
+      const trail = campOutboundTrail(trace, bed);
       await narrate('Objective', 'Get the original Mushroom safely back to camp before looking for more iron.');
-      const { owner, dog } = await returnToCampWithCompanion(action, checkpoint.dog, bed, trail,
-        message => narrate('Decision', message, 15_000));
+      const { owner, dog } = await returnToCampWithCompanion(action, checkpoint.dog, bed, trail, {
+        report: message => narrate('Decision', message, 15_000),
+        regroupTrail: companionRegroupTrail(trace, checkpoint.dog),
+      });
       delete checkpoint.returningAfterCare;
       if (live) await writeCheckpoint(checkpoint);
       console.log(JSON.stringify({ at: new Date().toISOString(), action: 'companion_care_return',

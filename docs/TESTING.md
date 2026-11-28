@@ -218,7 +218,11 @@ scouts another opening. On the surface it offers Mushroom an earned portion
 if his first meal is still pending. A decision to return after a meal
 survives a handoff and takes priority over mining until both the player and
 the original living dog reach the bed. For a long return near nightfall, the
-player looks for shelter and can sleep until daylight in a carried bed.
+player looks for shelter and can sleep until daylight in a carried bed. If the
+pair gets separated, the player checks for the original dog at longer range and
+regroups before continuing to wait or travel. An injured player under fire
+faces the archer and uses a carried shield before attempting another exposed
+step toward the dog.
 The first mined iron goes back to the camp bed before smelting. Both trips
 can retrace grounded positions recorded on the outbound path. The iron trip
 uses positions from before the first ore pickup. The trace records the

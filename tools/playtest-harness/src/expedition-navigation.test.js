@@ -339,6 +339,37 @@ test('a skeleton in shooting range interrupts an exposed daylight wait before it
   assert.ok(escaped);
 });
 
+test('a wounded owner faces the archer with an offhand shield before taking a step toward Mushroom', async () => {
+  const { regroupExpeditionCompanion } = await import('./expedition-home.mjs');
+  const archer = { id: 69, type: 'minecraft:skeleton', distance: 14 };
+  const dog = { uuid: 'original', pos: [5.5, 64, 0.5], distance: 10, health: 2 };
+  let shielded = false;
+  let looked = false;
+  let reunited = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe': return { inWorld: true, health: 5, onGround: true,
+        position: { x: reunited ? 2.5 : -4.5, y: 64, z: 0.5 }, threats: shielded ? [] : [archer] };
+      case 'get_entities': return { entities: [reunited ? { ...dog, distance: 3 } : dog] };
+      case 'get_inventory': return { selectedSlot: 0, slots: [{ slot: 0, id: 'minecraft:stone_pickaxe' },
+        { slot: 40, id: 'minecraft:shield', maxDamage: 336, damage: 1 }] };
+      case 'look': assert.equal(args.entityId, archer.id); looked = true; return {};
+      case 'use_item':
+        assert.ok(looked && args.ticks >= 36);
+        shielded = true;
+        return { completed: true, health: 5 };
+      case 'get_blocks': return { cells: Array.from({ length: 13 }, (_, x) => cell(x - 5, 63, 0)) };
+      case 'go_to':
+        assert.ok(shielded, 'Started across open ground before shielding');
+        reunited = true;
+        return { arrived: true, position: [2.5, 64, 0.5] };
+      default: assert.fail(name);
+    }
+  };
+  assert.equal((await regroupExpeditionCompanion(action, dog.uuid, dog.pos)).uuid, dog.uuid);
+  assert.ok(reunited);
+});
+
 test('a creeper at fourteen blocks diverts the next scouting walk before the fuse', async () => {
   const { retreatFromNearbyMob } = await import('./expedition-home.mjs');
   const player = { position: { x: 0.5, y: 64, z: 0.5 }, timeOfDay: 5_850, health: 16,

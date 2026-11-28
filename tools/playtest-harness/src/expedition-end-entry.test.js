@@ -163,13 +163,51 @@ test('an unfinished care return reaches the bed with an injured dog even without
   await earnIronKit(action, () => assert.fail('The player already has the iron kit'), { bed }, {
     returningAfterCare: true,
     returnAfterCare: async () => {
-      returned = await returnToCampWithCompanion(action, 'original', bed, [], () => {});
+      returned = await returnToCampWithCompanion(action, 'original', bed, [], { report: () => {} });
     },
   });
   assert.equal(walkLimit, 40);
   assert.equal(returned.dog.uuid, 'original');
   assert.equal(returned.dog.health, 4);
   assert.ok(Math.abs(returned.owner.position.x - 0.5) <= 4);
+});
+
+test('a nighttime care return turns back to an injured dog beyond the ordinary survey radius', async () => {
+  const { returnToCampWithCompanion } = await import('./expedition-eye-route.mjs');
+  const bed = [50, 64, 0];
+  const ground = Array.from({ length: 51 }, (_, x) => cell(x, 63, 0, 'grass_block'));
+  const messages = [];
+  const walked = [];
+  let position = { x: 30.5, y: 64, z: 0.5 };
+  let joined = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe': return { inWorld: true, dimension: 'minecraft:overworld', onGround: true, health: 9,
+        position, timeOfDay: joined ? 1_000 : 18_000, gameTime: 24_000 + walked.length * 45 };
+      case 'get_entities': {
+        const dogX = joined ? position.x - 1 : 0.5;
+        const dog = { uuid: 'original', health: 2, distance: Math.abs(dogX - position.x), pos: [dogX, 64, 0.5] };
+        return { entities: dog.distance <= args.radius ? [dog] : [] };
+      }
+      case 'get_inventory': return { slots: [] };
+      case 'get_blocks': return { cells: ground };
+      case 'go_to':
+        assert.ok(joined || args.pos[0] < position.x, 'The owner walked toward camp before regrouping');
+        walked.push(args.pos[0]);
+        position = { x: args.pos[0] + 0.5, y: args.pos[1], z: args.pos[2] + 0.5 };
+        if (position.x <= 6.5) joined = true;
+        return { arrived: true, position: [position.x, position.y, position.z] };
+      default: assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  const result = await returnToCampWithCompanion(action, 'original', bed, [], { report: message => messages.push(message) });
+  assert.ok(walked[0] < 30);
+  assert.ok(joined);
+  assert.equal(result.dog.uuid, 'original');
+  assert.equal(result.dog.health, 2);
+  assert.ok(result.owner.position.x >= 46.5);
+  assert.match(messages[0], /Regroup/);
+  assert.match(messages[1], /back within reach/);
 });
 
 test('a stronghold descent recognizes a dry doorway but refuses flooded masonry', async () => {
