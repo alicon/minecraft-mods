@@ -105,6 +105,7 @@ test('a crystal pillar descent checks the full water column and steers against s
     { ...from, position: { x: 40.86, y: 78, z: -24.5 }, inWater: true, onGround: false },
     { ...from, position: { x: 40.53, y: 70, z: -24.5 }, inWater: true, onGround: false },
     { ...from, position: { x: 40.52, y: 61, z: -24.5 }, inWater: true, onGround: false },
+    { ...from, position: { x: 41.52, y: 62, z: -24.5 }, inWater: true, onGround: false },
     { ...from, position: { x: 42.5, y: 61, z: -24.5 }, inWater: false, onGround: true },
   ];
   const moves = [];
@@ -122,7 +123,7 @@ test('a crystal pillar descent checks the full water column and steers against s
           return { cells: Array.from({ length: 19 }, (_, i) =>
             ({ x: 40, y: 61 + i, z: -25, b: 'minecraft:water' })) };
         }
-        return { cells: [40, 41, 42].map(x => ({ x, y: 60, z: -25, b: 'minecraft:end_stone' })) };
+        return { cells: [40, 41, 42].map(x => ({ x, y: 59, z: -25, b: 'minecraft:end_stone' })) };
       case 'move': moves.push(args); return { completed: true };
       case 'observe': return observations.shift();
       case 'go_to': return { arrived: true };
@@ -138,4 +139,5 @@ test('a crystal pillar descent checks the full water column and steers against s
   assert.equal(moves[2].sneak, true);
   assert.equal(moves[3].forward, undefined);
   assert.equal(moves[3].sneak, true);
+  assert.deepEqual(moves[4], { sneak: true, ticks: 5 });
 });

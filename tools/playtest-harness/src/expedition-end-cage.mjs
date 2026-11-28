@@ -58,8 +58,14 @@ async function leaveShallowWater(action, line) {
     // Allow shallow water in the route while still requiring solid support.
     const footing = view.cells.filter(cell => cell.b !== WATER || cell.y < here[1]);
     const next = dryWaypoint(footing, here, [], line, 'surface');
-    if (!next) return false;
-    await action('go_to', { pos: next, stopDistance: 0.3, maxTicks: 55 });
+    if (next) {
+      await action('go_to', { pos: next, stopDistance: 0.3, maxTicks: 55 });
+    } else if (player.inWater) {
+      // A wave can leave the swimmer above the height of the dry path.
+      await action('move', { sneak: true, ticks: 5 });
+    } else {
+      await setTimeout(125);
+    }
   }
   return false;
 }
