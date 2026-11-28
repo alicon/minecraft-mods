@@ -184,17 +184,20 @@ async function playerAction(name, args = {}) {
   return result.isError ? null : observation;
 }
 
-async function walk(pos, stopDistance) {
+async function walk(pos, stopDistance, { allowAlternate = false } = {}) {
   for (let attempt = 0; attempt < 4; attempt++) {
     const outcome = await action('go_to', { pos, stopDistance, maxTicks: 125 });
-    if (outcome?.arrived) return;
+    if (outcome?.arrived) return true;
     const obstruction = outcome?.reason?.match(/blocked by minecraft:[\w]+_leaves at (-?\d+),(-?\d+),(-?\d+)/);
     if (!obstruction) {
+      if (allowAlternate && /drop of more than|stuck|timed out|blocked by/.test(outcome?.reason ?? '')) return false;
       throw new Error(`Cannot reach ${pos}: ${outcome?.reason ?? 'no route'}`);
     }
     const clear = await action('break_block', { pos: obstruction.slice(1).map(Number), maxTicks: 30 });
+    if (allowAlternate && !clear?.broken) return false;
     assert.ok(clear?.broken, 'The blocking leaves stayed in place');
   }
+  if (allowAlternate) return false;
   throw new Error(`Could not reach ${pos} in four attempts`);
 }
 
@@ -1280,7 +1283,11 @@ async function collectStarterLogs(start, toward) {
     positionAtStart = await action('observe');
   }
   assert.ok(trunk?.distance <= 6, 'No usable tree trunk reached during the Survival scout');
-  await walk(trunk.logs[1], 2.8);
+  const alternate = { allowAlternate: true };
+  if (!await walk(trunk.logs[1], 2.8, alternate)) {
+    await narrate('Decision', 'First trunk route is blocked. Look for reachable wood from dry footing.');
+    return;
+  }
   for (const pos of trunk.logs) {
     const mined = await action('break_block', { pos, maxTicks: 100 });
     assert.ok(mined?.broken, `Could not mine the log at ${pos}`);
@@ -1293,13 +1300,15 @@ async function collectStarterLogs(start, toward) {
   }
   if (await logCount() < 3) {
     // go_to may reach the horizontal point with the logs still below.
-    await walk(trunk.logs[0], 0.8);
+    if (!await walk(trunk.logs[0], 0.8, alternate)) {
+      await narrate('Decision', 'Logs fell across unsafe ground. Look for reachable wood from dry footing.');
+      return;
+    }
     for (let height = 0; height < 3 && (await logCount()) < 3; height++) {
       if (!(await descendFromCanopy(await action('observe')))) break;
     }
     if (await logCount() < 3) {
-      await walk(trunk.logs[0], 0.3);
-      await setTimeout(300);
+      if (await walk(trunk.logs[0], 0.3, alternate)) await setTimeout(300);
     }
   }
 }
