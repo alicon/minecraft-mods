@@ -553,6 +553,46 @@ test('reattaching after the iron kit was earned does not start mining again', as
   assert.deepEqual(calls, ['get_inventory']);
 });
 
+test('iron work returns to camp after feeding the injured companion before spending another portion', async () => {
+  const { earnIronKit } = await import('./expedition-home.mjs');
+  const checkedAt = [];
+  let caredFor = false;
+  let x = 0;
+  let gameTime = 0;
+  const atCamp = new Error('The companion was checked again at camp');
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_inventory': return { slots: [] };
+      case 'observe':
+        gameTime += 50;
+        return { inWorld: true, position: { x: x + 0.5, y: 1, z: 0.5 }, health: 20, food: 20, gameTime };
+      case 'get_blocks':
+        assert.ok(caredFor);
+        return { cells: Array.from({ length: 9 }, (_, tile) => cell(tile, 0, 0)) };
+      case 'go_to':
+        assert.equal(args.pos[0], 8);
+        x = args.pos[0];
+        return { arrived: true, position: args.pos };
+      default: assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  const policy = {
+    companionNeedsCare: async () => {
+      checkedAt.push(x);
+      if (checkedAt.length > 1) throw atCamp;
+      return true;
+    },
+    tendCompanion: async () => {
+      assert.equal(x, 0);
+      caredFor = true;
+    },
+  };
+  await assert.rejects(earnIronKit(action, () => assert.fail('No recipe has ingredients'), {
+    bed: [8, 1, 0],
+  }, policy), error => error === atCamp);
+  assert.deepEqual(checkedAt, [0, 8]);
+});
+
 test('the first earned ingot funds a shield before scouting for the rest of the kit', async () => {
   const { earnIronKit } = await import('./expedition-home.mjs');
   const slots = [
@@ -633,14 +673,24 @@ test('a two-block sand bank and a low ceiling both block the direct step', async
 });
 
 test('an enclosed player can clear a leaf above solid ground', async () => {
-  const { dryWaypoint, leavesBlockingExit } = await import('./expedition-navigation.mjs');
+  const { dryWaypoint, exitObstruction } = await import('./expedition-navigation.mjs');
   const blocks = [
     cell(0, 0, 0), cell(1, 0, 0), cell(1, 1, 0, 'oak_leaves'), cell(1, 2, 0, 'oak_leaves'),
     cell(0, 0, 1, 'water'), cell(0, 2, 1, 'birch_leaves'),
   ];
   assert.equal(dryWaypoint(blocks, [0, 1, 0], [], [1, 1, 0]), null);
-  assert.deepEqual(leavesBlockingExit(blocks, [0, 1, 0]), [1, 1, 0]);
-  assert.deepEqual(leavesBlockingExit(blocks.filter(block => block.y !== 1), [0, 1, 0]), [1, 2, 0]);
+  assert.deepEqual(exitObstruction(blocks, [0, 1, 0]), [1, 1, 0]);
+  assert.deepEqual(exitObstruction(blocks.filter(block => block.y !== 1), [0, 1, 0]), [1, 2, 0]);
+});
+
+test('a crafting table can be packed when it blocks a dry step toward camp', async () => {
+  const { exitObstruction } = await import('./expedition-navigation.mjs');
+  const here = [0, 1, 0];
+  const table = [1, 2, 0];
+  const blocks = [cell(0, 0, 0), cell(1, 1, 0, 'stone'), cell(...table, 'crafting_table')];
+  assert.equal(exitObstruction(blocks, here), null);
+  assert.equal(exitObstruction(blocks, here, [-5, 2, 0]), null);
+  assert.deepEqual(exitObstruction(blocks, here, [5, 2, 0]), table);
 });
 
 test('bed placement finds a supported pair beyond a crowded immediate neighbor', async () => {

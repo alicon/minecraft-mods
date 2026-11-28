@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
 import {
-  bedSpotsWithGroundCover, dryStepKey, dryWaypoint, hasPlacedBed, leavesBlockingExit, nearbyBuildingSpots,
+  bedSpotsWithGroundCover, dryStepKey, dryWaypoint, exitObstruction, hasPlacedBed, nearbyBuildingSpots,
   nearestCover, quarryLandingIsClear, quarryStep,
 } from './expedition-navigation.mjs';
 import { cookExpeditionMutton, makeExpeditionCharcoal, smeltExpeditionIron } from './expedition-furnace.mjs';
@@ -201,8 +201,15 @@ export async function stepOut(action, player, visited, destination, preferredGro
   if (avoid && !pos) return false;
   const repeated = visited.filter(tile => tile.every((coordinate, axis) => coordinate === center[axis])).length > 2;
   if (!pos || repeated) {
-    const leaf = leavesBlockingExit(volume.cells, center);
-    if (leaf && (await action('break_block', { pos: leaf, maxTicks: 30 }))?.broken) return true;
+    const obstruction = exitObstruction(volume.cells, center, preferredGround === 'surface' ? destination : undefined);
+    if (obstruction) {
+      const [x, y, z] = obstruction;
+      const table = volume.cells.some(cell => cell.x === x && cell.y === y && cell.z === z
+        && cell.b === 'minecraft:crafting_table');
+      const removed = table ? await breakVisible(action, obstruction)
+        : await action('break_block', { pos: obstruction, maxTicks: 30 });
+      if (removed?.broken) return true;
+    }
     if (!pos) return false;
   }
   if (chooseRoute) {
@@ -592,15 +599,26 @@ async function seekExpeditionFood(action, player, visited, rejectedSteps, tried)
   }
 }
 
-export async function forageExpeditionMeal(action) {
+export async function forageExpeditionMeal(action, camp) {
   const visited = [];
   const rejectedSteps = new Set();
   const tried = new Set();
-  for (let attempt = 0; attempt < 28; attempt++) {
+  let returning = Boolean(camp);
+  for (let attempt = 0; attempt < (camp ? 48 : 28); attempt++) {
     const inventory = await action('get_inventory');
     if (DOG_FOOD.some(item => count(inventory, item))) return true;
     const player = await action('observe');
     if (!player?.inWorld || player.dead || player.health < 12) return false;
+    if (await retreatFromNearbyMob(action, player, visited, rejectedSteps)) continue;
+    if (returning) {
+      const here = feet(player);
+      returning = Math.hypot(...here.map((coordinate, axis) => coordinate - camp[axis])) > 6;
+      if (returning) {
+        visited.push(here);
+        await stepOut(action, player, visited, camp, 'surface', rejectedSteps);
+        continue;
+      }
+    }
     await seekExpeditionFood(action, player, visited, rejectedSteps, tried);
   }
   return false;
@@ -1153,6 +1171,8 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   let nextSleepCheck = 0;
   let nextCoverCheck = 0;
   let nextMealAttempt = 0;
+  let nextCompanionCheck = 0;
+  let returningAfterCare = false;
   const triedFoodSources = new Set();
   for (let attempt = 0; attempt < 190; attempt++) {
     const inventory = await action('get_inventory');
@@ -1171,6 +1191,29 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
     }
     const player = await action('observe');
     if (!stairs.length && await retreatFromNearbyMob(action, player, visited, rejectedSteps)) continue;
+    if (returningAfterCare) {
+      const here = feet(player);
+      returningAfterCare = Math.hypot(...here.map((coordinate, axis) => coordinate - bed[axis])) > 6;
+      if (returningAfterCare) {
+        visited.push(here);
+        await stepOut(action, player, visited, bed, 'surface', rejectedSteps);
+        continue;
+      }
+    }
+    if (policy.companionNeedsCare && player.gameTime >= nextCompanionCheck) {
+      nextCompanionCheck = player.gameTime + 40;
+      if (await policy.companionNeedsCare()) {
+        if (stairs.length) {
+          await leaveQuarry(action, stairs, policy);
+          stairs.length = 0;
+          await policy.saveQuarry?.([]);
+        }
+        await policy.tendCompanion();
+        returningAfterCare = true;
+        misses = 0;
+        continue;
+      }
+    }
     if (!stairs.length && isBedtime(player) && player.gameTime >= nextSleepCheck) {
       nextSleepCheck = player.gameTime + 300;
       if (await sleepNearby(action, player)) continue;

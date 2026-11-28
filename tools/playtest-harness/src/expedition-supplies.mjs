@@ -427,6 +427,20 @@ async function runExpedition(start, stage) {
       }
     }
     await narrate('Objective', 'Mine and smelt iron for a pickaxe, bucket, and shield.');
+    policy.companionNeedsCare = async () => {
+      const dogs = await action('get_entities', { type: 'mushroom_yorkie:mushroom_yorkie', radius: 32 });
+      const dog = dogs?.entities.find(entity => entity.uuid === checkpoint.dog);
+      return dog?.health > 0 && dog.health <= 6;
+    };
+    policy.tendCompanion = async () => {
+      await narrate('Objective', 'Leave the quarry and feed the injured original Mushroom.');
+      assert.ok(await forageExpeditionMeal(action, checkpoint.camp.bed), 'Could not earn food for the injured original dog');
+      const player = await action('observe');
+      assert.ok(await feedAdoptedDog(action, checkpoint.dog,
+        [player.position.x, player.position.y, player.position.z].map(Math.floor), 30),
+      'Could not feed the injured original dog after leaving the quarry');
+      await narrate('Result', 'The injured original Mushroom ate one portion. Returning to camp.');
+    };
     if (live) {
       policy.resumeQuarry = checkpoint.quarry;
       policy.resumeQuarryLanding = checkpoint.quarryLanding;

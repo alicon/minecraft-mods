@@ -81,8 +81,9 @@ export function bedSpotsWithGroundCover(cells, player) {
   });
 }
 
-export function leavesBlockingExit(cells, [x, y, z]) {
+export function exitObstruction(cells, [x, y, z], destination) {
   const block = new Map(cells.map(cell => [`${cell.x},${cell.y},${cell.z}`, cell.b]));
+  const removable = id => LEAVES.test(id) || destination && id === 'minecraft:crafting_table';
   for (const [dx, dz] of CARDINAL) {
     const tx = x + dx;
     const tz = z + dz;
@@ -91,9 +92,12 @@ export function leavesBlockingExit(cells, [x, y, z]) {
       const slots = Array.from({ length: Math.max(y, ty) + 2 - ty }, (_, i) => [tx, ty + i, tz]);
       if (ty > y && !gap(block.get(`${x},${ty + 1},${z}`))) continue;
       const ids = slots.map(pos => block.get(pos.join(',')));
-      if (!ids.every(id => gap(id) || LEAVES.test(id))) continue;
-      const leaf = ids.findIndex(id => LEAVES.test(id));
-      if (leaf >= 0) return slots[leaf];
+      if (!ids.every(id => gap(id) || removable(id))) continue;
+      const obstruction = ids.findIndex(removable);
+      if (obstruction < 0) continue;
+      if (ids[obstruction] === 'minecraft:crafting_table'
+          && distance(destination, [tx, ty, tz]) >= distance(destination, [x, y, z])) continue;
+      return slots[obstruction];
     }
   }
   return null;
