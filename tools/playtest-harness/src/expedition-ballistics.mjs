@@ -1,9 +1,9 @@
 const FULL_DRAW_SPEED = 3;
 const AIR_DRAG = 0.99;
 const ARROW_GRAVITY = 0.05;
+const MAX_FLIGHT_TICKS = 100;
 
-export function clearBowArc(player, target, solidAt) {
-  const aim = bowAim(player, target);
+export function clearBowArc(player, target, solidAt, aim = bowAim(player, target)) {
   if (!aim) return false;
   const { x, y, z } = player.position;
   const range = Math.hypot(target[0] - x, target[2] - z);
@@ -11,7 +11,7 @@ export function clearBowArc(player, target, solidAt) {
   const pitch = -aim.pitch * Math.PI / 180;
   const horizontal = FULL_DRAW_SPEED * Math.cos(pitch);
   const vertical = FULL_DRAW_SPEED * Math.sin(pitch);
-  for (let ticks = 0.125; ticks <= 45; ticks += 0.125) {
+  for (let ticks = 0.125; ticks <= MAX_FLIGHT_TICKS; ticks += 0.125) {
     const travel = (1 - AIR_DRAG ** ticks) / (1 - AIR_DRAG);
     const progress = horizontal * travel / range;
     if (progress >= 1) return true;
@@ -22,7 +22,7 @@ export function clearBowArc(player, target, solidAt) {
   return false;
 }
 
-export function bowAim(player, target) {
+export function bowAim(player, target, arc = 'low') {
   const dx = target[0] - player.position.x;
   const dy = target[1] - (player.position.y + 1.52);
   const dz = target[2] - player.position.z;
@@ -34,10 +34,16 @@ export function bowAim(player, target) {
     return { horizontal, vertical };
   };
 
-  for (let ticks = 1; ticks <= 45; ticks++) {
-    // Arrow velocity decays each tick. Use the first solution for the lower arc.
+  const highArc = arc === 'high';
+  let wasInRange = false;
+  for (let ticks = 1; ticks <= (highArc ? MAX_FLIGHT_TICKS : 45); ticks++) {
     const velocity = velocityAt(ticks);
-    if (Math.hypot(velocity.horizontal, velocity.vertical) > FULL_DRAW_SPEED) continue;
+    const inRange = Math.hypot(velocity.horizontal, velocity.vertical) <= FULL_DRAW_SPEED;
+    // The rising shot enters the reachable interval. The overhead shot
+    // leaves it at the other end of the same interval on its way down.
+    const crosses = highArc ? wasInRange && !inRange : inRange;
+    wasInRange = inRange;
+    if (!crosses) continue;
     // The arrow still travels at full draw speed. Solve between whole ticks
     // so the pitch does not assume an arrow slower than the one we release.
     let low = ticks - 1;
@@ -45,7 +51,8 @@ export function bowAim(player, target) {
     for (let step = 0; step < 12; step++) {
       const mid = (low + high) / 2;
       const trial = velocityAt(mid);
-      if (Math.hypot(trial.horizontal, trial.vertical) > FULL_DRAW_SPEED) low = mid;
+      const fits = Math.hypot(trial.horizontal, trial.vertical) <= FULL_DRAW_SPEED;
+      if (fits === highArc) low = mid;
       else high = mid;
     }
     const { horizontal, vertical } = velocityAt(high);

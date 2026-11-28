@@ -214,7 +214,9 @@ trace records the recovery as assisted. An archive taken inside a quarry can
 include `ironProgress` with the recorded `quarry`, `quarryLanding`, and
 `lastDogMealAt` so the controller can resume the stairs. During the iron hunt,
 the controller pauses to regroup with the dog when care is due and checks
-that they stay together while looking for food nearby. When a bed is within
+that they stay together while looking for food nearby. If the dog gets
+separated by terrain, it can retrace dry footing from their last same-level
+contact. When a bed is within
 reach at night, the controller attempts sleep before sending the player to
 search for food in the dark.
 
@@ -377,7 +379,8 @@ phase on the generated island with the vanilla dragon active. The disposable
 fixture supplies a bow, arrows, armor, food, and a protected camp for Mushroom.
 The controller scouts the island, watches for incoming dragon breath, and
 shoots from observed positions. The bridge's automatic melee is disabled
-to keep it from attacking neutral Endermen. It finishes its retreat
+to keep it from attacking neutral Endermen. After damage near an Enderman,
+the player tries to stand in water while recovering. It finishes its retreat
 through damage before shooting again. For a guarded crystal, it surveys
 a dry pillar, water landing, and clear bow trajectory around nearby towers.
 It opens a side with a pickaxe and removes the pillar one supported block
@@ -386,7 +389,9 @@ it checks the whole column and steers back toward it when the current
 pushes sideways. If knocked off the pillar, it looks straight down and
 tries to place water once solid ground comes within reach. From the ground
 it checks the bow arc from nearby dry
-footing, including any water or blocks obstructing the opened cage.
+footing, including any water or blocks obstructing the opened cage. After
+repeated misses at an exposed crystal it surveys both the direct and
+overhead shots against the observed tower blocks.
 The fixture
 supplies the blocks, pickaxe, and buckets. The server checks for the removal of all ten
 original crystals and verifies Mushroom's identity and health at camp. The
@@ -398,6 +403,9 @@ Set `MUSHROOM_EXPEDITION_CAGE_ONLY=1` with the same stage to start near a
 guarded spike and exercise one intact generated cage. The native verdict
 requires that exactly one guarded crystal broke, the dragon is still active,
 and the original Mushroom is still unharmed at his marked shelter.
+Set `MUSHROOM_EXPEDITION_TALLEST_ONLY=1` to replay the highest exposed spike.
+The server checks that this specific crystal broke and the other nine,
+dragon, and original Mushroom are still present.
 
 Set `MUSHROOM_EXPEDITION_STAGE=eye-route` to replay using an Eye of Ender
 to choose a route. The disposable fixture supplies one eye, Mushroom, and

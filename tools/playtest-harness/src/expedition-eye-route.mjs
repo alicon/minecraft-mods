@@ -144,19 +144,21 @@ async function travelToward(action, target, arrived, maxSteps, travel) {
   return null;
 }
 
-export function firstIronOutboundTrail(trace, bed) {
-  const trail = [];
+function* completeActionRows(trace) {
   // The final line can still be in flight while the launcher appends to the trace.
   for (const line of trace.split('\n').slice(0, -1)) {
     if (!line.startsWith('{')) continue;
-    let row;
     try {
-      row = JSON.parse(line);
+      yield JSON.parse(line);
     } catch {
       // A controller interrupted during logging can leave a partial row.
-      continue;
     }
-    const { action, observation } = row;
+  }
+}
+
+export function firstIronOutboundTrail(trace, bed) {
+  const trail = [];
+  for (const { action, observation } of completeActionRows(trace)) {
     if (action === 'get_inventory' && observation?.slots?.some(stack => stack.id === 'minecraft:raw_iron')) break;
     if (action !== 'observe' || !observation?.onGround || observation.inWater || observation.dead
         || observation.dimension !== OVERWORLD) continue;
@@ -169,6 +171,29 @@ export function firstIronOutboundTrail(trace, bed) {
     const previous = trail.findIndex(pos => String(pos) === String(point));
     if (previous >= 0) trail.splice(previous + 1);
     else if (Math.hypot(...point.map((value, index) => value - trail.at(-1)[index])) >= 5) trail.push(point);
+  }
+  return trail;
+}
+
+export function companionRegroupTrail(trace, uuid) {
+  const trail = [];
+  let grounded;
+  for (const { action, observation } of completeActionRows(trace)) {
+    if (action === 'get_entities') {
+      const dog = observation?.entities?.find(entity => entity.uuid === uuid && entity.health > 0);
+      if (grounded && dog?.distance <= 4 && Math.abs(dog.pos[1] - grounded[1]) <= 2) {
+        trail.splice(0, trail.length, grounded);
+      }
+      continue;
+    }
+    if (action !== 'observe') continue;
+    grounded = observation?.onGround && !observation.inWater && !observation.dead
+      && observation.dimension === OVERWORLD ? feet(observation) : undefined;
+    if (!grounded || !trail.length) continue;
+    const repeat = trail.findIndex(pos => pos[1] === grounded[1]
+      && Math.hypot(pos[0] - grounded[0], pos[2] - grounded[2]) <= 1);
+    if (repeat >= 0) trail.splice(repeat + 1);
+    else if (Math.hypot(...grounded.map((value, axis) => value - trail.at(-1)[axis])) >= 2) trail.push(grounded);
   }
   return trail;
 }

@@ -277,9 +277,9 @@ export async function stepOut(action, player, visited, destination, preferredGro
   return !wrongHeight && moved;
 }
 
-export async function retreatFromNearbyMob(action, player, visited, rejectedSteps, warningDistance = 7) {
+export async function retreatFromNearbyMob(action, player, visited, rejectedSteps, warningDistance = 7, creeperWarning = 16) {
   // A scouting walk can cover ten blocks before the next observation.
-  const threat = player.threats?.find(entity => entity.distance <= (entity.type === 'minecraft:creeper' ? 16 : warningDistance)
+  const threat = player.threats?.find(entity => entity.distance <= (entity.type === 'minecraft:creeper' ? creeperWarning : warningDistance)
     && (entity.type !== 'minecraft:spider' || isBedtime(player) || entity.distance <= 3));
   if (!threat) return false;
   const pursuit = threat.distance < (warningDistance > 7 ? 7 : 3) && threat.type !== 'minecraft:creeper';
@@ -1160,25 +1160,42 @@ export async function sleepNearby(action, player) {
   return false;
 }
 
-export async function regroupExpeditionCompanion(action, uuid, lastPosition) {
+export async function regroupExpeditionCompanion(action, uuid, lastPosition, trail = []) {
+  const distanceFrom = (first, second) => Math.hypot(...first.map((value, axis) => value - second[axis]));
   const visited = [];
   const rejected = new Set();
+  let waypointIndex;
   let blocked = 0;
   for (let approach = 0; approach < 36; approach++) {
     const player = await action('observe');
     assert.ok(player?.inWorld && !player.dead && player.health >= 8, 'The player became unsafe during regrouping');
     const dogs = await action('get_entities', { type: DOG, radius: 128 });
     const dog = dogs?.entities.find(entity => entity.uuid === uuid && entity.health > 0);
-    if (dog?.distance <= 6) return dog;
+    if (dog?.distance <= 6 && Math.abs(dog.pos[1] - player.position.y) <= 3) return dog;
     lastPosition = dog?.pos ?? lastPosition;
     assert.ok(lastPosition, 'The original Mushroom is out of sight and has no recorded position');
-    if (await retreatFromNearbyMob(action, player, visited, rejected)) continue;
     const here = feet(player);
-    const ground = Math.hypot(here[0] - lastPosition[0], here[2] - lastPosition[2]) <= 8
+    if (waypointIndex === undefined) {
+      const closest = trail.map((point, index) => ({ index, distance: distanceFrom(here, point) }))
+        .filter(waypoint => waypoint.distance <= 12 && Math.abs(here[1] - trail[waypoint.index][1]) <= 3)
+        .sort((first, second) => (first.distance + first.index * 0.3) - (second.distance + second.index * 0.3))[0];
+      waypointIndex = closest && distanceFrom(lastPosition, trail[0]) <= 8 ? closest.index : -1;
+    }
+    while (waypointIndex >= 0 && distanceFrom(here, trail[waypointIndex]) <= 1.5) waypointIndex--;
+    const pacedApproach = waypointIndex >= 0
+      && player.threats?.some(entity => entity.type === 'minecraft:creeper' && entity.distance <= 16);
+    if (await retreatFromNearbyMob(action, player, visited, rejected, 7, pacedApproach ? 8 : 16)) continue;
+    const target = trail[waypointIndex] ?? lastPosition;
+    const ground = waypointIndex >= 0 || Math.hypot(here[0] - target[0], here[2] - target[2]) <= 8
       ? 'elevation' : 'surface';
     visited.push(here);
-    if (await stepOut(action, player, visited, lastPosition, ground, rejected)) blocked = 0;
-    else if (++blocked >= 4) break;
+    if (await stepOut(action, player, visited, target, ground, rejected, undefined, undefined, pacedApproach ? 12 : 90)) {
+      blocked = 0;
+    } else if (++blocked >= 4) {
+      if (waypointIndex < 0) break;
+      waypointIndex = -1;
+      blocked = 0;
+    }
   }
   throw new Error('Could not reach the last known position of the original Mushroom');
 }

@@ -40,6 +40,17 @@ test('the archer can reject an arc that crosses a nearer spike', async () => {
   assert.equal(clearBowArc({ position: { ...player.position, z: 48.5 } }, crystal, pillar), true);
 });
 
+test('an overhead shot can reach the exposed crystal above a tall obsidian spike', async () => {
+  const { bowAim, clearBowArc } = await import('./expedition-ballistics.mjs');
+  const player = { position: { x: 52.5, y: 59, z: 26.5 } };
+  const target = [33.5, 96, 24.5];
+  const spike = ([x, y, z]) => Math.hypot(x - 33, z - 24) <= 3 && y <= 94;
+  const high = bowAim(player, target, 'high');
+  assert.equal(clearBowArc(player, target, spike), false);
+  assert.ok(high.pitch < bowAim(player, target).pitch);
+  assert.equal(clearBowArc(player, target, spike, high), true);
+});
+
 test('the End archer leaves crystals within blast range of the original dog intact', async () => {
   const { shootEndCrystal } = await import('./expedition-end-crystals.mjs');
   const player = { dimension: 'minecraft:the_end', position: { x: 0, y: 65, z: 0 }, onGround: true, health: 20 };
@@ -94,6 +105,49 @@ test('the crystal run takes a dry route away from an incoming dragon fireball be
   await assert.rejects(clearGeneratedCrystals(action, dog.uuid, () => assert.fail('No crystal should be fired at')),
     error => error === escape);
   assert.deepEqual(changes, [false, true]);
+});
+
+test('an Enderman hit interrupts crystal work until the player is protected by water', async () => {
+  const { clearGeneratedCrystals } = await import('./expedition-end-crystals.mjs');
+  const bucket = { id: 'minecraft:water_bucket', slot: 3, count: 1 };
+  const apple = { id: 'minecraft:golden_apple', slot: 4, count: 1 };
+  const dog = { uuid: 'original', health: 12, pos: [0, 60, 8] };
+  const crystal = { uuid: 'distant-crystal', pos: [24, 80, 0] };
+  const safe = new Error('Reached the recovery meal');
+  const used = [];
+  let mainHand;
+  let observations = 0;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'set_reflexes': return {};
+      case 'get_entities':
+        return { entities: ({
+          'mushroom_yorkie:mushroom_yorkie': [dog], 'minecraft:end_crystal': [crystal],
+        })[args.type] ?? [] };
+      case 'observe':
+        return {
+          inWorld: true, dimension: 'minecraft:the_end', position: { x: 0.5, y: 60, z: 0.5 }, gameTime: 100,
+          health: observations++ === 0 ? 20 : 13,
+          onGround: observations > 1, inWater: used.includes(bucket.id),
+          threats: [{ id: 816, type: 'minecraft:enderman', distance: 2 }],
+        };
+      case 'get_inventory': return { slots: [bucket, apple] };
+      case 'select_slot':
+        mainHand = [bucket, apple].find(item => item.slot === args.slot);
+        return { mainHand };
+      case 'look': return {};
+      case 'use_item':
+        used.push(mainHand.id);
+        if (mainHand === apple) {
+          assert.deepEqual(used, [bucket.id, apple.id]);
+          throw safe;
+        }
+        return { success: true };
+      default: assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  await assert.rejects(clearGeneratedCrystals(action, dog.uuid, () => assert.fail('No crystal work while being hit')),
+    error => error === safe);
 });
 
 test('a crystal pillar descent checks the full water column and steers against surface drift', async () => {
@@ -172,7 +226,7 @@ test('a displaced climber pours below only when solid ground comes within reach'
 });
 
 test('a cleared cage can be shot from an alternate dry stance using current block observations', async () => {
-  const { surveyedCageShot } = await import('./expedition-end-crystals.mjs');
+  const { surveyedCrystalShot } = await import('./expedition-end-crystals.mjs');
   const player = { inWorld: true, onGround: true, position: { x: -18.5, y: 57, z: 70.5 } };
   const crystal = { uuid: 'guarded', pos: [-12.5, 83, 39.5] };
   let blocks = [];
@@ -182,14 +236,14 @@ test('a cleared cage can be shot from an alternate dry stance using current bloc
     assert.ok(args.size[2] > 30);
     return { cells: blocks, stats: { unloadedChunks: 0 } };
   };
-  const available = await surveyedCageShot(action, player, crystal, [1, 1.5], new Set());
+  const available = await surveyedCrystalShot(action, player, crystal, [1, 1.5], new Set());
   assert.ok(available?.aim);
-  const next = await surveyedCageShot(action, player, crystal, [1, 1.5], new Set([available.key]));
+  const next = await surveyedCrystalShot(action, player, crystal, [1, 1.5], new Set([available.key]));
   assert.ok(next?.aim);
   assert.notEqual(next.key, available.key);
   blocks = Array.from({ length: 32 }, (_, index) => 57 + index).flatMap(y =>
     [-18, -17, -16].map(x => ({ x, y, z: 63, b: 'minecraft:obsidian' })));
-  assert.equal(await surveyedCageShot(action, player, crystal, [1, 1.5], new Set()), null);
+  assert.equal(await surveyedCrystalShot(action, player, crystal, [1, 1.5], new Set()), null);
 });
 
 test('the archer removes only his own pillar and stops on the original ground', async () => {

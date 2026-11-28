@@ -723,6 +723,29 @@ test('a recovery forage keeps the chicken collected through ordinary play', asyn
   assert.ok(hunted && collected);
 });
 
+test('regrouping on a known trail takes short steps before a distant creeper can close', async () => {
+  const { regroupExpeditionCompanion } = await import('./expedition-home.mjs');
+  const dog = { uuid: 'original', pos: [10.5, 64, 0.5], health: 12 };
+  let x = 0.5;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe': return { inWorld: true, onGround: true, health: 20, position: { x, y: 64, z: 0.5 },
+        threats: [{ id: 12, type: 'minecraft:creeper', distance: 12 }] };
+      case 'get_entities':
+        assert.equal(args.radius, 128, 'a distant creeper should not restart the same retreat loop');
+        return { entities: [{ ...dog, distance: Math.abs(dog.pos[0] - x) }] };
+      case 'get_blocks': return { cells: Array.from({ length: 12 }, (_, index) => cell(index, 63, 0, 'grass_block')) };
+      case 'go_to':
+        assert.equal(args.maxTicks, 12);
+        x = Math.min(args.pos[0] + 0.5, x + 2);
+        return { arrived: false, position: [x, 64, 0.5] };
+      default: assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  const together = await regroupExpeditionCompanion(action, dog.uuid, dog.pos, [[10, 64, 0], [0, 64, 0]]);
+  assert.equal(together.distance, 6);
+});
+
 test('companion forage checks again after regrouping before looking for food', async () => {
   const { forageExpeditionMeal } = await import('./expedition-home.mjs');
   const player = { inWorld: true, health: 20, position: { x: 912, y: 72, z: 205 } };

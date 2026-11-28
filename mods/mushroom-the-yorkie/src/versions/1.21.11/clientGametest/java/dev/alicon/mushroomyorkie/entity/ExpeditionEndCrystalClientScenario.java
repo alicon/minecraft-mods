@@ -6,6 +6,7 @@ import dev.alicon.mushroomyorkie.item.ModItems;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -101,6 +102,8 @@ final class ExpeditionEndCrystalClientScenario {
 
 	static void runGenerated(ClientGameTestContext context, TestServerContext server, UUID ownerId, Path status) throws IOException {
 		boolean cageOnly = "1".equals(System.getenv("MUSHROOM_EXPEDITION_CAGE_ONLY"));
+		boolean tallestOnly = "1".equals(System.getenv("MUSHROOM_EXPEDITION_TALLEST_ONLY"));
+		if (cageOnly && tallestOnly) throw new AssertionError("Select one crystal focus");
 		var camp = server.computeOnServer(minecraft -> {
 			var end = Objects.requireNonNull(minecraft.getLevel(Level.END));
 			var spikes = SpikeFeature.getSpikesForLevel(end);
@@ -113,6 +116,11 @@ final class ExpeditionEndCrystalClientScenario {
 				var guarded = spikes.stream().filter(SpikeFeature.EndSpike::isGuarded).findFirst().orElseThrow();
 				x = guarded.getCenterX() - 16 * Integer.signum(guarded.getCenterX());
 				z = guarded.getCenterZ();
+			} else if (tallestOnly) {
+				var tallest = spikes.stream().filter(spike -> !spike.isGuarded())
+						.max(Comparator.comparingInt(SpikeFeature.EndSpike::getHeight)).orElseThrow();
+				x = tallest.getCenterX() + 19 * Integer.signum(tallest.getCenterX());
+				z = tallest.getCenterZ() + 2;
 			}
 			var ground = end.getChunk(x >> 4, z >> 4);
 			var start = new BlockPos(x, ground.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15) + 1, z);
@@ -172,6 +180,10 @@ final class ExpeditionEndCrystalClientScenario {
 							&& spike.getCenterZ() == crystal.getBlockZ()))
 					.map(EndCrystal::getUUID).collect(Collectors.toUnmodifiableSet());
 		});
+		UUID tallestCrystal = tallestOnly ? server.computeOnServer(minecraft -> minecraft.getLevel(Level.END)
+				.getEntitiesOfClass(EndCrystal.class, new AABB(camp.start()).inflate(128)).stream()
+				.filter(crystal -> !guardedCrystals.contains(crystal.getUUID()))
+				.max(Comparator.comparingDouble(EndCrystal::getY)).orElseThrow().getUUID()) : null;
 		context.waitFor(client -> recordedCrystals.stream().anyMatch(uuid ->
 				client.level.getEntity(uuid) instanceof EndCrystal), 300);
 		Files.writeString(status.resolveSibling("end-crystal-companion"), camp.dogId().toString());
@@ -225,12 +237,13 @@ final class ExpeditionEndCrystalClientScenario {
 				var owner = minecraft.getPlayerList().getPlayer(ownerId);
 				var dog = (MushroomYorkieEntity) end.getEntity(camp.dogId());
 				int shots = owner.getStats().getValue(Stats.ITEM_USED.get(Items.BOW));
-				int target = cageOnly ? 1 : recordedCrystals.size();
+				int target = cageOnly || tallestOnly ? 1 : recordedCrystals.size();
 				long missing = recordedCrystals.stream().filter(uuid -> end.getEntity(uuid) == null).count();
 				int remaining = end.getEntitiesOfClass(EndCrystal.class, new AABB(camp.start()).inflate(128)).size();
 				if (!owner.isAlive() || !owner.level().dimension().equals(Level.END) || shots < target
 						|| missing != target || remaining != recordedCrystals.size() - target
 						|| end.getDragonFight().saveData().dragonKilled()
+						|| (tallestOnly && end.getEntity(tallestCrystal) != null)
 						|| (cageOnly && guardedCrystals.stream().noneMatch(uuid -> end.getEntity(uuid) == null))) {
 					throw new AssertionError("Expected native bow shots to break the selected generated crystals while the dragon lives");
 				}
@@ -240,7 +253,7 @@ final class ExpeditionEndCrystalClientScenario {
 					throw new AssertionError("Expected the original unhurt Mushroom at his marked End shelter");
 				}
 				System.out.printf("Expedition native generated %s passed: count=%d arrows=%d dog=%s%n",
-						cageOnly ? "cage" : "crystals", target, shots, camp.dogId());
+						cageOnly ? "cage" : tallestOnly ? "tallest crystal" : "crystals", target, shots, camp.dogId());
 			});
 			context.takeScreenshot("expedition-survival-generated-end-crystals");
 			return;

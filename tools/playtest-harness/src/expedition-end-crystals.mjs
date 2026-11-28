@@ -8,6 +8,8 @@ const CRYSTAL = 'minecraft:end_crystal';
 const DOG = 'mushroom_yorkie:mushroom_yorkie';
 const BOW = 'minecraft:bow';
 const END = 'minecraft:the_end';
+const ENDERMAN = 'minecraft:enderman';
+const WATER_BUCKET = 'minecraft:water_bucket';
 const SPIKE_COUNT = 10;
 const feet = ({ position: { x, y, z } }) => [x, y, z].map(Math.floor);
 const distance = (first, second) => Math.hypot(...first.map((coordinate, axis) => coordinate - second[axis]));
@@ -22,6 +24,21 @@ async function dragonBreathThreat(action) {
   return fireballs.length ? [...fireballs, ...breath] : null;
 }
 
+async function enterEndermanRefuge(action, player) {
+  if (player.inWater) return true;
+  if (!(await action('get_inventory')).slots.some(stack => stack.id === WATER_BUCKET)) return false;
+  await hold(action, WATER_BUCKET);
+  await action('look', { pitch: 90 });
+  if (!(await action('use_item'))?.success) return false;
+  for (let check = 0; check < 6; check++) {
+    const inside = await action('observe');
+    if (!inside?.inWorld || inside.dead) return false;
+    if (inside.inWater) return true;
+    await setTimeout(75);
+  }
+  return false;
+}
+
 async function fireAtCrystal(action, shot, radius, startingHealth) {
   await hold(action, BOW);
   if (!await action('look', shot.aim)) return null;
@@ -29,7 +46,7 @@ async function fireAtCrystal(action, shot, radius, startingHealth) {
   const fired = await action('use_item', { ticks: 24 });
   if (!fired?.completed) return null;
   const interrupted = Number.isFinite(startingHealth) && fired.health <= startingHealth - 3;
-  for (let check = 0; check < 16; check++) {
+  for (let check = 0; check < (shot.highArc ? 34 : 16); check++) {
     const view = await action('get_entities', { type: CRYSTAL, radius });
     if (view && !view.entities.some(entity => entity.uuid === shot.crystal.uuid)) return shot.crystal.uuid;
     if (interrupted) return null;
@@ -55,20 +72,23 @@ export async function shootEndCrystal(action, uuid) {
   return shot ? fireAtCrystal(action, shot, 80) : null;
 }
 
-export async function surveyedCageShot(action, player, crystal, heights, tried) {
+export async function surveyedCrystalShot(action, player, crystal, heights, tried, allowHighArc = false) {
   const origin = [player.position.x, player.position.y, player.position.z];
   if (!player.onGround || player.inWater || distance(origin, crystal.pos) < 14) return null;
   const stance = origin.map(value => Math.floor(value * 2)).join(',');
-  const shots = [...new Set([...heights, 1, 1.5, 0.65, 1.75])].flatMap(height => {
-    const key = `${crystal.uuid}:${stance}:${height}`;
+  const options = [...new Set([...heights, 1, 1.5, 0.65, 1.75])];
+  const shots = (allowHighArc ? ['low', 'high'] : ['low']).flatMap(arc => options.flatMap(height => {
+    const key = `${crystal.uuid}:${stance}:${height}:${arc}`;
     const target = [crystal.pos[0], crystal.pos[1] + height, crystal.pos[2]];
-    const aim = bowAim(player, target);
-    return !tried.has(key) && aim ? [{ crystal, target, aim, key }] : [];
-  });
+    const aim = bowAim(player, target, arc);
+    return !tried.has(key) && aim ? [{ crystal, target, aim, key, highArc: arc === 'high' }] : [];
+  }));
   if (!shots.length) return null;
   const low = origin.map((value, axis) => Math.floor(Math.min(value, crystal.pos[axis])) - 1);
   // At a forty-five tick flight the lower arc can rise above both endpoints.
   const high = origin.map((value, axis) => Math.ceil(Math.max(value, crystal.pos[axis])) + (axis === 1 ? 16 : 1));
+  // A full-draw arrow can rise about 67 blocks above a level shooter.
+  if (allowHighArc) high[1] = Math.max(high[1], Math.ceil(origin[1]) + 70);
   const size = high.map((value, axis) => value - low[axis] + 1);
   if (size.some(length => length > 96)) return null;
   const center = low.map((value, axis) => value + Math.floor(size[axis] / 2));
@@ -76,10 +96,10 @@ export async function surveyedCageShot(action, player, crystal, heights, tried) 
   if (!view || view.stats?.unloadedChunks) return null;
   const solid = new Set(view.cells.filter(cell => !/:(?:air|cave_air|void_air|fire|soul_fire)$/.test(cell.b))
     .map(cell => String([cell.x, cell.y, cell.z])));
-  return shots.find(shot => clearBowArc(player, shot.target, pos => solid.has(String(pos)))) ?? null;
+  return shots.find(shot => clearBowArc(player, shot.target, pos => solid.has(String(pos)), shot.aim)) ?? null;
 }
 
-export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = false } = {}) {
+export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = false, tallestOnly = false } = {}) {
   // The bridge classifies neutral Endermen as enemies even before they attack.
   await action('set_reflexes', { autoDefend: false });
   const dogs = await action('get_entities', { type: DOG, radius: 32 });
@@ -99,13 +119,20 @@ export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = 
   let detourSteps = 0;
   let nextRecovery = 0;
   let nextCageAttempt = 0;
-  const goal = cageOnly ? 1 : SPIKE_COUNT;
+  let lastHealth;
+  let refugeUntil = 0;
+  const goal = cageOnly || tallestOnly ? 1 : SPIKE_COUNT;
 
   for (let attempt = 0; attempt < 160 && broken.size < goal; attempt++) {
     const player = await action('observe');
     assert.ok(player?.inWorld && !player.dead && player.dimension === END && player.health >= 4,
       'The player became unsafe while clearing the End crystals');
-    if (!player.onGround) {
+    if (lastHealth - player.health >= 0.5
+        && player.threats?.some(threat => threat.type === ENDERMAN && threat.distance <= 5)) {
+      refugeUntil = player.gameTime + 180;
+    }
+    lastHealth = player.health;
+    if (!player.onGround && !player.inWater) {
       await setTimeout(200);
       continue;
     }
@@ -131,6 +158,7 @@ export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = 
       }
       continue;
     }
+    const sheltered = player.gameTime < refugeUntil && await enterEndermanRefuge(action, player);
     if (player.health < 16 && player.gameTime >= nextRecovery) {
       const inventory = await action('get_inventory');
       if (inventory.slots.some(stack => stack.id === 'minecraft:golden_apple')) {
@@ -140,6 +168,10 @@ export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = 
         nextRecovery = player.gameTime + 160;
         continue;
       }
+    }
+    if (sheltered) {
+      await setTimeout(350);
+      continue;
     }
 
     const group = [Math.floor(here[0] / 6), Math.floor(here[2] / 6)].join(',');
@@ -152,8 +184,10 @@ export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = 
         cageStatus.set(crystal.uuid, terrain.cells.some(cell => cell.b === 'minecraft:iron_bars'));
       }
     }
+    const tallest = tallestOnly && [...seen.values()].filter(crystal => cageStatus.get(crystal.uuid) === false)
+      .sort((first, second) => second.pos[1] - first.pos[1])[0];
     const candidates = (view?.entities ?? []).filter(crystal => !broken.has(crystal.uuid)
-        && (!cageOnly || cageStatus.get(crystal.uuid)))
+        && (!cageOnly || cageStatus.get(crystal.uuid)) && (!tallestOnly || tallest?.uuid === crystal.uuid))
       .map(crystal => ({ crystal, range: distance(crystal.pos, here),
       key: `${crystal.uuid}:${group}`, aim: bowAim(player, [crystal.pos[0], crystal.pos[1] + 1, crystal.pos[2]]) }))
       .filter(shot => distance(shot.crystal.pos, dog.pos) >= 14)
@@ -164,15 +198,21 @@ export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = 
     const vantage = firing?.line;
     const xzToLine = vantage ? Math.hypot(vantage[0] + 0.5 - player.position.x,
       vantage[2] + 0.5 - player.position.z) : Infinity;
-    const shot = firing
-      ? xzToLine <= 12 && await surveyedCageShot(action, player, activeWindow.crystal, firing.heights, positionsTried)
-      : candidates.find(candidate => !cageStatus.get(candidate.crystal.uuid) && candidate.aim
-        && candidate.range >= 14 && !positionsTried.has(candidate.key));
+    const exposed = !firing && candidates.find(candidate => !cageStatus.get(candidate.crystal.uuid) && candidate.aim
+      && candidate.range >= 14 && !positionsTried.has(candidate.key));
+    let shot = firing
+      ? xzToLine <= 12 && await surveyedCrystalShot(action, player, activeWindow.crystal, firing.heights, positionsTried)
+      : exposed;
+    if (exposed && (tallestOnly || (misses.get(exposed.crystal.uuid) ?? 0) >= 2)) {
+      shot = await surveyedCrystalShot(action, player, exposed.crystal, [], positionsTried, true);
+      if (!shot) positionsTried.add(exposed.key);
+    }
     if (shot && (firing || detourSteps === 0)) {
       const destroyed = await fireAtCrystal(action, shot, 128, player.health);
       if (destroyed === undefined) continue;
       positionsTried.add(shot.key);
-      await report({ crystal: shot.crystal, position: here, destroyed: Boolean(destroyed) });
+      if (exposed) positionsTried.add(exposed.key);
+      await report({ crystal: shot.crystal, position: here, destroyed: Boolean(destroyed), highArc: Boolean(shot.highArc) });
       if (destroyed) broken.add(destroyed);
       else {
         misses.set(shot.crystal.uuid, (misses.get(shot.crystal.uuid) ?? 0) + 1);
@@ -219,5 +259,6 @@ export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = 
     await stepOut(action, player, visited, destination, vantage ? 'elevation' : 'surface', rejected);
     detourSteps--;
   }
-  assert.equal(broken.size, goal, cageOnly ? 'The generated guarded crystal is still intact' : 'Some generated End crystals are still intact');
+  assert.equal(broken.size, goal, cageOnly || tallestOnly
+    ? 'The selected generated crystal is still intact' : 'Some generated End crystals are still intact');
 }

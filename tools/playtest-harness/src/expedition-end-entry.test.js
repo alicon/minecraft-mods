@@ -70,6 +70,23 @@ test('the ore return trail contains grounded outbound observations and ends at t
   assert.deepEqual(firstIronOutboundTrail(trace, home), [[0, 64, 0], [6, 64, 0], [13, 64, 0]]);
 });
 
+test('a regroup trail starts from the last same-level contact with the original dog', async () => {
+  const { companionRegroupTrail } = await import('./expedition-eye-route.mjs');
+  const point = (x, y, z = 0.5) => ({ action: 'observe', observation: {
+    dimension: 'minecraft:overworld', onGround: true, position: { x, y, z },
+  } });
+  const dog = (uuid, y, distance) => ({ action: 'get_entities', observation: {
+    entities: [{ uuid, pos: [0.5, y, 0.5], health: 12, distance }],
+  } });
+  const trace = [
+    point(0.5, 62), dog('original', 62, 1), point(2.5, 63), point(6.5, 66),
+    dog('other', 66, 1), dog('original', 62, 5), point(9.5, 67), point(6.5, 66), point(6.5, 68, 3.5),
+  ].map(row => JSON.stringify(row)).join('\n') + '\n{"incomplete":';
+  assert.deepEqual(companionRegroupTrail(trace, 'original'), [
+    [0, 62, 0], [2, 63, 0], [6, 66, 0], [6, 68, 3],
+  ]);
+});
+
 test('the return to an expedition bed verifies the original living dog nearby', async () => {
   const { returnToCampWithCompanion } = await import('./expedition-eye-route.mjs');
   const home = [0, 64, 0];

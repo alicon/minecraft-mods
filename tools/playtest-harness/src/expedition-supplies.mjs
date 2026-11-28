@@ -15,7 +15,9 @@ import { blazePowderCount, craftBlazePowder, earnBlazeRods } from './expedition-
 import { clearGeneratedCrystals, shootEndCrystal } from './expedition-end-crystals.mjs';
 import { craftEyes, crossEndPortal, enderEyeCount, findStrongholdPortalRoom } from './expedition-end-entry.mjs';
 import { earnEnderPearls } from './expedition-pearls.mjs';
-import { firstIronOutboundTrail, navigateToStronghold, returnToCampWithCompanion, scoutByEye } from './expedition-eye-route.mjs';
+import {
+  companionRegroupTrail, firstIronOutboundTrail, navigateToStronghold, returnToCampWithCompanion, scoutByEye,
+} from './expedition-eye-route.mjs';
 import { COMPANION_WEARABLES, markExpeditionCamp, practiceStayAndRecall, prepareCompanionGear } from './expedition-gear.mjs';
 import { expeditionPolicy } from './expedition-policy.mjs';
 import { NETHER, OVERWORLD, netherRoundTrip, prepareNetherPortal } from './expedition-nether.mjs';
@@ -285,12 +287,15 @@ try {
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
     const camp = await markExpeditionCamp(action);
     if (stage === 'generated-end-crystals') {
-      await clearGeneratedCrystals(action, companion, async ({ crystal, position, destroyed, openedCage }) => {
+      await clearGeneratedCrystals(action, companion, async ({ crystal, position, destroyed, openedCage, highArc }) => {
         console.log(JSON.stringify({ at: new Date().toISOString(), action: openedCage ? 'generated_cage_opened' : 'generated_crystal_shot',
-          crystal: crystal.uuid, target: crystal.pos, position, destroyed, openedCage, camp, dog: companion }));
+          crystal: crystal.uuid, target: crystal.pos, position, destroyed, openedCage, highArc, camp, dog: companion }));
         if (openedCage) await narrate('Result', 'Opened a crystal cage and descended to the ground.');
         if (destroyed) await narrate('Result', 'A generated End crystal broke.');
-      }, { cageOnly: process.env.MUSHROOM_EXPEDITION_CAGE_ONLY === '1' });
+      }, {
+        cageOnly: process.env.MUSHROOM_EXPEDITION_CAGE_ONLY === '1',
+        tallestOnly: process.env.MUSHROOM_EXPEDITION_TALLEST_ONLY === '1',
+      });
     } else {
       let crystal;
       for (let shot = 0; shot < 3 && !crystal; shot++) crystal = await shootEndCrystal(action, companion);
@@ -554,15 +559,25 @@ async function runExpedition(start, stage) {
     policy.reserveCompanionMeal = true;
     policy.scoutNewGround = resume && !checkpoint.quarry?.length;
     let lastCompanionPosition;
+    const regroup = async () => {
+      const trace = await readFile(join(dirname(statusFile), 'actions.jsonl'), 'utf8').catch(error => {
+        if (error.code !== 'ENOENT') throw error;
+        return '';
+      });
+      const trail = companionRegroupTrail(trace, checkpoint.dog);
+      const together = await regroupExpeditionCompanion(action, checkpoint.dog, lastCompanionPosition, trail);
+      lastCompanionPosition = together.pos;
+      console.log(JSON.stringify({ at: new Date().toISOString(), action: 'companion_regrouped',
+        dog: together.uuid, position: together.pos, health: together.health, distance: together.distance }));
+      await narrate('Result', 'The original Mushroom is nearby on reachable footing.');
+    };
     policy.checkCompanion = async (player, canRegroup) => {
       const dogs = await action('get_entities', { type: 'mushroom_yorkie:mushroom_yorkie', radius: 32 });
       const dog = dogs?.entities.find(entity => entity.uuid === checkpoint.dog);
       if (dog?.health > 0) lastCompanionPosition = dog.pos;
-      if (canRegroup && (!dog || dog.distance > 16)) {
+      if (canRegroup && (!dog || dog.distance > 16 || Math.abs(dog.pos[1] - player.position.y) > 5)) {
         await narrate('Decision', 'Pause mining and regroup with the original Mushroom.');
-        const together = await regroupExpeditionCompanion(action, checkpoint.dog, lastCompanionPosition);
-        lastCompanionPosition = together.pos;
-        await narrate('Result', 'The original Mushroom is back within six blocks.');
+        await regroup();
         return 'regrouped';
       }
       if (dog?.health > 0 && (dog.health <= 8
@@ -573,11 +588,9 @@ async function runExpedition(start, stage) {
       const nearby = await action('get_entities', { type: 'mushroom_yorkie:mushroom_yorkie', radius: 32 });
       const dog = nearby?.entities.find(entity => entity.uuid === checkpoint.dog && entity.health > 0);
       if (dog) lastCompanionPosition = dog.pos;
-      if (dog?.distance <= 6 || (dog?.distance <= 10 && Math.abs(dog.pos[1] - player.position.y) <= 4)) return false;
+      if (dog?.distance <= 10 && Math.abs(dog.pos[1] - player.position.y) <= 4) return false;
       await narrate('Decision', 'Mushroom is too far away to forage together. Regrouping before searching for food.', 10_000);
-      const together = await regroupExpeditionCompanion(action, checkpoint.dog, lastCompanionPosition);
-      lastCompanionPosition = together.pos;
-      await narrate('Result', 'The original Mushroom is back within six blocks.');
+      await regroup();
       return true;
     };
     policy.tendCompanion = async () => {
