@@ -208,9 +208,17 @@ async function runExpedition(start, stage) {
     assert.equal(checkpoint.owner, start.name);
     assert.equal(checkpoint.bridgeFingerprint, bridgeFingerprint, 'The recorded client is no longer listening');
     assert.ok(Number.isFinite(checkpoint.gameTime) && checkpoint.gameTime <= start.gameTime);
-    assert.ok(['camp', 'adoption', 'stone', 'iron'].includes(checkpoint.phase));
-    for (const pos of [checkpoint.camp?.bed, checkpoint.camp?.table]) {
-      assert.ok(blockPosition(pos), 'Invalid recorded camp');
+    assert.ok(['starter', 'provision', 'camp', 'adoption', 'stone', 'iron'].includes(checkpoint.phase));
+    if (checkpoint.phase === 'provision') {
+      for (const item of ['crafting_table', 'wooden_sword', 'wooden_pickaxe']) {
+        assert.ok(inventory.slots.some(stack => stack.id === `minecraft:${item}`), `The earned ${item} is missing`);
+      }
+    } else if (checkpoint.phase !== 'starter') {
+      for (const pos of [checkpoint.camp?.bed, checkpoint.camp?.table]) {
+        assert.ok(blockPosition(pos), 'Invalid recorded camp');
+      }
+    } else {
+      assert.equal(inventory.slots.length, 0, 'Starter recovery requires an empty inventory');
     }
     assert.ok(checkpoint.quarry === undefined
       || (Array.isArray(checkpoint.quarry) && checkpoint.quarry.length <= 44 && checkpoint.quarry.every(blockPosition)),
@@ -237,9 +245,17 @@ async function runExpedition(start, stage) {
     console.log(JSON.stringify({ at: new Date().toISOString(), action: 'controller_reattached', phase: checkpoint.phase }));
   } else {
     assert.equal(inventory.slots.length, 0, 'Expected an empty expedition inventory');
+    checkpoint = { owner: start.name, gameTime: start.gameTime, bridgeFingerprint, stage, phase: 'starter' };
+  }
+  await action('set_reflexes', { chargeRanged: false });
+  if (checkpoint.phase === 'starter') {
     await gatherStarterTools(start);
-    const camp = await prepareAdoptionCamp(action, craft, descendFromCanopy, policy);
-    checkpoint = { owner: start.name, gameTime: start.gameTime, bridgeFingerprint, stage, phase: 'camp', camp };
+    checkpoint.phase = 'provision';
+    if (live) await writeCheckpoint(checkpoint);
+  }
+  if (checkpoint.phase === 'provision') {
+    checkpoint.camp = await prepareAdoptionCamp(action, craft, descendFromCanopy, policy);
+    checkpoint.phase = 'camp';
     if (live) await writeCheckpoint(checkpoint);
   }
   if (checkpoint.phase === 'camp') {

@@ -5,6 +5,83 @@ function cell(x, y, z, type = 'grass_block') {
   return { x, y, z, b: `minecraft:${type}` };
 }
 
+test('an empty early-game food reserve can reroute the search toward a distant pig', async () => {
+  const { gatherWool } = await import('./expedition-home.mjs');
+  const player = { inWorld: true, health: 20, food: 6, position: { x: 0.5, y: 64, z: 0.5 } };
+  const ground = Array.from({ length: 9 }, (_, x) => cell(x, 63, 0));
+  let moved = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_inventory': return { slots: moved ? [{ id: 'minecraft:white_wool', count: 3 }] : [] };
+      case 'observe': return player;
+      case 'get_entities':
+        if (args.type === 'sheep') return { entities: [] };
+        assert.ok(args.radius >= 12, 'The pig is outside the old six-block backup search');
+        return { entities: [{ id: 1, type: 'minecraft:pig', distance: 12, pos: [12, 64, 0] }] };
+      case 'get_blocks': return { cells: ground };
+      case 'go_to':
+        assert.ok(args.pos[0] > 0);
+        moved = true;
+        return { arrived: true, position: args.pos };
+      default: assert.fail(name);
+    }
+  };
+  assert.equal(await gatherWool(action, () => assert.fail('The pig is reachable'), () => assert.fail('Forage by local rules')), 'white');
+  assert.ok(moved);
+});
+
+test('a nearly starving player may eat the final mutton and still build the bed once the wool is ready', async () => {
+  const { gatherWool } = await import('./expedition-home.mjs');
+  const player = { inWorld: true, health: 15, food: 6, position: { x: 0.5, y: 64, z: 0.5 } };
+  let ate = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_inventory': return { slots: [{ id: 'minecraft:white_wool', count: ate ? 3 : 2 },
+        ...(!ate ? [{ id: 'minecraft:mutton', count: 1, slot: 1 }] : [])] };
+      case 'observe': return player;
+      case 'select_slot': return { mainHand: { id: 'minecraft:mutton' } };
+      case 'use_item': ate = true; return { completed: true };
+      case 'get_entities': return { entities: [] };
+      case 'get_blocks': return { cells: [cell(0, 63, 0), cell(1, 63, 0)] };
+      case 'go_to': return { arrived: true, position: args.pos };
+      default: assert.fail(name);
+    }
+  };
+  assert.equal(await gatherWool(action, () => assert.fail('Already on dry ground')), 'white');
+  assert.ok(ate);
+});
+
+test('mixed wool uses a single collected dye to complete the most common color', async () => {
+  const { matchWoolWithDye } = await import('./expedition-home.mjs');
+  const stock = { slots: [{ id: 'minecraft:white_wool', count: 2 }, { id: 'minecraft:black_wool', count: 1 },
+    { id: 'minecraft:lily_of_the_valley', count: 1 }] };
+  const craft = [];
+  const action = async name => {
+    assert.equal(name, 'get_inventory');
+    return { slots: [{ id: 'minecraft:white_wool', count: 3 }] };
+  };
+  assert.equal(await matchWoolWithDye(action, async (item, amount) => craft.push([item, amount]), stock), 'white');
+  assert.deepEqual(craft, [['minecraft:white_dye', 1], ['minecraft:white_wool', 1]]);
+});
+
+test('an unarmored scout runs away from a close skeleton along native dry waypoints', async () => {
+  const { retreatFromNearbyMob } = await import('./expedition-home.mjs');
+  const player = { position: { x: 0.5, y: 64, z: 0.5 }, timeOfDay: 15_000, health: 20,
+    threats: [{ id: 71, type: 'minecraft:skeleton', distance: 4 }] };
+  const ground = Array.from({ length: 17 }, (_, i) => cell(i - 8, 63, 0));
+  let stepped = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_entities': return { entities: [{ id: 71, hostile: true, pos: [4.5, 64, 0.5] }] };
+      case 'get_blocks': return { cells: ground };
+      case 'go_to': stepped = args.pos[0] < 0; return { arrived: true, position: args.pos };
+      default: assert.fail(name);
+    }
+  };
+  assert.equal(await retreatFromNearbyMob(action, player, [], new Set()), true);
+  assert.ok(stepped);
+});
+
 test('after adoption the player can sleep in a nearby vanilla bed at night', async () => {
   const { sleepNearby } = await import('./expedition-home.mjs');
   const player = { inWorld: true, dimension: 'minecraft:overworld', timeOfDay: 15_000,

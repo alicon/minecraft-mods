@@ -103,8 +103,10 @@ the action trace, client and controller logs, and screenshots.
 
 The client starts in a fresh Normal Survival world with an empty inventory and
 commands disabled. The player gathers wood, crafts a wooden pickaxe and sword, packs
-the crafting table, collects matching wool and mutton from sheep, and crafts
-a bed. It uses remaining daylight to gather reachable supplies close to the
+the crafting table, and crafts a bed once it has collected matching wool.
+When food runs low, it can route toward nearby pigs or cows while scouting for
+wool. The scout can dye mixed wool when it has enough materials and takes a dry
+retreat from nearby danger. It uses remaining daylight to gather reachable supplies close to the
 bed, replenish food and timber, and cook when it has a furnace and enough
 mutton to keep a meal for the dog. It then sleeps at normal sunset and
 feeds the adopted dog. The
@@ -144,7 +146,9 @@ reacquisition.
 If a live controller has exited and its status is `held`, restart the external
 controller from its last saved phase with the same client still open. Use the
 same stage and policy and point to that run's status file. The client connection
-and owner must match the recorded checkpoint. An interrupted iron quarry
+and owner must match the recorded checkpoint. A player with the earned starter
+tools can resume searching for food and wool before a camp has been built.
+An interrupted iron quarry
 retains its grounded steps. The resumed controller can continue from the
 verified landing or use the recorded route to climb out.
 

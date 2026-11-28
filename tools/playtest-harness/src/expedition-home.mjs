@@ -33,6 +33,12 @@ const BACKUP_FOOD = [...Object.values(BACKUP_MEAT), 'minecraft:apple'];
 const COOKED_FOOD = ['minecraft:cooked_mutton', 'minecraft:cooked_beef', 'minecraft:cooked_porkchop'];
 const DOG_FOOD = [MUTTON, ...BACKUP_FOOD, ...COOKED_FOOD];
 const FEEDING_SEARCH_RADIUS = 24;
+const WOOL_DYES = {
+  white: ['minecraft:lily_of_the_valley', 'minecraft:bone_meal'],
+  yellow: ['minecraft:dandelion'],
+  red: ['minecraft:poppy', 'minecraft:red_tulip'],
+  light_gray: ['minecraft:oxeye_daisy', 'minecraft:azure_bluet', 'minecraft:white_tulip'],
+};
 
 function isBedtime(player) {
   return player?.dimension === 'minecraft:overworld' && player.timeOfDay >= 12_542 && player.timeOfDay < 23_460;
@@ -45,6 +51,57 @@ function count({ slots }, item) {
 function woolColor(inventory) {
   const colors = new Set(inventory.slots.map(({ id }) => WOOL.exec(id)?.[1]).filter(Boolean));
   return [...colors].find(color => count(inventory, `minecraft:${color}_wool`) >= 3);
+}
+
+export async function matchWoolWithDye(action, craft, inventory) {
+  if (inventory.slots.filter(stack => WOOL.test(stack.id)).reduce((total, stack) => total + stack.count, 0) < 3) return;
+  const options = Object.entries(WOOL_DYES).map(([color, ingredients]) => {
+    const wool = `minecraft:${color}_wool`;
+    const dye = `minecraft:${color}_dye`;
+    const missing = 3 - count(inventory, wool);
+    return { color, wool, dye, missing, stock: count(inventory, dye),
+      ingredients: ingredients.reduce((total, item) => total + count(inventory, item), 0) };
+  }).filter(option => option.missing > 0 && option.stock + option.ingredients >= option.missing)
+    .sort((a, b) => a.missing - b.missing);
+  const recipe = options[0];
+  if (!recipe) return;
+  if (recipe.stock < recipe.missing) await craft(recipe.dye, recipe.missing - recipe.stock);
+  await craft(recipe.wool, recipe.missing);
+  const after = await action('get_inventory');
+  assert.ok(count(after, recipe.wool) >= 3, 'The native dye recipe did not produce three matching blocks');
+  return recipe.color;
+}
+
+async function findDyeFlower(action, player, stock, tried) {
+  const plants = Object.values(WOOL_DYES).flat().filter(item => !item.endsWith('bone_meal'));
+  const scan = await action('scan_blocks', { blocks: plants, radius: 24, max: 12 });
+  const { x, y, z } = player.position;
+  return scan?.matches.flatMap(({ name, positions }) => positions.map(pos => ({ name, pos,
+    distance: Math.hypot(pos[0] + 0.5 - x, pos[1] - y, pos[2] + 0.5 - z),
+  }))).filter(item => Math.abs(item.pos[1] - y) < 3 && !tried.has(String(item.pos)))
+    .sort((a, b) => {
+      const score = flower => {
+        const color = Object.keys(WOOL_DYES).find(key => WOOL_DYES[key].includes(flower.name));
+        return flower.distance + (3 - count(stock, `minecraft:${color}_wool`)) * 5;
+      };
+      return score(a) - score(b);
+    })[0];
+}
+
+async function collectFlower(action, player, flower) {
+  const [fx, fy, fz] = flower.pos;
+  const dx = fx + 0.5 - player.position.x;
+  const dz = fz + 0.5 - player.position.z;
+  const dy = fy + 0.2 - player.position.y - 1.62;
+  await action('look', { yaw: Math.atan2(-dx, dz) * 180 / Math.PI, pitch: -Math.atan2(dy, Math.hypot(dx, dz)) * 180 / Math.PI });
+  await setTimeout(100);
+  if ((await action('observe'))?.crosshair?.pos?.join(',') !== flower.pos.join(',')) return false;
+  if (!(await action('break_block', { pos: flower.pos, maxTicks: 25 }))?.broken) return false;
+  await setTimeout(180);
+  const drops = await action('get_entities', { type: 'item', radius: 5 });
+  const item = drops?.entities.find(candidate => candidate.item?.id === flower.name);
+  if (item) await action('go_to', { entityId: item.id, stopDistance: 0.3, maxTicks: 30 });
+  return true;
 }
 
 export async function hold(action, item) {
@@ -148,20 +205,39 @@ async function stepOut(action, player, visited, destination, preferredGround, re
   return moved;
 }
 
-async function gatherWool(action, descendFromCanopy, chooseRoute) {
+export async function retreatFromNearbyMob(action, player, visited, rejectedSteps) {
+  const threat = player.threats?.find(entity => entity.distance <= 7
+    && (entity.type !== 'minecraft:spider' || isBedtime(player)));
+  if (!threat) return false;
+  const nearby = await action('get_entities', { radius: 10, max: 64 });
+  const danger = nearby?.entities.find(entity => entity.id === threat.id && entity.hostile);
+  if (!danger) return false;
+  const here = feet(player);
+  const away = [here[0] + 8 * Math.sign(player.position.x - danger.pos[0]), here[1],
+    here[2] + 8 * Math.sign(player.position.z - danger.pos[2])];
+  visited.push(here);
+  return stepOut(action, player, visited, away, undefined, rejectedSteps);
+}
+
+export async function gatherWool(action, descendFromCanopy, chooseRoute, craft) {
   const visited = [];
   const rejectedSteps = new Set();
   const triedAnimals = new Map();
+  const triedFlowers = new Set();
   let stalls = 0;
   // The first flock can come into range after several minutes of safe scouting.
   for (let round = 0; round < 400; round++) {
     const inventory = await action('get_inventory');
     const color = woolColor(inventory);
-    if (color && count(inventory, MUTTON) > 0) return color;
+    if (color) return color;
+    const dyed = craft && await matchWoolWithDye(action, craft, inventory);
+    if (dyed) return dyed;
 
     const player = await action('observe');
     assert.ok(player?.inWorld && !player.dead && player.health > 4, 'Sheep search ran out of safe health');
-    const meal = count(inventory, MUTTON) > 1 ? MUTTON : BACKUP_FOOD.find(item => count(inventory, item) > 0);
+    if (await retreatFromNearbyMob(action, player, visited, rejectedSteps)) continue;
+    const meal = BACKUP_FOOD.find(item => count(inventory, item) > 0)
+      ?? (count(inventory, MUTTON) > (player.food <= 8 ? 0 : 1) ? MUTTON : undefined);
     if (player.food <= 16 && meal) {
       await hold(action, meal);
       await action('use_item', { ticks: 36 });
@@ -169,22 +245,33 @@ async function gatherWool(action, descendFromCanopy, chooseRoute) {
     const nearby = await action('get_entities', { type: 'sheep', radius: 96, max: 16 });
     const sheep = nearby.entities.find(entity => (triedAnimals.get(entity.id) ?? -10) < round - 3
       && Math.abs(entity.pos[1] - player.position.y) <= 8);
-    if (sheep?.distance <= 6) {
-      triedAnimals.set(sheep.id, round);
-      if (await hunt(action, sheep, item => WOOL.test(item) || item === MUTTON)) continue;
-    }
+    let target = sheep;
     if (!meal && player.food <= 15) {
-      const { entities } = await action('get_entities', { radius: 6, max: 24 });
-      const animal = entities.find(entity => BACKUP_MEAT[entity.type]
+      const { entities } = await action('get_entities', { radius: 24, max: 64 });
+      const food = entities.find(entity => BACKUP_MEAT[entity.type] && Math.abs(entity.pos[1] - player.position.y) <= 3
         && (triedAnimals.get(entity.id) ?? -10) < round - 3);
-      if (animal) {
-        triedAnimals.set(animal.id, round);
-        if (await hunt(action, animal, item => item === BACKUP_MEAT[animal.type])) continue;
+      if (food && (!sheep || food.distance + (player.food <= 8 ? 0 : 5) < sheep.distance)) target = food;
+    }
+    if (target?.distance <= 6) {
+      triedAnimals.set(target.id, round);
+      const earns = target === sheep ? item => WOOL.test(item) || item === MUTTON : item => item === BACKUP_MEAT[target.type];
+      if (await hunt(action, target, earns)) continue;
+    }
+    const mixed = craft && inventory.slots.filter(stack => WOOL.test(stack.id)).reduce((total, stack) => total + stack.count, 0) >= 3;
+    const flower = mixed && (meal || player.food > 12) && target === sheep
+      ? await findDyeFlower(action, player, inventory, triedFlowers) : null;
+    if (flower && (!target || flower.distance < target.distance)) {
+      if (flower.distance < 3.6) {
+        triedFlowers.add(String(flower.pos));
+        if (await collectFlower(action, player, flower)) continue;
+      } else {
+        target = flower;
       }
     }
     const here = await action('observe');
     visited.push(feet(here));
-    if (await stepOut(action, here, visited, sheep?.pos, sheep ? undefined : 'grass', rejectedSteps, chooseRoute)
+    if (await stepOut(action, here, visited, target?.pos, target ? undefined : 'grass', rejectedSteps,
+      target === sheep ? chooseRoute : undefined)
         || await descendFromCanopy(here)) {
       stalls = 0;
     } else {
@@ -192,7 +279,7 @@ async function gatherWool(action, descendFromCanopy, chooseRoute) {
       assert.ok(stalls < 5, 'Could not find a dry way out while looking for sheep');
     }
   }
-  throw new Error('Sheep search ended before earning three matching wool blocks and food');
+  throw new Error('Sheep search ended before earning three matching wool blocks');
 }
 
 async function placeBeside(action, item) {
@@ -446,7 +533,7 @@ export async function forageExpeditionMeal(action) {
 }
 
 export async function prepareAdoptionCamp(action, craft, descendFromCanopy, { chooseRoute } = {}) {
-  const color = await gatherWool(action, descendFromCanopy, chooseRoute);
+  const color = await gatherWool(action, descendFromCanopy, chooseRoute, craft);
   await ensurePlanks(action, craft, 3);
   // Bring the first table to the flock so sleeping doesn't depend on retracing the route.
   const table = await placeBeside(action, 'minecraft:crafting_table');
