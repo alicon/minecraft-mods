@@ -932,6 +932,10 @@ export async function feedAdoptedDog(action, uuid, bed, attempts = 120) {
   return false;
 }
 
+function forageAttempts() {
+  return { drops: new Set(), hunts: new Map() };
+}
+
 async function seekExpeditionFood(action, player, visited, rejectedSteps, attempts, toward, sighting) {
   const nearby = await action('get_entities', { radius: 32, max: 96 });
   const drop = nearby?.entities.find(entity => entity.item?.id && DOG_FOOD.includes(entity.item.id)
@@ -950,7 +954,7 @@ async function seekExpeditionFood(action, player, visited, rejectedSteps, attemp
       Math.hypot(...position.map((axis, index) => axis - entity.pos[index])) < 5))
     .sort((a, b) => a.distance - b.distance + 2 * (Math.abs(heightGap(a)) - Math.abs(heightGap(b))))[0];
   let animal = reachableAnimal(nearby?.entities);
-  if (!animal && !toward && (sighting || visited.length % 4 === 0)) {
+  if (!animal && (sighting || visited.length % 4 === 0)) {
     const scouting = await action('get_entities', { radius: 64, max: 128 });
     animal = reachableAnimal(scouting?.entities);
   }
@@ -978,7 +982,7 @@ async function seekExpeditionFood(action, player, visited, rejectedSteps, attemp
 export async function forageExpeditionMeal(action, { camp, toward, minimum = 1, regroup } = {}) {
   const visited = [];
   const rejectedSteps = new Set();
-  const attempts = { drops: new Set(), hunts: new Map() };
+  const attempts = forageAttempts();
   let returning = Boolean(camp);
   let searchToward = toward;
   let sighting;
@@ -1909,7 +1913,8 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   let blockedCaveSteps = 0;
   let highlandSearch = 0;
   let movingToFreshGround = policy.scoutNewGround ? 8 : 0;
-  const triedFoodSources = new Set();
+  const foodAttempts = forageAttempts();
+  let foodSighting;
   let exhaustedQuarries = policy.exhaustedQuarries ?? [];
   let bringFirstIronHome = policy.bringFirstIronHome;
   for (let attempt = 0; attempt < 190; attempt++) {
@@ -1996,7 +2001,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
         await policy.saveQuarry?.([]);
         continue;
       }
-      await seekExpeditionFood(action, player, visited, rejectedSteps, triedFoodSources);
+      foodSighting = await seekExpeditionFood(action, player, visited, rejectedSteps, foodAttempts, undefined, foodSighting);
       continue;
     }
     const shield = plan.recipes.find(([item]) => item === SHIELD);

@@ -1260,7 +1260,7 @@ test('foraging from a ridge follows dry steps toward livestock in the valley', a
   assert.ok(moved && collected);
 });
 
-test('a brief long-range sheep sighting guides the next forage leg between scans', async () => {
+test('a brief long-range sheep sighting takes priority over an empty route toward camp', async () => {
   const { forageExpeditionMeal } = await import('./expedition-home.mjs');
   const sheep = { id: 21, type: 'minecraft:sheep', distance: 55, pos: [55, 112, 0] };
   const drop = { id: 22, item: { id: 'minecraft:mutton' }, distance: 1, pos: [13, 112, 0] };
@@ -1286,7 +1286,7 @@ test('a brief long-range sheep sighting guides the next forage leg between scans
       default: assert.fail(name);
     }
   };
-  assert.equal(await forageExpeditionMeal(action), true);
+  assert.equal(await forageExpeditionMeal(action, { toward: [-40, 112, 0] }), true);
   assert.equal(stride, 2);
 });
 
@@ -1876,6 +1876,37 @@ test('iron work sleeps before a nighttime forage when the player has no meal', a
       throw resumed;
     },
   }), error => error === resumed);
+});
+
+test('a hungry miner collects food and keeps the original dog’s portion', async () => {
+  const { earnIronKit } = await import('./expedition-home.mjs');
+  const mutton = { slot: 1, id: 'minecraft:mutton', count: 2 };
+  const resumed = new Error('Resumed with one portion in reserve');
+  let collected = false;
+  let ate = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_inventory':
+        if (ate) throw resumed;
+        return { slots: collected ? [mutton] : [] };
+      case 'observe': return { inWorld: true, dimension: 'minecraft:overworld', health: 20, food: 14,
+        position: { x: 0.5, y: 64, z: 0.5 }, timeOfDay: 300, gameTime: 26_000 };
+      case 'get_entities': return { entities: [{ id: 14, item: mutton, distance: 2, pos: [2, 64, 0] }] };
+      case 'go_to':
+        assert.equal(args.entityId, 14);
+        collected = true;
+        return { arrived: true };
+      case 'look': return {};
+      case 'select_slot': return { mainHand: mutton };
+      case 'use_item':
+        ate = true;
+        return { completed: true, food: 16 };
+      default: assert.fail(name);
+    }
+  };
+  await assert.rejects(earnIronKit(action, () => assert.fail('No recipe has ingredients'), { bed: [0, 64, 0] },
+    { reserveCompanionMeal: true }), error => error === resumed);
+  assert.ok(collected && ate);
 });
 
 test('iron work returns to camp after feeding the injured companion before spending another portion', async () => {
