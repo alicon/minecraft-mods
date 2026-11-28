@@ -810,10 +810,17 @@ async function runExpedition(start, stage) {
       await regroup();
       return true;
     };
+    const companionForage = {
+      regroup: regroupForCare,
+      restUntilDaylight: async () => {
+        await narrate('Decision', 'It is night and Mushroom keeps falling behind. Seeking cover until daylight.');
+        await waitForDaylightRecovery(action, checkpoint.camp.bed, message => narrate('Decision', message));
+      },
+    };
     policy.tendCompanion = async () => {
       await narrate('Objective', 'Pause the iron search and feed the original Mushroom.');
       await regroupForCare(await action('observe'));
-      assert.ok(await forageExpeditionMeal(action, { regroup: regroupForCare }),
+      assert.ok(await forageExpeditionMeal(action, companionForage),
         'Could not gather a meal near the original dog');
       const player = await action('observe');
       assert.ok(await feedMushroom(checkpoint.dog,
@@ -895,7 +902,7 @@ async function runExpedition(start, stage) {
           + Number(companionStatus === 'care');
         if (dogMealCount(await action('get_inventory')) < minimum) {
           await narrate('Objective', 'Gather food for the quarry and reserve a portion for Mushroom.');
-          assert.ok(await forageExpeditionMeal(action, { toward: checkpoint.camp.bed, minimum, regroup: regroupForCare }),
+          assert.ok(await forageExpeditionMeal(action, { ...companionForage, toward: checkpoint.camp.bed, minimum }),
             'Could not stock provisions before mining');
         }
         const stoneKit = await action('get_inventory');

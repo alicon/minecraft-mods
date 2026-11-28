@@ -1414,6 +1414,37 @@ test('companion forage checks again after regrouping before looking for food', a
   assert.equal(searched, 1);
 });
 
+test('repeated nighttime regrouping pauses forage until daylight', async () => {
+  const { forageExpeditionMeal } = await import('./expedition-home.mjs');
+  const drop = { id: 12, item: { id: 'minecraft:mutton' }, pos: [914, 72, 205], distance: 2 };
+  let rested = false;
+  let regroups = 0;
+  let collected = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe': return { inWorld: true, dimension: 'minecraft:overworld', health: 20,
+        timeOfDay: rested ? 100 : 13_900, position: { x: 912, y: 72, z: 205 } };
+      case 'get_inventory': return { slots: collected ? [{ id: drop.item.id, count: 1 }] : [] };
+      case 'get_entities':
+        assert.ok(rested, 'Do not resume the same nighttime forage');
+        return { entities: [drop] };
+      case 'go_to':
+        assert.equal(args.entityId, drop.id);
+        collected = true;
+        return { arrived: true };
+      default: assert.fail(name);
+    }
+  };
+  assert.ok(await forageExpeditionMeal(action, {
+    regroup: async () => { regroups++; return !rested; },
+    restUntilDaylight: async () => {
+      assert.equal(regroups, 2);
+      rested = true;
+    },
+  }));
+  assert.ok(collected);
+});
+
 test('the reserved recovery meal moves out of reach of automatic hotbar eating', async () => {
   const { packRecoveryMeal } = await import('./expedition-home.mjs');
   const actions = [];
