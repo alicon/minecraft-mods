@@ -199,6 +199,15 @@ the controller interrupts a proposed walk, the owner kills the spider through
 the native client, and the same injured dog survives. The staged encounter
 provides companion-defense coverage separately from fresh Survival progress.
 
+Set `MUSHROOM_EXPEDITION_STAGE=portal` to replay the Java Nether round trip.
+The disposable world stages an incomplete portal with a dry landing and gives
+the owner one obsidian and flint and steel. The controller recognizes and
+repairs the frame, lights it, and walks in. It walks clear in the Nether,
+waits out the portal cooldown, and returns with the same dog. The integrated
+server verifies the repaired frame and the living original dog with its owner
+in both dimensions. This stage provides native interaction coverage while
+the fresh Survival expedition still has to earn its supplies and find a route.
+
 ### Playtest bridge and server GameTests
 
 Matrix setup refuses a dead test owner before screenshots or fixture mutations.

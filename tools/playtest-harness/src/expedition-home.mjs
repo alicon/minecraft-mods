@@ -47,7 +47,7 @@ function woolColor(inventory) {
   return [...colors].find(color => count(inventory, `minecraft:${color}_wool`) >= 3);
 }
 
-async function hold(action, item) {
+export async function hold(action, item) {
   const inventory = await action('get_inventory');
   const stack = inventory.slots.filter(entry => entry.id === item)
     .sort((first, second) => durability(second) - durability(first))[0];

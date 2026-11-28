@@ -5,11 +5,12 @@ import { dirname, isAbsolute, join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import {
   adoptAtNight, earnIronKit, earnStoneKit, feedAdoptedDog, forageExpeditionMeal, prepareAdoptionCamp,
-  recoverDroppedLoadout, WOOD_LOGS,
+  hold, recoverDroppedLoadout, WOOD_LOGS,
 } from './expedition-home.mjs';
 import { hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
 import { expeditionPolicy } from './expedition-policy.mjs';
+import { netherRoundTrip } from './expedition-nether.mjs';
 
 const configFile = new URL(
   '../../../mods/mushroom-the-yorkie/build/run/clientGameTest/config/mcagent.json',
@@ -168,6 +169,11 @@ try {
   assert.ok(start?.inWorld && start.dimension === 'minecraft:overworld' && !start.dead);
   const stage = process.env.MUSHROOM_EXPEDITION_STAGE ?? 'adoption';
   if (stage === 'defense') await runCompanionDrill();
+  else if (stage === 'portal') {
+    companion = (await readFile(join(dirname(statusFile), 'portal-companion'), 'utf8')).trim();
+    assert.ok(/^[\da-f-]{36}$/i.test(companion));
+    await netherRoundTrip(action, companion, hold);
+  }
   else await runExpedition(start, stage);
   await reportStatus('finished');
 } catch (error) {
