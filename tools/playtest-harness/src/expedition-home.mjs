@@ -223,7 +223,7 @@ export async function hunt(action, animal, dropMatches, canContinue) {
 export async function stepOut(action, player, visited, destination, preferredGround, rejectedSteps = new Set(), chooseRoute, avoid, maxTicks = 90) {
   const center = feet(player);
   const width = preferredGround || chooseRoute ? 23 : 17;
-  const height = preferredGround === 'surface' ? 15 : 9;
+  const height = ['surface', 'elevation', 'cave'].includes(preferredGround) ? 15 : 9;
   const volume = await action('get_blocks', { center, size: [width, height, width], format: 'json' });
   if (!volume) return false;
   let pos = dryWaypoint(volume.cells, center, visited, destination, preferredGround, rejectedSteps, avoid);
@@ -607,6 +607,7 @@ export async function feedAdoptedDog(action, uuid, bed, attempts = 120) {
   if (startingStock.mainHand?.id !== offered) await hold(action, offered);
   const visited = [];
   const rejectedSteps = new Set();
+  let clearedObstacles = 0;
   let previousDistance = Infinity;
   for (let attempt = 0; attempt < attempts; attempt++) {
     let player = await action('observe');
@@ -639,9 +640,10 @@ export async function feedAdoptedDog(action, uuid, bed, attempts = 120) {
       const fromCamp = Math.hypot(tile[0] - bed[0], tile[1] - bed[1], tile[2] - bed[2]);
       visited.push(tile);
       const nearCamp = dog && Math.hypot(...dog.pos.map((axis, index) => axis - bed[index])) <= FEEDING_SEARCH_RADIUS;
-      if (nearCamp && Math.abs(dog.pos[1] - player.position.y) <= 4 && fromCamp < FEEDING_SEARCH_RADIUS) {
+      if (nearCamp && fromCamp < FEEDING_SEARCH_RADIUS) {
+        const vertical = Math.abs(dog.pos[1] - player.position.y);
         // Track the moving dog on level ground before falling back to dry waypoints.
-        if (dog.distance <= 12 && Math.abs(dog.pos[1] - player.position.y) <= 1.25) {
+        if (dog.distance <= 12 && vertical <= 1.25) {
           const approach = await action('go_to', { entityId: dog.id, stopDistance: 2.2, maxTicks: 45 });
           if (approach?.arrived) continue;
           // A timeout can still move the player several blocks. Plan any
@@ -650,8 +652,22 @@ export async function feedAdoptedDog(action, uuid, bed, attempts = 120) {
           if (!after?.inWorld || after.dead) return false;
           if (feet(after).join(',') !== tile.join(',')) continue;
           player = after;
+          const obstruction = approach?.reason?.match(/blocked by minecraft:(?:stone|andesite|diorite|granite|dirt|grass_block) at (-?\d+),(-?\d+),(-?\d+)/);
+          if (obstruction && clearedObstacles < 6 && !player.threats?.some(threat => threat.distance < 6)) {
+            const pos = obstruction.slice(1).map(Number);
+            const distanceFromDog = Math.hypot(...pos.map((coordinate, axis) => coordinate + 0.5 - dog.pos[axis]));
+            const surroundings = await action('get_blocks', { center: pos, size: [3, 5, 3], format: 'json' });
+            if (pos[1] >= tile[1] && pos[1] <= tile[1] + 1 && distanceFromDog > 2
+                && surroundings && !surroundings.stats?.unloadedChunks
+                && !surroundings.cells.some(cell => /:(?:water|lava|gravel|sand|powder_snow|fire)$/.test(cell.b))
+                && (await breakVisible(action, pos))?.broken) {
+              clearedObstacles++;
+              await hold(action, offered);
+              continue;
+            }
+          }
         }
-        await stepOut(action, player, visited, dog.pos, false, rejectedSteps);
+        await stepOut(action, player, visited, dog.pos, vertical > 2 ? 'elevation' : undefined, rejectedSteps);
       } else if (fromCamp > 3) {
         await stepOut(action, player, visited, bed, false, rejectedSteps);
       }
@@ -687,7 +703,9 @@ async function seekExpeditionFood(action, player, visited, rejectedSteps, tried,
       destination = levelApproach?.pos;
     }
     visited.push(feet(player));
-    await stepOut(action, player, visited, destination, animal || !destination ? 'grass' : 'surface', rejectedSteps);
+    let ground = animal || !destination ? 'grass' : 'surface';
+    if (destination && destination[1] - player.position.y > 2) ground = 'elevation';
+    await stepOut(action, player, visited, destination, ground, rejectedSteps);
   }
 }
 
@@ -1400,7 +1418,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       madeBackup = true;
       continue;
     }
-    const fallback = misses >= 15 ? 'quarry' : 'scout';
+    const fallback = misses >= 24 ? 'quarry' : 'scout';
     const work = policy.chooseWork && misses >= 8 && !stairs.length
       ? await policy.chooseWork(player, { material: 'iron', missedStone: misses,
         rawIron: count(inventory, RAW_IRON), needed: requiredOre, hasCoal: count(inventory, COAL) > 0 }, fallback)
@@ -1424,7 +1442,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
     }
     const scout = await action('observe');
     visited.push(feet(scout));
-    await stepOut(action, scout, visited, undefined, 'stone', rejectedSteps);
+    await stepOut(action, scout, visited, undefined, 'cave', rejectedSteps);
   }
   await leaveQuarry(action, stairs, policy);
   await policy.saveQuarry?.([]);

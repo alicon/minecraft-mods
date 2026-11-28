@@ -168,6 +168,7 @@ export function dryWaypoint(cells, start, visited, destination, preferredGround,
   const block = (x, y, z) => blocks.get(`${x},${y},${z}`);
   const hazards = Array.isArray(avoid?.[0]) ? avoid : avoid ? [avoid] : [];
   const clearance = tile => Math.min(...hazards.map(hazard => distance(hazard, tile)));
+  const rock = id => /:(?:stone|andesite|diorite|granite|deepslate|tuff)$/.test(id ?? '');
   const visits = new Map();
   for (const [x, , z] of visited) {
     const key = `${x},${z}`;
@@ -188,7 +189,7 @@ export function dryWaypoint(cells, start, visited, destination, preferredGround,
         const key = step.join(',');
         const support = block(tx, ty - 1, tz);
         if (seen.has(key) || rejectedSteps.has(dryStepKey(pos, step)) || !hasDrySupport(support)
-            || (preferredGround === 'surface' && /_(?:leaves|log)$/.test(support))
+            || (['surface', 'elevation', 'cave'].includes(preferredGround) && /_(?:leaves|log)$/.test(support))
             || (hazards.length && clearance(step) <= clearance(pos))
             || !gap(block(tx, ty, tz)) || !gap(block(tx, ty + 1, tz))
             || (ty > y && !gap(block(x, ty + 1, z)))
@@ -207,15 +208,18 @@ export function dryWaypoint(cells, start, visited, destination, preferredGround,
         const exposedRock = preferredGround === 'stone' ? [[0, 0], ...CARDINAL].filter(([ox, oz]) => {
           const px = tx + ox;
           const pz = tz + oz;
-          return /:(?:stone|andesite|diorite|granite)$/.test(block(px, ty - 1, pz) ?? '')
+          return rock(block(px, ty - 1, pz))
             && gap(block(px, ty, pz)) && gap(block(px, ty + 1, pz));
         }).length : 0;
+        const cave = preferredGround === 'cave' ? CARDINAL.filter(([ox, oz]) =>
+          rock(block(tx + ox, ty, tz + oz)) || rock(block(tx + ox, ty + 1, tz + oz))).length
+          + Number(rock(block(tx, ty - 1, tz))) + Number(rock(block(tx, ty + 2, tz))) : 0;
         const score = (destination
           ? -2 * distance(destination, step)
-            - (preferredGround === 'surface' ? 0 : 1.25 * Math.abs(destination[1] - ty))
+            - (preferredGround === 'surface' ? 0 : (preferredGround === 'elevation' ? 5 : 1.25) * Math.abs(destination[1] - ty))
             - route.length * 0.25 + fresh * 0.1
           : fresh + 0.3 * distance(start, step) - route.length * 0.12 + pasture * 0.65
-            + exposedRock * 0.9) - routeRepeatCost * 1.5;
+            + exposedRock * 0.9 + cave * 1.8) - routeRepeatCost * 1.5;
         if (score > bestScore) {
           best = route;
           bestScore = score;

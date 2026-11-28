@@ -424,6 +424,26 @@ test('a hunt routes around an obstruction before giving up a wounded cow', async
   assert.ok(detoured && struck && pickedUp);
 });
 
+test('an uphill approach takes the stairs toward an animal above a shelf', async () => {
+  const { dryWaypoint } = await import('./expedition-navigation.mjs');
+  const cells = [];
+  for (let x = 0; x <= 6; x++) cells.push({ x, y: 63, z: 0, b: 'minecraft:stone' });
+  for (let z = 1; z <= 3; z++) cells.push({ x: 0, y: 63 + z, z, b: 'minecraft:grass_block' });
+  assert.deepEqual(dryWaypoint(cells, [0, 64, 0], [], [7, 67, 0], 'elevation'), [0, 67, 3]);
+});
+
+test('iron scouting favors a dry cave with exposed walls', async () => {
+  const { dryWaypoint } = await import('./expedition-navigation.mjs');
+  const cells = [];
+  for (let x = 0; x <= 7; x++) cells.push({ x, y: 63, z: 0, b: 'minecraft:grass_block' });
+  for (let z = 1; z <= 4; z++) {
+    cells.push({ x: 0, y: 63, z, b: 'minecraft:stone' });
+    cells.push({ x: 1, y: 64, z, b: 'minecraft:stone' });
+    cells.push({ x: 0, y: 66, z, b: 'minecraft:stone' });
+  }
+  assert.deepEqual(dryWaypoint(cells, [0, 64, 0], [[0, 64, 0]], undefined, 'cave'), [0, 64, 4]);
+});
+
 test('an escape between two clouds avoids both centers', async () => {
   const { dryWaypoint } = await import('./expedition-navigation.mjs');
   const cells = [];
@@ -604,6 +624,57 @@ test('a feeding attempt walks away from a zombie before offering the meal', asyn
   };
   assert.equal(await feedAdoptedDog(action, dog.uuid, [0, 1, 0], 2), true);
   assert.equal(meals, 0);
+});
+
+test('a rock blocking the feeding approach is mined with a pickaxe before offering the meal', async () => {
+  const { feedAdoptedDog } = await import('./expedition-home.mjs');
+  const meat = 'minecraft:mutton';
+  const pickaxe = 'minecraft:stone_pickaxe';
+  const dog = { id: 22, uuid: 'original', pos: [4.5, 64, 0.5], distance: 4 };
+  const block = [1, 64, 0];
+  let mainHand = meat;
+  let meals = 2;
+  let cleared = false;
+  let breaking = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe':
+        return { inWorld: true, health: 20, position: { x: 0.5, y: 64, z: 0.5 }, crosshair: cleared
+          ? { id: dog.id } : breaking ? { pos: block, block: 'minecraft:stone' } : {} };
+      case 'get_inventory':
+        return { mainHand: { id: mainHand }, slots: [
+          { slot: 0, id: meat, count: meals }, { slot: 1, id: pickaxe, count: 1, maxDamage: 131 },
+        ] };
+      case 'get_entities':
+        return { entities: [dog] };
+      case 'go_to':
+        assert.equal(args.entityId, dog.id);
+        return { arrived: false, reason: 'blocked by minecraft:stone at 1,64,0' };
+      case 'get_blocks':
+        assert.deepEqual(args.center, block);
+        return { cells: [cell(...block)], stats: { unloadedChunks: 0 } };
+      case 'look':
+        breaking = Boolean(args.at);
+        return {};
+      case 'select_slot':
+        mainHand = args.slot === 1 ? pickaxe : meat;
+        return { mainHand: { id: mainHand } };
+      case 'break_block':
+        assert.deepEqual(args.pos, block);
+        assert.equal(mainHand, pickaxe);
+        cleared = true;
+        return { broken: true };
+      case 'interact_entity':
+        assert.equal(args.entityId, dog.id);
+        assert.equal(mainHand, meat);
+        meals--;
+        return {};
+      default:
+        assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  assert.equal(await feedAdoptedDog(action, dog.uuid, [0, 64, 0], 9), true);
+  assert.equal(meals, 1);
 });
 
 test('forest-floor litter can be cleared for a bed with two dry supports', async () => {

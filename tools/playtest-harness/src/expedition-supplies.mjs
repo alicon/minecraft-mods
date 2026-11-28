@@ -536,7 +536,7 @@ async function runExpedition(start, stage) {
     try {
       if (!checkpoint.quarry?.length && dogMealCount(await action('get_inventory')) < 2) {
         await narrate('Objective', 'Gather food for Mushroom and keep a spare portion for the quarry.');
-        assert.ok(await forageExpeditionMeal(action, { camp: checkpoint.camp.bed, minimum: 2 }),
+        assert.ok(await forageExpeditionMeal(action, { toward: checkpoint.camp.bed, minimum: 2 }),
           'Could not stock provisions before mining');
       }
       if (!checkpoint.quarry?.length && checkpoint.fedDog === false) await policy.tendCompanion();

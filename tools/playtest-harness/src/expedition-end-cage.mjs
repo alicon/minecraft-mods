@@ -107,7 +107,6 @@ async function firingGround(action, crystal, plan) {
     solid.add(String([pillarX + plan.dx, height, pillarZ + plan.dz]));
   }
   const opening = new Set(plan.bars.map(String));
-  const target = [crystal.pos[0], crystal.pos[1] + 1, crystal.pos[2]];
   const dry = view.cells.filter(cell => (cell.x - x) * plan.dx + (cell.z - z) * plan.dz >= 14
     && Math.abs(cell.y + 1 - plan.base[1]) <= 5 && hasDrySupport(cell.b)
     && !solid.has(`${cell.x},${cell.y + 1},${cell.z}`)
@@ -115,20 +114,30 @@ async function firingGround(action, crystal, plan) {
   const vantage = [x + plan.dx * 30, plan.base[1], z + plan.dz * 30];
   const candidates = dry.map(cell => [cell.x, cell.y + 1, cell.z])
     .sort((a, b) => horizontal(a, vantage) - horizontal(b, vantage));
+  let first;
   for (const [x, y, z] of candidates) {
     const needed = new Set();
-    const clear = [0, -0.35, 0.35].every(offset => clearBowArc({
-      position: { x: x + 0.5 + plan.dz * offset, y, z: z + 0.5 + plan.dx * offset },
-    }, target, pos => {
-      const key = String(pos);
-      if (!solid.has(key)) return false;
-      if (!opening.has(key)) return true;
-      needed.add(key);
-      return false;
-    }));
-    if (clear) return { line: [x, y, z], bars: plan.bars.filter(pos => needed.has(String(pos))) };
+    const heights = [1, 1.5, 0.65, 1.75].filter(height => {
+      const blockers = new Set();
+      const target = [crystal.pos[0], crystal.pos[1] + height, crystal.pos[2]];
+      const clear = [0, -0.35, 0.35].every(offset => clearBowArc({
+        position: { x: x + 0.5 + plan.dz * offset, y, z: z + 0.5 + plan.dx * offset },
+      }, target, pos => {
+        const key = String(pos);
+        if (!solid.has(key)) return false;
+        if (!opening.has(key)) return true;
+        blockers.add(key);
+        return false;
+      }));
+      if (clear) for (const key of blockers) needed.add(key);
+      return clear;
+    });
+    if (!heights.length) continue;
+    const firing = { line: [x, y, z], heights, bars: plan.bars.filter(pos => needed.has(String(pos))) };
+    if (heights.length >= 2) return firing;
+    first ??= firing;
   }
-  return null;
+  return first ?? null;
 }
 
 export async function openCrystalCage(action, player, crystal, dangerous) {
@@ -144,7 +153,7 @@ export async function openCrystalCage(action, player, crystal, dangerous) {
   if (!plan) return null;
   const firing = await firingGround(action, crystal, plan);
   if (!firing) return null;
-  const { line, bars } = firing;
+  const { line, heights, bars } = firing;
   const stock = await action('get_inventory');
   const blocks = MATERIAL.find(item => stock.slots.reduce((sum, stack) =>
     sum + (stack.id === item ? stack.count : 0), 0) >= plan.top - plan.base[1]);
@@ -196,5 +205,5 @@ export async function openCrystalCage(action, player, crystal, dangerous) {
   }
   player = await action('observe');
   if (!await descendWater(action, player, plan, line) || !opened) return null;
-  return line;
+  return { line, heights };
 }
