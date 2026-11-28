@@ -98,6 +98,18 @@ if [ -d "$expedition_screens" ]; then
     -exec cp {} "$expedition_report/screenshots" \;
 fi
 if [ "$expedition_result" -ne 0 ]; then
+  expedition_save='mods/mushroom-the-yorkie/build/run/clientGameTest/saves/Codex Expedition Survival'
+  if [ -f "$expedition_save/level.dat" ]; then
+    if cp -R "$expedition_save" "$expedition_report/saved-world-copy" &&
+        cmp -s "$expedition_save/level.dat" "$expedition_report/saved-world-copy/level.dat" &&
+        mv "$expedition_report/saved-world-copy" "$expedition_report/saved-world"; then
+      printf '[%s] Archive | Preserved the closed Survival save in saved-world.\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$expedition_report/playtest.log"
+    else
+      printf '[%s] Archive | Could not verify the copy of the closed Survival save.\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$expedition_report/playtest.log"
+    fi
+  fi
   printf '[%s] Verification | The native game test exited with code %s. See game.log.\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$expedition_result" >> "$expedition_report/playtest.log"
   exit "$expedition_result"

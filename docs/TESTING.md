@@ -263,7 +263,9 @@ MUSHROOM_EXPEDITION_STATUS="$RUN_DIRECTORY/status" MUSHROOM_EXPEDITION_RESUME=1 
 ```
 
 A closed test world can be continued at the iron phase with
-`MUSHROOM_EXPEDITION_RESTORE_MANIFEST`. Archive the closed save under
+`MUSHROOM_EXPEDITION_RESTORE_MANIFEST`. When the native client exits after a
+failure, the launcher preserves the generated world in the report's
+`saved-world` directory if it exists. Keep the closed save under
 `build/playtest-reports`. Make a JSON manifest containing the absolute
 `source` directory, the `seed`, the `owner` and `dog` UUIDs, and a `camp`
 object with the `bed` and `table` block coordinates. Start the ordinary
