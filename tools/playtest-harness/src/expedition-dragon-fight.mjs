@@ -4,15 +4,58 @@ import { eatExpeditionMeal, hold, regroupExpeditionCompanion, stepOut } from './
 import { dragonBreathThreat, retreatFromDragonThreat } from './expedition-end-crystals.mjs';
 import { catchEndFall } from './expedition-end-cage.mjs';
 import { useEmptyHandOnCompanion } from './expedition-gear.mjs';
+import { bowAim, movingBowAim } from './expedition-ballistics.mjs';
 
 const END = 'minecraft:the_end';
 const DRAGON = 'minecraft:ender_dragon';
 const DOG = 'mushroom_yorkie:mushroom_yorkie';
 const APPLE = 'minecraft:golden_apple';
 const WATER_BUCKET = 'minecraft:water_bucket';
+const BOW = 'minecraft:bow';
+const ARROW = 'minecraft:arrow';
 const SWORDS = ['netherite', 'diamond', 'iron', 'stone'].map(tier => `minecraft:${tier}_sword`);
 const RATIONS = ['cooked_beef', 'cooked_porkchop', 'cooked_mutton', 'cooked_chicken', 'bread'].map(id => `minecraft:${id}`);
 const feet = ({ position }) => [position.x, position.y, position.z].map(Math.floor);
+const dragonBody = dragon => dragon?.parts.find(part => part.name === 'body') ?? dragon?.parts.find(part => part.name === 'head');
+
+async function observeDragon(action) {
+  const view = await action('get_entities', { type: DRAGON, radius: 128, max: 16 });
+  return view?.entities.find(entity => entity.parts?.some(part => part.name === 'head'));
+}
+
+async function shootFlyingDragon(action, player, dragon) {
+  const initialAim = bowAim(player, dragonBody(dragon).center);
+  if (!initialAim) return null;
+  if (player.mainHand?.id !== BOW) await hold(action, BOW);
+  await action('look', initialAim);
+  let drawError;
+  const draw = action('use_item', { ticks: 32 }).catch(error => { drawError = error; });
+  let previous;
+  let lead;
+  try {
+    for (let check = 0; check < 10; check++) {
+      await setTimeout(140);
+      const pose = await action('observe');
+      const left = pose?.agent?.useTicksLeft ?? 0;
+      if (left < 3 || !pose.onGround || pose.health < player.health - 1) break;
+      const target = await observeDragon(action);
+      if (!target || target.perched || target.uuid !== dragon.uuid) break;
+      const sample = { tick: pose.gameTime, pos: dragonBody(target).center };
+      if (previous && left <= 15) {
+        const candidate = movingBowAim(pose, previous, sample, left);
+        if (candidate && await action('look', candidate.aim)) {
+          lead = { tick: pose.gameTime, before: target.health, flightTicks: candidate.flightTicks };
+        }
+      }
+      previous = sample;
+    }
+  } finally {
+    const release = await draw;
+    if (drawError) throw drawError;
+    if (!release?.completed) lead = null;
+  }
+  return lead;
+}
 
 export function findEndFountain(positions) {
   const columns = new Map();
@@ -84,7 +127,7 @@ export async function keepLandingBucketOnHotbar(action, stock) {
 }
 
 export async function fightEndDragon(action, report, progress = {},
-    { useCarriedPickaxe = false, nativeWaterLanding = false } = {}) {
+    { useCarriedPickaxe = false, nativeWaterLanding = false, shootWhileFlying = false } = {}) {
   const start = await action('observe');
   assert.equal(start?.dimension, END);
   const stock = await action('get_inventory');
@@ -101,8 +144,9 @@ export async function fightEndDragon(action, report, progress = {},
   const bearingX = start.position.x - fx - 0.5;
   const bearingZ = start.position.z - fz - 0.5;
   const bearingLength = Math.hypot(bearingX, bearingZ) || 1;
-  const ready = [Math.floor(fx + 0.5 + 8 * bearingX / bearingLength), Math.floor(start.position.y),
-    Math.floor(fz + 0.5 + 8 * bearingZ / bearingLength)];
+  const archerRadius = shootWhileFlying ? 17 : 8;
+  const ready = [Math.floor(fx + 0.5 + archerRadius * bearingX / bearingLength), Math.floor(start.position.y),
+    Math.floor(fz + 0.5 + archerRadius * bearingZ / bearingLength)];
   const visited = [];
   const rejected = new Set();
   let lastPerch;
@@ -111,6 +155,10 @@ export async function fightEndDragon(action, report, progress = {},
   let nextMeal = 0;
   let groundY = start.onGround ? start.position.y : fountain[1] + 1;
   let launchY;
+  let shots = shootWhileFlying && stock.slots.some(stack => stack.id === BOW)
+    ? Math.min(45, stock.slots.filter(stack => stack.id === ARROW).reduce((sum, stack) => sum + stack.count, 0)) : 0;
+  let nextShot = 0;
+  let pendingShot;
   for (let attempt = 0; attempt < 1_200; attempt++) {
     const player = await action('observe');
     assert.ok(player?.inWorld && player.dimension === END && !player.dead && player.health >= 4,
@@ -142,8 +190,7 @@ export async function fightEndDragon(action, report, progress = {},
     groundY = player.position.y;
     // Vanilla's nearby scan can return the head, wings and tails under the
     // same type as their parent. Include all eight parts plus the dragon.
-    const dragons = await action('get_entities', { type: DRAGON, radius: 128, max: 16 });
-    const dragon = dragons?.entities.find(entity => entity.parts?.some(part => part.name === 'head'));
+    const dragon = await observeDragon(action);
     if (!dragon && seenDragon) {
       const exit = await action('scan_blocks', { blocks: ['end_portal'], center: fountain, radius: 5, max: 20 });
       const portals = exit?.matches?.find(group => group.name === 'minecraft:end_portal')?.positions ?? [];
@@ -155,6 +202,12 @@ export async function fightEndDragon(action, report, progress = {},
     }
     if (dragon) {
       seenDragon = dragon.uuid;
+      if (pendingShot && player.gameTime > pendingShot.tick + pendingShot.flightTicks + 30) pendingShot = null;
+      if (pendingShot && dragon.health < pendingShot.before) {
+        hits++;
+        await report('strike', { dragon: dragon.uuid, before: pendingShot.before, after: dragon.health, hits, method: 'bow' });
+        pendingShot = null;
+      }
       if (lastPerch !== dragon.perched) {
         lastPerch = dragon.perched;
         await report('phase', { dragon: dragon.uuid, perched: dragon.perched, health: dragon.health });
@@ -183,9 +236,12 @@ export async function fightEndDragon(action, report, progress = {},
         continue;
       }
     }
-    if (dragon?.perched) {
+    // Stay beyond the breath around the fountain while the bow is the
+    // safer way to whittle down the dragon. Approach for the final hits.
+    if (dragon?.perched && (!shootWhileFlying || !shots || dragon.health <= 65)) {
       const hit = await strikePerchedDragon(action, player, dragon, weapon);
       if (hit) {
+        pendingShot = null;
         hits++;
         await report('strike', { dragon: dragon.uuid, before: dragon.health, attackStrength: hit.attackStrength, hits });
         await setTimeout(350);
@@ -208,6 +264,17 @@ export async function fightEndDragon(action, report, progress = {},
       }
       visited.push(feet(player));
       await stepOut(action, player, visited.slice(-24), stance, 'elevation', rejected, undefined, undefined, 26);
+      continue;
+    }
+    if (dragon && !dragon.perched && shots && player.health >= 14 && player.gameTime >= nextShot
+        && dragon.distance >= 12 && dragon.distance <= 58) {
+      const shot = await shootFlyingDragon(action, player, dragon);
+      shots--;
+      nextShot = player.gameTime + 55;
+      if (shot) {
+        pendingShot = shot;
+        await report('bow_release', { ...shot, dragon: dragon.uuid, shotsRemaining: shots });
+      }
       continue;
     }
     if (Math.hypot(player.position.x - ready[0] - 0.5, player.position.z - ready[2] - 0.5) > 2

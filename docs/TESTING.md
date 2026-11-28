@@ -143,6 +143,12 @@ It logs the choices, latency and reported input cost in `actions.jsonl`.
 The controller has a local fallback.
 The ordinary Survival actions and assertions are identical in both modes.
 
+After a respawn, the controller can take a direct daylight recovery route
+when it can see both the dropped shield and Field Guide near the recorded
+death site. It verifies the recovered shield in the offhand. Before looking
+for iron again, it replaces a missing stone pickaxe or furnace using earned
+materials and a crafting table it places within reach.
+
 For Survival routing decisions, use daylight for a sheltered bed, cooked
 food, and a way back to camp. Put a solid barrier between the player and
 ranged mobs. Light enclosed routes and keep the return path out of a quarry.
@@ -449,6 +455,9 @@ the original dragon died and Mushroom is still at shelter before the
 pilot recalls him and enters the exit. The server checks both identities
 in the Overworld and again after reopening. This continuation starts
 with the equipment and world state from the crystal fixture.
+The pilot waits farther from the fountain while the dragon is healthy and
+shoots during flight. It updates its aim during the draw from observed
+movement and records a hit only after the native health reading drops.
 
 Set `MUSHROOM_EXPEDITION_STAGE=eye-route` to replay using an Eye of Ender
 to choose a route. The disposable fixture supplies one eye, Mushroom, and

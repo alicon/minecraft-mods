@@ -1232,7 +1232,17 @@ export async function regroupExpeditionCompanion(action, uuid, lastPosition, tra
   throw new Error('Could not reach the last known position of the original Mushroom');
 }
 
-export async function recoverDroppedLoadout(action, destination, { reserveMeal = false, companionUuid } = {}) {
+export async function daylightLoadoutIsVisible(action, player, destination) {
+  if (!player?.onGround || player.inWater || player.health < 16 || player.food < 16
+      || !Number.isFinite(player.timeOfDay) || player.timeOfDay > 9_000
+      || player.threats?.some(threat => threat.distance <= 14)) return false;
+  const view = await action('get_entities', { type: 'minecraft:item', radius: 96, max: 96 });
+  const nearDeath = view?.entities.filter(drop => drop.item && drop.pos
+    && Math.hypot(...drop.pos.map((coordinate, axis) => coordinate - destination[axis])) <= 8) ?? [];
+  return [SHIELD, FIELD_GUIDE].every(item => nearDeath.some(drop => drop.item.id === item));
+}
+
+export async function recoverDroppedLoadout(action, destination, { reserveMeal = false, companionUuid, direct = false } = {}) {
   const visited = [];
   const rejectedSteps = new Set();
   let stalled = 0;
@@ -1273,8 +1283,13 @@ export async function recoverDroppedLoadout(action, destination, { reserveMeal =
         await action('go_to', { entityId: drop.id, stopDistance: 0.25, maxTicks: 40 });
       }
       const stock = await action('get_inventory');
-      if (count(stock, FIELD_GUIDE)) return 'guide';
-      if (companionUuid && count(stock, STONE_PICKAXE) && count(stock, FURNACE)) {
+      if (direct && count(stock, SHIELD)) {
+        if (!stock.slots.some(stack => stack.id === SHIELD && stack.slot === 40)) await equipExpeditionShield(action);
+        if (count(stock, FIELD_GUIDE)) return 'guide';
+      } else if (!direct && count(stock, FIELD_GUIDE)) {
+        return 'guide';
+      }
+      if (!direct && companionUuid && count(stock, STONE_PICKAXE) && count(stock, FURNACE)) {
         const dogs = await action('get_entities', { type: DOG, radius: FEEDING_SEARCH_RADIUS });
         if (dogs?.entities.some(dog => dog.uuid === companionUuid && dog.health > 0)) return 'companion';
       }
@@ -1287,11 +1302,20 @@ export async function recoverDroppedLoadout(action, destination, { reserveMeal =
       visited.splice(0, visited.length - 4);
       continue;
     }
-    stalled = await stepOut(action, player, visited, destination, false, rejectedSteps) ? 0 : stalled + 1;
+    stalled = await stepOut(action, player, visited, destination, direct ? 'surface' : false, rejectedSteps) ? 0 : stalled + 1;
     if (stalled >= 3) break;
   }
   await takeCover(action);
   throw new Error('Could not verify the original expedition after returning to the dropped gear');
+}
+
+async function equipExpeditionShield(action) {
+  const menu = await action('get_container');
+  const shield = menu?.slots.find(stack => stack.section === 'player' && stack.id === SHIELD);
+  assert.ok(shield, 'Could not find the shield in the player inventory');
+  await action('click_slot', { slot: shield.slot, action: 'swap', hotbar: 40 });
+  assert.ok((await action('get_inventory')).slots.some(stack => stack.id === SHIELD && stack.slot === 40),
+    'The shield did not move to the offhand');
 }
 
 export async function earnStoneKit(action, craft, { table, bed },
@@ -1691,12 +1715,5 @@ async function craftIronKit(action, craft, recipes, ore, inventory, visited, pac
     await craft(item, 1);
   }
   await action('stop', { closeScreen: true });
-  if (hasShieldRecipe) {
-    const menu = await action('get_container');
-    const shield = menu?.slots.find(stack => stack.section === 'player' && stack.id === SHIELD);
-    assert.ok(shield, 'Could not find the crafted shield in the player inventory');
-    await action('click_slot', { slot: shield.slot, action: 'swap', hotbar: 40 });
-    assert.ok((await action('get_inventory')).slots.some(stack => stack.id === SHIELD && stack.slot === 40),
-      'The shield did not move to the offhand');
-  }
+  if (hasShieldRecipe) await equipExpeditionShield(action);
 }

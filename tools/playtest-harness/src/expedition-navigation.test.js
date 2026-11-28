@@ -426,6 +426,43 @@ test('the respawn route can verify the original live companion when the guide is
   assert.equal(await recoverDroppedLoadout(action, [10, 64, 10], { companionUuid }), 'companion');
 });
 
+test('visible gear selects direct recovery in safe daylight, then equips the shield', async () => {
+  const { daylightLoadoutIsVisible, recoverDroppedLoadout } = await import('./expedition-home.mjs');
+  const guide = 'mushroom_yorkie:field_guide';
+  const shield = 'minecraft:shield';
+  const player = { inWorld: true, onGround: true, health: 18.3, food: 17, timeOfDay: 2_200,
+    position: { x: -20.5, y: 63, z: 51.5 } };
+  const destination = [-21, 63, 51];
+  const picked = [];
+  let equipped = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe': return player;
+      case 'get_entities': return { entities: [
+        { id: 10, item: { id: shield }, pos: [-18.7, 64, 51.7] },
+        { id: 11, item: { id: guide }, pos: [-21.3, 63, 51.5] },
+      ] };
+      case 'go_to': picked.push(args.entityId); return { arrived: true };
+      case 'get_container': return { slots: [{ id: shield, section: 'player', slot: 38 }] };
+      case 'click_slot':
+        assert.deepEqual(args, { slot: 38, action: 'swap', hotbar: 40 });
+        equipped = true;
+        return {};
+      case 'get_inventory': return { slots: [
+        ...picked.includes(10) ? [{ id: shield, slot: equipped ? 40 : 2, count: 1 }] : [],
+        ...picked.includes(11) ? [{ id: guide, slot: 3, count: 1 }] : [],
+      ] };
+      default: assert.fail(name);
+    }
+  };
+  assert.equal(await daylightLoadoutIsVisible(action, { ...player, timeOfDay: 14_000 }, destination), false);
+  assert.equal(await daylightLoadoutIsVisible(action, player, [0, 63, 0]), false);
+  assert.equal(await daylightLoadoutIsVisible(action, player, destination), true);
+  assert.equal(await recoverDroppedLoadout(action, destination, { direct: true }), 'guide');
+  assert.deepEqual(picked, [11, 10]);
+  assert.equal(equipped, true);
+});
+
 test('recovery widens its distance from pursuing zombies before returning to gear', async () => {
   const { recoverDroppedLoadout } = await import('./expedition-home.mjs');
   const zombie = { id: 36, type: 'minecraft:zombie', pos: [8.2, 64, 0.5], distance: 7.7, hostile: true };

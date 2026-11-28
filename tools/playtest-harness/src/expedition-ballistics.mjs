@@ -23,6 +23,10 @@ export function clearBowArc(player, target, solidAt, aim = bowAim(player, target
 }
 
 export function bowAim(player, target, arc = 'low') {
+  return solveBowAim(player, target, arc)?.aim ?? null;
+}
+
+function solveBowAim(player, target, arc = 'low') {
   const dx = target[0] - player.position.x;
   const dy = target[1] - (player.position.y + 1.52);
   const dz = target[2] - player.position.z;
@@ -56,8 +60,22 @@ export function bowAim(player, target, arc = 'low') {
       else high = mid;
     }
     const { horizontal, vertical } = velocityAt(high);
-    return { yaw: Math.atan2(-dx, dz) * 180 / Math.PI,
-      pitch: -Math.atan2(vertical, horizontal) * 180 / Math.PI };
+    return { flightTicks: high, aim: { yaw: Math.atan2(-dx, dz) * 180 / Math.PI,
+      pitch: -Math.atan2(vertical, horizontal) * 180 / Math.PI } };
   }
   return null;
+}
+
+export function movingBowAim(player, previous, current, drawTicksLeft) {
+  const elapsed = current.tick - previous.tick;
+  if (elapsed < 2 || elapsed > 12 || drawTicksLeft < 0) return null;
+  const velocity = current.pos.map((coordinate, axis) => (coordinate - previous.pos[axis]) / elapsed);
+  if (Math.hypot(...velocity) > 2.5) return null;
+  let shot = solveBowAim(player, current.pos);
+  for (let attempt = 0; attempt < 5 && shot; attempt++) {
+    const travel = drawTicksLeft + shot.flightTicks;
+    const target = current.pos.map((coordinate, axis) => coordinate + velocity[axis] * travel);
+    shot = solveBowAim(player, target);
+  }
+  return shot?.flightTicks <= 26 ? shot : null;
 }

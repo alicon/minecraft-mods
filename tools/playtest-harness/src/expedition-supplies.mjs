@@ -5,7 +5,7 @@ import { dirname, isAbsolute, join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import {
   adoptAtNight, dogMealCount, earnIronKit, earnStoneKit, feedAdoptedDog, forageExpeditionMeal, prepareAdoptionCamp,
-  breakVisible, climbQuarry, descendQuarry, ensurePlanks, hold, packRecoveryMeal, placeBeside, recoverDroppedLoadout,
+  breakVisible, climbQuarry, daylightLoadoutIsVisible, descendQuarry, ensurePlanks, hold, packRecoveryMeal, placeBeside, recoverDroppedLoadout,
   regroupExpeditionCompanion, retreatFromNearbyMob,
   settleOnDryStep, sleepNearby, stepOut, WOOD_LOGS,
 } from './expedition-home.mjs';
@@ -329,7 +329,9 @@ try {
           const next = `${endFile}-${process.pid}`;
           await writeFile(next, JSON.stringify(progress));
           await rename(next, endFile);
-          await narrate('Action', `Struck the perched dragon at ${observation.before} health.`, 4_000);
+          await narrate('Action', observation.method === 'bow'
+            ? `Hit the flying dragon with an arrow. Health is ${observation.after}.`
+            : `Struck the perched dragon at ${observation.before} health.`, 4_000);
         }
         if (kind === 'fall_recovery' && observation.landed) {
           await narrate('Action', 'Recovered from dragon knockback and reached the ground.');
@@ -337,7 +339,7 @@ try {
         if (kind === 'victory') await narrate('Result', 'The native End exit is open.');
       };
       const victory = fallOnly ? await replayBucketLanding(reflexes, start, report) : await fightEndDragon(action, report,
-        progress, { useCarriedPickaxe: archivedEnd, nativeWaterLanding: reflexes?.waterLanding === true });
+        progress, { useCarriedPickaxe: archivedEnd, nativeWaterLanding: reflexes?.waterLanding === true, shootWhileFlying: archivedEnd });
       if (archive) {
         assert.equal(victory.dragon, archive.dragon, 'The controller must fight the original dragon from the crystal stage');
         await reportStatus('victory');
@@ -493,10 +495,12 @@ async function runExpedition(start, stage) {
       await writeCheckpoint(checkpoint);
       const { x, y, z } = start.position;
       const longReturn = Math.hypot(destination[0] - x, destination[1] - y, destination[2] - z) > 32;
-      const resumeAutoEat = longReturn && (await action('set_reflexes'))?.autoEat;
+      const direct = longReturn && await daylightLoadoutIsVisible(action, start, destination);
+      const provisionFirst = longReturn && !direct;
+      const resumeAutoEat = provisionFirst && (await action('set_reflexes'))?.autoEat;
       if (resumeAutoEat) await action('set_reflexes', { autoEat: false });
       try {
-        if (longReturn) {
+        if (provisionFirst) {
           let player = await action('observe');
           if (await sleepNearby(action, player)) {
             await narrate('Result', 'Slept until dawn before looking for replacement tools and food.');
@@ -518,11 +522,13 @@ async function runExpedition(start, stage) {
             'Could not find food for the player and Mushroom before the return');
           await narrate('Result', 'Packed food for the player and reserved one portion for Mushroom.');
         }
-        await narrate('Objective', 'Return to the recorded death site and collect the dropped gear.');
-        console.log(JSON.stringify({ at: new Date().toISOString(), action: 'recover_dropped_loadout', destination }));
+        await narrate('Objective', direct ? 'Recover the shield and guide while both are visible in daylight.'
+          : 'Return to the recorded death site and collect the dropped gear.');
+        console.log(JSON.stringify({ at: new Date().toISOString(), action: 'recover_dropped_loadout', destination, direct }));
         const recovered = await recoverDroppedLoadout(action, destination, {
-          reserveMeal: longReturn, companionUuid: checkpoint.dog,
+          reserveMeal: provisionFirst, companionUuid: checkpoint.dog, direct,
         });
+        if (direct) await narrate('Result', 'Retrieved the dropped shield and equipped it.');
         checkpoint.recoveredWithoutGuide = recovered === 'companion';
         checkpoint.gameTime = (await action('observe')).gameTime;
         if (checkpoint.recoveredWithoutGuide) {
@@ -734,6 +740,15 @@ async function runExpedition(start, stage) {
           await narrate('Objective', 'Gather food for the quarry and reserve a portion for Mushroom.');
           assert.ok(await forageExpeditionMeal(action, { toward: checkpoint.camp.bed, minimum }),
             'Could not stock provisions before mining');
+        }
+        const stoneKit = await action('get_inventory');
+        if (!['minecraft:stone_pickaxe', 'minecraft:furnace']
+          .every(item => stoneKit.slots.some(stack => stack.id === item))) {
+          await narrate('Objective', 'Rebuild the missing stone pickaxe or furnace before looking for iron.');
+          await gatherStarterTools(await action('observe'));
+          const table = await placeBeside(action, 'minecraft:crafting_table');
+          await earnStoneKit(action, craft, { table, bed: checkpoint.camp.bed });
+          await narrate('Result', 'Rebuilt the quarry kit with ordinary Survival materials.');
         }
       }
       if (!checkpoint.quarry?.length && checkpoint.fedDog === false) await policy.tendCompanion();

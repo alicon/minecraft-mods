@@ -66,6 +66,20 @@ test('a still-visible breath cloud blocks a walk back in from safe ground', asyn
   assert.equal(breathBlocksWalk(player, [-7, 61, -1], [{ pos: [-7.17, 82, 4.42] }]), false);
 });
 
+test('a bow shot leads a moving dragon through the remaining draw and arrow flight', async () => {
+  const { bowAim, movingBowAim } = await import('./expedition-ballistics.mjs');
+  const player = { position: { x: 0, y: 60, z: 0 } };
+  const previous = { pos: [0, 70, 30], tick: 96 };
+  const current = { pos: [4, 70, 30], tick: 100 };
+  const stationary = bowAim(player, current.pos);
+  const prompt = movingBowAim(player, previous, current, 2);
+  const delayed = movingBowAim(player, previous, current, 10);
+  assert.ok(prompt.aim.yaw < stationary.yaw);
+  assert.ok(delayed.aim.yaw < prompt.aim.yaw);
+  assert.ok(delayed.flightTicks > prompt.flightTicks);
+  assert.equal(movingBowAim(player, previous, { ...current, tick: 112 }, 2), null);
+});
+
 test('a dragon launch keeps checking until a water landing is in reach', async () => {
   const { fightEndDragon } = await import('./expedition-dragon-fight.mjs');
   const state = { inWorld: true, dimension: 'minecraft:the_end', onGround: true,
