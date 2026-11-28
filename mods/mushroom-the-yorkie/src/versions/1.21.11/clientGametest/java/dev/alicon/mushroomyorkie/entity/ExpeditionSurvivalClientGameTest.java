@@ -57,7 +57,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 			case "nether" -> NETHER_WINDOW_TICKS;
 			case "nether-powder" -> NETHER_POWDER_WINDOW_TICKS;
 			case "defense", "feeding", "portal", "nether-supplies", "nether-distant-supplies", "shelter", "equipment", "end-entry", "end-crystal", "generated-end-crystals",
-					"eye-route", "stronghold-approach", "quarry-tools", "quarry-iron" -> 0;
+					"eye-route", "stronghold-approach", "ender-supplies", "quarry-tools", "quarry-iron" -> 0;
 			default -> throw new AssertionError("Unknown expedition stage " + stage);
 		};
 		TestWorldSave save;
@@ -66,12 +66,18 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 		var stayedWithGear = new AtomicBoolean();
 		var togetherInNether = new AtomicBoolean();
 		var companionDeath = new AtomicReference<String>();
+		ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, source, baseDamage, damage, blocked) -> {
+			if (damage > 0 && !blocked && entity instanceof MushroomYorkieEntity dog && dog.getUUID().equals(originalDog.get())) {
+				System.out.printf("Expedition companion hurt: dog=%s source=%s amount=%.2f health=%.2f dimension=%s pos=%s%n",
+						dog.getUUID(), source.getMsgId(), damage, dog.getHealth(), dog.level().dimension().identifier(), dog.blockPosition());
+			}
+		});
 		ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
 			if (entity instanceof MushroomYorkieEntity dog && dog.getUUID().equals(originalDog.get())) {
 				companionDeath.set(source.getLocalizedDeathMessage(dog).getString());
 			}
 		});
-		var builder = context.worldBuilder().setUseConsistentSettings(false).adjustSettings(settings -> {
+		var builder = context.worldBuilder().setUseConsistentSettings("ender-supplies".equals(stage)).adjustSettings(settings -> {
 			settings.setName("Codex Expedition Survival");
 			settings.setDifficulty(Difficulty.NORMAL);
 			settings.setAllowCommands(false);
@@ -122,6 +128,10 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 				}
 				if ("equipment".equals(stage)) {
 					ExpeditionGearClientScenario.run(context, server, ownerId, status);
+					return;
+				}
+				if ("ender-supplies".equals(stage)) {
+					ExpeditionPearlClientScenario.run(context, server, ownerId, status);
 					return;
 				}
 				if ("end-entry".equals(stage)) {

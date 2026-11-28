@@ -12,7 +12,8 @@ import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
 import { blazePowderCount, craftBlazePowder, earnBlazeRods } from './expedition-blaze-rods.mjs';
 import { clearGeneratedCrystals, shootEndCrystal } from './expedition-end-crystals.mjs';
-import { crossEndPortal } from './expedition-end-entry.mjs';
+import { craftEyes, crossEndPortal } from './expedition-end-entry.mjs';
+import { earnEnderPearls } from './expedition-pearls.mjs';
 import { navigateToStronghold, scoutByEye } from './expedition-eye-route.mjs';
 import { COMPANION_WEARABLES, markExpeditionCamp, practiceStayAndRecall, prepareCompanionGear } from './expedition-gear.mjs';
 import { expeditionPolicy } from './expedition-policy.mjs';
@@ -64,6 +65,7 @@ const milestoneObjectives = {
   portal: 'Find supplies, repair the Nether portal, and come home with Mushroom.',
   'nether-supplies': 'Shelter Mushroom in the Nether, earn a blaze rod, and return together.',
   'nether-distant-supplies': 'Scout for a distant Nether fortress with Mushroom and bring home a blaze rod.',
+  'ender-supplies': 'Shelter Mushroom, earn an Ender pearl, and craft an Eye of Ender.',
   shelter: 'Enter the furnished house and sleep with the door closed.',
   equipment: 'Craft the harness, padded vest, and mat. Fit Mushroom’s gear and mark camp.',
   'end-entry': 'Craft Eyes of Ender and bring Mushroom through the active portal.',
@@ -242,6 +244,14 @@ try {
     const work = stage === 'portal' ? undefined : exit => bringBlazeRods(companion, exit, 2);
     await netherRoundTrip(action, companion, hold, () => prepareNetherPortal(action, craft), OVERWORLD, work);
     if (work) await craftBlazePowder(action, craft, 2);
+  } else if (stage === 'ender-supplies') {
+    companion = (await readFile(join(dirname(statusFile), 'pearl-companion'), 'utf8')).trim();
+    assert.ok(/^[\da-f-]{36}$/i.test(companion));
+    await earnEnderPearls(action, companion, 1, async (kind, observation) => {
+      console.log(JSON.stringify({ at: new Date().toISOString(), action: `pearl_${kind}`, observation }));
+      if (kind === 'camp') await narrate('Decision', 'Mushroom is staying at camp while the player looks for an Enderman.');
+    });
+    await craftEyes(action, craft, 1);
   } else if (stage === 'shelter') {
     const camp = await prepareAdoptionCamp(action, craft, descendFromCanopy);
     assert.ok(camp.door, 'Expected to find a furnished house in the shelter replay');

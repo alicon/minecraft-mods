@@ -107,6 +107,8 @@ the action trace, client and controller logs, and screenshots. Follow
 `tail -f "$RUN_DIRECTORY/playtest.log"` for the current objective, status,
 observations that changed the plan, and actions such as crafting. With Jev
 enabled, the log also names its selected action or the local fallback.
+The native game log records the damage source, health, and position when
+the original companion is hurt during a fresh or recovered expedition.
 
 The client starts in a fresh Normal Survival world with an empty inventory and
 commands disabled. If wood drops through the canopy,
@@ -305,6 +307,13 @@ finds a fortress from observed terrain, marks a camp for Mushroom, and hunts
 blazes. After recalling the dog and crossing home, the player crafts twelve
 blaze powder. The server verifies the kill and crafting stats, the powder in the
 inventory, and the original equipped dog after reopening the save.
+
+Set `MUSHROOM_EXPEDITION_STAGE=ender-supplies` to replay the transition from
+blaze powder to an Eye of Ender. The flat Normal Survival fixture supplies an
+iron sword, one blaze powder, and two separate covered areas. The controller
+asks Mushroom to stay, uses a two-block-high shelter to fight an Enderman, picks up its loot,
+and recalls the dog before crafting the Eye. Native checks require a player
+kill, an Eye crafted from the earned pearl, and the original unharmed dog.
 
 Set `MUSHROOM_EXPEDITION_STAGE=equipment` to replay crafting, fitting and
 marking camp in the native client. The disposable fixture places a crafting

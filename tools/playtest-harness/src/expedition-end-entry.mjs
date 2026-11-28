@@ -51,9 +51,9 @@ export function findEndRing(cells, player) {
   return found.sort((a, b) => distance(a.approaches[0], player) - distance(b.approaches[0], player))[0];
 }
 
-async function craftEyes(action, craft) {
+export async function craftEyes(action, craft, total = 12) {
   let inventory = await action('get_inventory');
-  const wanted = Math.min(12 - count(inventory, EYE), count(inventory, PEARL));
+  const wanted = Math.min(total - count(inventory, EYE), count(inventory, PEARL));
   if (wanted > count(inventory, POWDER) && count(inventory, ROD)) {
     await craft(POWDER, Math.min(wanted - count(inventory, POWDER), 2 * count(inventory, ROD)));
     inventory = await action('get_inventory');
