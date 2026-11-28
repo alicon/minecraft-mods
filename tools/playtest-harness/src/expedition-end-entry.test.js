@@ -72,6 +72,20 @@ test('the ore return trail contains grounded outbound observations and ends at t
   assert.deepEqual(campOutboundTrail(trace, home), [...waypoints, [88, 64, 0]]);
 });
 
+test('the camp return drops quarry excursions when the player revisits the same ground', async () => {
+  const { campOutboundTrail } = await import('./expedition-eye-route.mjs');
+  const bed = [-180, 71, -90];
+  const surface = [-62, 72, -67];
+  const oldExit = [-39, 70, -56];
+  const last = [-53, 64, -59];
+  const rows = [bed, [-66, 73, -73], surface, [-51, 72, -78], oldExit,
+    [-39, 65, -54], [-47, 71, -57], [-61, 72, -65], last].map(([x, y, z]) => JSON.stringify({
+    action: 'observe',
+    observation: { onGround: true, dimension: 'minecraft:overworld', position: { x, y, z } },
+  }));
+  assert.deepEqual(campOutboundTrail(rows.join('\n') + '\n', bed), [bed, [-66, 73, -73], surface, last]);
+});
+
 test('a regroup trail starts from the last same-level contact with the original dog', async () => {
   const { companionRegroupTrail } = await import('./expedition-eye-route.mjs');
   const point = (x, y, z = 0.5) => ({ action: 'observe', observation: {
@@ -102,7 +116,7 @@ test('the return to an expedition bed verifies the original living dog nearby', 
         { uuid: 'different', health: 12, distance: 1, pos: [0.5, 64, 0.5] },
         { uuid: 'original', health: 9, distance: 2, pos: [position.x + 2, 64, 0.5] },
       ] };
-      case 'get_blocks': return { cells: Array.from({ length: 12 }, (_, x) =>
+      case 'get_blocks': return { cells: Array.from({ length: 26 }, (_, x) =>
         ({ x, y: 63, z: 0, b: 'minecraft:grass_block' })) };
       case 'go_to':
         moved.push(args.pos);
@@ -111,8 +125,10 @@ test('the return to an expedition bed verifies the original living dog nearby', 
       default: assert.fail(`Unexpected action: ${name}`);
     }
   };
-  const returned = await returnToCampWithCompanion(action, 'original', home);
+  const outbound = [home, [6, 64, 0], [23, 64, 0], [8, 64, 0]];
+  const returned = await returnToCampWithCompanion(action, 'original', home, outbound);
   assert.ok(moved.length > 0);
+  assert.ok(moved.every(pos => pos[0] <= 8), 'An old outbound errand should not pull the player away from camp');
   assert.equal(returned.dog.uuid, 'original');
   assert.equal(returned.dog.health, 9);
   assert.ok(Math.abs(returned.owner.position.x - 0.5) <= 4);

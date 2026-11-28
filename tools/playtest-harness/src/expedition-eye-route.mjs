@@ -193,7 +193,10 @@ export function campOutboundTrail(trace, bed, { beforeIron = false } = {}) {
       continue;
     }
     if (!trail.length) continue;
-    const previous = trail.findIndex(pos => String(pos) === String(point));
+    // Native walking may return to the same stretch of ground one or two tiles
+    // off the outbound track. Drop that excursion before retracing toward camp.
+    const previous = trail.findIndex(pos => Math.abs(pos[1] - point[1]) <= 1
+      && Math.hypot(pos[0] - point[0], pos[2] - point[2]) <= 3);
     if (previous >= 0) trail.splice(previous + 1);
     else if (Math.hypot(...point.map((value, index) => value - trail.at(-1)[index])) >= 5) trail.push(point);
   }
@@ -237,10 +240,13 @@ export async function returnToCampWithCompanion(action, uuid, bed, trail = [], r
     range: Math.hypot(start.position.x - x - 0.5, start.position.y - y, start.position.z - z - 0.5) }))
     .filter(point => point.range <= 14).sort((a, b) => a.range - b.range)[0];
   if (nearby && !atCamp(start.position)) {
+    let closestHome = horizontalDistance(start.position, camp);
     for (const [x, y, z] of trail.slice(0, nearby.index + 1).reverse()) {
       const point = { x: x + 0.5, y, z: z + 0.5 };
-      await travelToward(action, point, pos => horizontalDistance(pos, point) <= 2.5 && Math.abs(pos.y - y) <= 1,
+      if (horizontalDistance(point, camp) > closestHome + 8) continue;
+      const reached = await travelToward(action, point, pos => horizontalDistance(pos, point) <= 2.5 && Math.abs(pos.y - y) <= 1,
         18, travel);
+      if (reached) closestHome = Math.min(closestHome, horizontalDistance(reached, camp));
     }
   }
   const steps = Math.min(180, Math.ceil(horizontalDistance(start.position, camp)) + 35);
