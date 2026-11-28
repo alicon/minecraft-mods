@@ -31,7 +31,6 @@ export async function defendCompanion(action, player, dogUuid) {
   }
 
   if (attacker.distance > 4.25) {
-    if (attacker.distance > 10) return true;
     await approach(action, attacker.id);
     // Finish the defense on this interrupt when the walk reaches melee range.
     // A new planning turn can lose the target when the mob moves around the dog.

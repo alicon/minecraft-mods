@@ -82,6 +82,26 @@ test('reaching a spider attacking the dog converts the same interrupt into a swo
   assert.deepEqual(strikes, [spider.id]);
 });
 
+test('defense closes distance while a zombie is still far from the player but beside the injured dog', async () => {
+  const { defendCompanion } = await import('./expedition-companion.mjs');
+  const injuredDog = { ...dog, pos: [12, 64, 0], distance: 12, health: 7 };
+  const zombie = { ...spider, type: 'minecraft:zombie', pos: [14, 64, 0], distance: 14 };
+  const moves = [];
+  const action = async (name, args) => {
+    if (name === 'get_entities') {
+      return { entities: [injuredDog, { ...zombie, distance: moves.length ? 8 : zombie.distance }] };
+    }
+    if (name === 'stop') return {};
+    if (name === 'go_to') {
+      moves.push(args);
+      return { arrived: false, position: [6, 64, 0] };
+    }
+    assert.fail(name);
+  };
+  assert.equal(await defendCompanion(action, player, injuredDog.uuid), true);
+  assert.deepEqual(moves, [{ entityId: zombie.id, stopDistance: 2.3, maxTicks: 24 }]);
+});
+
 test('when a creeper is close to the original dog, retreat without swinging', async () => {
   const { defendCompanion } = await import('./expedition-companion.mjs');
   const closeDog = { ...dog, pos: [1, 64, 0], distance: 1, recentlyHurt: false, health: 20 };
