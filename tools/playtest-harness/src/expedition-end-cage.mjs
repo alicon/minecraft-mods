@@ -113,11 +113,22 @@ async function firingGround(action, crystal, plan) {
     && !solid.has(`${cell.x},${cell.y + 1},${cell.z}`)
     && !solid.has(`${cell.x},${cell.y + 2},${cell.z}`));
   const vantage = [x + plan.dx * 30, plan.base[1], z + plan.dz * 30];
-  return dry.map(cell => [cell.x, cell.y + 1, cell.z])
-    .sort((a, b) => horizontal(a, vantage) - horizontal(b, vantage))
-    .find(([x, y, z]) => [0, -0.35, 0.35].every(offset => clearBowArc({
+  const candidates = dry.map(cell => [cell.x, cell.y + 1, cell.z])
+    .sort((a, b) => horizontal(a, vantage) - horizontal(b, vantage));
+  for (const [x, y, z] of candidates) {
+    const needed = new Set();
+    const clear = [0, -0.35, 0.35].every(offset => clearBowArc({
       position: { x: x + 0.5 + plan.dz * offset, y, z: z + 0.5 + plan.dx * offset },
-    }, target, pos => solid.has(String(pos)) && !opening.has(String(pos))))) ?? null;
+    }, target, pos => {
+      const key = String(pos);
+      if (!solid.has(key)) return false;
+      if (!opening.has(key)) return true;
+      needed.add(key);
+      return false;
+    }));
+    if (clear) return { line: [x, y, z], bars: plan.bars.filter(pos => needed.has(String(pos))) };
+  }
+  return null;
 }
 
 export async function openCrystalCage(action, player, crystal, dangerous) {
@@ -131,8 +142,9 @@ export async function openCrystalCage(action, player, crystal, dangerous) {
   if (!terrain || terrain.stats?.unloadedChunks) return null;
   const plan = cageApproach(terrain.cells, crystal, player);
   if (!plan) return null;
-  const line = await firingGround(action, crystal, plan);
-  if (!line) return null;
+  const firing = await firingGround(action, crystal, plan);
+  if (!firing) return null;
+  const { line, bars } = firing;
   const stock = await action('get_inventory');
   const blocks = MATERIAL.find(item => stock.slots.reduce((sum, stack) =>
     sum + (stack.id === item ? stack.count : 0), 0) >= plan.top - plan.base[1]);
@@ -173,7 +185,7 @@ export async function openCrystalCage(action, player, crystal, dangerous) {
   if (player.onGround && Math.floor(player.position.y) === plan.top && player.health >= 16 && !await dangerous()) {
     await hold(action, pickaxe);
     opened = true;
-    for (const pos of plan.bars) {
+    for (const pos of bars) {
       const existing = await action('get_blocks', { center: pos, size: [1, 1, 1], format: 'json' });
       if (!existing?.cells.some(cell => cell.b === BARS)) continue;
       if (await dangerous() || !(await action('break_block', { pos, maxTicks: 75 }))?.broken) {
