@@ -41,6 +41,7 @@ const BACKUP_FOOD = [...Object.values(BACKUP_MEAT), 'minecraft:apple'];
 const COOKED_FOOD = ['minecraft:cooked_mutton', 'minecraft:cooked_beef', 'minecraft:cooked_porkchop', 'minecraft:cooked_chicken'];
 const DOG_FOOD = [MUTTON, ...Object.values(BACKUP_MEAT), ...COOKED_FOOD, 'minecraft:apple'];
 const FEEDING_SEARCH_RADIUS = 24;
+const FEEDING_OBSTRUCTION = /^minecraft:(?:stone|andesite|diorite|granite|dirt|grass_block)$/;
 const WOOL_DYES = {
   white: ['minecraft:lily_of_the_valley', 'minecraft:bone_meal'],
   yellow: ['minecraft:dandelion'],
@@ -798,6 +799,16 @@ async function provisionCampBeforeSleep(action, craft, bed) {
   throw new Error('Could not walk back to the bed after collecting camp supplies');
 }
 
+async function clearFeedingObstruction(action, pos, owner, dog) {
+  const [x, y, z] = feet(owner);
+  if (y > pos[1] || y + 1 < pos[1] || pos[1] < Math.floor(dog.pos[1])
+      || (x === pos[0] && z === pos[2]) || owner.threats?.some(threat => threat.distance < 6)) return false;
+  const surroundings = await action('get_blocks', { center: pos, size: [3, 5, 3], format: 'json' });
+  return Boolean(surroundings && !surroundings.stats?.unloadedChunks
+    && !surroundings.cells.some(cell => /:(?:water|lava|gravel|sand|powder_snow|fire)$/.test(cell.b))
+    && (await breakVisible(action, pos))?.broken);
+}
+
 export async function feedAdoptedDog(action, uuid, bed, attempts = 120) {
   const startingStock = await action('get_inventory');
   const offered = DOG_FOOD.find(item => count(startingStock, item));
@@ -841,6 +852,12 @@ export async function feedAdoptedDog(action, uuid, bed, attempts = 120) {
           continue;
         }
       }
+      if (hit?.pos && FEEDING_OBSTRUCTION.test(hit.block) && aimed.onGround && !aimed.inWater
+          && clearedObstacles < 6 && await clearFeedingObstruction(action, hit.pos, aimed, dog)) {
+        clearedObstacles++;
+        await hold(action, meal);
+        continue;
+      }
     }
     // Holding meat can interrupt barking at a peaceful mob. Let the dog
     // return on his own while the offer is fresh or he is coming closer.
@@ -854,25 +871,22 @@ export async function feedAdoptedDog(action, uuid, bed, attempts = 120) {
       const nearCamp = dog && Math.hypot(...dog.pos.map((axis, index) => axis - bed[index])) <= FEEDING_SEARCH_RADIUS;
       if (nearCamp && fromCamp < FEEDING_SEARCH_RADIUS) {
         const vertical = Math.abs(dog.pos[1] - player.position.y);
-        // Track the moving dog on level ground before falling back to dry waypoints.
-        if (dog.distance <= 12 && vertical <= 1.25) {
-          const approach = await action('go_to', { entityId: dog.id, stopDistance: 2.2, maxTicks: 45 });
-          if (approach?.arrived) continue;
+        const feedingDistance = 2.2;
+        // An approach that is already within its stopping distance cannot change the sightline.
+        if (dog.distance > feedingDistance && dog.distance <= 12 && vertical <= 1.25) {
+          const approach = await action('go_to', { entityId: dog.id, stopDistance: feedingDistance, maxTicks: 45 });
+          if (approach?.arrived && approach.ticks !== 0) continue;
           // A timeout can still move the player several blocks. Plan any
           // detour from there and let the next observation check for a meal.
           const after = await action('observe');
           if (!after?.inWorld || after.dead) return false;
           if (feet(after).join(',') !== tile.join(',')) continue;
           player = after;
-          const obstruction = approach?.reason?.match(/blocked by minecraft:(?:stone|andesite|diorite|granite|dirt|grass_block) at (-?\d+),(-?\d+),(-?\d+)/);
-          if (obstruction && clearedObstacles < 6 && !player.threats?.some(threat => threat.distance < 6)) {
-            const pos = obstruction.slice(1).map(Number);
+          const obstruction = approach?.reason?.match(/blocked by (minecraft:\w+) at (-?\d+),(-?\d+),(-?\d+)/);
+          if (obstruction && FEEDING_OBSTRUCTION.test(obstruction[1]) && clearedObstacles < 6) {
+            const pos = obstruction.slice(2).map(Number);
             const distanceFromDog = Math.hypot(...pos.map((coordinate, axis) => coordinate + 0.5 - dog.pos[axis]));
-            const surroundings = await action('get_blocks', { center: pos, size: [3, 5, 3], format: 'json' });
-            if (pos[1] >= tile[1] && pos[1] <= tile[1] + 1 && distanceFromDog > 2
-                && surroundings && !surroundings.stats?.unloadedChunks
-                && !surroundings.cells.some(cell => /:(?:water|lava|gravel|sand|powder_snow|fire)$/.test(cell.b))
-                && (await breakVisible(action, pos))?.broken) {
+            if (distanceFromDog > 2 && await clearFeedingObstruction(action, pos, player, dog)) {
               clearedObstacles++;
               await hold(action, offered);
               continue;

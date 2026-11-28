@@ -1277,6 +1277,101 @@ test('a feeding approach that times out after moving does not backtrack from sta
   assert.equal(meals, 0);
 });
 
+test('a nearby dog behind a ledge gets fed after walking around the obstruction', async () => {
+  const { feedAdoptedDog } = await import('./expedition-home.mjs');
+  const meat = 'minecraft:mutton';
+  const dog = { id: 22, uuid: 'original', pos: [2.1, 66, 0.5], distance: 1.89, health: 12 };
+  const obstacle = [1, 67, 0];
+  const footing = [cell(0, 66, 0), cell(...obstacle, 'obsidian'), cell(0, 66, 1),
+    cell(1, 65, 1), cell(2, 65, 1), cell(2, 65, 0)];
+  let rounds = 0;
+  let meals = 2;
+  let moved = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe':
+        return { inWorld: true, onGround: true, health: 20,
+          position: { x: 0.5, y: 67, z: moved ? 1.5 : 0.5 },
+          crosshair: moved ? { id: dog.id } : { pos: obstacle, block: 'minecraft:obsidian' } };
+      case 'get_inventory':
+        return { mainHand: { id: meat }, slots: [{ id: meat, count: meals }] };
+      case 'get_entities':
+        return { entities: [dog] };
+      case 'look':
+        return {};
+      case 'get_blocks':
+        return { cells: footing };
+      case 'go_to':
+        if (args.entityId === dog.id) {
+          rounds++;
+          return { arrived: true, ticks: 0, position: [0.5, 67, 0.5] };
+        }
+        assert.deepEqual(args.pos, [0, 67, 1]);
+        moved = true;
+        return { arrived: true, ticks: 9, position: [0.5, 67, 1.5] };
+      case 'interact_entity':
+        assert.equal(args.entityId, dog.id);
+        assert.ok(moved);
+        meals--;
+        return { success: true };
+      default:
+        assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  assert.equal(await feedAdoptedDog(action, dog.uuid, [0, 67, 0], 9), true);
+  assert.equal(rounds, 0);
+  assert.equal(meals, 1);
+});
+
+test('a nearby Mushroom can be fed through a cleared stone shelf with safe footing', async () => {
+  const { feedAdoptedDog } = await import('./expedition-home.mjs');
+  const dog = { id: 22, uuid: 'original', pos: [-78.5, 66, -82.05], distance: 2.08, health: 12 };
+  const ledge = [-80, 67, -82];
+  const meat = 'minecraft:mutton';
+  const pickaxe = 'minecraft:stone_pickaxe';
+  for (const hazardous of [true, false]) {
+    let held = meat;
+    let cleared = false;
+    let meals = 3;
+    const action = async (name, args) => {
+      switch (name) {
+        case 'observe':
+          return { inWorld: true, onGround: true, health: 20, position: { x: -79.46, y: 67, z: -80.5 },
+            crosshair: cleared ? { id: dog.id } : { pos: ledge, block: 'minecraft:stone' } };
+        case 'get_entities':
+          return { entities: [dog] };
+        case 'look':
+          return {};
+        case 'get_inventory':
+          return { mainHand: { id: held }, slots: [{ id: meat, count: meals, slot: 0 },
+            { id: pickaxe, count: 1, maxDamage: 131, slot: 1 }] };
+        case 'get_blocks':
+          assert.deepEqual(args.center, ledge);
+          return { cells: hazardous ? [cell(-80, 68, -82, 'water')] : [cell(...ledge, 'stone')] };
+        case 'select_slot':
+          held = args.slot === 1 ? pickaxe : meat;
+          return { mainHand: { id: held } };
+        case 'break_block':
+          assert.deepEqual(args.pos, ledge);
+          assert.equal(held, pickaxe);
+          cleared = true;
+          return { broken: true };
+        case 'interact_entity':
+          assert.ok(cleared);
+          assert.equal(args.entityId, dog.id);
+          assert.equal(held, meat);
+          meals--;
+          return { success: true };
+        default:
+          assert.fail(`Unexpected action: ${name}`);
+      }
+    };
+    assert.equal(await feedAdoptedDog(action, dog.uuid, [-80, 67, -81], 2), !hazardous);
+    assert.equal(cleared, !hazardous);
+    assert.equal(meals, hazardous ? 3 : 2);
+  }
+});
+
 test('grass in the feeding sightline can be cleared before using one meal on Mushroom', async () => {
   const { feedAdoptedDog } = await import('./expedition-home.mjs');
   const meat = 'minecraft:mutton';
