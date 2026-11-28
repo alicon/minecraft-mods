@@ -38,7 +38,10 @@ const bridgeFingerprint = createHash('sha256').update(config.authToken).digest('
 const statusFile = process.env.MUSHROOM_EXPEDITION_STATUS;
 assert.ok(statusFile && isAbsolute(statusFile), 'Set MUSHROOM_EXPEDITION_STATUS to the absolute run status path');
 const resume = process.env.MUSHROOM_EXPEDITION_RESUME === '1';
-assert.equal(await readFile(statusFile, 'utf8'), resume ? 'held' : 'ready', 'The disposable expedition is not in the expected state');
+const blockedStrike = process.env.MUSHROOM_EXPEDITION_STAGE === 'defense'
+  && process.env.MUSHROOM_EXPEDITION_DEFENSE_BLOCKER === '1';
+const startingStatus = blockedStrike ? 'defense-config' : 'ready';
+assert.equal(await readFile(statusFile, 'utf8'), resume ? 'held' : startingStatus, 'The disposable expedition is not in the expected state');
 const ownerFile = join(dirname(statusFile), 'controller-owner');
 const launchOwner = process.env.MUSHROOM_EXPEDITION_CONTROLLER_OWNER;
 if (launchOwner) {
@@ -266,6 +269,13 @@ try {
   const archivedEnd = stage === 'end-return';
   const duel = archivedEnd || (stage === 'generated-end-crystals' && process.env.MUSHROOM_EXPEDITION_DUEL_ONLY === '1');
   await narrate('Run', `${resume ? 'Reattached to the same save' : 'Started the Survival controller'}. Stage ${stage}, policy ${policy}.`);
+  if (blockedStrike) {
+    const reflexes = await playerAction('set_reflexes', { autoDefend: false, chargeRanged: false });
+    assert.ok(reflexes?.autoDefend === false && reflexes.chargeRanged === false,
+      'Could not turn off automatic combat before staging the blocking skeleton');
+    await reportStatus('defense-configured');
+    await awaitNativeProof('status', 'ready', 'The blocking skeleton fixture did not become ready');
+  }
   const start = await action('observe');
   const startDimension = ['end-crystal', 'generated-end-crystals', 'end-return'].includes(stage) ? 'minecraft:the_end' : OVERWORLD;
   assert.ok(start?.inWorld && !start.dead && (start.dimension === startDimension
@@ -468,8 +478,6 @@ async function runCompanionDrill(start) {
   const [uuid, errand, scenarioDetails] = (await readFile(join(dirname(statusFile), 'defense-fixture'), 'utf8')).trim().split('\n');
   const pos = errand.trim().split(/\s+/).map(Number);
   assert.ok(/^[\da-f-]{36}$/i.test(uuid) && blockPosition(pos));
-  const blockedStrike = process.env.MUSHROOM_EXPEDITION_DEFENSE_BLOCKER === '1';
-  if (blockedStrike) await playerAction('set_reflexes', { autoDefend: false });
   companion = uuid;
   assert.equal(await action('go_to', { pos, stopDistance: 0.7, maxTicks: 28 }), null,
     'The proposed errand should be interrupted by danger to Mushroom');

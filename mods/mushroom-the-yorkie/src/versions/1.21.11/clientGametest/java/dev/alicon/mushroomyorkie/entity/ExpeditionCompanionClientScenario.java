@@ -33,6 +33,15 @@ final class ExpeditionCompanionClientScenario {
 		if ((cover ? 1 : 0) + (creeperApproach ? 1 : 0) + (distant ? 1 : 0) + (blockedStrike ? 1 : 0) > 1) {
 			throw new IllegalArgumentException("Choose one companion defense fixture");
 		}
+		if (blockedStrike) {
+			Files.writeString(status, "defense-config");
+			for (int attempt = 0; !"defense-configured".equals(Files.readString(status)); attempt++) {
+				if (attempt >= 100 || "failed".equals(Files.readString(status))) {
+					throw new AssertionError("The controller did not stop automatic combat before the defense fixture");
+				}
+				context.waitTicks(2);
+			}
+		}
 		var fixture = server.computeOnServer(minecraft -> {
 			var level = minecraft.overworld();
 			var owner = Objects.requireNonNull(minecraft.getPlayerList().getPlayer(ownerId));
