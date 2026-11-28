@@ -105,7 +105,7 @@ observations that changed the plan, and actions such as crafting. With Jev
 enabled, the log also names its selected action or the local fallback.
 
 The client starts in a fresh Normal Survival world with an empty inventory and
-commands disabled. The player gathers wood, crafts a wooden pickaxe and sword, packs
+commands disabled. The player gathers wood, crafts a wooden pickaxe, sword, and shovel, packs
 the crafting table, and looks for a bed behind a door and under a roof. It
 walks through the door and closes it before sleeping. If it cannot find a
 reachable sheltered bed, it crafts a bed once it has collected matching wool.
@@ -132,6 +132,20 @@ Each run reserves at most 76 requests, including after controller reattachment.
 It logs the choices, latency and reported input cost in `actions.jsonl`.
 The controller has a local fallback.
 The ordinary Survival actions and assertions are identical in both modes.
+
+For Survival routing decisions, use daylight for a sheltered bed, cooked
+food, and a way back to camp. Put a solid barrier between the player and
+ranged mobs. Light enclosed routes and keep the return path out of a quarry.
+Fit the tool to the block and keep a stone-or-better pickaxe for iron ore.
+Use the earliest iron toward a shield when working around skeletons. Once in
+the End, establish Mushroom's camp and a safe return route before attacking
+the crystals. These are priorities for the pilot. The stage results
+indicate which actions the controller actually exercised.
+
+[First-night and shelter guide](https://www.minecraft.net/en-us/article/how-survive-your-first-night-minecraft)
+· [Shovel](https://www.minecraft.net/en-us/article/taking-inventory-shovel)
+· [Exploring with a shield and supplies](https://www.minecraft.net/en-us/article/exploring-minecraft)
+· [Ender Dragon](https://www.minecraft.net/en-us/article/ender-dragon)
 
 Write `coach.txt` inside the printed report directory to send one short gameplay
 instruction to the next Jev decision. The note is read again for every call
@@ -248,6 +262,12 @@ the client, and follows that bearing. The server independently checks that
 the player moved closer to the world's actual stronghold with the same
 living dog nearby. The controller receives the dog's identity and learns
 the direction from the thrown eye.
+
+Set `MUSHROOM_EXPEDITION_STAGE=quarry-tools` to verify tool selection at
+the dirt-to-stone boundary. The disposable native fixture supplies four logs
+and two reachable blocks. The controller crafts the starter kit, packs the
+crafting table, uses the shovel on dirt, and switches to the pickaxe for stone.
+The server checks that both blocks broke and that each tool took one point of wear.
 
 Set `MUSHROOM_EXPEDITION_STAGE=shelter` to replay the Java sheltered adoption.
 The disposable world provides a furnished house at night. The player

@@ -15,6 +15,10 @@ const FIELD_GUIDE = 'mushroom_yorkie:field_guide';
 const DOG = 'mushroom_yorkie:mushroom_yorkie';
 const PICKAXE = 'minecraft:wooden_pickaxe';
 const STONE_PICKAXE = 'minecraft:stone_pickaxe';
+const DIGGABLE = /^minecraft:(?:grass_block|dirt|coarse_dirt|rooted_dirt|dirt_path|podzol|mycelium|sand|red_sand|gravel|clay|soul_sand|snow_block)$/;
+const MINEABLE = /^minecraft:(?:stone|cobblestone|furnace|deepslate|andesite|diorite|granite|(?:deepslate_)?(?:coal|iron)_ore)$/;
+const CHOPPABLE = /^minecraft:(?:crafting_table|\w+_(?:log|wood|planks))$/;
+const TOOL_TIERS = ['netherite', 'diamond', 'iron', 'stone', 'wooden'];
 const COBBLESTONE = 'minecraft:cobblestone';
 const FURNACE = 'minecraft:furnace';
 const RAW_IRON = 'minecraft:raw_iron';
@@ -617,10 +621,32 @@ export async function adoptAtNight(action, { bed, door, entrance }, craft) {
   throw new Error('No native night sleep and adoption within the test window');
 }
 
-async function breakVisible(action, pos) {
+async function selectBreakingTool(action, block) {
+  const kind = DIGGABLE.test(block) ? 'shovel' : MINEABLE.test(block) ? 'pickaxe' : CHOPPABLE.test(block) ? 'axe' : null;
+  if (!kind && block !== 'minecraft:leaf_litter') return true;
+  const stock = await action('get_inventory');
+  const tiers = block.endsWith('iron_ore') ? TOOL_TIERS.slice(0, -1) : TOOL_TIERS;
+  const tool = kind && tiers.map(tier => `minecraft:${tier}_${kind}`)
+    .find(id => stock.slots.some(stack => stack.id === id && durability(stack) > 0));
+  if (tool) {
+    if (stock.mainHand?.id !== tool) await hold(action, tool);
+    return true;
+  }
+  if (kind === 'pickaxe') return false;
+  // A hand can break these blocks if the matching tool is unavailable.
+  if (!stock.mainHand?.maxDamage) return true;
+  const empty = Array.from({ length: 9 }, (_, slot) => slot).find(slot => !stock.slots.some(stack => stack.slot === slot));
+  const spare = stock.slots.find(stack => stack.slot < 9 && !stack.maxDamage)?.slot;
+  const slot = empty ?? spare;
+  if (slot === undefined) return false;
+  return Boolean(await action('select_slot', { slot }));
+}
+
+export async function breakVisible(action, pos) {
   await action('look', { at: pos });
   await setTimeout(80);
-  if ((await action('observe'))?.crosshair?.pos?.join(',') !== pos.join(',')) return null;
+  const hit = (await action('observe'))?.crosshair;
+  if (hit?.pos?.join(',') !== pos.join(',') || !await selectBreakingTool(action, hit.block)) return null;
   return action('break_block', { pos, maxTicks: 115 });
 }
 

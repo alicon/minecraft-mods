@@ -209,6 +209,40 @@ test('breaking an ore without picking up its drop does not count as mining progr
   assert.equal(breaks, 1);
 });
 
+test('the quarry changes tools at the soil-to-stone boundary and keeps the pickaxe off dirt', async () => {
+  const { breakVisible } = await import('./expedition-home.mjs');
+  const pick = { id: 'minecraft:stone_pickaxe', slot: 0, count: 1, damage: 0, maxDamage: 131 };
+  const shovel = { id: 'minecraft:wooden_shovel', slot: 1, count: 1, damage: 0, maxDamage: 59 };
+  const pos = [1, 1, 0];
+  let slots = [pick, shovel];
+  let selectedSlot = 0;
+  let block = 'minecraft:dirt';
+  const breaking = [];
+  const action = async (name, args) => {
+    const mainHand = () => slots.find(stack => stack.slot === selectedSlot);
+    if (name === 'look') return {};
+    if (name === 'observe') return { crosshair: { pos, block } };
+    if (name === 'get_inventory') return { selectedSlot, mainHand: mainHand(), slots };
+    if (name === 'select_slot') {
+      selectedSlot = args.slot;
+      return { mainHand: mainHand() };
+    }
+    assert.equal(name, 'break_block');
+    breaking.push(mainHand()?.id);
+    return { broken: true };
+  };
+  assert.ok((await breakVisible(action, pos))?.broken);
+  block = 'minecraft:iron_ore';
+  assert.ok((await breakVisible(action, pos))?.broken);
+  block = 'minecraft:grass_block';
+  slots = [pick];
+  assert.ok((await breakVisible(action, pos))?.broken);
+  block = 'minecraft:iron_ore';
+  slots = [{ ...pick, id: 'minecraft:wooden_pickaxe' }];
+  assert.equal(await breakVisible(action, pos), null);
+  assert.deepEqual(breaking, [shovel.id, pick.id, undefined]);
+});
+
 test('a route to an elevated camp climbs instead of stopping directly below it', async () => {
   const { dryWaypoint } = await import('./expedition-navigation.mjs');
   const terrain = [

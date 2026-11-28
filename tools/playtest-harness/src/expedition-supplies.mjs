@@ -5,7 +5,7 @@ import { dirname, isAbsolute, join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import {
   adoptAtNight, earnIronKit, earnStoneKit, feedAdoptedDog, forageExpeditionMeal, prepareAdoptionCamp,
-  ensurePlanks, hold, placeBeside, recoverDroppedLoadout, WOOD_LOGS,
+  breakVisible, ensurePlanks, hold, placeBeside, recoverDroppedLoadout, WOOD_LOGS,
 } from './expedition-home.mjs';
 import { hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
@@ -60,6 +60,7 @@ const milestoneObjectives = {
   equipment: 'Craft the harness, padded vest, and mat. Fit Mushroom’s gear and mark camp.',
   'end-entry': 'Craft Eyes of Ender and bring Mushroom through the active portal.',
   'eye-route': 'Throw an Eye of Ender and follow its visible flight with Mushroom.',
+  'quarry-tools': 'Craft the starter kit, shovel soil, and switch to a pickaxe for stone.',
 };
 
 async function rpc(method, params) {
@@ -230,6 +231,14 @@ try {
       const yaw = Math.round(Math.atan2(-bearing.x, bearing.z) * 180 / Math.PI);
       await narrate('Decision', `Saw the eye travel ${bearing.distance.toFixed(1)} blocks. Heading toward its bearing at yaw ${yaw}° on dry ground.`);
     });
+  } else if (stage === 'quarry-tools') {
+    const targets = JSON.parse(await readFile(join(dirname(statusFile), 'quarry-tool-targets'), 'utf8'));
+    assert.ok(targets.length === 2 && targets.every(blockPosition));
+    await gatherStarterTools(start);
+    for (const [index, block] of ['minecraft:dirt', 'minecraft:stone'].entries()) {
+      const result = await breakVisible(action, targets[index]);
+      assert.ok(result?.broken && result.block === block, `Could not break the staged ${block}`);
+    }
   } else await runExpedition(start, stage);
   await narrate('Result', 'The controller finished its stage. The game test is checking the outcome.');
   await reportStatus('finished');
@@ -485,18 +494,19 @@ async function recoverLooseLogs() {
 async function gatherStarterTools(start) {
   const stock = await action('get_inventory');
   const amount = item => stock.slots.reduce((total, stack) => total + (stack.id === item ? stack.count : 0), 0);
-  const tools = [['wooden_pickaxe', 3, 2], ['wooden_sword', 2, 1]]
+  const tools = [['wooden_pickaxe', 3, 2], ['wooden_sword', 2, 1], ['wooden_shovel', 1, 2]]
     .filter(([item]) => !amount(`minecraft:${item}`));
   const needsTable = !amount('minecraft:crafting_table');
-  const needsSticks = amount('minecraft:stick') < tools.reduce((total, [, , cost]) => total + cost, 0);
-  const planks = tools.reduce((total, [, cost]) => total + cost, 0) + (needsTable ? 4 : 0) + (needsSticks ? 2 : 0);
+  const sticksNeeded = tools.reduce((total, [, , cost]) => total + cost, 0) - amount('minecraft:stick');
+  const stickBatches = Math.max(0, Math.ceil(sticksNeeded / 4));
+  const planks = tools.reduce((total, [, cost]) => total + cost, 0) + (needsTable ? 4 : 0) + stickBatches * 2;
   if (!planks) return;
 
   const hasWood = stock.slots.some(stack => /_(?:log|planks)$/.test(stack.id));
   if (!hasWood) await collectStarterLogs(start);
   else await recoverLooseLogs();
   await ensurePlanks(action, craft, planks);
-  if (needsSticks) await craft('stick', 4);
+  if (stickBatches) await craft('stick', stickBatches * 4);
   if (needsTable) await craft('crafting_table', 1);
   if (!tools.length) return;
 
@@ -527,7 +537,7 @@ async function gatherStarterTools(start) {
     assert.equal(opened?.screenOpened, 'CraftingScreen');
     for (const [item] of tools) await craft(item, 1);
     await action('stop', { closeScreen: true });
-    assert.ok((await action('break_block', { pos, maxTicks: 100 }))?.broken, 'Could not pack up the crafting table');
+    assert.ok((await breakVisible(action, pos))?.broken, 'Could not pack up the crafting table');
     await walk(pos, 0.3);
     await setTimeout(400);
     assert.ok((await action('get_inventory')).slots.some(stack => stack.id === 'minecraft:crafting_table'),
