@@ -98,7 +98,8 @@ async function firingGround(action, crystal, plan) {
   const size = plan.dx ? [49, top - bottom + 1, 25] : [25, top - bottom + 1, 49];
   const view = await action('get_blocks', { center, size, format: 'json' });
   if (!view || view.stats?.unloadedChunks) return null;
-  const solid = new Set(view.cells.map(cell => `${cell.x},${cell.y},${cell.z}`));
+  const solid = new Set(view.cells.filter(cell => !/:(?:fire|soul_fire)$/.test(cell.b))
+    .map(cell => `${cell.x},${cell.y},${cell.z}`));
   const [pillarX, pillarY, pillarZ] = plan.base;
   for (let height = pillarY; height < plan.top; height++) {
     solid.add(String([pillarX, height, pillarZ]));
