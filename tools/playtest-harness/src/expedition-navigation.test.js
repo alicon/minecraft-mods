@@ -5,6 +5,26 @@ function cell(x, y, z, type = 'grass_block') {
   return { x, y, z, b: `minecraft:${type}` };
 }
 
+test('eating at camp closes the crafting screen and checks that the food was actually consumed', async () => {
+  const { eatExpeditionMeal } = await import('./expedition-home.mjs');
+  const player = { screen: 'CraftingScreen', food: 15 };
+  for (const consumed of [false, true]) {
+    const keys = [];
+    const action = async (name, args) => {
+      keys.push(name);
+      if (name === 'get_inventory') return { slots: [{ id: 'minecraft:mutton', count: 6, slot: 1 }] };
+      if (name === 'select_slot') return { mainHand: { id: 'minecraft:mutton' } };
+      if (name === 'use_item') return { completed: true, food: consumed ? 17 : 15 };
+      if (name === 'observe') return player;
+      if (name === 'stop') assert.deepEqual(args, { closeScreen: true });
+      if (name === 'look') assert.ok(args.pitch < 0);
+      return {};
+    };
+    assert.equal(await eatExpeditionMeal(action, player, 'minecraft:mutton'), consumed);
+    assert.deepEqual(keys.slice(0, 2), ['stop', 'look']);
+  }
+});
+
 test('camp placement and foot travel accept solid End terrain but reject the void', async () => {
   const { nearbyBuildingSpots, dryWaypoint } = await import('./expedition-navigation.mjs');
   const rocks = [cell(0, 64, 0, 'end_stone'), cell(1, 64, 0, 'end_stone'), cell(2, 64, 0, 'obsidian')];

@@ -1,8 +1,11 @@
 package dev.alicon.mushroomyorkie.entity;
 
+import dev.alicon.mushroomyorkie.item.ModItems;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -11,9 +14,13 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.stats.Stats;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
@@ -21,12 +28,13 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.NetherPortalBlock;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.phys.AABB;
 
 final class ExpeditionPortalClientScenario {
 	private ExpeditionPortalClientScenario() {
 	}
 
-	static void run(ClientGameTestContext context, TestServerContext server, UUID ownerId, Path status) throws IOException {
+	static void run(ClientGameTestContext context, TestServerContext server, UUID ownerId, Path status, boolean blazeHunt) throws IOException {
 		var fixture = server.computeOnServer(minecraft -> {
 			var owner = Objects.requireNonNull(minecraft.getPlayerList().getPlayer(ownerId));
 			var home = minecraft.overworld();
@@ -35,6 +43,17 @@ final class ExpeditionPortalClientScenario {
 			var destination = new BlockPos(Math.floorDiv(origin.getX(), 8), origin.getY(), Math.floorDiv(origin.getZ(), 8));
 			preparePortal(home, origin, false);
 			preparePortal(nether, destination, true);
+			owner.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.IRON_INGOT));
+			if (blazeHunt) {
+				prepareFortressRoom(nether, destination);
+				owner.getInventory().add(new ItemStack(Items.IRON_SWORD));
+				owner.getInventory().add(new ItemStack(Items.BOW));
+				owner.getInventory().add(new ItemStack(Items.ARROW, 24));
+				owner.getInventory().add(new ItemStack(Items.COOKED_BEEF, 8));
+				owner.getInventory().add(new ItemStack(ModItems.CAMP_MAT));
+				owner.setItemSlot(EquipmentSlot.CHEST, new ItemStack(Items.IRON_CHESTPLATE));
+				owner.setItemSlot(EquipmentSlot.LEGS, new ItemStack(Items.IRON_LEGGINGS));
+			}
 			var landing = origin.south(3);
 			var chestPos = landing.east(2);
 			home.setBlockAndUpdate(chestPos, Blocks.CHEST.defaultBlockState());
@@ -43,12 +62,11 @@ final class ExpeditionPortalClientScenario {
 			chest.setItem(1, new ItemStack(Items.FLINT));
 			chest.setItem(2, new ItemStack(Items.COBBLESTONE));
 			owner.teleportTo(landing.getX() + 0.5, landing.getY(), landing.getZ() + 0.5);
-			owner.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.IRON_INGOT));
 			var dog = Objects.requireNonNull(ModEntities.MUSHROOM_YORKIE.create(home, EntitySpawnReason.TRIGGERED));
 			dog.claimFor(owner);
 			dog.setPos(landing.getX() + 1.5, landing.getY(), landing.getZ() + 0.5);
 			home.addFreshEntity(dog);
-			return new Fixture(origin, landing, chestPos, dog.getUUID(), dog.getId());
+			return new Fixture(origin, landing, chestPos, destination.south(13), dog.getUUID(), dog.getId());
 		});
 		context.waitFor(client -> client.player.blockPosition().equals(fixture.landing())
 				&& client.player.getMainHandItem().is(Items.IRON_INGOT)
@@ -56,13 +74,25 @@ final class ExpeditionPortalClientScenario {
 		Files.writeString(status.resolveSibling("portal-companion"), fixture.dogId().toString());
 		Files.writeString(status, "ready");
 		boolean togetherInNether = false;
-		for (int tick = 0; tick < 1_600; tick += 5) {
+		var blazes = new ArrayList<UUID>();
+		for (int tick = 0; tick < (blazeHunt ? 4_000 : 1_600); tick += 5) {
 			String result = Files.readString(status);
 			togetherInNether |= server.computeOnServer(minecraft -> {
 				var owner = minecraft.getPlayerList().getPlayer(ownerId);
 				return owner.level().dimension().equals(Level.NETHER)
 						&& validDog(owner, owner.level().getEntity(fixture.dogId()));
 			});
+			if (blazeHunt && togetherInNether) {
+				server.runOnServer(minecraft -> {
+					var owner = minecraft.getPlayerList().getPlayer(ownerId);
+					if (owner.level().dimension().equals(Level.NETHER)
+							&& minecraft.overworld().getEntity(fixture.dogId()) instanceof MushroomYorkieEntity dog
+							&& dog.isOrderedToSit()) {
+						throw new AssertionError("Mushroom crossed back to the Overworld while seated at " + dog.blockPosition());
+					}
+				});
+				stageBlaze(server, ownerId, fixture, blazes);
+			}
 			if ("finished".equals(result)) {
 				if (!togetherInNether) throw new AssertionError("The original dog never reached the Nether with its owner");
 				server.runOnServer(minecraft -> {
@@ -78,6 +108,17 @@ final class ExpeditionPortalClientScenario {
 							|| !chest.getItem(2).is(Items.COBBLESTONE)) {
 						throw new AssertionError("Expected the repaired, lit frame and the same living dog and owner back home");
 					}
+						if (blazeHunt) {
+							var dog = (MushroomYorkieEntity) home.getEntity(fixture.dogId());
+							if (blazes.isEmpty() || owner.getStats().getValue(Stats.ENTITY_KILLED.get(EntityType.BLAZE)) == 0
+									|| owner.getInventory().countItem(Items.BLAZE_ROD) == 0 || dog.isOrderedToSit()
+									|| owner.getStats().getValue(Stats.ITEM_USED.get(Items.BOW)) == 0
+									|| dog.expeditionCamp.anchor() == null || !dog.expeditionCamp.anchor().dimension().equals(Level.NETHER)) {
+								throw new AssertionError("Expected an earned blaze rod and the original dog recalled from his Nether camp");
+							}
+							System.out.printf("Expedition native Nether supplies passed: dog=%s rods=%d%n",
+									fixture.dogId(), owner.getInventory().countItem(Items.BLAZE_ROD));
+						}
 				});
 				context.takeScreenshot("expedition-survival-nether-return");
 				System.out.printf("Expedition Nether round trip passed: dog=%s owner=%s%n", fixture.dogId(), ownerId);
@@ -87,6 +128,34 @@ final class ExpeditionPortalClientScenario {
 			context.waitTicks(5);
 		}
 		throw new AssertionError("The Nether portal controller did not finish the round trip");
+	}
+
+	private static void stageBlaze(TestServerContext server, UUID ownerId, Fixture fixture, List<UUID> blazes) {
+		if (blazes.size() >= 6) return;
+		var spawned = server.computeOnServer(minecraft -> {
+			var owner = minecraft.getPlayerList().getPlayer(ownerId);
+			var nether = minecraft.getLevel(Level.NETHER);
+			if (owner.level() != nether || owner.getInventory().countItem(Items.BLAZE_ROD) > 0
+					|| !(nether.getEntity(fixture.dogId()) instanceof MushroomYorkieEntity dog) || !dog.isOrderedToSit()
+					|| (!blazes.isEmpty() && nether.getEntity(blazes.getLast()) != null)) return null;
+			var pos = fixture.blazeRoom();
+			if (!nether.getEntitiesOfClass(ItemEntity.class, new AABB(pos).inflate(12),
+					drop -> drop.getItem().is(Items.BLAZE_ROD)).isEmpty()) return null;
+			var blaze = Objects.requireNonNull(EntityType.BLAZE.create(nether, EntitySpawnReason.TRIGGERED));
+			blaze.setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
+			nether.addFreshEntity(blaze);
+			return blaze.getUUID();
+		});
+		if (spawned != null) blazes.add(spawned);
+	}
+
+	private static void prepareFortressRoom(ServerLevel level, BlockPos opening) {
+		for (BlockPos pos : BlockPos.betweenClosed(opening.offset(-4, -1, 5), opening.offset(5, 3, 17))) {
+			boolean boundary = pos.getX() == opening.getX() - 4 || pos.getX() == opening.getX() + 5
+					|| pos.getY() == opening.getY() - 1 || pos.getY() == opening.getY() + 3
+					|| pos.getZ() == opening.getZ() + 17;
+			level.setBlockAndUpdate(pos, (boundary ? Blocks.NETHER_BRICKS : Blocks.AIR).defaultBlockState());
+		}
 	}
 
 	private static boolean validDog(ServerPlayer owner, Entity animal) {
@@ -116,6 +185,6 @@ final class ExpeditionPortalClientScenario {
 		}
 	}
 
-	private record Fixture(BlockPos origin, BlockPos landing, BlockPos chest, UUID dogId, int runtimeId) {
+	private record Fixture(BlockPos origin, BlockPos landing, BlockPos chest, BlockPos blazeRoom, UUID dogId, int runtimeId) {
 	}
 }

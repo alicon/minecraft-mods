@@ -145,8 +145,13 @@ export async function markExpeditionCamp(action) {
 }
 
 export async function practiceStayAndRecall(action, uuid) {
-  await selectEmptyHand(action);
-  assert.ok((await action('interact_entity', { entityId: await aimAtDog(action, uuid) }))?.success, 'The dog did not sit');
+  await useEmptyHandOnCompanion(action, uuid);
   await setTimeout(1_200);
-  assert.ok((await action('interact_entity', { entityId: await aimAtDog(action, uuid) }))?.success, 'The dog did not resume following');
+  await useEmptyHandOnCompanion(action, uuid);
+}
+
+export async function useEmptyHandOnCompanion(action, uuid) {
+  await selectEmptyHand(action);
+  assert.ok((await action('interact_entity', { entityId: await aimAtDog(action, uuid) }))?.success,
+    'Mushroom did not accept the stay or recall interaction');
 }

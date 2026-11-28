@@ -10,7 +10,6 @@ const STEEL = 'minecraft:flint_and_steel';
 const FIRE_CHARGE = 'minecraft:fire_charge';
 const INGOT = 'minecraft:iron_ingot';
 const AIR = /^(?:minecraft:)?(?:air|cave_air|void_air)$/;
-const NETHER_GROUND = /^minecraft:(?:obsidian|netherrack|blackstone|basalt|smooth_basalt|soul_soil|cobblestone|nether_bricks)$/;
 export const OVERWORLD = 'minecraft:overworld';
 export const NETHER = 'minecraft:the_nether';
 const OFFSETS = [[0, -1], [1, -1], [-1, 0], [2, 0], [-1, 1], [2, 1], [-1, 2], [2, 2], [0, 3], [1, 3]];
@@ -31,7 +30,7 @@ export function findPortalFrame(cells, player, spareObsidian = 0) {
   const blocks = new Map(cells.map(({ x, y, z, b }) => [`${x},${y},${z}`, b]));
   const at = pos => blocks.get(pos.join(','));
   const air = pos => at(pos) === undefined || AIR.test(at(pos));
-  const dry = pos => hasDrySupport(at(pos)) || NETHER_GROUND.test(at(pos) ?? '');
+  const dry = pos => hasDrySupport(at(pos));
   const examined = new Set();
   const found = [];
   for (const { x, y, z, b } of cells) {
@@ -175,7 +174,7 @@ async function walk(action, pos) {
   assert.ok(walk?.arrived, `Could not safely walk to ${pos}: ${walk?.reason ?? 'interrupted'}`);
 }
 
-export async function netherRoundTrip(action, uuid, hold, prepare, startDimension = OVERWORLD) {
+export async function netherRoundTrip(action, uuid, hold, prepare, startDimension = OVERWORLD, workInNether) {
   if (startDimension === OVERWORLD) {
     await withCompanion(action, OVERWORLD, uuid);
     const { frame, lighter } = await prepare();
@@ -205,6 +204,10 @@ export async function netherRoundTrip(action, uuid, hold, prepare, startDimensio
   const { gameTime } = await action('observe');
   await waitFor(action, player => player.dimension === NETHER && player.gameTime >= gameTime + 320,
     'The Nether portal cooldown did not clear on dry ground');
+  if (workInNether) {
+    await workInNether(exit);
+    await walk(action, exit.landing);
+  }
   await walk(action, exit.opening);
   await withCompanion(action, OVERWORLD, uuid);
 }

@@ -9,6 +9,7 @@ import {
 } from './expedition-home.mjs';
 import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
+import { earnBlazeRods } from './expedition-blaze-rods.mjs';
 import { shootEndCrystal } from './expedition-end-crystals.mjs';
 import { crossEndPortal } from './expedition-end-entry.mjs';
 import { scoutByEye } from './expedition-eye-route.mjs';
@@ -58,6 +59,7 @@ const milestoneObjectives = {
   defense: 'Protect Mushroom before continuing the errand.',
   feeding: 'Call Mushroom back from the sheep and give him a meal at camp.',
   portal: 'Find supplies, repair the Nether portal, and come home with Mushroom.',
+  'nether-supplies': 'Shelter Mushroom in the Nether, earn a blaze rod, and return together.',
   shelter: 'Enter the furnished house and sleep with the door closed.',
   equipment: 'Craft the harness, padded vest, and mat. Fit Mushroom’s gear and mark camp.',
   'end-entry': 'Craft Eyes of Ender and bring Mushroom through the active portal.',
@@ -220,10 +222,15 @@ try {
     const camp = [start.position.x, start.position.y, start.position.z].map(Math.floor);
     assert.ok(await feedAdoptedDog(action, companion, camp, 24), 'The original Mushroom was not fed at camp');
   }
-  else if (stage === 'portal') {
+  else if (stage === 'portal' || stage === 'nether-supplies') {
     companion = (await readFile(join(dirname(statusFile), 'portal-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
-    await netherRoundTrip(action, companion, hold, () => prepareNetherPortal(action, craft));
+    const work = stage === 'nether-supplies' ? async exit => {
+      await action('set_reflexes', { autoDefend: false, chargeRanged: false });
+      const mat = await earnBlazeRods(action, companion, exit, 1);
+      console.log(JSON.stringify({ at: new Date().toISOString(), action: 'blaze_rod_earned', dog: companion, mat }));
+    } : undefined;
+    await netherRoundTrip(action, companion, hold, () => prepareNetherPortal(action, craft), OVERWORLD, work);
   } else if (stage === 'shelter') {
     const camp = await prepareAdoptionCamp(action, craft, descendFromCanopy);
     assert.ok(camp.door, 'Expected to find a furnished house in the shelter replay');

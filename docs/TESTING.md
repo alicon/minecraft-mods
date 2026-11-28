@@ -251,6 +251,16 @@ waits out the portal cooldown, and returns with the same dog. The integrated
 server verifies the repaired frame and the living original dog with its owner
 in both dimensions.
 
+Set `MUSHROOM_EXPEDITION_STAGE=nether-supplies` to replay the crossing,
+then earn a blaze rod and bring Mushroom home. The fixture supplies a bow,
+arrows, a sword, iron armor, food and a camp mat. It stages live blazes one at
+a time beyond the portal, with time to pick up any rod that drops.
+The controller marks camp, asks Mushroom to stay, uses ranged combat, and
+returns to cover to recover if hurt. It picks up the rod and recalls the
+original dog for the exit. The integrated server
+checks bow use, a vanilla blaze kill, the earned rod, and the same living dog
+back in the Overworld with his Nether camp recorded.
+
 Set `MUSHROOM_EXPEDITION_STAGE=nether` to play from a fresh Survival spawn
 through the iron stage and a round trip. The controller can reserve a smelted
 ingot for ignition and scout for a repairable ruined portal and usable chest.

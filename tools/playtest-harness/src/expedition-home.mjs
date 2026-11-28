@@ -28,7 +28,7 @@ const CHARCOAL = 'minecraft:charcoal';
 const IRON_RECIPES = [
   ['minecraft:iron_pickaxe', 3], ['minecraft:bucket', 3], ['minecraft:shield', 1],
 ];
-const SWORDS = ['minecraft:stone_sword', 'minecraft:wooden_sword'];
+const SWORDS = TOOL_TIERS.map(tier => `minecraft:${tier}_sword`);
 const CAMP_WORK_END = 11_900;
 const BACKUP_MEAT = {
   'minecraft:cow': 'minecraft:beef',
@@ -138,13 +138,23 @@ function feet(player) {
   return [player.position.x, player.position.y, player.position.z].map(Math.floor);
 }
 
+export async function eatExpeditionMeal(action, player, meal) {
+  if (player.screen) await action('stop', { closeScreen: true });
+  // Use can reopen the table or activate the bed if the crosshair stays on it.
+  await action('look', { pitch: -75 });
+  await hold(action, meal);
+  const result = await action('use_item', { ticks: 36 });
+  if (!result?.completed) return false;
+  return (result.food ?? 0) > player.food || ((await action('observe'))?.food ?? 0) > player.food;
+}
+
 export async function visible(action, entityId) {
   if (!await action('look', { entityId })) return false;
   await setTimeout(110);
   return (await action('observe'))?.crosshair?.id === entityId;
 }
 
-export async function hunt(action, animal, dropMatches) {
+export async function hunt(action, animal, dropMatches, canContinue) {
   const inventory = await action('get_inventory');
   const sword = SWORDS.find(item => count(inventory, item) > 0);
   // Mining tools lose extra durability in combat. Keep the pickaxe for
@@ -160,6 +170,7 @@ export async function hunt(action, animal, dropMatches) {
     }
   }
   for (let hit = 0; hit < 12; hit++) {
+    if (canContinue && !await canContinue()) return false;
     const present = (await action('get_entities', { type: animal.type, radius: 8 })).entities
       .some(entity => entity.id === animal.id);
     if (!present) return false;
@@ -1132,6 +1143,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   let madeBackup = false;
   let nextSleepCheck = 0;
   let nextCoverCheck = 0;
+  let nextMealAttempt = 0;
   const triedFoodSources = new Set();
   for (let attempt = 0; attempt < 190; attempt++) {
     const inventory = await action('get_inventory');
@@ -1166,10 +1178,9 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
     }
     const meal = [...COOKED_FOOD, ...BACKUP_FOOD].find(item => count(inventory, item))
       ?? (count(inventory, MUTTON) > (player.health < 14 || player.food <= 12 ? 0 : 1) ? MUTTON : undefined);
-    if (player.food < 20 && (player.food <= 16 || player.health < 14) && meal) {
-      await hold(action, meal);
-      await action('use_item', { ticks: 36 });
-      continue;
+    if (player.food < 20 && (player.food <= 16 || player.health < 14) && meal && player.gameTime >= nextMealAttempt) {
+      if (await eatExpeditionMeal(action, player, meal)) continue;
+      nextMealAttempt = player.gameTime + 100;
     }
     if (!meal && (player.food <= 16 || (player.food < 18 && player.health < 14))) {
       if (stairs.length) {
