@@ -465,15 +465,29 @@ try {
 }
 
 async function runCompanionDrill(start) {
-  const [uuid, errand, retreatX] = (await readFile(join(dirname(statusFile), 'defense-fixture'), 'utf8')).trim().split('\n');
+  const [uuid, errand, scenarioDetails] = (await readFile(join(dirname(statusFile), 'defense-fixture'), 'utf8')).trim().split('\n');
   const pos = errand.trim().split(/\s+/).map(Number);
   assert.ok(/^[\da-f-]{36}$/i.test(uuid) && blockPosition(pos));
+  const blockedStrike = process.env.MUSHROOM_EXPEDITION_DEFENSE_BLOCKER === '1';
+  if (blockedStrike) await playerAction('set_reflexes', { autoDefend: false });
   companion = uuid;
   assert.equal(await action('go_to', { pos, stopDistance: 0.7, maxTicks: 28 }), null,
     'The proposed errand should be interrupted by danger to Mushroom');
-  if (retreatX !== undefined) {
+  if (blockedStrike) {
+    const enemies = scenarioDetails.split(' ');
+    assert.ok(enemies.length === 2 && enemies.every(id => /^[\da-f-]{36}$/i.test(id)));
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const view = await playerAction('get_entities', { type: 'minecraft:skeleton', radius: 8 });
+      if (!view.entities.some(entity => enemies.includes(entity.uuid) && entity.health > 0)) return;
+      await setTimeout(250);
+      await action('observe');
+    }
+    throw new Error('The player could not clear the blocker and reach Mushroom’s attacker');
+  }
+  if (scenarioDetails !== undefined) {
+    const retreatX = Number(scenarioDetails);
     const after = await playerAction('observe');
-    assert.ok(Number.isInteger(Number(retreatX)) && after.onGround && Math.floor(after.position.x) <= Number(retreatX),
+    assert.ok(Number.isInteger(retreatX) && after.onGround && Math.floor(after.position.x) <= retreatX,
       'The companion interrupt did not move the player away from the creeper');
     await narrate('Result', 'Retreated from the creeper before trying to help the original Mushroom.');
     return;

@@ -399,6 +399,10 @@ Set `MUSHROOM_EXPEDITION_DEFENSE_DISTANT=1` to stage a stationary zombie
 fourteen blocks from the player and within striking distance of injured
 Mushroom. The first interrupt must move toward the zombie. The native
 verifier checks kill credit and the original dog's health and ownership.
+Set `MUSHROOM_EXPEDITION_DEFENSE_BLOCKER=1` to put a second skeleton in
+the line of sight. The verifier checks that the player strikes the blocking
+skeleton first, then kills the attacker while the original dog stays alive
+at his starting health. The stationary mobs keep the strike order repeatable.
 
 Set `MUSHROOM_EXPEDITION_STAGE=feeding` to replay a meal while Mushroom is
 chasing a sheep. The disposable fixture supplies mutton and waits until the
