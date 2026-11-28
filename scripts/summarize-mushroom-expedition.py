@@ -92,6 +92,8 @@ def summarize(path):
     reopened = REOPENED.search(game_log)
     status_path = path / "status"
     status = status_path.read_text(encoding="utf-8").strip() if status_path.exists() else "starting"
+    retired_path = path / "retired-for-build"
+    retired = retired_path.read_text(encoding="utf-8").strip() if retired_path.is_file() else ""
     archived_failure = path / "archived-controller-failure.txt"
     failure_reason = None
     if status == "held" and archived_failure.is_file() and playtest_log:
@@ -124,6 +126,8 @@ def summarize(path):
                     broken_generated_crystals.add(row["crystal"])
                 if action == "agent_replaced_controller" or row.get("assisted") is True:
                     assisted = True
+                if action == "controller_resume_started" and row.get("assisted") is not False:
+                    assisted = True
                 if row.get("policy") == "jev":
                     choices["requests"] += 1
                     choices["answered"] += bool(row.get("chosen"))
@@ -137,6 +141,9 @@ def summarize(path):
                         charge_unknown += 1
                         costs_missing += bool(row.get("chosen"))
                     tokens += row.get("inputTokens") or 0
+    reattachments = max(actions["controller_resume_started"], actions["controller_reattached"],
+                        playtest_log.count("Run | Reattached to the same save. Stage "))
+    assisted |= reattachments > actions["controller_resume_started"]
     same_dog_after_reopen = bool(passed and reopened and passed.groups() == reopened.groups())
     native_finished = "BUILD SUCCESSFUL" in game_log
     native_failed = "BUILD FAILED" in game_log
@@ -153,6 +160,7 @@ def summarize(path):
         "nativeClientFailed": native_failed,
         "terminal": native_finished or native_failed or failure_reason is not None,
         "archivedControllerFailure": failure_reason,
+        "retiredForBuild": retired or None,
         "fullExpeditionVerified": native_finished and verified_expedition,
         "nativeMilestone": passed.group(1) if passed else None,
         "nativeCompanionDefense": "Expedition companion defense passed:" in game_log,
@@ -177,7 +185,7 @@ def summarize(path):
         "originalDogLost": "Expedition lost the original companion:" in game_log,
         "assisted": assisted,
         "movementCalls": actions["go_to"] + actions["move"],
-        "controllerReattachments": actions["controller_reattached"],
+        "controllerReattachments": reattachments,
         "nativeRespawns": game_log.count("Expedition Survival owner respawned in the same save"),
         "controllerHolds": playtest_log.count("Result | Run held."),
         "careReturns": actions["companion_care_return"],
@@ -196,7 +204,8 @@ def summarize(path):
 
 def compare_policies(runs):
     eligible = [r for r in runs if r.get("stage") == "expedition" and r["revision"]
-                and r["seed"] is not None and r["policy"] in ("jev", "rules") and not r["assisted"]]
+                and r["seed"] is not None and r["policy"] in ("jev", "rules")
+                and not r["assisted"] and not r["retiredForBuild"]]
     seeds = {}
     for run in eligible:
         seeds.setdefault((run["revision"], run["seed"]), set()).add(run["policy"])

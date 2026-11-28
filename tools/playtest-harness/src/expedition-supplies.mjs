@@ -242,6 +242,9 @@ function nearbyTrunk(matches, position) {
   return trunks.sort((a, b) => a.distance - b.distance)[0];
 }
 
+if (resume) {
+  console.log(JSON.stringify({ at: new Date().toISOString(), action: 'controller_resume_started', assisted: !launchOwner }));
+}
 await rpc('initialize', {
   protocolVersion: '2025-06-18',
   capabilities: {},

@@ -281,7 +281,9 @@ held-out reports in separate invocations. Only a native dragon victory followed
 by a return and reopen with the original dog counts as a win. The cost per win
 includes failed terminal attempts. It stays unset when there are no verified
 wins or when billable usage is unknown. Live attempts remain visible without
-being counted as finished.
+being counted as finished. When a run is stopped to replace its build, record
+the reason in `retired-for-build` before shutting down the client. The report
+retains its usage and excludes it from the matched comparison.
 
 When an experiment's controller exits with a failure and the test keeps
 the world open for investigation, copy the report before reattaching. In
@@ -295,8 +297,11 @@ time, completed cases, input recovery, and the add-on and fixture checksums.
 A Bedrock soak passes only after the logged duration meets the requested
 duration and the fixture emits its final pass marker.
 
-Keep assisted runs out of unattended policy comparisons. Charge reported
-inference spend from failed attempts to the policy that made them.
+The controller marks manual reattachments as assisted when they begin. The
+original launcher can retry automatically after a native respawn. Older
+reattachment logs without that distinction are treated as assisted. Charge
+reported inference spend from failed benchmark attempts to the policy that
+made them.
 
 Apply the companion patch to the isolated bridge checkout before rebuilding the
 JAR. It exposes the original dog's stable identity and hurt animation alongside
