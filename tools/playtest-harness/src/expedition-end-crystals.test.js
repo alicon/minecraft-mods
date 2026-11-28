@@ -142,6 +142,35 @@ test('a crystal pillar descent checks the full water column and steers against s
   assert.deepEqual(moves[4], { sneak: true, ticks: 5 });
 });
 
+test('a displaced climber pours below only when solid ground comes within reach', async () => {
+  const { catchCrystalFall } = await import('./expedition-end-cage.mjs');
+  const bucket = { id: 'minecraft:water_bucket', slot: 3, count: 1 };
+  const airborne = { inWorld: true, health: 18, onGround: false, inWater: false };
+  const observations = [
+    { ...airborne, crosshair: { type: 'miss' } },
+    { ...airborne, crosshair: { type: 'block', block: 'minecraft:obsidian', face: 'east' } },
+    { ...airborne, crosshair: { type: 'block', block: 'minecraft:end_stone', face: 'up' } },
+    { ...airborne, inWater: true },
+  ];
+  let pours = 0;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'look': assert.deepEqual(args, { pitch: 90 }); return {};
+      case 'get_inventory': return { slots: [bucket] };
+      case 'select_slot': assert.equal(args.slot, bucket.slot); return { mainHand: bucket };
+      case 'observe': return observations.shift();
+      case 'use_item':
+        assert.equal(observations.length, 1);
+        pours++;
+        return { success: true };
+      default: assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  assert.equal(await catchCrystalFall(action, airborne), true);
+  assert.equal(pours, 1);
+  assert.equal(observations.length, 0);
+});
+
 test('a cleared cage can be shot from an alternate dry stance using current block observations', async () => {
   const { surveyedCageShot } = await import('./expedition-end-crystals.mjs');
   const player = { inWorld: true, onGround: true, position: { x: -18.5, y: 57, z: 70.5 } };

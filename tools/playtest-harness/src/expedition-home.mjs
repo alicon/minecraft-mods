@@ -482,15 +482,17 @@ async function harvestReachableLog(action, camp, timberSite) {
       if (!target?.block?.endsWith('_leaves')
           || !(await action('break_block', { pos: target.pos, maxTicks: 30 }))?.broken) break;
     }
-    if (!visibleLog) continue;
+    if (!visibleLog || !await selectBreakingTool(action, tree.name)) continue;
     const stock = count(await action('get_inventory'), tree.name);
     if (!(await action('break_block', { pos: tree.pos, maxTicks: 100 }))?.broken) continue;
-    const drops = await action('get_entities', { type: 'item', radius: 5 });
-    for (const item of drops.entities.filter(candidate => candidate.item?.id === tree.name)) {
-      await action('go_to', { entityId: item.id, stopDistance: 0.3, maxTicks: 55 });
+    // A canopy drop can start outside the player's pickup area and fall into it.
+    for (let check = 0; check < 4; check++) {
+      const drops = await action('get_entities', { type: 'item', radius: 7 });
+      const log = drops.entities.find(candidate => candidate.item?.id === tree.name);
+      if (log) await action('go_to', { entityId: log.id, stopDistance: 0.3, maxTicks: 55 });
+      await setTimeout(350);
+      if (count(await action('get_inventory'), tree.name) > stock) return tree.name;
     }
-    await setTimeout(350);
-    if (count(await action('get_inventory'), tree.name) > stock) return tree.name;
   }
 }
 
@@ -1601,10 +1603,12 @@ function ironKitPlan(inventory, { reserveIgnitionIron, makeIronSword }) {
 
 async function craftIronKit(action, craft, recipes, ore, inventory, visited, packFurnace) {
   const fuel = count(inventory, COAL) ? COAL : CHARCOAL;
-  const needsCharcoal = ore > 0 && !count(inventory, fuel);
+  const needsFuel = ore > 0 && !count(inventory, fuel);
+  const burnsPlank = needsFuel && ore === 1;
+  const needsCharcoal = needsFuel && !burnsPlank;
   const hasShieldRecipe = recipes.some(([item]) => item === SHIELD);
   const tablePlanks = hasShieldRecipe ? 10 : recipes.length ? 4 : 0;
-  const planks = tablePlanks + Number(needsCharcoal);
+  const planks = tablePlanks + Number(needsFuel);
   await ensurePlanks(action, craft, planks);
   const sticks = recipes.reduce((total, [item]) => total + (
     item === 'minecraft:iron_pickaxe' ? 2 : item === 'minecraft:iron_sword' ? 1 : 0), 0);
@@ -1619,7 +1623,9 @@ async function craftIronKit(action, craft, recipes, ore, inventory, visited, pac
     const furnace = await placeBeside(action, FURNACE);
     await action('interact_block', { pos: furnace });
     if (needsCharcoal) await makeExpeditionCharcoal(action);
-    await smeltExpeditionIron(action, ore, fuel);
+    const plank = burnsPlank && (await action('get_inventory')).slots.find(stack => stack.id.endsWith('_planks'));
+    if (burnsPlank) assert.ok(plank, 'Need a plank to smelt the first raw iron');
+    await smeltExpeditionIron(action, ore, plank ? plank.id : fuel);
     await action('stop', { closeScreen: true });
     if (packFurnace) {
       assert.ok((await breakVisible(action, furnace))?.broken, 'Could not pack the furnace after smelting the first iron');

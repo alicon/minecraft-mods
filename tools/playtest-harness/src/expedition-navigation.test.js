@@ -665,6 +665,35 @@ test('starter planks can use a reachable fourth log above the first three', asyn
   assert.equal(stock[0].count, 16);
 });
 
+test('a log cut from above is collected after it falls into reach', async () => {
+  const { ensurePlanks } = await import('./expedition-home.mjs');
+  const log = [1, 69, 0];
+  const player = { inWorld: true, onGround: true, health: 20, position: { x: 0.5, y: 64, z: 0.5 } };
+  const axe = { id: 'minecraft:stone_axe', slot: 1, maxDamage: 131 };
+  const stock = [axe];
+  let selected = false;
+  let scans = 0;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_inventory': return { slots: stock, mainHand: selected ? axe : undefined };
+      case 'scan_blocks': return { matches: [{ name: 'minecraft:oak_log', positions: [log] }] };
+      case 'look': return {};
+      case 'observe': return { ...player, crosshair: { pos: log, block: 'minecraft:oak_log' } };
+      case 'select_slot': selected = args.slot === axe.slot; return { mainHand: axe };
+      case 'break_block': return { broken: true };
+      case 'get_entities':
+        return { entities: ++scans < 2 ? [] : [{ id: 11, item: { id: 'minecraft:oak_log' } }] };
+      case 'go_to':
+        if (args.entityId === 11) stock.push({ id: 'minecraft:oak_log', count: 1 });
+        return { arrived: true };
+      default: assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  await ensurePlanks(action, async (item, count) => stock.push({ id: item, count }), 3);
+  assert.equal(stock.at(-1).id, 'minecraft:oak_planks');
+  assert.ok(selected, 'use the owned axe for chopping timber');
+});
+
 test('a recovery forage keeps the chicken collected through ordinary play', async () => {
   const { forageExpeditionMeal } = await import('./expedition-home.mjs');
   const chicken = { id: 11, type: 'minecraft:chicken', distance: 2, pos: [2, 64, 0] };

@@ -59,10 +59,19 @@ export async function smeltExpeditionIron(action, needed, fuel = COAL) {
   assert.ok(furnace.slots.every(slot => slot.section === 'player'), 'Expected the expedition furnace to be empty');
   const initial = await action('get_inventory');
   const before = initial.slots.filter(stack => stack.id === INGOT).reduce((sum, stack) => sum + stack.count, 0);
+  const plank = fuel.endsWith('_planks')
+    ? furnace.slots.find(stack => stack.section === 'player' && stack.id === fuel)
+    : null;
+  if (fuel.endsWith('_planks')) assert.ok(plank && needed === 1, 'Direct plank fuel requires a plank and one raw iron');
   const ore = await action('transfer_items', { to: 'container', item: RAW_IRON, count: needed });
   assert.ok(ore?.moved >= needed, 'Raw iron did not move into the native furnace');
-  const addedFuel = await action('transfer_items', { to: 'container', item: fuel, count: Math.ceil(needed / 8) });
-  assert.ok(addedFuel?.moved >= Math.ceil(needed / 8), 'Fuel did not move into the furnace slot');
+  if (plank) {
+    await putInSlot(action, plank, 1, 1);
+  } else {
+    const fuelCount = Math.ceil(needed / 8);
+    const addedFuel = await action('transfer_items', { to: 'container', item: fuel, count: fuelCount });
+    assert.ok(addedFuel?.moved >= fuelCount, 'Fuel did not move into the furnace slot');
+  }
 
   // The bridge follows the actual game clock. Allow slower ticks without
   // skipping time or simulating a result in the controller.

@@ -69,3 +69,30 @@ test('a stale output or failed transfer cannot count as earned iron', async () =
     };
   }, 7), /did not take the smelted ingots/);
 });
+
+test('the first ore can smelt directly on a single plank', async () => {
+  const { smeltExpeditionIron } = await import('./expedition-furnace.mjs');
+  const plank = { id: 'minecraft:oak_planks', section: 'player', slot: 10, count: 11 };
+  const ingot = { id: 'minecraft:iron_ingot', section: 'result', count: 1 };
+  const clicks = [];
+  let reads = 0;
+  let taken = false;
+  await smeltExpeditionIron(async (name, args) => {
+    switch (name) {
+      case 'get_container':
+        return { containerId: 7, type: 'minecraft:furnace', slots: reads++ ? [ingot, plank] : [plank] };
+      case 'get_inventory': return { slots: taken ? [ingot] : [] };
+      case 'transfer_items':
+        if (args.to === 'player') taken = true;
+        else assert.equal(args.item, 'minecraft:raw_iron');
+        return { moved: args.count };
+      case 'click_slot': clicks.push(args); return {};
+      default: assert.fail(`Unexpected action: ${name}`);
+    }
+  }, 1, plank.id);
+  assert.deepEqual(clicks, [
+    { slot: 10, action: 'left' },
+    { slot: 1, action: 'right' },
+    { slot: 10, action: 'left' },
+  ]);
+});

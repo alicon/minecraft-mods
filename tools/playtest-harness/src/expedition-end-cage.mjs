@@ -11,6 +11,8 @@ const WATER_BUCKET = 'minecraft:water_bucket';
 const SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const feet = ({ position }) => [position.x, position.y, position.z].map(Math.floor);
 const horizontal = ([ax, , az], [bx, , bz]) => Math.hypot(ax - bx, az - bz);
+const closeDragon = player => player.threats?.some(threat =>
+  threat.type === 'minecraft:ender_dragon' && threat.distance <= 14);
 
 export function cageApproach(cells, crystal, player) {
   const [x, y, z] = crystal.pos.map(Math.floor);
@@ -89,6 +91,10 @@ export async function descendCrystalPillar(action, player, plan, line) {
   for (let check = 0; check < 100; check++) {
     const view = await action('get_blocks', column);
     if (view?.cells.filter(cell => cell.b === WATER).length === column.size[1]) break;
+    const waiting = await action('observe');
+    if (!waiting?.inWorld || waiting.dead) return false;
+    const [currentX, , currentZ] = feet(waiting);
+    if (!waiting.onGround && !waiting.inWater && (currentX !== x || currentZ !== z)) return false;
     if (check === 99) return false;
     await setTimeout(200);
   }
@@ -113,6 +119,31 @@ export async function descendCrystalPillar(action, player, plan, line) {
   return false;
 }
 
+export async function catchCrystalFall(action, player) {
+  if (!player?.inWorld || player.dead) return false;
+  if (player.onGround || player.inWater) return true;
+  await action('look', { pitch: 90 });
+  const bucket = (await action('get_inventory')).slots.find(stack => stack.id === WATER_BUCKET);
+  if (!bucket) return false;
+  if (bucket.slot < 9) {
+    if ((await action('select_slot', { slot: bucket.slot }))?.mainHand?.id !== WATER_BUCKET) return false;
+  } else {
+    await hold(action, WATER_BUCKET);
+  }
+  let placedWater = false;
+  // At the end of a long fall, solid ground is in reach for only a few ticks.
+  for (let check = 0; check < 48; check++) {
+    const landing = await action('observe');
+    if (!landing?.inWorld || landing.dead) return false;
+    if (landing.inWater || landing.onGround) return true;
+    const hit = landing.crosshair;
+    if (!placedWater && hit?.type === 'block' && hit.face === 'up' && hasDrySupport(hit.block)) {
+      placedWater = (await action('use_item'))?.success === true;
+    }
+  }
+  return false;
+}
+
 export async function dismantleCrystalPillar(action, player, base, material) {
   const [x, floor, z] = base;
   const safeStance = (view, height) => view?.inWorld && view.onGround && !view.dead && view.health >= 10
@@ -130,6 +161,8 @@ export async function dismantleCrystalPillar(action, player, base, material) {
       player = await action('observe');
       if (safeStance(player, height - 1)) break;
       if (!player?.inWorld || player.dead || player.health < 10) return false;
+      const [currentX, , currentZ] = feet(player);
+      if (currentX !== x || currentZ !== z) return false;
       await setTimeout(100);
     }
     if (!safeStance(player, height - 1)) return false;
@@ -227,7 +260,7 @@ export async function openCrystalCage(action, player, crystal, dangerous) {
   await hold(action, blocks);
   let opened = false;
   for (let height = plan.base[1]; height < plan.top; height++) {
-    if (player.health < 16 || await dangerous()) break;
+    if (player.health < 16 || closeDragon(player) || await dangerous()) break;
     const placed = await action('place_block', { pos: feet(player) });
     if (!placed?.placed) break;
     player = await action('observe');
@@ -237,7 +270,8 @@ export async function openCrystalCage(action, player, crystal, dangerous) {
     }
     if (!player.onGround || Math.floor(player.position.y) !== height + 1) break;
   }
-  if (player.onGround && Math.floor(player.position.y) === plan.top && player.health >= 16 && !await dangerous()) {
+  if (player.onGround && Math.floor(player.position.y) === plan.top && player.health >= 16
+      && !closeDragon(player) && !await dangerous()) {
     await hold(action, pickaxe);
     opened = true;
     for (const pos of bars) {
@@ -255,8 +289,15 @@ export async function openCrystalCage(action, player, crystal, dangerous) {
   let returned = await dismantleCrystalPillar(action, player, plan.base, blocks);
   if (!returned) {
     player = await action('observe');
-    if (feet(player)[0] === plan.base[0] && feet(player)[2] === plan.base[2]) {
+    if (player.onGround && horizontal(feet(player), plan.base) === 0) {
       returned = await descendCrystalPillar(action, player, plan, line);
+      if (!returned) player = await action('observe');
+    }
+    if (!returned && await catchCrystalFall(action, player)) {
+      const landing = await action('observe');
+      if (landing?.position.y <= plan.base[1] + 3) {
+        returned = (landing.onGround && !landing.inWater) || await leaveShallowWater(action, line);
+      }
     }
   }
   return returned && opened ? { line, heights } : null;

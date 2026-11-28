@@ -252,8 +252,9 @@ the furnace, and the original adopted dog's identity.
 
 Set `MUSHROOM_EXPEDITION_STAGE=iron` to continue from the stone kit. The
 controller looks for exposed iron and coal, verifies the actual mining
-crosshair, and waits for the native furnace to smelt the ore. It can make
-charcoal from local wood when fuel is scarce. Before the first quarry trip
+crosshair, and waits for the native furnace to smelt the ore. It can burn a
+plank for the first piece of iron or make charcoal for a larger batch when
+coal is scarce. Before the first quarry trip
 the controller stocks food and reserves a portion for Mushroom. It returns
 to feed the original dog when he is injured or due for a meal, and records the
 last verified feeding so the schedule survives reattachment. The server checks
@@ -382,7 +383,9 @@ a dry pillar, water landing, and clear bow trajectory around nearby towers.
 It opens a side with a pickaxe and removes the pillar one supported block
 at a time to keep the area dry for the arrow. If it needs the water exit,
 it checks the whole column and steers back toward it when the current
-pushes sideways. From the ground it checks the bow arc from nearby dry
+pushes sideways. If knocked off the pillar, it looks straight down and
+tries to place water once solid ground comes within reach. From the ground
+it checks the bow arc from nearby dry
 footing, including any water or blocks obstructing the opened cage.
 The fixture
 supplies the blocks, pickaxe, and buckets. The server checks for the removal of all ten
