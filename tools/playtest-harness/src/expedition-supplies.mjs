@@ -9,6 +9,7 @@ import {
 } from './expedition-home.mjs';
 import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
+import { shootEndCrystal } from './expedition-end-crystals.mjs';
 import { crossEndPortal } from './expedition-end-entry.mjs';
 import { scoutByEye } from './expedition-eye-route.mjs';
 import { COMPANION_WEARABLES, markExpeditionCamp, practiceStayAndRecall, prepareCompanionGear } from './expedition-gear.mjs';
@@ -60,6 +61,7 @@ const milestoneObjectives = {
   shelter: 'Enter the furnished house and sleep with the door closed.',
   equipment: 'Craft the harness, padded vest, and mat. Fit Mushroom’s gear and mark camp.',
   'end-entry': 'Craft Eyes of Ender and bring Mushroom through the active portal.',
+  'end-crystal': 'Mark Mushroom’s shelter and break an End crystal from a safe bow position.',
   'eye-route': 'Throw an Eye of Ender and follow its visible flight with Mushroom.',
   'quarry-tools': 'Craft the starter kit, shovel soil, and switch to a pickaxe for stone.',
   'quarry-iron': 'Mine the iron below camp, return up the stairs, and make the expedition kit.',
@@ -207,8 +209,9 @@ try {
   const policy = process.env.MUSHROOM_EXPEDITION_POLICY ?? 'rules';
   await narrate('Run', `${resume ? 'Reattached to the same save' : 'Started the Survival controller'}. Stage ${stage}, policy ${policy}.`);
   const start = await action('observe');
-  assert.ok(start?.inWorld && !start.dead && (start.dimension === OVERWORLD
-    || (resume && stage === 'nether' && start.dimension === NETHER)));
+  const startDimension = stage === 'end-crystal' ? 'minecraft:the_end' : OVERWORLD;
+  assert.ok(start?.inWorld && !start.dead && (start.dimension === startDimension
+    || (resume && stage === 'nether' && start.dimension === NETHER)), 'The controller was not in its expected starting dimension');
   if (milestoneObjectives[stage]) await narrate('Objective', milestoneObjectives[stage]);
   if (stage === 'defense') await runCompanionDrill();
   else if (stage === 'feeding') {
@@ -236,6 +239,14 @@ try {
     companion = (await readFile(join(dirname(statusFile), 'end-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
     await crossEndPortal(action, craft, companion);
+  } else if (stage === 'end-crystal') {
+    companion = (await readFile(join(dirname(statusFile), 'end-crystal-companion'), 'utf8')).trim();
+    assert.ok(/^[\da-f-]{36}$/i.test(companion));
+    const camp = await markExpeditionCamp(action);
+    let crystal;
+    for (let shot = 0; shot < 3 && !crystal; shot++) crystal = await shootEndCrystal(action, companion);
+    assert.ok(crystal, 'The crystal in bow range survived all shots');
+    console.log(JSON.stringify({ at: new Date().toISOString(), action: 'end_crystal_destroyed', crystal, camp, dog: companion }));
   } else if (stage === 'eye-route') {
     companion = (await readFile(join(dirname(statusFile), 'eye-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));

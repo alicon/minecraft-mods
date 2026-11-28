@@ -129,6 +129,7 @@ def summarize(path):
         "nativeQuarryIron": "Expedition native quarry iron passed:" in game_log,
         "nativeCompanionEquipment": "Expedition companion equipment passed:" in game_log,
         "nativeEndEntry": "Expedition native End entry passed:" in game_log,
+        "nativeEndCrystal": "Expedition native End crystal passed:" in game_log,
         "nativeEyeRoute": "Expedition native eye route passed:" in game_log,
         "nativeNetherRoundTrip": "Expedition Nether round trip passed:" in game_log,
         "nativeShelteredAdoption": "Expedition sheltered adoption passed:" in game_log,

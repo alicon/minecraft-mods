@@ -274,6 +274,14 @@ sockets through Use, and jumps into the portal. The integrated server
 checks that the frame activated and the same living dog arrived with its
 owner in the End. This replay begins in the portal room.
 
+Set `MUSHROOM_EXPEDITION_STAGE=end-crystal` to replay the first combat step
+with a native bow. The disposable End fixture supplies a bow, arrows, a
+camp mat, a seated Mushroom under cover, and one raised End crystal. The
+controller marks camp, finds the crystal from the client, and aims outside
+blast range for both the player and the dog. The server checks that the
+crystal broke, the bow used ammunition, and the same Mushroom stayed
+unhurt beside his marked camp.
+
 Set `MUSHROOM_EXPEDITION_STAGE=eye-route` to replay using an Eye of Ender
 to choose a route. The disposable fixture supplies one eye, Mushroom, and
 dry footing. The controller uses the eye, measures the flight exposed by

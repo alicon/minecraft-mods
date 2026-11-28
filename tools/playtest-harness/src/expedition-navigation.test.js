@@ -5,6 +5,14 @@ function cell(x, y, z, type = 'grass_block') {
   return { x, y, z, b: `minecraft:${type}` };
 }
 
+test('camp placement and foot travel accept solid End terrain but reject the void', async () => {
+  const { nearbyBuildingSpots, dryWaypoint } = await import('./expedition-navigation.mjs');
+  const rocks = [cell(0, 64, 0, 'end_stone'), cell(1, 64, 0, 'end_stone'), cell(2, 64, 0, 'obsidian')];
+  const player = { x: 0.5, y: 65, z: 0.5 };
+  assert.deepEqual(nearbyBuildingSpots(rocks, player, false), [[2, 65, 0]]);
+  assert.deepEqual(dryWaypoint(rocks, [0, 65, 0], [], [3, 65, 0]), [2, 65, 0]);
+});
+
 test('canopy drops are measured to the top of the landing block and reject hazardous floors', async () => {
   const { canopyLanding } = await import('./expedition-navigation.mjs');
   const start = [160, 78, 161];
