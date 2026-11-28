@@ -19,7 +19,8 @@ export function cageApproach(cells, crystal, player) {
   const block = (x, y, z) => blocks.get(`${x},${y},${z}`);
   const approaches = [];
   for (const [dx, dz] of SIDES) {
-    const bars = [-1, 0, 1].map(offset => [x + dx * 2, y + offset, z + dz * 2]);
+    const bars = [-1, 0, 1].flatMap(height => [0, -1, 1]
+      .map(offset => [x + dx * 2 + dz * offset, y + height, z + dz * 2 + dx * offset]));
     if (!bars.some(pos => block(...pos) === BARS)) continue;
     for (const offset of [4, 5, 6]) {
       const baseX = x + dx * offset;
@@ -114,8 +115,9 @@ async function firingGround(action, crystal, plan) {
   const vantage = [x + plan.dx * 30, plan.base[1], z + plan.dz * 30];
   return dry.map(cell => [cell.x, cell.y + 1, cell.z])
     .sort((a, b) => horizontal(a, vantage) - horizontal(b, vantage))
-    .find(([x, y, z]) => clearBowArc({ position: { x: x + 0.5, y, z: z + 0.5 } }, target,
-      pos => solid.has(String(pos)) && !opening.has(String(pos)))) ?? null;
+    .find(([x, y, z]) => [0, -0.35, 0.35].every(offset => clearBowArc({
+      position: { x: x + 0.5 + plan.dz * offset, y, z: z + 0.5 + plan.dx * offset },
+    }, target, pos => solid.has(String(pos)) && !opening.has(String(pos))))) ?? null;
 }
 
 export async function openCrystalCage(action, player, crystal, dangerous) {
