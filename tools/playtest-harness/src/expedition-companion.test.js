@@ -128,6 +128,31 @@ test('a blocked defense approach follows dry footing around the wall toward Mush
   assert.deepEqual(moves[1]?.pos, [0, 64, 1]);
 });
 
+test('horizontal arrival above a skeleton finds the stairs before trying to protect Mushroom', async () => {
+  const { defendCompanion } = await import('./expedition-companion.mjs');
+  const hurtDog = { ...dog, pos: [0.5, 58, 0.5], distance: 5, health: 7 };
+  const archer = { ...spider, type: 'minecraft:skeleton', pos: [0.5, 58, 1.5], distance: 5.1 };
+  const onGround = { ...player, onGround: true, position: { x: 0.5, y: 63, z: 0.5 } };
+  const floor = [[0, 62, 0], [1, 61, 0], [2, 60, 0], [2, 59, 1], [2, 58, 2], [1, 57, 2]]
+    .map(([x, y, z]) => ({ x, y, z, b: 'minecraft:stone' }));
+  const moves = [];
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_entities': return { entities: [hurtDog, archer] };
+      case 'stop': return {};
+      case 'observe': return onGround;
+      case 'get_blocks': return { cells: floor };
+      case 'go_to':
+        moves.push(args);
+        return args.entityId ? { arrived: true, position: [0.5, 63, 0.5] } : { arrived: true };
+      default: assert.fail(name);
+    }
+  };
+  assert.equal(await defendCompanion(action, onGround, hurtDog.uuid), true);
+  assert.equal(moves[0].entityId, archer.id);
+  assert.deepEqual(moves[1]?.pos, [2, 61, 0]);
+});
+
 test('when a creeper is close to the original dog, retreat without swinging', async () => {
   const { defendCompanion } = await import('./expedition-companion.mjs');
   const closeDog = { ...dog, pos: [1, 64, 0], distance: 1, recentlyHurt: false, health: 20 };

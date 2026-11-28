@@ -31,7 +31,7 @@ export async function defendCompanion(action, player, dogUuid) {
   }
 
   if (attacker.distance > 4.25) {
-    await approach(action, attacker.id, dog.pos);
+    await approach(action, attacker, dog.pos);
     // Finish the defense on this interrupt when the walk reaches melee range.
     // A new planning turn can lose the target when the mob moves around the dog.
     const view = await action('get_entities', { radius: 24, max: 128 });
@@ -64,9 +64,11 @@ async function aimAtAttacker(action, entityId) {
   return action('observe');
 }
 
-async function approach(action, entityId, dogPosition) {
-  const direct = await action('go_to', { entityId, stopDistance: 2.3, maxTicks: 24 });
-  if (direct?.arrived || !direct?.reason?.startsWith('blocked by ')) return;
+async function approach(action, attacker, dogPosition) {
+  const direct = await action('go_to', { entityId: attacker.id, stopDistance: 2.3, maxTicks: 24 });
+  // Native walking can report horizontal arrival on a different floor.
+  const wrongFloor = direct?.arrived && Math.abs(direct.position?.[1] - attacker.pos[1]) > 2;
+  if (!wrongFloor && !direct?.reason?.startsWith('blocked by ')) return;
   const player = await action('observe');
   if (!player?.inWorld || !player.onGround || player.dead || player.inWater || player.health < 7) return;
   const { x, y, z } = player.position;
