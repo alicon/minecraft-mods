@@ -162,7 +162,7 @@ async function waitFor(action, predicate, description) {
   throw new Error(description);
 }
 
-async function withCompanion(action, dimension, uuid) {
+export async function withCompanion(action, dimension, uuid) {
   return waitFor(action, async player => {
     if (player.dimension !== dimension) return false;
     const dogs = await action('get_entities', { type: 'mushroom_yorkie:mushroom_yorkie', radius: 24 });

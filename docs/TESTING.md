@@ -230,6 +230,14 @@ black dye from ink, makes the three mod recipes, fits the harness and vest,
 asks Mushroom to stay and follow, and places and marks the mat. The server
 checks the same dog's ownership, equipment, sit order and camp marker.
 
+Set `MUSHROOM_EXPEDITION_STAGE=end-entry` to replay opening and crossing a
+vanilla End portal. The disposable fixture supplies one blaze rod, two
+pearls, the original dog, and a portal frame with two empty sockets above
+lava. The controller crafts the eyes, finds dry approaches, fills the
+sockets through Use, and jumps into the portal. The integrated server
+checks that the frame activated and the same living dog arrived with its
+owner in the End. This replay begins in the portal room.
+
 Set `MUSHROOM_EXPEDITION_STAGE=shelter` to replay the Java sheltered adoption.
 The disposable world provides a furnished house at night. The player
 starts outside with an empty inventory. The integrated server verifies the

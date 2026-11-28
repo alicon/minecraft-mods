@@ -9,6 +9,7 @@ import {
 } from './expedition-home.mjs';
 import { hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
+import { crossEndPortal } from './expedition-end-entry.mjs';
 import { COMPANION_WEARABLES, markExpeditionCamp, practiceStayAndRecall, prepareCompanionGear } from './expedition-gear.mjs';
 import { expeditionPolicy } from './expedition-policy.mjs';
 import { NETHER, OVERWORLD, netherRoundTrip, prepareNetherPortal } from './expedition-nether.mjs';
@@ -40,7 +41,7 @@ let lastPlayer;
 let companion;
 let checkedCompanionAt = -Infinity;
 let companionEmergency = false;
-const interruptibleWork = new Set(['go_to', 'break_block', 'interact_block', 'use_item']);
+const interruptibleWork = new Set(['go_to', 'move', 'break_block', 'interact_block', 'use_item']);
 
 async function rpc(method, params) {
   const headers = {
@@ -186,6 +187,10 @@ try {
     await practiceStayAndRecall(action, companion);
     const camp = await markExpeditionCamp(action);
     console.log(JSON.stringify({ at: new Date().toISOString(), action: 'camp_marked', dog: companion, camp }));
+  } else if (stage === 'end-entry') {
+    companion = (await readFile(join(dirname(statusFile), 'end-companion'), 'utf8')).trim();
+    assert.ok(/^[\da-f-]{36}$/i.test(companion));
+    await crossEndPortal(action, craft, companion);
   } else await runExpedition(start, stage);
   await reportStatus('finished');
 } catch (error) {

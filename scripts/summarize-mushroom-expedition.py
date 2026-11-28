@@ -126,6 +126,7 @@ def summarize(path):
         "nativeMilestone": passed.group(1) if passed else None,
         "nativeCompanionDefense": "Expedition companion defense passed:" in game_log,
         "nativeCompanionEquipment": "Expedition companion equipment passed:" in game_log,
+        "nativeEndEntry": "Expedition native End entry passed:" in game_log,
         "nativeNetherRoundTrip": "Expedition Nether round trip passed:" in game_log,
         "nativeShelteredAdoption": "Expedition sheltered adoption passed:" in game_log,
         "sameDogAndOwnerAfterReopen": bool(passed and reopened and passed.groups() == reopened.groups()),
