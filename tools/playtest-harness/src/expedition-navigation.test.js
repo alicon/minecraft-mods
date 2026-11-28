@@ -388,6 +388,42 @@ test('a gear recovery with low health stops before approaching the old death loc
   }, [10, 64, 10]), /return to the dropped gear became unsafe/);
 });
 
+test('a hunt routes around an obstruction before giving up a wounded cow', async () => {
+  const { hunt } = await import('./expedition-home.mjs');
+  const cow = { id: 10, type: 'minecraft:cow', pos: [3, 64, 0] };
+  const floor = Array.from({ length: 5 }, (_, x) => ({ x, y: 63, z: 0, b: 'minecraft:grass_block' }));
+  floor.push({ x: 1, y: 64, z: 0, b: 'minecraft:oak_log' });
+  for (let x = 0; x < 5; x++) floor.push({ x, y: 63, z: 1, b: 'minecraft:grass_block' });
+  let detoured = false;
+  let struck = false;
+  let pickedUp = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_inventory': return { slots: [] };
+      case 'get_entities': return { entities: args.type === 'item'
+        ? [{ id: 11, item: { id: 'minecraft:beef' } }] : struck ? [] : [cow] };
+      case 'go_to':
+        if (args.entityId === 11) pickedUp = true;
+        if (args.pos) {
+          assert.equal(args.pos[2], 1);
+          detoured = true;
+        }
+        return { arrived: detoured, position: args.pos };
+      case 'look': return {};
+      case 'observe': return { inWorld: true, health: 15, position: { x: 0.5, y: 64, z: 0.5 },
+        crosshair: detoured ? { id: cow.id } : { type: 'block' } };
+      case 'get_blocks': return { cells: floor };
+      case 'attack_entity':
+        assert.ok(detoured);
+        struck = true;
+        return {};
+      default: throw new Error(`Unexpected action: ${name}`);
+    }
+  };
+  assert.ok(await hunt(action, cow, item => item === 'minecraft:beef'));
+  assert.ok(detoured && struck && pickedUp);
+});
+
 test('a recovery forage keeps the chicken collected through ordinary play', async () => {
   const { forageExpeditionMeal } = await import('./expedition-home.mjs');
   const chicken = { id: 11, type: 'minecraft:chicken', distance: 2, pos: [2, 64, 0] };

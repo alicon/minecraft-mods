@@ -55,7 +55,7 @@ function count({ slots }, item) {
   return slots.reduce((total, stack) => total + (stack.id === item ? stack.count : 0), 0);
 }
 
-function dogMealCount(inventory) {
+export function dogMealCount(inventory) {
   return inventory.slots.reduce((total, stack) => total + (DOG_FOOD.includes(stack.id) ? stack.count : 0), 0);
 }
 
@@ -186,14 +186,26 @@ export async function hunt(action, animal, dropMatches, canContinue) {
       await action('select_slot', { slot: empty ?? alternate.slot });
     }
   }
-  for (let hit = 0; hit < 12; hit++) {
+  const visited = [];
+  const rejectedSteps = new Set();
+  let blockedApproaches = 0;
+  for (let hit = 0; hit < 12;) {
     if (canContinue && !await canContinue()) return false;
-    const present = (await action('get_entities', { type: animal.type, radius: 8 })).entities
-      .some(entity => entity.id === animal.id);
+    const present = (await action('get_entities', { type: animal.type, radius: 16 })).entities
+      .find(entity => entity.id === animal.id);
     if (!present) return false;
     const near = await action('go_to', { entityId: animal.id, stopDistance: 1.65, maxTicks: 40 });
-    if (!near?.arrived || !await visible(action, animal.id)) return false;
+    if (!near?.arrived || !await visible(action, animal.id)) {
+      if (++blockedApproaches > 3 || !present.pos) return false;
+      const player = await action('observe');
+      if (!player?.inWorld || player.dead || player.health < 8) return false;
+      visited.push(feet(player));
+      if (!await stepOut(action, player, visited, present.pos, 'surface', rejectedSteps)) return false;
+      continue;
+    }
+    blockedApproaches = 0;
     await action('attack_entity', { entityId: animal.id });
+    hit++;
     await setTimeout(725);
     const { entities } = await action('get_entities', { type: animal.type, radius: 16 });
     if (!entities.some(entity => entity.id === animal.id)) {
@@ -397,9 +409,24 @@ async function harvestReachableLog(action, camp) {
     .filter(({ pos }) => !camp || Math.hypot(...pos.map((axis, index) => axis - camp[index])) <= 9)
     .sort((a, b) => Math.hypot(a.pos[0] - position.x, a.pos[2] - position.z)
       - Math.hypot(b.pos[0] - position.x, b.pos[2] - position.z));
+  const visited = [];
+  const rejected = new Set();
+  const detoured = new Set();
   for (const tree of candidates.slice(0, 8)) {
+    const column = `${tree.pos[0]},${tree.pos[2]}`;
     const approached = await action('go_to', { pos: tree.pos, stopDistance: 2.1, maxTicks: 65 });
-    if (!approached?.arrived) continue;
+    if (!approached?.arrived) {
+      if (detoured.has(column)) continue;
+      detoured.add(column);
+      for (let detour = 0; detour < 6; detour++) {
+        const player = await action('observe');
+        if (!player?.inWorld || player.dead || player.health < 8) return;
+        const { x, y, z } = player.position;
+        if (Math.hypot(tree.pos[0] + 0.5 - x, tree.pos[1] + 0.5 - y - 1.62, tree.pos[2] + 0.5 - z) <= 4) break;
+        visited.push(feet(player));
+        if (!await stepOut(action, player, visited, tree.pos, 'surface', rejected)) break;
+      }
+    }
     await action('look', { at: tree.pos });
     await setTimeout(80);
     if ((await action('observe')).crosshair?.pos?.join(',') !== tree.pos.join(',')) continue;
@@ -611,15 +638,24 @@ async function seekExpeditionFood(action, player, visited, rejectedSteps, tried,
     if ((await action('go_to', { entityId: drop.id, stopDistance: 0.3, maxTicks: 50 }))?.arrived) return;
   }
   const hostiles = (nearby?.entities ?? []).filter(entity => entity.hostile);
-  const animal = nearby?.entities.find(entity => (BACKUP_MEAT[entity.type] || entity.type === 'minecraft:sheep')
+  const available = entity => (BACKUP_MEAT[entity.type] || entity.type === 'minecraft:sheep')
     && !tried.has(entity.id) && Math.abs(entity.pos[1] - player.position.y) <= 9
-    && !hostiles.some(threat => Math.hypot(...threat.pos.map((axis, index) => axis - entity.pos[index])) < 8));
+    && !hostiles.some(threat => Math.hypot(...threat.pos.map((axis, index) => axis - entity.pos[index])) < 8);
+  const animal = nearby?.entities.find(available);
   if (animal?.distance <= 6 && Math.abs(animal.pos[1] - player.position.y) < 3) {
     tried.add(animal.id);
     await hunt(action, animal, item => item === (BACKUP_MEAT[animal.type] ?? MUTTON));
   } else {
+    let destination = animal?.pos ?? toward;
+    if (!destination && visited.length % 4 === 0) {
+      const scouting = await action('get_entities', { radius: 64, max: 128 });
+      const levelApproach = scouting?.entities.filter(available)
+        .sort((a, b) => a.distance - b.distance
+          + 4 * (Math.abs(a.pos[1] - player.position.y) - Math.abs(b.pos[1] - player.position.y)))[0];
+      destination = levelApproach?.pos;
+    }
     visited.push(feet(player));
-    await stepOut(action, player, visited, animal?.pos ?? toward, animal || !toward ? 'grass' : 'surface', rejectedSteps);
+    await stepOut(action, player, visited, destination, animal || !destination ? 'grass' : 'surface', rejectedSteps);
   }
 }
 
@@ -1241,7 +1277,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
     }
     if (policy.companionNeedsCare && player.gameTime >= nextCompanionCheck) {
       nextCompanionCheck = player.gameTime + 40;
-      if (await policy.companionNeedsCare()) {
+      if (await policy.companionNeedsCare(player)) {
         if (stairs.length) {
           await leaveQuarry(action, stairs, policy);
           stairs.length = 0;
@@ -1269,8 +1305,15 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
         continue;
       }
     }
-    const meal = [...COOKED_FOOD, ...BACKUP_FOOD].find(item => count(inventory, item))
-      ?? (count(inventory, MUTTON) > (player.health < 14 || player.food <= 12 ? 0 : 1) ? MUTTON : undefined);
+    let meal;
+    if (policy.reserveCompanionMeal) {
+      if (dogMealCount(inventory) > 1) {
+        meal = [...COOKED_FOOD, ...BACKUP_FOOD, MUTTON].find(item => count(inventory, item));
+      }
+    } else {
+      meal = [...COOKED_FOOD, ...BACKUP_FOOD].find(item => count(inventory, item));
+      if (!meal && count(inventory, MUTTON) > (player.health < 14 || player.food <= 12 ? 0 : 1)) meal = MUTTON;
+    }
     if (player.food < 20 && (player.food <= 16 || player.health < 14) && meal && player.gameTime >= nextMealAttempt) {
       if (await eatExpeditionMeal(action, player, meal)) continue;
       nextMealAttempt = player.gameTime + 100;

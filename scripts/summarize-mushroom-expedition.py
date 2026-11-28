@@ -95,6 +95,8 @@ def summarize(path):
     costs_missing = 0
     assisted = any(sidecar.stat().st_size for sidecar in path.glob("live-*.actions.jsonl"))
     trace_path = path / "actions.jsonl"
+    end_server_path = path / "generated-end-server.json"
+    end_server = json.loads(end_server_path.read_text(encoding="utf-8")) if end_server_path.is_file() else None
     if trace_path.exists():
         with trace_path.open(encoding="utf-8") as stream:
             for line in stream:
@@ -107,7 +109,7 @@ def summarize(path):
                     actions[action] += 1
                 if action == "generated_crystal_shot" and row.get("destroyed"):
                     broken_generated_crystals.add(row["crystal"])
-                if action == "agent_replaced_controller":
+                if action == "agent_replaced_controller" or row.get("assisted") is True:
                     assisted = True
                 if row.get("policy") == "jev":
                     choices["requests"] += 1
@@ -136,6 +138,7 @@ def summarize(path):
         "nativeGeneratedEndCrystals": "Expedition native generated crystals passed:" in game_log,
         "generatedCrystalShots": actions["generated_crystal_shot"],
         "generatedCrystalsBroken": len(broken_generated_crystals),
+        "generatedEndServer": end_server,
         "nativeEyeRoute": "Expedition native eye route passed:" in game_log,
         "nativeStrongholdApproach": "Expedition native stronghold approach passed:" in game_log,
         "nativeNetherRoundTrip": "Expedition Nether round trip passed:" in game_log,

@@ -1,5 +1,7 @@
 package dev.alicon.mushroomyorkie.entity;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import dev.alicon.mushroomyorkie.item.ModItems;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -151,33 +153,71 @@ final class ExpeditionEndCrystalClientScenario {
 				client.level.getEntity(uuid) instanceof EndCrystal), 300);
 		Files.writeString(status.resolveSibling("end-crystal-companion"), camp.dogId().toString());
 		Files.writeString(status, "ready");
+		boolean controllerFinished = false;
 		for (int tick = 0; tick < 12_000; tick += 5) {
 			String result = Files.readString(status);
 			if ("finished".equals(result)) {
-				server.runOnServer(minecraft -> {
-					var end = minecraft.getLevel(Level.END);
-					var owner = minecraft.getPlayerList().getPlayer(ownerId);
-					var dog = (MushroomYorkieEntity) end.getEntity(camp.dogId());
-					int shots = owner.getStats().getValue(Stats.ITEM_USED.get(Items.BOW));
-					if (!owner.isAlive() || !owner.level().dimension().equals(Level.END) || shots < recordedCrystals.size()
-							|| recordedCrystals.stream().anyMatch(uuid -> end.getEntity(uuid) != null)
-							|| !end.getEntitiesOfClass(EndCrystal.class, new AABB(camp.start()).inflate(128)).isEmpty()
-							|| end.getDragonFight().saveData().dragonKilled()) {
-						throw new AssertionError("Expected native bow shots to break all the generated crystals before the dragon fight");
-					}
-					if (dog == null || !dog.isAlive() || !dog.isOwnedBy(owner) || !dog.isOrderedToSit()
-							|| !dog.blockPosition().equals(camp.shelter()) || dog.getHealth() < camp.dogHealth()
-							|| dog.expeditionCamp.anchor() == null || !dog.expeditionCamp.anchor().dimension().equals(Level.END)) {
-						throw new AssertionError("Expected the original unhurt Mushroom at his marked End shelter");
-					}
-					System.out.printf("Expedition native generated crystals passed: count=%d arrows=%d dog=%s%n",
-							recordedCrystals.size(), shots, camp.dogId());
-				});
-				context.takeScreenshot("expedition-survival-generated-end-crystals");
-				return;
+				controllerFinished = true;
+				break;
 			}
 			if ("failed".equals(result)) break;
 			context.waitTicks(5);
+		}
+		var evidence = server.computeOnServer(minecraft -> {
+			var end = minecraft.getLevel(Level.END);
+			var owner = minecraft.getPlayerList().getPlayer(ownerId);
+			var dog = (MushroomYorkieEntity) end.getEntity(camp.dogId());
+			var report = new JsonObject();
+			report.addProperty("startingCrystals", recordedCrystals.size());
+			var remaining = new JsonArray();
+			for (var crystal : end.getEntitiesOfClass(EndCrystal.class, new AABB(camp.start()).inflate(128))) {
+				var entry = new JsonObject();
+				entry.addProperty("id", crystal.getUUID().toString());
+				entry.addProperty("x", crystal.getX());
+				entry.addProperty("y", crystal.getY());
+				entry.addProperty("z", crystal.getZ());
+				var spike = SpikeFeature.getSpikesForLevel(end).stream()
+						.filter(candidate -> candidate.getCenterX() == crystal.getBlockX()
+								&& candidate.getCenterZ() == crystal.getBlockZ()).findFirst().orElse(null);
+				if (spike != null) entry.addProperty("guarded", spike.isGuarded());
+				remaining.add(entry);
+			}
+			report.add("loadedRemainingCrystals", remaining);
+			report.addProperty("ownerAlive", owner != null && owner.isAlive());
+			if (owner != null) report.addProperty("bowUses", owner.getStats().getValue(Stats.ITEM_USED.get(Items.BOW)));
+			report.addProperty("dragonKilled", end.getDragonFight().saveData().dragonKilled());
+			report.addProperty("dogId", camp.dogId().toString());
+			report.addProperty("dogLoaded", dog != null);
+			if (dog != null) {
+				report.addProperty("dogAlive", dog.isAlive());
+				report.addProperty("dogHealth", dog.getHealth());
+				report.addProperty("dogAtShelter", dog.blockPosition().equals(camp.shelter()));
+			}
+			return report;
+		});
+		Files.writeString(status.resolveSibling("generated-end-server.json"), evidence.toString() + "\n");
+		if (controllerFinished) {
+			server.runOnServer(minecraft -> {
+				var end = minecraft.getLevel(Level.END);
+				var owner = minecraft.getPlayerList().getPlayer(ownerId);
+				var dog = (MushroomYorkieEntity) end.getEntity(camp.dogId());
+				int shots = owner.getStats().getValue(Stats.ITEM_USED.get(Items.BOW));
+				if (!owner.isAlive() || !owner.level().dimension().equals(Level.END) || shots < recordedCrystals.size()
+						|| recordedCrystals.stream().anyMatch(uuid -> end.getEntity(uuid) != null)
+						|| !end.getEntitiesOfClass(EndCrystal.class, new AABB(camp.start()).inflate(128)).isEmpty()
+						|| end.getDragonFight().saveData().dragonKilled()) {
+					throw new AssertionError("Expected native bow shots to break all the generated crystals before the dragon fight");
+				}
+				if (dog == null || !dog.isAlive() || !dog.isOwnedBy(owner) || !dog.isOrderedToSit()
+						|| !dog.blockPosition().equals(camp.shelter()) || dog.getHealth() < camp.dogHealth()
+						|| dog.expeditionCamp.anchor() == null || !dog.expeditionCamp.anchor().dimension().equals(Level.END)) {
+					throw new AssertionError("Expected the original unhurt Mushroom at his marked End shelter");
+				}
+				System.out.printf("Expedition native generated crystals passed: count=%d arrows=%d dog=%s%n",
+						recordedCrystals.size(), shots, camp.dogId());
+			});
+			context.takeScreenshot("expedition-survival-generated-end-crystals");
+			return;
 		}
 		throw new AssertionError("The controller did not clear the generated End crystals");
 	}

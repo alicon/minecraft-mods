@@ -4,9 +4,9 @@ import { appendFile, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import {
-  adoptAtNight, earnIronKit, earnStoneKit, feedAdoptedDog, forageExpeditionMeal, prepareAdoptionCamp,
+  adoptAtNight, dogMealCount, earnIronKit, earnStoneKit, feedAdoptedDog, forageExpeditionMeal, prepareAdoptionCamp,
   breakVisible, climbQuarry, descendQuarry, ensurePlanks, hold, packRecoveryMeal, placeBeside, recoverDroppedLoadout, retreatFromNearbyMob,
-  settleOnDryStep, WOOD_LOGS,
+  settleOnDryStep, stepOut, WOOD_LOGS,
 } from './expedition-home.mjs';
 import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
@@ -38,6 +38,7 @@ const playtestLog = join(dirname(statusFile), 'playtest.log');
 const live = process.env.MUSHROOM_EXPEDITION_LIVE === '1';
 const deathAtStart = live ? await readFile(deathFile, 'utf8').catch(() => '') : '';
 const blockPosition = pos => Array.isArray(pos) && pos.length === 3 && pos.every(Number.isInteger);
+const DOG_MEAL_INTERVAL = 4_000;
 
 const url = `http://127.0.0.1:${config.port}/mcp`;
 let session;
@@ -358,6 +359,8 @@ async function runExpedition(start, stage) {
     assert.ok(checkpoint.recoveryDestination === undefined || blockPosition(checkpoint.recoveryDestination),
       'Invalid recorded recovery destination');
     assert.ok(checkpoint.dog === undefined || /^[\da-f-]{36}$/i.test(String(checkpoint.dog)), 'Invalid recorded dog UUID');
+    assert.ok(checkpoint.lastDogMealAt === undefined || (Number.isInteger(checkpoint.lastDogMealAt)
+      && checkpoint.lastDogMealAt >= 0 && checkpoint.lastDogMealAt <= start.gameTime), 'Invalid recorded meal time');
     assert.ok(checkpoint.equipment === undefined || (Array.isArray(checkpoint.equipment)
       && new Set(checkpoint.equipment).size === checkpoint.equipment.length
       && checkpoint.equipment.every(item => COMPANION_WEARABLES.includes(item))), 'Invalid recorded companion equipment');
@@ -454,6 +457,7 @@ async function runExpedition(start, stage) {
     checkpoint.dog = await adoptAtNight(action, checkpoint.camp, craft);
     companion = checkpoint.dog;
     checkpoint.fedDog = await feedAdoptedDog(action, checkpoint.dog, checkpoint.camp.bed, stage === 'adoption' ? 120 : 24);
+    if (checkpoint.fedDog) checkpoint.lastDogMealAt = (await action('observe')).gameTime;
     checkpoint.phase = 'stone';
     if (live && stage !== 'adoption') await writeCheckpoint(checkpoint);
     if (!checkpoint.fedDog) {
@@ -480,25 +484,30 @@ async function runExpedition(start, stage) {
           [player.position.x, player.position.y, player.position.z].map(Math.floor), 24)
           || await feedAdoptedDog(action, checkpoint.dog, checkpoint.camp.bed, 48);
         if (checkpoint.fedDog) {
+          checkpoint.lastDogMealAt = (await action('observe')).gameTime;
           await narrate('Result', 'The original Mushroom ate one portion.');
           if (live) await writeCheckpoint(checkpoint);
         }
       }
     }
-    await narrate('Objective', 'Mine and smelt iron for a pickaxe, bucket, and shield.');
-    policy.companionNeedsCare = async () => {
+    policy.reserveCompanionMeal = true;
+    policy.companionNeedsCare = async player => {
       const dogs = await action('get_entities', { type: 'mushroom_yorkie:mushroom_yorkie', radius: 32 });
       const dog = dogs?.entities.find(entity => entity.uuid === checkpoint.dog);
-      return dog?.health > 0 && dog.health <= 6;
+      return dog?.health > 0 && (dog.health <= 8
+        || player.gameTime - (checkpoint.lastDogMealAt ?? checkpoint.gameTime) >= DOG_MEAL_INTERVAL);
     };
     policy.tendCompanion = async () => {
-      await narrate('Objective', 'Leave the quarry and feed the injured original Mushroom.');
+      await narrate('Objective', 'Feed the original Mushroom before resuming mining.');
       assert.ok(await forageExpeditionMeal(action, { camp: checkpoint.camp.bed }), 'Could not earn food for the injured original dog');
       const player = await action('observe');
       assert.ok(await feedAdoptedDog(action, checkpoint.dog,
         [player.position.x, player.position.y, player.position.z].map(Math.floor), 30),
-      'Could not feed the injured original dog after leaving the quarry');
-      await narrate('Result', 'The injured original Mushroom ate one portion. Returning to camp.');
+      'Could not feed the original dog before returning to the quarry');
+      checkpoint.fedDog = true;
+      checkpoint.lastDogMealAt = (await action('observe')).gameTime;
+      if (live) await writeCheckpoint(checkpoint);
+      await narrate('Result', 'The original Mushroom ate one portion. Returning to camp.');
     };
     if (live) {
       policy.resumeQuarry = checkpoint.quarry;
@@ -511,7 +520,26 @@ async function runExpedition(start, stage) {
         await writeCheckpoint(checkpoint);
       };
     }
-    await earnIronKit(action, craft, checkpoint.camp, { ...policy, reserveIgnitionIron: stage === 'nether' });
+    const restoreAutoEat = (await action('set_reflexes'))?.autoEat;
+    if (restoreAutoEat) await action('set_reflexes', { autoEat: false });
+    try {
+      if (!checkpoint.quarry?.length && dogMealCount(await action('get_inventory')) < 2) {
+        await narrate('Objective', 'Gather food for Mushroom and keep a spare portion for the quarry.');
+        assert.ok(await forageExpeditionMeal(action, { camp: checkpoint.camp.bed, minimum: 2 }),
+          'Could not stock provisions before mining');
+      }
+      if (!checkpoint.quarry?.length && checkpoint.fedDog === false) await policy.tendCompanion();
+      await narrate('Objective', 'Mine and smelt iron for a pickaxe, bucket, and shield.');
+      await earnIronKit(action, craft, checkpoint.camp, { ...policy, reserveIgnitionIron: stage === 'nether' });
+    } finally {
+      if (restoreAutoEat) {
+        try {
+          await packRecoveryMeal(action);
+        } finally {
+          await action('set_reflexes', { autoEat: true });
+        }
+      }
+    }
   }
   if (checkpoint.fedDog === false) {
     await narrate('Objective', 'Find a meal for the original Mushroom.');
@@ -520,6 +548,7 @@ async function runExpedition(start, stage) {
     const position = [player.position.x, player.position.y, player.position.z].map(Math.floor);
     assert.ok(await feedAdoptedDog(action, checkpoint.dog, position), 'Could not feed the original dog before finishing');
     checkpoint.fedDog = true;
+    checkpoint.lastDogMealAt = (await action('observe')).gameTime;
     if (live) await writeCheckpoint(checkpoint);
   }
   if (stage === 'nether') {
@@ -586,15 +615,34 @@ async function collectStarterLogs(start) {
   };
   let positionAtStart = start;
   let trunk;
-  for (let height = 0; height < 4; height++) {
+  const visited = [];
+  const rejected = new Set();
+  for (let step = 0; step < 24; step++) {
     const scan = await action('scan_blocks', scanArgs);
     trunk = nearbyTrunk(scan.matches, positionAtStart.position);
-    if (trunk) break;
+    if (trunk?.distance <= 6) break;
     const lower = await descendFromCanopy(positionAtStart);
-    if (!lower) break;
-    positionAtStart = lower;
+    if (lower) {
+      positionAtStart = lower;
+      continue;
+    }
+    if (step === 0) await narrate('Decision', 'Scout dry ground for a tree before crafting.');
+    assert.ok(positionAtStart?.onGround && !positionAtStart.dead && positionAtStart.health >= 8,
+      'Could not scout for wood safely');
+    if (!await retreatFromNearbyMob(action, positionAtStart, visited, rejected)) {
+      const { x, y, z } = positionAtStart.position;
+      visited.push([x, y, z].map(Math.floor));
+      let target = trunk?.logs[0];
+      if (!target) {
+        const wider = await action('scan_blocks', { ...scanArgs, radius: 32 });
+        target = wider?.matches.flatMap(match => match.positions)
+          .sort((a, b) => Math.hypot(a[0] - x, a[2] - z) - Math.hypot(b[0] - x, b[2] - z))[0];
+      }
+      await stepOut(action, positionAtStart, visited, target, 'surface', rejected);
+    }
+    positionAtStart = await action('observe');
   }
-  assert.ok(trunk, 'No usable tree trunk in the local search area');
+  assert.ok(trunk?.distance <= 6, 'No usable tree trunk reached during the Survival scout');
   await walk(trunk.logs[1], 2.8);
   for (const pos of trunk.logs) {
     const mined = await action('break_block', { pos, maxTicks: 100 });

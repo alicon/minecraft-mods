@@ -226,8 +226,11 @@ the furnace, and the original adopted dog's identity.
 Set `MUSHROOM_EXPEDITION_STAGE=iron` to continue from the stone kit. The
 controller looks for exposed iron and coal, verifies the actual mining
 crosshair, and waits for the native furnace to smelt the ore. It can make
-charcoal from local wood when fuel is scarce. The server
-checks the earned iron pickaxe, bucket, shield, and original dog.
+charcoal from local wood when fuel is scarce. Before the first quarry trip
+the controller stocks food and reserves a portion for Mushroom. It returns
+to feed the original dog when he is injured or due for a meal, and records the
+last verified feeding so the schedule survives reattachment. The server checks
+the earned iron pickaxe, bucket, shield, and original dog.
 
 Set `MUSHROOM_EXPEDITION_STAGE=quarry-iron` to replay the iron portion in a
 disposable native client. The fixture supplies the stone kit, fuel, timber
@@ -312,6 +315,9 @@ The controller scouts the island, watches for incoming dragon breath, and
 shoots from observed positions. The server checks for the removal of all ten
 original crystals and verifies Mushroom's identity and health at camp. The
 summary reports shot attempts, observed breaks, and the native verdict.
+The fixture saves a server snapshot even when the controller fails. It
+lists loaded remaining crystals, whether their original spikes were
+guarded, and whether the dog stayed alive at his shelter.
 
 Set `MUSHROOM_EXPEDITION_STAGE=eye-route` to replay using an Eye of Ender
 to choose a route. The disposable fixture supplies one eye, Mushroom, and
