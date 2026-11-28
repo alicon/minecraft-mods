@@ -1164,7 +1164,7 @@ async function openCampTable(action, table, visited) {
   throw new Error('Could not walk back to the crafting table after quarrying');
 }
 
-async function takeCover(action) {
+async function takeCover(action, threats = []) {
   const player = await action('observe');
   if (!player?.inWorld || player.dead || player.timeOfDay < 12_000 || player.timeOfDay >= 23_500) return false;
   const center = feet(player);
@@ -1179,7 +1179,7 @@ async function takeCover(action) {
     const tile = feet(position);
     if (tile.join(',') === cover.join(',')) return true;
     visited.push(tile);
-    await stepOut(action, position, visited, cover, undefined, rejected);
+    await stepOut(action, position, visited, cover, undefined, rejected, undefined, threats.length ? threats : undefined);
   }
   return false;
 }
@@ -1228,6 +1228,37 @@ async function sleepInField(action, player, bed) {
     throw error;
   });
   return Boolean(landing && await sleepNearby(action, await action('observe')));
+}
+
+export async function waitForDaylightRecovery(action, bed, report) {
+  const visited = [];
+  const rejected = new Set();
+  let nextShelter = 0;
+  let nextSleep = 0;
+  for (let check = 0; check < 180; check++) {
+    const player = await action('observe');
+    assert.ok(player?.inWorld && !player.dead, 'The player did not survive the night before the reunion');
+    if (player.timeOfDay < 12_000) return;
+    if (player.gameTime >= nextSleep) {
+      nextSleep = player.gameTime + 70;
+      if (await sleepNearby(action, player) || await sleepInField(action, player, bed)) {
+        await report('Slept until daylight before looking for Mushroom.');
+        return;
+      }
+    }
+    if (player.gameTime >= nextShelter) {
+      nextShelter = player.gameTime + 160;
+      const nearby = await action('get_entities', { radius: 12, max: 64 });
+      const hazards = nearby?.entities.filter(entity => entity.hostile).map(entity => entity.pos) ?? [];
+      if (await takeCover(action, hazards)) {
+        await report('Found cover while waiting for a daylight route to Mushroom.');
+        continue;
+      }
+    }
+    if (await retreatFromNearbyMob(action, player, visited, rejected)) continue;
+    await setTimeout(2_500);
+  }
+  throw new Error('Could not reach daylight safely before the reunion');
 }
 
 export async function regroupExpeditionCompanion(action, uuid, lastPosition, trail = []) {

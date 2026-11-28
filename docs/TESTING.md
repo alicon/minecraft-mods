@@ -225,9 +225,10 @@ A closed test world can be continued at the iron phase with
 `build/playtest-reports`. Make a JSON manifest containing the absolute
 `source` directory, the `seed`, the `owner` and `dog` UUIDs, and a `camp`
 object with the `bed` and `table` block coordinates. Start the ordinary
-runner with the manifest path and the `iron`, `nether`, `nether-powder`, or
-`stronghold` stage. The client opens a copy, verifies the world, owner, camp, earned stone
-kit and original living dog, then hands control back at the iron phase. The
+runner with the manifest path and the `iron`, `nether`, `nether-powder`,
+`stronghold`, or `expedition` stage. The client opens a copy and verifies
+the world, owner, camp, earned stone kit and original living dog before
+handing control back at the iron phase. The
 trace records the recovery as assisted. An archive taken inside a quarry can
 include `ironProgress` with the recorded `quarry`, `quarryLanding`, and
 `lastDogMealAt` so the controller can resume the stairs. During the iron hunt,
@@ -238,6 +239,15 @@ contact. The surface retreat check looks for intervening solid rock when a
 creeper is well below the player. When a bed is within
 reach at night, the controller attempts sleep before sending the player to
 search for food in the dark.
+
+Use `MUSHROOM_EXPEDITION_STAGE=reunion` with a restore manifest to replay
+an injured dog and separated owner from a copied save. Add a `reunion`
+object with the last observed block position as `lastSeen` and the dog's
+previous `health`. The controller seeks daylight, earns a meal, and uses
+the old sighting to look for Mushroom. The native verifier checks that
+the same living dog has recovered health beside the original owner.
+The run report's `source-build.txt` records the Git revision and working
+changes to the mod and controller sources used to launch the native client.
 
 Summarize the action logs and the native save/reopen evidence for comparison:
 
@@ -413,7 +423,9 @@ landing to the surface and retrace the same stairs back to camp. The
 controller mines observed End stone and keeps the camp floor and roof in
 place. The server verifies the exposed End surface and seated original
 Mushroom at the waypoint, then verifies the same dog and camp when the
-owner returns.
+owner returns. The controller recalls the dog through normal Use and
+climbs out together. The final native check requires the original dog
+following near the top of the stairs.
 
 Set `MUSHROOM_EXPEDITION_STAGE=expedition` for the complete fresh Survival
 campaign. After earning its gear and reaching the generated stronghold,

@@ -7,15 +7,15 @@ import {
   adoptAtNight, dogMealCount, earnIronKit, earnStoneKit, feedAdoptedDog, forageExpeditionMeal, prepareAdoptionCamp,
   breakVisible, climbQuarry, daylightLoadoutIsVisible, descendQuarry, ensurePlanks, hold, packRecoveryMeal, placeBeside, recoverDroppedLoadout,
   regroupExpeditionCompanion, retreatFromNearbyMob,
-  settleOnDryStep, sleepNearby, stepOut, WOOD_LOGS,
+  settleOnDryStep, sleepNearby, stepOut, waitForDaylightRecovery, WOOD_LOGS,
 } from './expedition-home.mjs';
 import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
 import { shelterAtEndArrival } from './expedition-end-camp.mjs';
-import { reachEndIslandSurface, walkBackToEndCamp } from './expedition-end-route.mjs';
+import { reachEndIslandSurface } from './expedition-end-route.mjs';
 import { blazePowderCount, craftBlazePowder, earnBlazeRods } from './expedition-blaze-rods.mjs';
 import { clearGeneratedCrystals, readCrystalProgress, shootEndCrystal } from './expedition-end-crystals.mjs';
-import { fightEndDragon, recallAndExitEnd } from './expedition-dragon-fight.mjs';
+import { fightEndDragon, recallAndExitEnd, recallEndCompanion } from './expedition-dragon-fight.mjs';
 import { prepareEndCombatKit } from './expedition-end-kit.mjs';
 import { craftEyes, crossEndPortal, descendToStronghold, enderEyeCount, findStrongholdPortalRoom } from './expedition-end-entry.mjs';
 import { earnEnderPearls } from './expedition-pearls.mjs';
@@ -83,6 +83,7 @@ async function narrate(kind, message, interval = 0) {
 const milestoneObjectives = {
   defense: 'Protect Mushroom before continuing the errand.',
   feeding: 'Call Mushroom back from the sheep and give him a meal at camp.',
+  reunion: 'Get through the night, earn a meal, and find the original injured Mushroom.',
   portal: 'Find supplies, repair the Nether portal, and come home with Mushroom.',
   'nether-supplies': 'Shelter Mushroom in the Nether, earn a blaze rod, and return together.',
   'nether-distant-supplies': 'Scout for a distant Nether fortress with Mushroom and bring home a blaze rod.',
@@ -92,7 +93,7 @@ const milestoneObjectives = {
   'end-entry': 'Craft Eyes of Ender and bring Mushroom through the active portal.',
   'generated-end-entry': 'Find the generated portal room, open its portal, and bring Mushroom through.',
   'end-camp': 'Cross the generated portal with Mushroom and build his shelter on safe footing.',
-  'end-camp-route': 'Keep Mushroom under cover and dig a returnable staircase from his camp to the End island surface.',
+  'end-camp-route': 'Dig a reversible staircase, return to Mushroom’s camp, then recall him and climb out together.',
   'end-crystal': 'Mark Mushroom’s shelter and break an End crystal from a safe bow position.',
   'generated-end-crystals': 'Shelter Mushroom and clear the generated End crystals using the bow and safe approaches.',
   'eye-route': 'Throw an Eye of Ender and follow its visible flight with Mushroom.',
@@ -259,6 +260,7 @@ try {
   'The controller was not in its expected starting dimension');
   if (!duel && milestoneObjectives[stage]) await narrate('Objective', milestoneObjectives[stage]);
   if (stage === 'defense') await runCompanionDrill();
+  else if (stage === 'reunion') await runReunion(start);
   else if (stage === 'feeding') {
     companion = (await readFile(join(dirname(statusFile), 'feeding-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
@@ -309,8 +311,14 @@ try {
         const trail = await reachEndIslandSurface(action, camp, reportEndCamp);
         await reportStatus('surface');
         await awaitNativeProof('native-end-surface', companion, 'The server did not confirm the End surface and sheltered dog');
-        await walkBackToEndCamp(action, trail);
-        await narrate('Result', 'Walked the same staircase back to Mushroom’s shelter.');
+        await recallEndCompanion(action, companion, camp.shelter, async (kind, observation) => {
+          await reportEndCamp(kind, observation);
+          if (kind === 'camp_returned') {
+            await reportStatus('camp-returned');
+            await awaitNativeProof('native-end-camp-returned', companion, 'The server did not confirm the original dog at camp');
+          }
+        }, trail);
+        await narrate('Result', 'Recalled the original Mushroom and climbed out of the End camp together.');
       }
     }
   } else if (stage === 'end-crystal' || stage === 'generated-end-crystals' || archivedEnd) {
@@ -448,6 +456,29 @@ async function runCompanionDrill() {
     if (!observed.entities.length) return;
   }
   throw new Error('The spider was still alive after the first companion interruption');
+}
+
+async function runReunion(start) {
+  const saved = JSON.parse(await readFile(join(dirname(statusFile), 'reunion-start.json'), 'utf8'));
+  assert.ok(/^[\da-f-]{36}$/i.test(saved.dog) && blockPosition(saved.lastSeen) && blockPosition(saved.bed));
+  companion = saved.dog;
+  const waitForDaylight = () => waitForDaylightRecovery(action, saved.bed, message => narrate('Decision', message, 15_000));
+  await waitForDaylight();
+  await reportStatus('reunion-daylight');
+  await awaitNativeProof('native-reunion-daylight', companion, 'The server did not verify a safe daylight start');
+  const inventory = await action('get_inventory');
+  if (!inventory.slots.some(stack => stack.id.endsWith('_sword'))) {
+    await gatherStarterTools(await action('observe'), { combatOnly: true });
+  }
+  assert.ok(await forageExpeditionMeal(action, { toward: saved.lastSeen, minimum: 2 }),
+    'Could not earn a meal to bring to the original Mushroom');
+  await waitForDaylight();
+  await narrate('Objective', 'Return to the last sighting with a meal reserved for Mushroom.');
+  const dog = await regroupExpeditionCompanion(action, saved.dog, saved.lastSeen);
+  assert.ok(await feedAdoptedDog(action, saved.dog, dog.pos.map(Math.floor), 24), 'The original dog did not accept an earned meal');
+  console.log(JSON.stringify({ at: new Date().toISOString(), action: 'reunion_fed', dog: saved.dog,
+    lastSeen: saved.lastSeen, beforeHealth: dog.health, startedAt: start.gameTime }));
+  await narrate('Result', 'Reunited with the original Mushroom and fed him.');
 }
 
 async function runExpedition(start, stage) {
@@ -995,6 +1026,7 @@ async function reportEndCamp(kind, observation) {
   console.log(JSON.stringify({ at: new Date().toISOString(), action: `end_camp_${kind}`, observation, dog: companion }));
   if (kind === 'sheltered') await narrate('Result', 'Marked the mat and settled the original Mushroom under cover.');
   if (kind === 'surface') await narrate('Result', 'Reached exposed End stone by walking a staircase from camp.');
+  if (kind === 'camp_returned') await narrate('Result', 'Walked the same staircase back to Mushroom’s shelter.');
 }
 
 async function reportStrongholdEntry(kind, observation) {

@@ -109,6 +109,6 @@ export async function climbEndTrailWithCompanion(action, trail, waitForCompanion
   await approachEndTrail(action, trail[0]);
   for (const [index, tile] of trail.entries()) {
     if (index > 0) await walkStair(action, tile);
-    if (index % 3 === 0 || index === trail.length - 1) await waitForCompanion();
+    if (index % 3 === 0 || index === trail.length - 1) await waitForCompanion(tile);
   }
 }

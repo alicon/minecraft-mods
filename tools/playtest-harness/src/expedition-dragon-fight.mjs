@@ -477,24 +477,30 @@ export async function fightEndDragon(action, report, progress = {},
   throw new Error('The dragon fight did not reach a native open exit');
 }
 
-export async function recallAndExitEnd(action, uuid, shelter, portals, report, trail) {
+export async function recallEndCompanion(action, uuid, shelter, report, trail) {
   if (trail) {
     await approachEndTrail(action, trail.at(-1));
     await walkBackToEndCamp(action, trail);
   }
   const dog = await regroupExpeditionCompanion(action, uuid, shelter);
+  await report('camp_returned', { position: dog.pos, health: dog.health });
   await useEmptyHandOnCompanion(action, uuid);
   await report('recalled', { previousPosition: dog.pos });
   if (trail) {
-    await climbEndTrailWithCompanion(action, trail, async () => {
+    await climbEndTrailWithCompanion(action, trail, async tile => {
       for (let check = 0; check < 20; check++) {
         const dogs = await action('get_entities', { type: DOG, radius: 12 });
-        if (dogs?.entities.some(entity => entity.uuid === uuid && entity.health > 0 && entity.distance <= 5)) return;
+        if (dogs?.entities.some(entity => entity.uuid === uuid && entity.health > 0
+            && entity.distance <= 5 && entity.pos[1] >= tile[1] - 1.2)) return;
         await setTimeout(250);
       }
-      throw new Error('The original Mushroom has not followed up the End staircase');
+      throw new Error(`The original Mushroom has not followed up the End staircase near ${tile}`);
     });
   }
+}
+
+export async function recallAndExitEnd(action, uuid, shelter, portals, report, trail) {
+  await recallEndCompanion(action, uuid, shelter, report, trail);
   const visited = [];
   const rejected = new Set();
   let lastJump;

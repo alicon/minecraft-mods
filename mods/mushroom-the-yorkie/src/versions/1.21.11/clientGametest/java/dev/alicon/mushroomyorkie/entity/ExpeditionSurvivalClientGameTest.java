@@ -64,6 +64,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 		boolean strongholdTrip = "stronghold".equals(stage);
 		boolean full = "expedition".equals(stage);
 		boolean endReturn = "end-return".equals(stage);
+		boolean reunion = "reunion".equals(stage);
 		boolean visitsNether = "nether".equals(stage) || powderTrip || strongholdTrip || full;
 		var recovery = recoveryFromManifest(status, stage);
 		int windowTicks = switch (stage) {
@@ -75,7 +76,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 			case "stronghold" -> STRONGHOLD_WINDOW_TICKS;
 			case "expedition" -> COMPLETE_WINDOW_TICKS;
 			case "end-kit", "defense", "feeding", "portal", "nether-supplies", "nether-distant-supplies", "shelter", "equipment", "end-entry", "end-camp", "end-camp-route", "end-crystal", "generated-end-crystals",
-					"eye-route", "stronghold-approach", "ender-supplies", "generated-end-entry", "quarry-tools", "quarry-iron", "end-return" -> 0;
+					"eye-route", "stronghold-approach", "ender-supplies", "generated-end-entry", "quarry-tools", "quarry-iron", "end-return", "reunion" -> 0;
 			default -> throw new AssertionError("Unknown expedition stage " + stage);
 		};
 		TestWorldSave save;
@@ -112,6 +113,15 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 			if (recovery == null) throw new AssertionError("The End return requires a closed crystal-stage save");
 			try {
 				ExpeditionEndReturnClientScenario.run(context, builder, recovery, status);
+			} catch (IOException failure) {
+				throw new UncheckedIOException(failure);
+			}
+			return;
+		}
+		if (reunion) {
+			if (recovery == null) throw new AssertionError("The reunion requires an archived Survival save");
+			try {
+				ExpeditionReunionClientScenario.run(context, builder, recovery, status);
 			} catch (IOException failure) {
 				throw new UncheckedIOException(failure);
 			}
@@ -386,7 +396,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 		String manifest = System.getenv("MUSHROOM_EXPEDITION_RESTORE_MANIFEST");
 		if (manifest == null) return null;
 		if (!"iron".equals(stage) && !"nether".equals(stage) && !"nether-powder".equals(stage)
-				&& !"stronghold".equals(stage) && !"end-return".equals(stage)) {
+				&& !"stronghold".equals(stage) && !"expedition".equals(stage) && !"end-return".equals(stage) && !"reunion".equals(stage)) {
 			throw new AssertionError("The selected stage does not accept an archived save");
 		}
 		try {

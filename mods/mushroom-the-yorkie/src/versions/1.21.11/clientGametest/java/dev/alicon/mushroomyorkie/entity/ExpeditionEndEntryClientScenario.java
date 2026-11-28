@@ -80,11 +80,12 @@ final class ExpeditionEndEntryClientScenario {
 				&& client.level.getEntity(fixture.runtimeId()) instanceof MushroomYorkieEntity);
 		Files.writeString(status.resolveSibling("end-companion"), fixture.dogId().toString());
 		Files.writeString(status, "ready");
-		boolean reachedSurface = false;
+		BlockPos surface = null;
+		boolean returnedToCamp = false;
 		for (int tick = 0; tick < (generated ? 8_000 : 1_800); tick += 5) {
 			String result = Files.readString(status);
-			if (route && !reachedSurface && "surface".equals(result)) {
-				server.runOnServer(minecraft -> {
+			if (route && surface == null && "surface".equals(result)) {
+				surface = server.computeOnServer(minecraft -> {
 					var owner = minecraft.getPlayerList().getPlayer(ownerId);
 					var pos = owner.blockPosition();
 					var level = owner.level();
@@ -97,19 +98,33 @@ final class ExpeditionEndEntryClientScenario {
 							|| dog.distanceTo(owner) < 5) {
 						throw new AssertionError("Expected the player on the End island surface and original dog at camp");
 					}
+					return pos;
 				});
 				context.takeScreenshot("expedition-survival-end-camp-route-surface");
 				Files.writeString(status.resolveSibling("native-end-surface"), fixture.dogId().toString());
-				reachedSurface = true;
 			}
-			if ("finished".equals(result)) {
-				if (route && !reachedSurface) throw new AssertionError("Expected a verified trip to the End island surface");
+			if (route && surface != null && !returnedToCamp && "camp-returned".equals(result)) {
 				server.runOnServer(minecraft -> {
 					var owner = minecraft.getPlayerList().getPlayer(ownerId);
 					if (!owner.isAlive() || !owner.level().dimension().equals(Level.END)
 							|| !(owner.level().getEntity(fixture.dogId()) instanceof MushroomYorkieEntity dog)
-							|| !dog.isAlive() || !dog.belongsTo(owner) || dog.isOrderedToSit() != shelter
-								|| (route && dog.distanceTo(owner) > 4)
+							|| !dog.isAlive() || !dog.belongsTo(owner) || !dog.isOrderedToSit() || dog.distanceTo(owner) > 4) {
+						throw new AssertionError("The player did not return to the original seated Mushroom at camp");
+					}
+					verifyCamp(owner, dog);
+				});
+				context.takeScreenshot("expedition-survival-end-camp-route-returned");
+				Files.writeString(status.resolveSibling("native-end-camp-returned"), fixture.dogId().toString());
+				returnedToCamp = true;
+			}
+			if ("finished".equals(result)) {
+				if (route && !returnedToCamp) throw new AssertionError("Expected a verified trip to the End surface and back to camp");
+				final BlockPos surfaceAt = surface;
+				server.runOnServer(minecraft -> {
+					var owner = minecraft.getPlayerList().getPlayer(ownerId);
+					if (!owner.isAlive() || !owner.level().dimension().equals(Level.END)
+							|| !(owner.level().getEntity(fixture.dogId()) instanceof MushroomYorkieEntity dog)
+							|| !dog.isAlive() || !dog.belongsTo(owner) || dog.isOrderedToSit() != (shelter && !route)
 							|| !minecraft.overworld().getBlockState(fixture.center()).is(Blocks.END_PORTAL)
 							|| (startAbove && owner.getStats().getValue(Stats.BLOCK_MINED.get(Blocks.STONE)) == 0)
 							|| (generated ? owner.getInventory().countItem(Items.ENDER_EYE) >= 12
@@ -117,21 +132,13 @@ final class ExpeditionEndEntryClientScenario {
 											|| stack.is(Items.BLAZE_POWDER) || stack.is(Items.BLAZE_ROD)))) {
 						throw new AssertionError("Expected a completed vanilla portal and the same living dog in the End");
 					}
-					if (shelter) {
-						var anchor = dog.expeditionCamp.anchor();
-						var dogRoof = dog.blockPosition().above(2);
-						if (anchor == null || !anchor.dimension().equals(Level.END)
-								|| !owner.level().getBlockState(anchor.pos()).is(ModBlocks.CAMP_MAT)
-								|| !owner.level().getBlockState(dogRoof).isFaceSturdy(owner.level(), dogRoof, Direction.DOWN)
-								|| !owner.level().getBlockState(anchor.pos().above(2)).isFaceSturdy(
-										owner.level(), anchor.pos().above(2), Direction.DOWN)
-								|| anchor.pos().distSqr(dog.blockPosition()) > 9
-								|| owner.getStats().getValue(Stats.ITEM_USED.get(Items.COBBLESTONE)) == 0) {
-							throw new AssertionError("Expected the original dog and its marked mat beneath player-built cover");
-						}
+					if (route && (dog.distanceTo(owner) > 5 || dog.blockPosition().getY() < surfaceAt.getY() - 1
+							|| !owner.blockPosition().closerThan(surfaceAt, 2))) {
+						throw new AssertionError("The original Mushroom did not follow his owner up the End staircase");
 					}
+					if (shelter && !route) verifyCamp(owner, dog);
 				});
-				context.takeScreenshot(route ? "expedition-survival-end-camp-route-returned" : shelter ? "expedition-survival-end-camp"
+				context.takeScreenshot(route ? "expedition-survival-end-camp-route-recalled" : shelter ? "expedition-survival-end-camp"
 						: generated ? "expedition-survival-generated-end-entry" : "expedition-survival-end-entry");
 				System.out.printf("Expedition native %s passed: dog=%s owner=%s%n",
 						route ? "End camp route" : shelter ? "End camp" : generated ? "generated End entry" : "End entry",
@@ -142,6 +149,20 @@ final class ExpeditionEndEntryClientScenario {
 			context.waitTicks(5);
 		}
 		throw new AssertionError("The controller did not complete and cross the native End portal");
+	}
+
+	private static void verifyCamp(ServerPlayer owner, MushroomYorkieEntity dog) {
+		var anchor = dog.expeditionCamp.anchor();
+		var level = owner.level();
+		var dogRoof = dog.blockPosition().above(2);
+		if (anchor == null || !anchor.dimension().equals(Level.END)
+				|| !level.getBlockState(anchor.pos()).is(ModBlocks.CAMP_MAT)
+				|| !level.getBlockState(dogRoof).isFaceSturdy(level, dogRoof, Direction.DOWN)
+				|| !level.getBlockState(anchor.pos().above(2)).isFaceSturdy(level, anchor.pos().above(2), Direction.DOWN)
+				|| anchor.pos().distSqr(dog.blockPosition()) > 9
+				|| owner.getStats().getValue(Stats.ITEM_USED.get(Items.COBBLESTONE)) == 0) {
+			throw new AssertionError("Expected the original dog and its marked mat beneath player-built cover");
+		}
 	}
 
 	private static Fixture prepareGeneratedStronghold(ServerLevel level, ServerPlayer owner, boolean startAbove) {
