@@ -1627,8 +1627,6 @@ export async function regroupExpeditionCompanion(action, uuid, lastPosition, tra
         continue;
       }
     }
-    assert.ok(player.health >= 8 || !player.threats?.some(threat => threat.distance <= 18),
-      'The player became unsafe during regrouping');
     approach++;
     lastPosition = dog?.pos ?? lastPosition;
     assert.ok(lastPosition, 'The original Mushroom is out of sight and has no recorded position');
@@ -1642,7 +1640,10 @@ export async function regroupExpeditionCompanion(action, uuid, lastPosition, tra
     while (waypointIndex >= 0 && distanceFrom(here, trail[waypointIndex]) <= 1.5) waypointIndex--;
     const pacedApproach = waypointIndex >= 0
       && player.threats?.some(entity => entity.type === 'minecraft:creeper' && entity.distance <= 16);
-    if (await retreatFromNearbyMob(action, player, visited, rejected, 7, pacedApproach ? 8 : 16)) continue;
+    const retreatRange = player.health < 8 ? 12 : 7;
+    if (await retreatFromNearbyMob(action, player, visited, rejected, retreatRange, pacedApproach ? 8 : 16)) continue;
+    assert.ok(player.health >= 8 || !player.threats?.some(threat => threat.distance <= 18),
+      'The player became unsafe during regrouping');
     const target = trail[waypointIndex] ?? lastPosition;
     const nearby = Math.hypot(here[0] - target[0], here[2] - target[2]) <= 8;
     const uphill = nearby && target[1] - here[1] >= 2;

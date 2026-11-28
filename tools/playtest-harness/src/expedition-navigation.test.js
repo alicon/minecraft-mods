@@ -1353,6 +1353,37 @@ test('regrouping on a known trail takes short steps before a distant creeper can
   assert.equal(together.distance, 6);
 });
 
+test('a wounded player retreats from a zombie before trying to regroup', async () => {
+  const { regroupExpeditionCompanion } = await import('./expedition-home.mjs');
+  const dog = { uuid: 'original', pos: [-10.5, 64, 0.5], health: 12 };
+  const zombie = { id: 12, type: 'minecraft:zombie', pos: [3, 64, 0.5], distance: 2.5, hostile: true };
+  for (const escapeIsOpen of [false, true]) {
+    let x = 0.5;
+    let retreats = 0;
+    const action = async (name, args) => {
+      switch (name) {
+        case 'observe': return { inWorld: true, onGround: true, health: 5, position: { x, y: 64, z: 0.5 }, threats: [zombie] };
+        case 'get_entities': return { entities: args.radius === 128 ? [{ ...dog, distance: Math.abs(dog.pos[0] - x) }] : [zombie] };
+        case 'get_blocks': return { cells: Array.from({ length: escapeIsOpen ? 9 : 1 }, (_, i) => cell(-i, 63, 0, 'grass_block')) };
+        case 'set_reflexes': return { interruptOnDamage: true };
+        case 'go_to':
+          assert.ok(args.pos[0] < 0, 'Retreat must increase distance from the pursuing zombie');
+          assert.ok(args.maxTicks <= 40);
+          x = args.pos[0] + 0.5;
+          retreats++;
+          return { arrived: true, position: [x, 64, 0.5] };
+        default: assert.fail(`Unexpected action: ${name}`);
+      }
+    };
+    if (escapeIsOpen) {
+      assert.equal((await regroupExpeditionCompanion(action, dog.uuid, dog.pos)).uuid, dog.uuid);
+    } else {
+      await assert.rejects(regroupExpeditionCompanion(action, dog.uuid, dog.pos), /unsafe during regrouping/);
+    }
+    assert.equal(retreats, Number(escapeIsOpen));
+  }
+});
+
 test('a regroup climb can cut dry headroom instead of taking the same staircase down', async () => {
   const { regroupExpeditionCompanion } = await import('./expedition-home.mjs');
   const dog = { uuid: 'original', pos: [2.5, 65, 0.5], health: 12, distance: 4.5 };

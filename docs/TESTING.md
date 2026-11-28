@@ -241,7 +241,8 @@ survives a handoff and takes priority over mining until both the player and
 the original living dog reach the bed. For a long return near nightfall, the
 player looks for shelter and can sleep until daylight in a carried bed. If the
 pair gets separated, the player checks for the original dog at longer range and
-regroups before continuing to wait or travel. An injured player under fire
+regroups before continuing to wait or travel. A wounded player first checks
+for a supported retreat away from nearby melee pursuers. An injured player under fire
 faces the archer and uses a carried shield before attempting another exposed
 step toward the dog. At critical health, it can dig and cap a shallow shelter
 when the observed terrain has solid walls, a floor and a climbable exit. The
@@ -331,7 +332,7 @@ Apply the companion patch to the isolated bridge checkout before rebuilding the
 JAR. It exposes the original dog's stable identity and hurt animation alongside
 the client-observed health. The controller can interrupt work for nearby danger,
 and the native game test fails if that dog dies. For a smoother spectator camera,
-also apply the camera patch. Use separate JARs for concurrent clients.
+also apply the camera patch.
 
 ```shell
 git -C "$BRIDGE_CHECKOUT" apply --unidiff-zero "$PWD/tools/playtest-harness/patches/mc-agent-mcp-companion.patch"
