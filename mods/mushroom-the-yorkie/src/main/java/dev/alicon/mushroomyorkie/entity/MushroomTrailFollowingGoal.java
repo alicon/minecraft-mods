@@ -11,7 +11,6 @@ final class MushroomTrailFollowingGoal extends FollowOwnerGoal {
 	private final MushroomYorkieEntity dog;
 	private BlockPos blockedStep;
 	private Vec3 ownerAtWarning;
-	private boolean following;
 
 	MushroomTrailFollowingGoal(MushroomYorkieEntity dog) {
 		super(dog, 1.25D, 2.0F, 1.0F);
@@ -26,15 +25,8 @@ final class MushroomTrailFollowingGoal extends FollowOwnerGoal {
 	}
 
 	@Override
-	public void start() {
-		super.start();
-		this.following = true;
-	}
-
-	@Override
 	public void stop() {
 		super.stop();
-		this.following = false;
 		this.blockedStep = null;
 		this.ownerAtWarning = null;
 	}
@@ -82,8 +74,8 @@ final class MushroomTrailFollowingGoal extends FollowOwnerGoal {
 	}
 
 	Vec3 guardStride(Vec3 movement) {
-		if (!this.following || this.dog.isOrderedToSit() || this.dog.isPassenger()
-				|| this.dog.hurtTime > 0 || movement.y > 0 || movement.horizontalDistanceSqr() == 0
+		if (this.dog.isOrderedToSit() || this.dog.isPassenger()
+				|| this.dog.hurtTime > 0 || movement.horizontalDistanceSqr() == 0
 				|| !(this.dog.level() instanceof ServerLevel level)) {
 			return movement;
 		}

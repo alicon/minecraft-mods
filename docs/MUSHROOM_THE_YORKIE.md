@@ -30,9 +30,10 @@ When he retreats, he looks for a safe path to the marked mat. If the mat has
 been moved or the path is unsafe, he tries to stop on safe ground. He waits for
 you to come back. In Java, a following Mushroom also tries to step off magma
 and wait on safe ground before you have marked a mat. Magma can still hurt him.
-While he follows a Survival player on foot in Java, he also checks where his
-next stride would land. At a cliff bend, he can stop and bark before momentum
-carries him off the ledge. Give him supported footing to continue.
+In Java Survival, Mushroom checks where his next stride would land as he
+walks. At a cliff bend, he can stop and bark before momentum carries him off
+the ledge, even as he changes direction or stops following. Give him supported
+footing to continue.
 In Bedrock, build his retreat path on one level. Return to
 within two blocks to call him back when it is safe. In Java, you can also use
 an empty hand to recall him from a few steps away.

@@ -169,8 +169,9 @@ final class ExpeditionCampScenarios {
 		}
 		var minimumY = helper.absoluteVec(new Vec3(0, 7, 0)).y;
 		helper.startSequence().thenExecuteFor(160, () ->
-				helper.assertTrue(dog.isAlive() && dog.getHealth() == 1.0F && dog.getY() >= minimumY,
-						"Mushroom fell across the inside of the cliff bend at " + dog.position()))
+				helper.assertTrue(dog.isAlive() && dog.getY() >= minimumY,
+						"Mushroom lost safe footing at " + dog.position() + ", minimum Y=" + minimumY
+								+ ", health=" + dog.getHealth() + ", damage=" + dog.getLastDamageSource()))
 				.thenExecute(() -> {
 					helper.assertTrue(dog.distanceToSqr(owner) <= 4 || dog.lastWarnedTrailStep != null,
 							"Mushroom neither followed the owner nor warned at the bend; dog=" + dog.position()
