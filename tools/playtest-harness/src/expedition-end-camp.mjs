@@ -57,7 +57,11 @@ export async function shelterAtEndArrival(action, uuid, report) {
     .find(entity => entity.uuid === uuid && entity.health > 0);
   for (let attempt = 0; attempt < 18; attempt++) {
     const player = await action('observe');
-    assert.ok(player?.onGround && player.health >= 12, 'End camp construction needs safe footing');
+    assert.ok(player?.inWorld && player.dimension === END && player.health >= 12, 'End camp construction needs a healthy player');
+    if (!player.onGround) {
+      await setTimeout(150);
+      continue;
+    }
     const owner = [player.position.x, player.position.y, player.position.z].map(Math.floor);
     const dog = await observeDog();
     const area = await action('get_blocks', { center: owner, size: [11, 9, 11], format: 'json' });

@@ -1,5 +1,6 @@
 package dev.alicon.mushroomyorkie.entity;
 
+import dev.alicon.mushroomyorkie.block.ModBlocks;
 import dev.alicon.mushroomyorkie.item.ModItems;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -12,21 +13,26 @@ import java.util.concurrent.atomic.AtomicReference;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
+import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldBuilder;
 import net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldSave;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.minecraft.client.gui.screens.DeathScreen;
+import net.minecraft.client.gui.screens.WinScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.stats.Stats;
 import net.minecraft.tags.StructureTags;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.entity.EntityTypeTest;
+import net.minecraft.world.phys.AABB;
 
 public final class ExpeditionSurvivalClientGameTest implements FabricClientGameTest {
 	private static final int ADOPTION_WINDOW_TICKS = 26_000;
@@ -35,6 +41,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 	private static final int NETHER_WINDOW_TICKS = 96_000;
 	private static final int NETHER_POWDER_WINDOW_TICKS = 120_000;
 	private static final int STRONGHOLD_WINDOW_TICKS = 240_000;
+	private static final int COMPLETE_WINDOW_TICKS = 300_000;
 	private static final int PORTAL_POWDER = 12;
 	private static final int STRONGHOLD_EYES = 20;
 
@@ -55,8 +62,9 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 		String stage = requestedStage == null ? "adoption" : requestedStage;
 		boolean powderTrip = "nether-powder".equals(stage);
 		boolean strongholdTrip = "stronghold".equals(stage);
+		boolean full = "expedition".equals(stage);
 		boolean endReturn = "end-return".equals(stage);
-		boolean visitsNether = "nether".equals(stage) || powderTrip || strongholdTrip;
+		boolean visitsNether = "nether".equals(stage) || powderTrip || strongholdTrip || full;
 		var recovery = recoveryFromManifest(status, stage);
 		int windowTicks = switch (stage) {
 			case "adoption" -> ADOPTION_WINDOW_TICKS;
@@ -65,7 +73,8 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 			case "nether" -> NETHER_WINDOW_TICKS;
 			case "nether-powder" -> NETHER_POWDER_WINDOW_TICKS;
 			case "stronghold" -> STRONGHOLD_WINDOW_TICKS;
-			case "end-kit", "defense", "feeding", "portal", "nether-supplies", "nether-distant-supplies", "shelter", "equipment", "end-entry", "end-camp", "end-crystal", "generated-end-crystals",
+			case "expedition" -> COMPLETE_WINDOW_TICKS;
+			case "end-kit", "defense", "feeding", "portal", "nether-supplies", "nether-distant-supplies", "shelter", "equipment", "end-entry", "end-camp", "end-camp-route", "end-crystal", "generated-end-crystals",
 					"eye-route", "stronghold-approach", "ender-supplies", "generated-end-entry", "quarry-tools", "quarry-iron", "end-return" -> 0;
 			default -> throw new AssertionError("Unknown expedition stage " + stage);
 		};
@@ -74,6 +83,8 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 		var originalDog = new AtomicReference<UUID>();
 		var stayedWithGear = new AtomicBoolean();
 		var togetherInNether = new AtomicBoolean();
+		var togetherInEnd = new AtomicBoolean();
+		var originalDragon = new AtomicReference<UUID>();
 		var companionDeath = new AtomicReference<String>();
 		ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, source, baseDamage, damage, blocked) -> {
 			if (damage > 0 && !blocked && entity instanceof MushroomYorkieEntity dog && dog.getUUID().equals(originalDog.get())) {
@@ -156,9 +167,11 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 					ExpeditionEndKitClientScenario.run(context, server, ownerId, status);
 					return;
 				}
-				if ("end-entry".equals(stage) || "generated-end-entry".equals(stage) || "end-camp".equals(stage)) {
+				if ("end-entry".equals(stage) || "generated-end-entry".equals(stage)
+						|| "end-camp".equals(stage) || "end-camp-route".equals(stage)) {
 					ExpeditionEndEntryClientScenario.run(context, server, ownerId, status,
-							!"end-entry".equals(stage), "end-camp".equals(stage));
+							!"end-entry".equals(stage), "end-camp".equals(stage) || "end-camp-route".equals(stage),
+							"end-camp-route".equals(stage));
 					return;
 				}
 				if ("end-crystal".equals(stage)) {
@@ -183,6 +196,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 				}
 				Files.writeString(status, "ready", StandardOpenOption.CREATE_NEW);
 				boolean passed = false;
+				boolean verifiedEndVictory = false;
 				boolean frozenForHandoff = false;
 				Path handoffState = status.resolveSibling("live-handoff-safety");
 				if (live) Files.writeString(handoffState, "running");
@@ -221,6 +235,16 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 						server.runOnServer(minecraft -> minecraft.tickRateManager().setFrozen(freeze));
 						Files.writeString(handoffState, freeze ? "frozen" : "running");
 					}
+					if (full && !verifiedEndVictory && "victory".equals(result)) {
+						verifyExpeditionVictory(server, ownerId, originalDog.get(), originalDragon.get());
+						context.takeScreenshot("expedition-survival-expedition-victory");
+						Files.writeString(status.resolveSibling("native-end-victory"), originalDragon.get().toString());
+						verifiedEndVictory = true;
+					}
+					if (verifiedEndVictory && context.computeOnClient(client -> client.screen instanceof WinScreen)) {
+						ExpeditionTravelClientGameTest.finishPortalTravel(context, world, Level.END, Level.OVERWORLD);
+					}
+					final boolean won = verifiedEndVictory;
 					String dogEvidence = server.computeOnServer(minecraft -> {
 						var owner = minecraft.getPlayerList().getPlayer(ownerId);
 						if (owner == null) {
@@ -248,12 +272,20 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 							if (stayedWithGear.get() && owner.level().dimension().equals(Level.NETHER) && !living.isOrderedToSit()) {
 								togetherInNether.set(true);
 							}
+							if (full && owner.level().dimension().equals(Level.END)) {
+								if (!living.isOrderedToSit()) togetherInEnd.set(true);
+								var fight = owner.level().getDragonFight();
+								if (fight != null && owner.level().getEntity(fight.getDragonUUID()) instanceof EnderDragon dragon
+										&& dragon.isAlive() && dragon.getHealth() == dragon.getMaxHealth()) {
+									originalDragon.compareAndSet(null, dragon.getUUID());
+								}
+							}
 						}
 						if (!finished) {
 							return null;
 						}
 						if (owner.isSleeping() || dogs.size() != 1 || !hasGuide
-								|| !owner.getInventory().contains(stack -> stack.is(Items.WOODEN_PICKAXE))
+								|| (!full && !owner.getInventory().contains(stack -> stack.is(Items.WOODEN_PICKAXE)))
 								|| minecraft.overworld().getDayTime() < 24_000L) {
 							throw new AssertionError("Expected to wake the next day with one living owned dog, the guide, and the pickaxe");
 						}
@@ -264,7 +296,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 								|| !owner.getInventory().contains(stack -> stack.is(Items.FURNACE)))) {
 							throw new AssertionError("The player did not finish with the earned stone pickaxe and furnace");
 						}
-						if (("iron".equals(stage) || visitsNether) && (!owner.getInventory().contains(stack -> stack.is(Items.IRON_PICKAXE))
+						if (!full && ("iron".equals(stage) || visitsNether) && (!owner.getInventory().contains(stack -> stack.is(Items.IRON_PICKAXE))
 								|| !owner.getInventory().contains(stack -> stack.is(Items.BUCKET) || stack.is(Items.WATER_BUCKET))
 								|| !owner.getInventory().contains(stack -> stack.is(Items.SHIELD)))) {
 							throw new AssertionError("The player did not finish with the earned iron pickaxe, bucket and shield");
@@ -282,6 +314,17 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 							throw new AssertionError("Expected the fresh expedition to earn and craft its stronghold powder supply");
 						}
 						if (strongholdTrip) verifyStrongholdArrival(owner, dogs.getFirst());
+						if (full) {
+							var stats = owner.getStats();
+							if (!won || !togetherInEnd.get() || dogs.getFirst().isOrderedToSit()
+									|| stats.getValue(Stats.ITEM_CRAFTED.get(Items.IRON_PICKAXE)) == 0
+									|| stats.getValue(Stats.ITEM_CRAFTED.get(Items.BOW)) == 0
+									|| stats.getValue(Stats.ITEM_CRAFTED.get(Items.ARROW)) == 0
+									|| stats.getValue(Stats.ENTITY_KILLED.get(EntityType.BLAZE)) == 0
+									|| stats.getValue(Stats.ITEM_CRAFTED.get(Items.ENDER_EYE)) < STRONGHOLD_EYES) {
+								throw new AssertionError("Expected earned equipment, full dragon victory, and the original dog back home");
+							}
+						}
 						return dogs.getFirst().getUUID().toString();
 					});
 					if (dogEvidence != null) {
@@ -324,7 +367,11 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 							|| owner.getInventory().countItem(Items.BLAZE_POWDER) < PORTAL_POWDER)) {
 						throw new AssertionError("The earned powder and its owner did not reload back home");
 					}
-				if (strongholdTrip) verifyStrongholdArrival(owner, dogs.getFirst());
+					if (strongholdTrip) verifyStrongholdArrival(owner, dogs.getFirst());
+					if (full && (!owner.level().dimension().equals(Level.OVERWORLD) || dogs.getFirst().isOrderedToSit()
+							|| !minecraft.getLevel(Level.END).getDragonFight().saveData().dragonKilled())) {
+						throw new AssertionError("The completed expedition did not reopen with the original dog and defeated dragon");
+					}
 				});
 				System.out.printf("Expedition Survival %s reopened: dog=%s owner=%s%n", stage, originalDog.get(), ownerId);
 				context.takeScreenshot("expedition-survival-" + stage + "-reopened");
@@ -359,6 +406,26 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 
 	private static boolean equipped(MushroomYorkieEntity dog) {
 		return dog.hasHarness() && dog.hasExpeditionVest();
+	}
+
+	private static void verifyExpeditionVictory(TestServerContext server, UUID ownerId, UUID dogId, UUID dragonId) {
+		server.runOnServer(minecraft -> {
+			var owner = minecraft.getPlayerList().getPlayer(ownerId);
+			var end = minecraft.getLevel(Level.END);
+			var fight = end.getDragonFight();
+			var exit = fight.saveData().exitPortalLocation().orElseThrow();
+			if (owner == null || !owner.isAlive() || !owner.level().dimension().equals(Level.END)
+					|| dragonId == null || !fight.saveData().dragonKilled() || end.getEntity(dragonId) != null
+					|| !BlockPos.betweenClosedStream(exit.offset(-3, 0, -3), exit.offset(3, 1, 3))
+							.anyMatch(pos -> end.getBlockState(pos).is(Blocks.END_PORTAL))
+					|| !end.getEntitiesOfClass(EndCrystal.class, new AABB(exit).inflate(110)).isEmpty()
+					|| !(end.getEntity(dogId) instanceof MushroomYorkieEntity dog)
+					|| !dog.isAlive() || !dog.belongsTo(owner) || !dog.isOrderedToSit() || !equipped(dog)
+					|| dog.expeditionCamp.anchor() == null || !dog.expeditionCamp.anchor().dimension().equals(Level.END)
+					|| !end.getBlockState(dog.expeditionCamp.anchor().pos()).is(ModBlocks.CAMP_MAT)) {
+				throw new AssertionError("Expected the original full-health dragon defeated and original dog sheltered at the open exit");
+			}
+		});
 	}
 
 	private static void verifyStrongholdArrival(ServerPlayer owner, MushroomYorkieEntity dog) {

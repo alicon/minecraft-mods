@@ -351,4 +351,5 @@ export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = 
   }
   assert.equal(broken.size, goal, cageOnly || tallestOnly
     ? 'The selected generated crystal is still intact' : 'Some generated End crystals are still intact');
+  return [...seen.values()];
 }

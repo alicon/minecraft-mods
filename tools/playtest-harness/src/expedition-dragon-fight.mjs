@@ -5,6 +5,7 @@ import { dragonBreathThreat, enterEndermanRefuge, retreatFromDragonThreat } from
 import { catchEndFall } from './expedition-end-cage.mjs';
 import { useEmptyHandOnCompanion } from './expedition-gear.mjs';
 import { bowAim, movingBowAim } from './expedition-ballistics.mjs';
+import { approachEndTrail, climbEndTrailWithCompanion, walkBackToEndCamp } from './expedition-end-route.mjs';
 
 const END = 'minecraft:the_end';
 const DRAGON = 'minecraft:ender_dragon';
@@ -476,10 +477,24 @@ export async function fightEndDragon(action, report, progress = {},
   throw new Error('The dragon fight did not reach a native open exit');
 }
 
-export async function recallAndExitEnd(action, uuid, shelter, portals, report) {
+export async function recallAndExitEnd(action, uuid, shelter, portals, report, trail) {
+  if (trail) {
+    await approachEndTrail(action, trail.at(-1));
+    await walkBackToEndCamp(action, trail);
+  }
   const dog = await regroupExpeditionCompanion(action, uuid, shelter);
   await useEmptyHandOnCompanion(action, uuid);
   await report('recalled', { previousPosition: dog.pos });
+  if (trail) {
+    await climbEndTrailWithCompanion(action, trail, async () => {
+      for (let check = 0; check < 20; check++) {
+        const dogs = await action('get_entities', { type: DOG, radius: 12 });
+        if (dogs?.entities.some(entity => entity.uuid === uuid && entity.health > 0 && entity.distance <= 5)) return;
+        await setTimeout(250);
+      }
+      throw new Error('The original Mushroom has not followed up the End staircase');
+    });
+  }
   const visited = [];
   const rejected = new Set();
   let lastJump;

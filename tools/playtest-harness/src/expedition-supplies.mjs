@@ -12,6 +12,7 @@ import {
 import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
 import { shelterAtEndArrival } from './expedition-end-camp.mjs';
+import { reachEndIslandSurface, walkBackToEndCamp } from './expedition-end-route.mjs';
 import { blazePowderCount, craftBlazePowder, earnBlazeRods } from './expedition-blaze-rods.mjs';
 import { clearGeneratedCrystals, readCrystalProgress, shootEndCrystal } from './expedition-end-crystals.mjs';
 import { fightEndDragon, recallAndExitEnd } from './expedition-dragon-fight.mjs';
@@ -58,6 +59,9 @@ const DOG_MEAL_INTERVAL = 4_000;
 const PORTAL_POWDER = 12;
 // Leave enough for the twelve sockets after up to eight scouting throws.
 const STRONGHOLD_EYES = 20;
+const END = 'minecraft:the_end';
+const STRONGHOLD_PHASES = ['gather-eyes', 'arm-for-end', 'follow-eyes', 'descend-stronghold'];
+const END_PHASES = ['cross-end', 'end-camp', 'end-surface', 'end-crystals', 'end-dragon', 'end-return', 'home'];
 
 const url = `http://127.0.0.1:${config.port}/mcp`;
 let session;
@@ -88,6 +92,7 @@ const milestoneObjectives = {
   'end-entry': 'Craft Eyes of Ender and bring Mushroom through the active portal.',
   'generated-end-entry': 'Find the generated portal room, open its portal, and bring Mushroom through.',
   'end-camp': 'Cross the generated portal with Mushroom and build his shelter on safe footing.',
+  'end-camp-route': 'Keep Mushroom under cover and dig a returnable staircase from his camp to the End island surface.',
   'end-crystal': 'Mark Mushroom’s shelter and break an End crystal from a safe bow position.',
   'generated-end-crystals': 'Shelter Mushroom and clear the generated End crystals using the bow and safe approaches.',
   'eye-route': 'Throw an Eye of Ender and follow its visible flight with Mushroom.',
@@ -249,7 +254,8 @@ try {
   const start = await action('observe');
   const startDimension = ['end-crystal', 'generated-end-crystals', 'end-return'].includes(stage) ? 'minecraft:the_end' : OVERWORLD;
   assert.ok(start?.inWorld && !start.dead && (start.dimension === startDimension
-    || (resume && ['nether', 'nether-powder', 'stronghold'].includes(stage) && start.dimension === NETHER)),
+    || (resume && ['nether', 'nether-powder', 'stronghold', 'expedition'].includes(stage) && start.dimension === NETHER)
+    || (resume && stage === 'expedition' && start.dimension === END)),
   'The controller was not in its expected starting dimension');
   if (!duel && milestoneObjectives[stage]) await narrate('Objective', milestoneObjectives[stage]);
   if (stage === 'defense') await runCompanionDrill();
@@ -285,7 +291,7 @@ try {
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
     await narrate('Objective', 'Earn the missing feather, craft a bow and arrows, and pack cooked food and water.');
     await prepareEndCombatKit(action, craft, companion, reportEndKit, { arrows: 12, rations: 3 });
-  } else if (stage === 'end-entry' || stage === 'generated-end-entry' || stage === 'end-camp') {
+  } else if (['end-entry', 'generated-end-entry', 'end-camp', 'end-camp-route'].includes(stage)) {
     companion = (await readFile(join(dirname(statusFile), 'end-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
     if (stage !== 'end-entry' && process.env.MUSHROOM_EXPEDITION_START_ABOVE_STRONGHOLD === '1') {
@@ -297,7 +303,16 @@ try {
       if (event === 'portal_room') await narrate('Result', 'Reached a dry position beside the generated End portal.');
     }) : undefined;
     await crossEndPortal(action, craft, companion, ring);
-    if (stage === 'end-camp') await shelterAtEndArrival(action, companion, reportEndCamp);
+    if (stage === 'end-camp' || stage === 'end-camp-route') {
+      const camp = await shelterAtEndArrival(action, companion, reportEndCamp);
+      if (stage === 'end-camp-route') {
+        const trail = await reachEndIslandSurface(action, camp, reportEndCamp);
+        await reportStatus('surface');
+        await awaitNativeProof('native-end-surface', companion, 'The server did not confirm the End surface and sheltered dog');
+        await walkBackToEndCamp(action, trail);
+        await narrate('Result', 'Walked the same staircase back to Mushroom’s shelter.');
+      }
+    }
   } else if (stage === 'end-crystal' || stage === 'generated-end-crystals' || archivedEnd) {
     const archive = archivedEnd
       ? JSON.parse(await readFile(join(dirname(statusFile), 'archived-end-start.json'), 'utf8')) : null;
@@ -365,26 +380,14 @@ try {
       if (archive) {
         assert.equal(victory.dragon, archive.dragon, 'The controller must fight the original dragon from the crystal stage');
         await reportStatus('victory');
-        const verified = join(dirname(statusFile), 'native-end-victory');
-        for (let attempt = 0; attempt < 60; attempt++) {
-          if ((await readFile(verified, 'utf8').catch(() => '')) === archive.dragon) break;
-          await setTimeout(200);
-        }
-        assert.equal(await readFile(verified, 'utf8'), archive.dragon);
+        await awaitNativeProof('native-end-victory', archive.dragon, 'The server did not confirm the archived dragon');
         await recallAndExitEnd(action, companion, archive.shelter, victory.portals, report);
         await narrate('Result', 'The player and the original Mushroom reached the Overworld.');
       }
     } else if (generated) {
       const observations = resume
         ? readCrystalProgress(await readFile(join(dirname(statusFile), 'actions.jsonl'), 'utf8')) : undefined;
-      await clearGeneratedCrystals(action, companion, async ({ crystal, position, destroyed, openedCage, highArc, confirmedMissing }) => {
-        const actionType = openedCage ? 'generated_cage_opened' : confirmedMissing ? 'generated_crystal_absence' : 'generated_crystal_shot';
-        console.log(JSON.stringify({ at: new Date().toISOString(), action: actionType,
-          crystal: crystal.uuid, target: crystal.pos, position, destroyed, openedCage, highArc, camp, dog: companion }));
-        if (openedCage) await narrate('Result', 'Opened a crystal cage and descended to the ground.');
-        if (destroyed) await narrate('Result', 'A generated End crystal broke.');
-        if (confirmedMissing) await narrate('Result', 'Confirmed the previously observed crystal is gone from its loaded tower.');
-      }, {
+      await clearGeneratedCrystals(action, companion, entry => reportGeneratedCrystal(entry, camp), {
         cageOnly: process.env.MUSHROOM_EXPEDITION_CAGE_ONLY === '1',
         tallestOnly: process.env.MUSHROOM_EXPEDITION_TALLEST_ONLY === '1',
         progress: observations,
@@ -448,7 +451,8 @@ async function runCompanionDrill() {
 }
 
 async function runExpedition(start, stage) {
-  const findStronghold = stage === 'stronghold';
+  const full = stage === 'expedition';
+  const findStronghold = stage === 'stronghold' || full;
   const huntBlazes = stage === 'nether-powder' || findStronghold;
   const powderNeeded = findStronghold ? STRONGHOLD_EYES : PORTAL_POWDER;
   const visitNether = stage === 'nether' || huntBlazes;
@@ -466,12 +470,26 @@ async function runExpedition(start, stage) {
     assert.ok(Number.isFinite(checkpoint.gameTime) && checkpoint.gameTime <= start.gameTime);
     assert.ok(['starter', 'provision', 'camp', 'adoption', 'stone', 'iron', 'nether'].includes(checkpoint.phase)
       || huntBlazes && checkpoint.phase === 'nether-returned'
-      || findStronghold && ['gather-eyes', 'arm-for-end', 'follow-eyes', 'descend-stronghold'].includes(checkpoint.phase));
+      || findStronghold && STRONGHOLD_PHASES.includes(checkpoint.phase)
+      || full && END_PHASES.includes(checkpoint.phase));
     assert.ok(checkpoint.timberSite === undefined || blockPosition(checkpoint.timberSite), 'Invalid recorded timber site');
     if (checkpoint.phase === 'descend-stronghold') {
       assert.ok(blockPosition(checkpoint.surfaceFix), 'Invalid recorded Eye bearing fix');
     }
-    assert.ok(start.dimension === OVERWORLD || checkpoint.phase === 'nether', 'Unexpected dimension before the Nether phase');
+    const inEndCampaign = full && END_PHASES.includes(checkpoint.phase);
+    if (inEndCampaign) {
+      const expected = ['cross-end', 'end-return'].includes(checkpoint.phase) ? [OVERWORLD, END]
+        : checkpoint.phase === 'home' ? [OVERWORLD] : [END];
+      assert.ok(expected.includes(start.dimension), 'The End recovery requires the player in the recorded dimension');
+      if (END_PHASES.indexOf(checkpoint.phase) >= END_PHASES.indexOf('end-surface')) {
+        assert.ok(blockPosition(checkpoint.endCamp?.mat) && blockPosition(checkpoint.endCamp?.shelter),
+          'Invalid recorded End camp');
+      }
+      assert.ok(checkpoint.endTrail === undefined || (Array.isArray(checkpoint.endTrail)
+        && checkpoint.endTrail.length <= 48 && checkpoint.endTrail.every(blockPosition)), 'Invalid recorded End staircase');
+    } else {
+      assert.ok(start.dimension === OVERWORLD || checkpoint.phase === 'nether', 'Unexpected dimension before the Nether phase');
+    }
     const handoffState = join(dirname(statusFile), 'live-handoff-safety');
     const worldTicks = () => readFile(handoffState, 'utf8').catch(error => {
       if (error.code === 'ENOENT') return null;
@@ -831,8 +849,7 @@ async function runExpedition(start, stage) {
     checkpoint.lastDogMealAt = (await action('observe')).gameTime;
     if (live) await writeCheckpoint(checkpoint);
   }
-  const returnedFromNether = ['nether-returned', 'gather-eyes', 'arm-for-end', 'follow-eyes', 'descend-stronghold']
-    .includes(checkpoint.phase);
+  const returnedFromNether = ['nether-returned', ...STRONGHOLD_PHASES, ...END_PHASES].includes(checkpoint.phase);
   if (visitNether && !returnedFromNether) {
     if (checkpoint.phase !== 'nether') {
       await narrate('Objective', 'Equip Mushroom and pack the camp mat before travelling.');
@@ -871,6 +888,7 @@ async function runExpedition(start, stage) {
   }
   if (findStronghold && checkpoint.phase === 'arm-for-end') {
     await narrate('Objective', 'Earn a durable bow, ammunition, two water buckets and cooked rations for the End.');
+    if (full) await prepareCompanionGear(action, craft, checkpoint.dog, checkpoint.equipment);
     await prepareEndCombatKit(action, craft, checkpoint.dog, reportEndKit);
     checkpoint.phase = 'follow-eyes';
     if (live) await writeCheckpoint(checkpoint);
@@ -883,11 +901,80 @@ async function runExpedition(start, stage) {
     checkpoint.phase = 'descend-stronghold';
     if (live) await writeCheckpoint(checkpoint);
   }
+  let ring;
   if (findStronghold && checkpoint.phase === 'descend-stronghold') {
     await narrate('Objective', 'Find a safe way down from the Eye bearings and lead Mushroom to the portal room.');
     await descendToStronghold(action, checkpoint.dog, checkpoint.surfaceFix, reportStrongholdEntry);
-    await findStrongholdPortalRoom(action, checkpoint.dog, reportStrongholdEntry);
+    ring = await findStrongholdPortalRoom(action, checkpoint.dog, reportStrongholdEntry);
+    if (full) {
+      checkpoint.phase = 'cross-end';
+      if (live) await writeCheckpoint(checkpoint);
+    }
   }
+  if (full) await finishExpeditionInEnd(checkpoint, ring);
+}
+
+async function finishExpeditionInEnd(checkpoint, observedRing) {
+  const uuid = checkpoint.dog;
+  const save = async () => {
+    if (live) await writeCheckpoint(checkpoint);
+  };
+  const next = async phase => {
+    checkpoint.phase = phase;
+    await save();
+  };
+  if (checkpoint.phase === 'cross-end') {
+    await narrate('Objective', 'Activate the generated End portal and bring the original Mushroom through.');
+    if ((await action('observe')).dimension !== END) {
+      const ring = observedRing ?? await findStrongholdPortalRoom(action, uuid, reportStrongholdEntry);
+      await crossEndPortal(action, craft, uuid, ring);
+    }
+    await next('end-camp');
+  }
+  if (checkpoint.phase === 'end-camp') {
+    checkpoint.endCamp = await shelterAtEndArrival(action, uuid, reportEndCamp);
+    await next('end-surface');
+  }
+  if (checkpoint.phase === 'end-surface') {
+    checkpoint.endTrail ??= [];
+    await reachEndIslandSurface(action, checkpoint.endCamp, reportEndCamp, checkpoint.endTrail, save);
+    await next('end-crystals');
+  }
+  if (checkpoint.phase === 'end-crystals') {
+    await narrate('Objective', 'Clear the generated crystals while Mushroom stays under cover.');
+    const prior = resume
+      ? readCrystalProgress(await readFile(join(dirname(statusFile), 'actions.jsonl'), 'utf8')) : undefined;
+    const crystals = await clearGeneratedCrystals(action, uuid,
+      entry => reportGeneratedCrystal(entry, checkpoint.endCamp.mat), { progress: prior });
+    const center = [0, 2].map(axis => Math.round(crystals.reduce((sum, crystal) => sum + crystal.pos[axis], 0) / crystals.length));
+    checkpoint.dragonProgress = { fountain: [center[0], Math.floor((await action('observe')).position.y), center[1]] };
+    await next('end-dragon');
+  }
+  const reportFight = async (kind, observation) => {
+    console.log(JSON.stringify({ at: new Date().toISOString(), action: `dragon_${kind}`, observation, dog: uuid }));
+    if (kind === 'fountain') checkpoint.dragonProgress.fountain = observation.position;
+    if (kind === 'strike') Object.assign(checkpoint.dragonProgress, { dragon: observation.dragon, hits: observation.hits });
+    if (kind === 'strike' || kind === 'fountain') await save();
+    if (kind === 'victory') await narrate('Result', 'The native End exit is open.');
+  };
+  if (checkpoint.phase === 'end-dragon') {
+    await narrate('Objective', 'Fight the original dragon with the earned gear and keep Mushroom at camp.');
+    const reflexes = await action('set_reflexes', { autoDefend: false, waterLanding: true });
+    checkpoint.victory = await fightEndDragon(action, reportFight, checkpoint.dragonProgress,
+      { nativeWaterLanding: reflexes?.waterLanding === true, shootWhileFlying: true });
+    await next('end-return');
+  }
+  if (checkpoint.phase === 'end-return') {
+    if ((await action('observe')).dimension === END) {
+      await reportStatus('victory');
+      await awaitNativeProof('native-end-victory', checkpoint.victory.dragon, 'The server did not confirm the final dragon');
+      await recallAndExitEnd(action, uuid, checkpoint.endCamp.shelter, checkpoint.victory.portals, reportFight, checkpoint.endTrail);
+    }
+    await withCompanion(action, OVERWORLD, uuid);
+    await narrate('Result', 'Returned to the Overworld with the original living Mushroom after the dragon fight.');
+    await next('home');
+  }
+  assert.equal(checkpoint.phase, 'home', 'The full expedition must finish in the Overworld');
 }
 
 async function reportEndKit(kind, observation) {
@@ -895,9 +982,19 @@ async function reportEndKit(kind, observation) {
   if (kind === 'packed') await narrate('Result', 'Packed the bow, arrows, rations and two filled buckets.');
 }
 
+async function reportGeneratedCrystal({ crystal, position, destroyed, openedCage, highArc, confirmedMissing }, camp) {
+  const type = openedCage ? 'generated_cage_opened' : confirmedMissing ? 'generated_crystal_absence' : 'generated_crystal_shot';
+  console.log(JSON.stringify({ at: new Date().toISOString(), action: type,
+    crystal: crystal.uuid, target: crystal.pos, position, destroyed, openedCage, highArc, camp, dog: companion }));
+  if (openedCage) await narrate('Result', 'Opened a crystal cage and descended to the ground.');
+  if (destroyed) await narrate('Result', 'A generated End crystal broke.');
+  if (confirmedMissing) await narrate('Result', 'Confirmed the previously observed crystal is gone from its loaded tower.');
+}
+
 async function reportEndCamp(kind, observation) {
   console.log(JSON.stringify({ at: new Date().toISOString(), action: `end_camp_${kind}`, observation, dog: companion }));
   if (kind === 'sheltered') await narrate('Result', 'Marked the mat and settled the original Mushroom under cover.');
+  if (kind === 'surface') await narrate('Result', 'Reached exposed End stone by walking a staircase from camp.');
 }
 
 async function reportStrongholdEntry(kind, observation) {
@@ -953,6 +1050,19 @@ function verifiedDeathSite(player, checkpoint) {
 
 async function reportStatus(status) {
   await replaceFile(statusFile, status);
+}
+
+async function awaitNativeProof(file, expected, failure) {
+  const verified = join(dirname(statusFile), file);
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const result = await readFile(verified, 'utf8').catch(error => {
+      if (error.code === 'ENOENT') return '';
+      throw error;
+    });
+    if (result === expected) return;
+    await setTimeout(200);
+  }
+  throw new Error(failure);
 }
 
 async function replayBucketLanding(reflexes, start, report) {

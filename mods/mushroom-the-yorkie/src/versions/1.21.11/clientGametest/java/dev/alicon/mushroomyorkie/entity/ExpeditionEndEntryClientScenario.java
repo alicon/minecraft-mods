@@ -23,6 +23,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.EndPortalFrameBlock;
 import net.minecraft.world.level.gamerules.GameRules;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceType;
 import net.minecraft.world.level.levelgen.structure.structures.StrongholdStructure;
@@ -33,7 +34,7 @@ final class ExpeditionEndEntryClientScenario {
 	}
 
 	static void run(ClientGameTestContext context, TestServerContext server, UUID ownerId, Path status,
-			boolean generated, boolean shelter) throws IOException {
+			boolean generated, boolean shelter, boolean route) throws IOException {
 		boolean startAbove = generated && "1".equals(System.getenv("MUSHROOM_EXPEDITION_START_ABOVE_STRONGHOLD"));
 		var fixture = server.computeOnServer(minecraft -> {
 			var owner = Objects.requireNonNull(minecraft.getPlayerList().getPlayer(ownerId));
@@ -79,14 +80,36 @@ final class ExpeditionEndEntryClientScenario {
 				&& client.level.getEntity(fixture.runtimeId()) instanceof MushroomYorkieEntity);
 		Files.writeString(status.resolveSibling("end-companion"), fixture.dogId().toString());
 		Files.writeString(status, "ready");
+		boolean reachedSurface = false;
 		for (int tick = 0; tick < (generated ? 8_000 : 1_800); tick += 5) {
 			String result = Files.readString(status);
+			if (route && !reachedSurface && "surface".equals(result)) {
+				server.runOnServer(minecraft -> {
+					var owner = minecraft.getPlayerList().getPlayer(ownerId);
+					var pos = owner.blockPosition();
+					var level = owner.level();
+					if (!owner.isAlive() || !level.dimension().equals(Level.END)
+							|| !level.getBlockState(pos.below()).is(Blocks.END_STONE)
+							|| level.getHeight(Heightmap.Types.MOTION_BLOCKING, pos.getX(), pos.getZ()) != pos.getY()
+							|| owner.getStats().getValue(Stats.BLOCK_MINED.get(Blocks.END_STONE)) == 0
+							|| !(level.getEntity(fixture.dogId()) instanceof MushroomYorkieEntity dog)
+							|| !dog.isAlive() || !dog.isOrderedToSit() || !dog.belongsTo(owner)
+							|| dog.distanceTo(owner) < 5) {
+						throw new AssertionError("Expected the player on the End island surface and original dog at camp");
+					}
+				});
+				context.takeScreenshot("expedition-survival-end-camp-route-surface");
+				Files.writeString(status.resolveSibling("native-end-surface"), fixture.dogId().toString());
+				reachedSurface = true;
+			}
 			if ("finished".equals(result)) {
+				if (route && !reachedSurface) throw new AssertionError("Expected a verified trip to the End island surface");
 				server.runOnServer(minecraft -> {
 					var owner = minecraft.getPlayerList().getPlayer(ownerId);
 					if (!owner.isAlive() || !owner.level().dimension().equals(Level.END)
 							|| !(owner.level().getEntity(fixture.dogId()) instanceof MushroomYorkieEntity dog)
 							|| !dog.isAlive() || !dog.belongsTo(owner) || dog.isOrderedToSit() != shelter
+								|| (route && dog.distanceTo(owner) > 4)
 							|| !minecraft.overworld().getBlockState(fixture.center()).is(Blocks.END_PORTAL)
 							|| (startAbove && owner.getStats().getValue(Stats.BLOCK_MINED.get(Blocks.STONE)) == 0)
 							|| (generated ? owner.getInventory().countItem(Items.ENDER_EYE) >= 12
@@ -108,10 +131,11 @@ final class ExpeditionEndEntryClientScenario {
 						}
 					}
 				});
-				context.takeScreenshot(shelter ? "expedition-survival-end-camp"
+				context.takeScreenshot(route ? "expedition-survival-end-camp-route-returned" : shelter ? "expedition-survival-end-camp"
 						: generated ? "expedition-survival-generated-end-entry" : "expedition-survival-end-entry");
 				System.out.printf("Expedition native %s passed: dog=%s owner=%s%n",
-						shelter ? "End camp" : generated ? "generated End entry" : "End entry", fixture.dogId(), ownerId);
+						route ? "End camp route" : shelter ? "End camp" : generated ? "generated End entry" : "End entry",
+						fixture.dogId(), ownerId);
 				return;
 			}
 			if ("failed".equals(result)) break;

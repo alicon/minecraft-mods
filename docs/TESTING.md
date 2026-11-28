@@ -408,6 +408,22 @@ original dog to stay, builds a roof with room for him and his mat, and
 marks the mat through normal Use. The server verifies the same living,
 seated dog and marked mat beneath solid cover.
 
+Set `MUSHROOM_EXPEDITION_STAGE=end-camp-route` to walk the generated End
+landing to the surface and retrace the same stairs back to camp. The
+controller mines observed End stone and keeps the camp floor and roof in
+place. The server verifies the exposed End surface and seated original
+Mushroom at the waypoint, then verifies the same dog and camp when the
+owner returns.
+
+Set `MUSHROOM_EXPEDITION_STAGE=expedition` for the complete fresh Survival
+campaign. After earning its gear and reaching the generated stronghold,
+the player crosses with Mushroom, builds and marks his shelter, reaches
+the surface, clears the generated crystals, and fights the dragon.
+The server records the original full-health dragon and verifies the
+native exit before the player recalls Mushroom and brings him home.
+The run finishes after a save and reopen check of the original living
+dog, his owner and equipment, and the defeated dragon.
+
 Set `MUSHROOM_EXPEDITION_STAGE=end-crystal` to replay the first combat step
 with a native bow. The disposable End fixture supplies a bow, arrows, a
 camp mat, a seated Mushroom under cover, and one raised End crystal. The
