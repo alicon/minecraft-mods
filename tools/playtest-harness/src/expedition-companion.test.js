@@ -102,6 +102,28 @@ test('when a creeper is close to the original dog, retreat without swinging', as
   assert.ok(moves[0][0] < 0);
 });
 
+test('a creeper between the player and injured Mushroom overrides a melee rescue', async () => {
+  const { defendCompanion } = await import('./expedition-companion.mjs');
+  const injuredDog = { ...dog, pos: [11, 64, 0], distance: 11 };
+  const nearbyCreeper = { ...spider, id: 3240, type: 'minecraft:creeper', pos: [4, 64, 0], distance: 4 };
+  const attacker = { ...spider, pos: [12, 64, 0], distance: 12 };
+  const ground = Array.from({ length: 13 }, (_, i) => ({ x: i - 6, y: 63, z: 0, b: 'minecraft:dirt' }));
+  const moves = [];
+  const action = async (name, args) => {
+    if (name === 'get_entities') return { entities: [injuredDog, nearbyCreeper, attacker] };
+    if (name === 'stop') return {};
+    if (name === 'get_blocks') return { cells: ground };
+    if (name === 'go_to') {
+      assert.ok(args.pos[0] < 0);
+      moves.push(args.pos);
+      return { arrived: true };
+    }
+    assert.fail(name);
+  };
+  assert.equal(await defendCompanion(action, player, injuredDog.uuid), true);
+  assert.equal(moves.length, 1);
+});
+
 test('harmless nearby mobs and injury to another dog leave the current task alone', async () => {
   const { defendCompanion } = await import('./expedition-companion.mjs');
   const unhurt = { ...dog, recentlyHurt: false, health: 20 };

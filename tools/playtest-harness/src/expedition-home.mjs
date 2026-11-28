@@ -284,24 +284,26 @@ export async function stepOut(action, player, visited, destination, preferredGro
   return !wrongHeight && moved;
 }
 
-export async function retreatFromNearbyMob(action, player, visited, rejectedSteps, warningDistance = 7, creeperWarning = 16) {
+export async function retreatFromNearbyMob(action, player, visited, rejectedSteps,
+  warningDistance = 7, creeperWarning = 16, skeletonWarning = warningDistance) {
   // A scouting walk can cover ten blocks before the next observation.
   let danger;
   let pursuit;
   let hazards;
   for (const threat of player.threats ?? []) {
     const creeper = threat.type === 'minecraft:creeper';
-    if (threat.distance > (creeper ? creeperWarning : warningDistance)
+    const warning = /:(?:skeleton|stray|bogged|parched)$/.test(threat.type) ? skeletonWarning : warningDistance;
+    if (threat.distance > (creeper ? creeperWarning : warning)
         || (threat.type === 'minecraft:spider' && !isBedtime(player) && threat.distance > 3)) continue;
-    pursuit = threat.distance < (warningDistance > 7 ? 7 : 3) && !creeper;
-    const surveyGroup = pursuit || warningDistance > 7;
+    pursuit = threat.distance < (warning > 7 ? 7 : 3) && !creeper;
+    const surveyGroup = pursuit || warning > 7;
     const nearby = await action('get_entities', surveyGroup
-      ? { radius: warningDistance + 1, max: 96 } : { type: threat.type, radius: 18, max: 16 });
+      ? { radius: warning + 1, max: 96 } : { type: threat.type, radius: 18, max: 16 });
     const candidate = nearby?.entities.find(entity => entity.id === threat.id && entity.hostile);
     if (!candidate || (creeper && await separatedByRock(action, player, candidate))) continue;
     danger = { ...candidate, type: threat.type };
     hazards = surveyGroup
-      ? nearby.entities.filter(entity => entity.hostile && entity.distance <= warningDistance).map(entity => entity.pos)
+      ? nearby.entities.filter(entity => entity.hostile && entity.distance <= warning).map(entity => entity.pos)
       : danger.pos;
     break;
   }
@@ -1301,7 +1303,7 @@ export async function waitForDaylightRecovery(action, bed, report) {
         continue;
       }
     }
-    if (await retreatFromNearbyMob(action, player, visited, rejected)) continue;
+    if (await retreatFromNearbyMob(action, player, visited, rejected, 7, 16, 16)) continue;
     await setTimeout(2_500);
   }
   throw new Error('Could not reach daylight safely before the reunion');

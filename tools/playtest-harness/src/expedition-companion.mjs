@@ -10,16 +10,23 @@ export async function defendCompanion(action, player, dogUuid) {
   const dog = snapshot?.entities.find(entity => entity.type === DOG && entity.uuid === dogUuid);
   if (!dog) return false;
   const injured = dog.recentlyHurt || dog.health <= 8;
-  const threats = snapshot.entities.filter(entity => entity.hostile && distance(entity.pos, dog.pos)
-    <= (injured && entity.type !== 'minecraft:creeper' ? 4.5 : 3));
-  const creeper = threats.find(entity => entity.type === 'minecraft:creeper');
-  let attacker = threats.sort((a, b) => distance(a.pos, dog.pos) - distance(b.pos, dog.pos))[0];
-  if (!creeper && (!attacker || !injured)) return false;
+  const threats = snapshot.entities.filter(entity => entity.hostile);
+  const creeper = threats.filter(entity => entity.type === 'minecraft:creeper'
+    && (distance(entity.pos, dog.pos) <= 5 || (injured || dog.distance <= 6) && entity.distance <= 7))
+    .sort((a, b) => a.distance - b.distance)[0];
+  if (creeper) {
+    await action('stop', { closeScreen: Boolean(player.screen) });
+    await retreat(action, player, creeper);
+    return true;
+  }
+  if (!injured) return false;
+  let attacker = threats.filter(entity => entity.type !== 'minecraft:creeper' && distance(entity.pos, dog.pos) <= 4.5)
+    .sort((a, b) => distance(a.pos, dog.pos) - distance(b.pos, dog.pos))[0];
+  if (!attacker) return false;
 
   await action('stop', { closeScreen: Boolean(player.screen) });
-  if (creeper || player.health < 7) {
-    if (dog.distance <= 4) await retreat(action, player, creeper ?? attacker);
-    else if (dog.distance <= 9 && creeper?.distance > 5) await approach(action, dog.id);
+  if (player.health < 7) {
+    if (dog.distance <= 4) await retreat(action, player, attacker);
     return true;
   }
 
@@ -68,7 +75,7 @@ async function retreat(action, player, threat) {
   const [dx, , dz] = [x, y, z].map((axis, index) => axis - threat.pos[index]);
   const goal = [start[0] + Math.sign(dx) * 6, start[1], start[2] + Math.sign(dz) * 6];
   const local = await action('get_blocks', { center: start, size: [15, 7, 15], format: 'json' });
-  const waypoint = local && dryWaypoint(local.cells, start, [start], goal);
+  const waypoint = local && dryWaypoint(local.cells, start, [start], goal, undefined, new Set(), threat.pos);
   if (waypoint && distance(waypoint, threat.pos) > distance(start, threat.pos)) {
     await action('go_to', { pos: waypoint, stopDistance: 0.7, maxTicks: 24 });
   }

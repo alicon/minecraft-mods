@@ -169,6 +169,29 @@ test('an unarmored scout runs away from a close skeleton along native dry waypoi
   assert.ok(stepped);
 });
 
+test('a skeleton in shooting range interrupts an exposed daylight wait before it reaches seven blocks', async () => {
+  const { waitForDaylightRecovery } = await import('./expedition-home.mjs');
+  const skeleton = { id: 3029, type: 'minecraft:skeleton', hostile: true, distance: 10.3, pos: [10.8, 94, 0.5] };
+  const floor = Array.from({ length: 17 }, (_, i) => cell(i - 8, 93, 0));
+  let escaped = false;
+  const action = async (name, args) => {
+    if (name === 'observe') return { inWorld: true, onGround: true, dimension: 'minecraft:overworld',
+      position: { x: 0.5, y: 94, z: 0.5 }, health: 20, timeOfDay: escaped ? 20 : 22_800,
+      gameTime: 35_500, threats: escaped ? [] : [skeleton] };
+    if (name === 'get_entities') return { entities: args.radius >= 11 ? [skeleton] : [] };
+    if (name === 'get_blocks') return { cells: floor };
+    if (name === 'get_inventory') return { slots: [] };
+    if (name === 'go_to') {
+      assert.ok(args.pos[0] < 0);
+      escaped = true;
+      return { arrived: true, position: args.pos };
+    }
+    assert.fail(name);
+  };
+  await waitForDaylightRecovery(action, [50, 94, 0], () => {});
+  assert.ok(escaped);
+});
+
 test('a creeper at fourteen blocks diverts the next scouting walk before the fuse', async () => {
   const { retreatFromNearbyMob } = await import('./expedition-home.mjs');
   const player = { position: { x: 0.5, y: 64, z: 0.5 }, timeOfDay: 5_850, health: 16,
