@@ -28,25 +28,26 @@ export function canStepTo(dimension, clouds, from, to) {
       || (inCloud(cloud, from) && distanceSquared(cloud, to) > distanceSquared(cloud, from)));
 }
 
-function exposedSide(dimension, side) {
-  const ground = dimension.getBlockFromRay({ x: side.x + 0.5, y: side.y + 0.9, z: side.z + 0.5 },
-    { x: 0, y: -1, z: 0 }, { maxDistance: 3.9, includePassableBlocks: false, includeLiquidBlocks: false })?.block;
+function exposedFooting(dimension, point, includeLiquidBlocks = false) {
+  const ground = dimension.getBlockFromRay({ x: point.x + 0.5, y: point.y + 0.9, z: point.z + 0.5 },
+    { x: 0, y: -1, z: 0 }, { maxDistance: 3.9, includePassableBlocks: false, includeLiquidBlocks })?.block;
   if (!ground) return true;
-  for (let y = side.y; y >= ground.y; y--) {
-    const block = blockAt(dimension, { ...side, y });
+  for (let y = point.y; y >= ground.y; y--) {
+    const block = blockAt(dimension, { ...point, y });
     if (!block || isExpeditionHazard(block)) return true;
   }
   return false;
 }
 
-export function unsafeTrailStep(dimension, step, dx, dz) {
+export function unsafeTrailStep(dimension, step, dx, dz, approachingEdge) {
   const block = blockAt(dimension, step);
   if (block?.typeId === "minecraft:portal" || block?.typeId === "minecraft:nether_portal") return false;
   if (!block || isExpeditionHazard(block) || isExpeditionHazard(blockAt(dimension, { ...step, y: step.y - 1 }))) {
     return true;
   }
-  return exposedSide(dimension, { x: step.x + dz, y: step.y, z: step.z + dx })
-    && exposedSide(dimension, { x: step.x - dz, y: step.y, z: step.z - dx });
+  if (approachingEdge && exposedFooting(dimension, step, true)) return true;
+  return exposedFooting(dimension, { x: step.x + dz, y: step.y, z: step.z + dx })
+    && exposedFooting(dimension, { x: step.x - dz, y: step.y, z: step.z - dx });
 }
 
 export function findRetreat(dimension, location, camp, clouds) {

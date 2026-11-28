@@ -72,8 +72,9 @@ fixture exercises native placement, ownership, a safe route around a wall, recal
 and a missing mat. It also throws a lingering potion in the End to exercise a
 native cloud and keep Mushroom clear while the owner is still inside it.
 A restart checks the same dog's mark and safety hold. The trail fixture
-checks a one-wide bridge for an owner and for a guest holding the lead, then
-widens it and verifies that Mushroom resumes walking across.
+checks a one-wide bridge for an owner and for a guest holding the lead. It also
+checks a deep gap beside a solid shoulder. Mushroom resumes walking when the
+crossing has safe footing.
 The Dragon fixture watches for a native fireball and its breath cloud, then
 tests the original dog walking out on prepared footing. A separate fresh world
 stages the final hit by reducing the Dragon's health and clearing its crystals.

@@ -8,7 +8,7 @@ const ORDERED_SIT = storage("ordered_sit");
 const TICKS_PER_CHECK = 2;
 const warnings = new Map();
 
-function walkingToward(dog, handler, holding) {
+function walkingToward(dog, handler, holding, velocity) {
   if (!(handler instanceof Player) || !handler.isValid || handler.dimension.id !== dog.dimension.id
     || !dog.isOnGround || dog.isInWater || dog.getProperty(ORDERED_SIT) || dog.getProperty(WALKING_AFTER_STAY)
     || dog.getProperty(FLIGHT_MODE) !== "ground" || dog.getProperty(storage("fetch_busy"))
@@ -18,7 +18,7 @@ function walkingToward(dog, handler, holding) {
     || distanceSquared(dog.location, handler.location) < 2 ** 2) return undefined;
   const { x, z } = holding
     ? { x: handler.location.x - dog.location.x, z: handler.location.z - dog.location.z }
-    : dog.getVelocity();
+    : velocity;
   if (Math.hypot(x, z) < 0.06) return undefined;
   return Math.abs(x) >= Math.abs(z) ? { dx: Math.sign(x), dz: 0 } : { dx: 0, dz: Math.sign(z) };
 }
@@ -32,22 +32,34 @@ function updateTrail(dog) {
   }
   const lead = dog.getComponent("minecraft:leashable");
   const handler = lead?.isLeashed ? lead.leashHolder : dog.getComponent("minecraft:is_tamed")?.tamedToPlayer;
-  const direction = walkingToward(dog, handler, holding);
+  const velocity = dog.getVelocity();
+  const direction = walkingToward(dog, handler, holding, velocity);
   const former = warnings.get(dog.id);
   const { x, y, z } = dog.location;
+  let approachingEdge = false;
+  if (direction) {
+    const position = direction.dx ? x : z;
+    const sign = direction.dx || direction.dz;
+    const edge = Math.floor(position) + (sign > 0 ? 1 : 0);
+    const speed = Math.abs(direction.dx ? velocity.x : velocity.z);
+    // Brief sideways leash motion may settle before it would reach the edge.
+    approachingEdge = Math.abs(edge - position) <= Math.max(0.5, speed * TICKS_PER_CHECK + 0.1);
+  }
   const checking = former && handler?.id === former.handler && distanceSquared(handler.location, former.at) <= 4
     ? former : direction && {
       ...direction,
       step: { x: Math.floor(x) + direction.dx, y: Math.floor(y), z: Math.floor(z) + direction.dz },
+      approachingEdge,
       handler: handler.id,
       at: handler.location,
     };
-  if (!direction || !checking || !unsafeTrailStep(dog.dimension, checking.step, checking.dx, checking.dz)) {
+  if (!direction || !checking || !unsafeTrailStep(
+    dog.dimension, checking.step, checking.dx, checking.dz, checking.approachingEdge
+  )) {
     if (holding) dog.triggerEvent(storage("home_idle"));
     warnings.delete(dog.id);
     return;
   }
-  const velocity = dog.getVelocity();
   dog.applyImpulse({ x: -velocity.x, y: 0, z: -velocity.z });
   warnings.set(dog.id, checking);
   if (!holding) {
