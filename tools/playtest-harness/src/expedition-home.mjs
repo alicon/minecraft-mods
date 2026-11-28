@@ -1192,7 +1192,7 @@ export async function earnStoneKit(action, craft, { table, bed },
       : normalWork;
     if (work === 'camp') break;
     if (stairs.length || work === 'quarry') {
-      const descent = stairs.length < 7
+      const descent = stairs.length < 14
         ? await descendQuarry(action, player, bed, stairs, protectedGround)
         : 'unavailable';
       if (Array.isArray(descent)) continue;
