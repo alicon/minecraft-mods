@@ -5,6 +5,7 @@ import {
   nearestCover, quarryStep,
 } from './expedition-navigation.mjs';
 import { cookExpeditionMutton, makeExpeditionCharcoal, smeltExpeditionIron } from './expedition-furnace.mjs';
+import { enterShelter, findShelteredBed, useShelterDoor } from './expedition-shelter.mjs';
 
 export const WOOD_LOGS = ['oak', 'birch', 'spruce', 'acacia', 'dark_oak', 'jungle', 'cherry', 'pale_oak', 'mangrove']
   .map(wood => `${wood}_log`);
@@ -224,6 +225,9 @@ export async function gatherWool(action, descendFromCanopy, chooseRoute, craft) 
   const rejectedSteps = new Set();
   const triedAnimals = new Map();
   const triedFlowers = new Set();
+  const blockedShelters = new Set();
+  let shelter;
+  let shelterSteps = 0;
   let stalls = 0;
   // The first flock can come into range after several minutes of safe scouting.
   for (let round = 0; round < 400; round++) {
@@ -241,6 +245,21 @@ export async function gatherWool(action, descendFromCanopy, chooseRoute, craft) 
     if (player.food <= 16 && meal) {
       await hold(action, meal);
       await action('use_item', { ticks: 36 });
+    }
+    if (craft && !shelter && round % 8 === 0) {
+      shelter = await findShelteredBed(action, player, blockedShelters);
+      shelterSteps = 0;
+    }
+    if (shelter && player.food > 10) {
+      const here = feet(player);
+      if (here.join(',') === shelter.entrance.join(',')) {
+        if (await enterShelter(action, shelter)) return shelter;
+      } else if (shelterSteps++ < 20) {
+        visited.push(here);
+        if (await stepOut(action, player, visited, shelter.entrance, undefined, rejectedSteps)) continue;
+      }
+      blockedShelters.add(String(shelter.bed));
+      shelter = undefined;
     }
     const nearby = await action('get_entities', { type: 'sheep', radius: 96, max: 16 });
     const sheep = nearby.entities.find(entity => (triedAnimals.get(entity.id) ?? -10) < round - 3
@@ -282,7 +301,7 @@ export async function gatherWool(action, descendFromCanopy, chooseRoute, craft) 
   throw new Error('Sheep search ended before earning three matching wool blocks');
 }
 
-async function placeBeside(action, item) {
+export async function placeBeside(action, item) {
   await hold(action, item);
   const player = await action('observe');
   const { cells } = await action('get_blocks', { center: feet(player), size: [11, 5, 11], format: 'json' });
@@ -533,12 +552,15 @@ export async function forageExpeditionMeal(action) {
 }
 
 export async function prepareAdoptionCamp(action, craft, descendFromCanopy, { chooseRoute } = {}) {
-  const color = await gatherWool(action, descendFromCanopy, chooseRoute, craft);
+  const bedding = await gatherWool(action, descendFromCanopy, chooseRoute, craft);
+  if (typeof bedding !== 'string') {
+    return { bed: bedding.bed, door: bedding.door, entrance: bedding.entrance };
+  }
   await ensurePlanks(action, craft, 3);
   // Bring the first table to the flock so sleeping doesn't depend on retracing the route.
   const table = await placeBeside(action, 'minecraft:crafting_table');
   assert.equal((await action('interact_block', { pos: table }))?.screenOpened, 'CraftingScreen');
-  const bed = `minecraft:${color}_bed`;
+  const bed = `minecraft:${bedding}_bed`;
   await craft(bed, 1);
   await action('stop', { closeScreen: true });
   const bedPos = await placeBeside(action, bed);
@@ -546,8 +568,8 @@ export async function prepareAdoptionCamp(action, craft, descendFromCanopy, { ch
   return { table, bed: bedPos };
 }
 
-export async function adoptAtNight(action, { bed }, craft) {
-  await provisionCampBeforeSleep(action, craft, bed);
+export async function adoptAtNight(action, { bed, door, entrance }, craft) {
+  if (!door) await provisionCampBeforeSleep(action, craft, bed);
   await action('look', { pitch: 4 });
 
   for (let attempt = 0; attempt < 180; attempt++) {
@@ -563,6 +585,14 @@ export async function adoptAtNight(action, { bed }, craft) {
     const inventory = pup && !player.screen ? await action('get_inventory') : null;
     if (inventory?.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide')) {
       assert.ok(pup.uuid, 'Rebuild the expedition bridge with companion identity support');
+      if (door) {
+        // Waking can put the player beside the bed, so only open the door when crossing the threshold.
+        const outside = () => action('go_to', { pos: entrance, stopDistance: 0.35, maxTicks: 35 });
+        if (!(await outside())?.arrived) {
+          assert.ok(await useShelterDoor(action, door) && (await outside())?.arrived,
+            'Could not leave the sheltered bed through its door');
+        }
+      }
       return pup.uuid;
     }
     if (!player.screen && player.timeOfDay >= 12_542 && player.timeOfDay < 23_460) {

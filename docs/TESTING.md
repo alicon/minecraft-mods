@@ -103,7 +103,9 @@ the action trace, client and controller logs, and screenshots.
 
 The client starts in a fresh Normal Survival world with an empty inventory and
 commands disabled. The player gathers wood, crafts a wooden pickaxe and sword, packs
-the crafting table, and crafts a bed once it has collected matching wool.
+the crafting table, and looks for a bed behind a door and under a roof. It
+walks through the door and closes it before sleeping. If it cannot find a
+reachable sheltered bed, it crafts a bed once it has collected matching wool.
 When food runs low, it can route toward nearby pigs or cows while scouting for
 wool. The scout can dye mixed wool when it has enough materials and takes a dry
 retreat from nearby danger. It uses remaining daylight to gather reachable supplies close to the
@@ -211,6 +213,12 @@ waits out the portal cooldown, and returns with the same dog. The integrated
 server verifies the repaired frame and the living original dog with its owner
 in both dimensions. This stage provides native interaction coverage while
 the fresh Survival expedition still has to earn its supplies and find a route.
+
+Set `MUSHROOM_EXPEDITION_STAGE=shelter` to replay the Java sheltered adoption.
+The disposable world provides a furnished house at night. The player
+starts outside with an empty inventory. The integrated server verifies the
+player slept inside with the door closed and woke to a living owned Mushroom
+and a Field Guide.
 
 ### Playtest bridge and server GameTests
 

@@ -5,7 +5,7 @@ import { dirname, isAbsolute, join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import {
   adoptAtNight, earnIronKit, earnStoneKit, feedAdoptedDog, forageExpeditionMeal, prepareAdoptionCamp,
-  hold, recoverDroppedLoadout, WOOD_LOGS,
+  hold, placeBeside, recoverDroppedLoadout, WOOD_LOGS,
 } from './expedition-home.mjs';
 import { hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
@@ -173,6 +173,10 @@ try {
     companion = (await readFile(join(dirname(statusFile), 'portal-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
     await netherRoundTrip(action, companion, hold);
+  } else if (stage === 'shelter') {
+    const camp = await prepareAdoptionCamp(action, craft, descendFromCanopy);
+    assert.ok(camp.door, 'Expected to find a furnished house in the shelter replay');
+    await adoptAtNight(action, camp, craft);
   }
   else await runExpedition(start, stage);
   await reportStatus('finished');
@@ -221,7 +225,9 @@ async function runExpedition(start, stage) {
         assert.ok(inventory.slots.some(stack => stack.id === `minecraft:${item}`), `The earned ${item} is missing`);
       }
     } else if (checkpoint.phase !== 'starter') {
-      for (const pos of [checkpoint.camp?.bed, checkpoint.camp?.table]) {
+      const camp = checkpoint.camp;
+      const site = camp?.door ? [camp.bed, camp.door, camp.entrance] : [camp?.bed, camp?.table];
+      for (const pos of site) {
         assert.ok(blockPosition(pos), 'Invalid recorded camp');
       }
     } else {
@@ -262,7 +268,9 @@ async function runExpedition(start, stage) {
     if (live) await writeCheckpoint(checkpoint);
   }
   if (checkpoint.phase === 'camp') {
-    if (stage !== 'adoption') await earnStoneKit(action, craft, checkpoint.camp, { ...policy, beforeNight: true });
+    if (stage !== 'adoption' && !checkpoint.camp.door) {
+      await earnStoneKit(action, craft, checkpoint.camp, { ...policy, beforeNight: true });
+    }
     checkpoint.phase = 'adoption';
     if (live) await writeCheckpoint(checkpoint);
   }
@@ -278,6 +286,10 @@ async function runExpedition(start, stage) {
     }
   }
   if (stage !== 'adoption' && checkpoint.phase === 'stone') {
+    if (!checkpoint.camp.table) {
+      checkpoint.camp.table = await placeBeside(action, 'minecraft:crafting_table');
+      if (live) await writeCheckpoint(checkpoint);
+    }
     await earnStoneKit(action, craft, checkpoint.camp, policy);
     checkpoint.phase = 'iron';
     if (live && stage === 'iron') await writeCheckpoint(checkpoint);

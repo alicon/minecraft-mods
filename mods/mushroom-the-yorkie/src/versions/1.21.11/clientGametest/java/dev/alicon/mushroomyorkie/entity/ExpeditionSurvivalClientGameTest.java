@@ -42,7 +42,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 			case "adoption" -> ADOPTION_WINDOW_TICKS;
 			case "stone" -> STONE_WINDOW_TICKS;
 			case "iron" -> IRON_WINDOW_TICKS;
-			case "defense", "portal" -> 0;
+			case "defense", "portal", "shelter" -> 0;
 			default -> throw new AssertionError("Unknown expedition stage " + stage);
 		};
 		TestWorldSave save;
@@ -86,6 +86,10 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 				}
 				if ("portal".equals(stage)) {
 					ExpeditionPortalClientScenario.run(context, server, ownerId, status);
+					return;
+				}
+				if ("shelter".equals(stage)) {
+					ExpeditionShelterClientScenario.run(context, server, ownerId, status);
 					return;
 				}
 				Files.writeString(status, "ready", StandardOpenOption.CREATE_NEW);
