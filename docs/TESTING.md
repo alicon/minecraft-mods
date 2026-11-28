@@ -362,6 +362,10 @@ that the player abandons the errand and walks away before trying melee, with
 the original dog, owner, and both mobs still at their starting health. The
 fixture stages the danger and checks the native retreat. Use a Survival run
 to verify encounters with mobile creepers and actual blasts.
+Set `MUSHROOM_EXPEDITION_DEFENSE_DISTANT=1` to stage a stationary zombie
+fourteen blocks from the player and within striking distance of injured
+Mushroom. The first interrupt must move toward the zombie. The native
+verifier checks kill credit and the original dog's health and ownership.
 
 Set `MUSHROOM_EXPEDITION_STAGE=feeding` to replay a meal while Mushroom is
 chasing a sheep. The disposable fixture supplies mutton and waits until the

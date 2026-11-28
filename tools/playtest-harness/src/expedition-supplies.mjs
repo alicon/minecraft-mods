@@ -263,7 +263,7 @@ try {
     || (resume && stage === 'expedition' && start.dimension === END)),
   'The controller was not in its expected starting dimension');
   if (!duel && milestoneObjectives[stage]) await narrate('Objective', milestoneObjectives[stage]);
-  if (stage === 'defense') await runCompanionDrill();
+  if (stage === 'defense') await runCompanionDrill(start);
   else if (stage === 'reunion') await runReunion(start);
   else if (stage === 'field-sleep') {
     companion = (await readFile(join(dirname(statusFile), 'field-sleep-dog'), 'utf8')).trim();
@@ -454,7 +454,7 @@ try {
   throw error;
 }
 
-async function runCompanionDrill() {
+async function runCompanionDrill(start) {
   const [uuid, errand, retreatX] = (await readFile(join(dirname(statusFile), 'defense-fixture'), 'utf8')).trim().split('\n');
   const pos = errand.trim().split(/\s+/).map(Number);
   assert.ok(/^[\da-f-]{36}$/i.test(uuid) && blockPosition(pos));
@@ -467,6 +467,18 @@ async function runCompanionDrill() {
       'The companion interrupt did not move the player away from the creeper');
     await narrate('Result', 'Retreated from the creeper before trying to help the original Mushroom.');
     return;
+  }
+  if (process.env.MUSHROOM_EXPEDITION_DEFENSE_DISTANT === '1') {
+    const firstStep = await playerAction('observe');
+    assert.ok(firstStep.position.x >= start.position.x + 1,
+      'The first interrupt stood still while the zombie was beside Mushroom');
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const nearby = await playerAction('get_entities', { type: 'minecraft:zombie', radius: 24 });
+      if (!nearby.entities.length) return;
+      await setTimeout(250);
+      await action('observe');
+    }
+    throw new Error('The player did not reach and kill the zombie during the defense');
   }
   for (let attempt = 0; attempt < 6; attempt++) {
     await setTimeout(250);

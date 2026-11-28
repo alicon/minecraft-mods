@@ -12,7 +12,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.monster.Creeper;
-import net.minecraft.world.entity.monster.spider.Spider;
+import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
@@ -26,13 +26,16 @@ final class ExpeditionCompanionClientScenario {
 	static void run(ClientGameTestContext context, TestServerContext server, UUID ownerId, Path status) throws IOException {
 		boolean cover = "1".equals(System.getenv("MUSHROOM_EXPEDITION_DEFENSE_COVER"));
 		boolean creeperApproach = "1".equals(System.getenv("MUSHROOM_EXPEDITION_DEFENSE_CREEPER"));
-		if (cover && creeperApproach) throw new IllegalArgumentException("Choose one companion defense fixture");
+		boolean distant = "1".equals(System.getenv("MUSHROOM_EXPEDITION_DEFENSE_DISTANT"));
+		if ((cover ? 1 : 0) + (creeperApproach ? 1 : 0) + (distant ? 1 : 0) > 1) {
+			throw new IllegalArgumentException("Choose one companion defense fixture");
+		}
 		var fixture = server.computeOnServer(minecraft -> {
 			var level = minecraft.overworld();
 			var owner = Objects.requireNonNull(minecraft.getPlayerList().getPlayer(ownerId));
 			BlockPos origin = owner.blockPosition().above(5);
 			int west = creeperApproach ? -9 : -4;
-			int east = creeperApproach ? 13 : 9;
+			int east = distant ? 17 : creeperApproach ? 13 : 9;
 			for (BlockPos pos : BlockPos.betweenClosed(origin.offset(west, -1, -4), origin.offset(east, -1, 4))) {
 				level.setBlockAndUpdate(pos, Blocks.COBBLESTONE.defaultBlockState());
 			}
@@ -50,16 +53,20 @@ final class ExpeditionCompanionClientScenario {
 			owner.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.STONE_SWORD));
 			var dog = Objects.requireNonNull(ModEntities.MUSHROOM_YORKIE.create(level, EntitySpawnReason.TRIGGERED));
 			dog.claimFor(owner);
-			dog.setPos(origin.getX() + (creeperApproach ? 10.5 : cover ? 3.1 : 5.6), origin.getY(), origin.getZ() - 0.65);
+			double dogX = distant ? 12.5 : creeperApproach ? 10.5 : cover ? 3.1 : 5.6;
+			dog.setPos(origin.getX() + dogX, origin.getY(), origin.getZ() - 0.65);
 			dog.setNoAi(true);
 			dog.setHealth(creeperApproach ? 4 : 7);
 			level.addFreshEntity(dog);
-			var spider = Objects.requireNonNull(EntityType.SPIDER.create(level, EntitySpawnReason.TRIGGERED));
-			spider.setPos(origin.getX() + (creeperApproach ? 11.2 : cover ? 3.2 : 6.2), origin.getY(), origin.getZ() + 0.4);
-			spider.setHealth(4);
+			if (distant) level.setDayTime(14_000);
+			Monster attacker = Objects.requireNonNull((distant ? EntityType.ZOMBIE : EntityType.SPIDER)
+					.create(level, EntitySpawnReason.TRIGGERED));
+			double attackerX = distant ? 14.5 : creeperApproach ? 11.2 : cover ? 3.2 : 6.2;
+			attacker.setPos(origin.getX() + attackerX, origin.getY(), origin.getZ() + 0.4);
+			attacker.setHealth(4);
 			// Hold the replay pose so the attack path is isolated from the bridge's owner-defense reflex.
-			spider.setNoAi(true);
-			level.addFreshEntity(spider);
+			attacker.setNoAi(true);
+			level.addFreshEntity(attacker);
 			Creeper creeper = null;
 			if (creeperApproach) {
 				creeper = Objects.requireNonNull(EntityType.CREEPER.create(level, EntitySpawnReason.TRIGGERED));
@@ -67,12 +74,12 @@ final class ExpeditionCompanionClientScenario {
 				creeper.setNoAi(true);
 				level.addFreshEntity(creeper);
 			}
-			return new Fixture(origin, dog, spider, vegetation, creeper);
+			return new Fixture(origin, dog, attacker, vegetation, creeper);
 		});
 		context.waitFor(client -> client.player.blockPosition().equals(fixture.origin())
 				&& client.player.getMainHandItem().is(Items.STONE_SWORD)
 				&& client.level.getEntity(fixture.dog().getId()) instanceof MushroomYorkieEntity
-				&& client.level.getEntity(fixture.spider().getId()) instanceof Spider
+				&& client.level.getEntity(fixture.attacker().getId()) instanceof Monster
 				&& (fixture.creeper() == null || client.level.getEntity(fixture.creeper().getId()) instanceof Creeper));
 		BlockPos errand = creeperApproach ? fixture.origin().east(3) : fixture.origin().west(3);
 		Files.writeString(status.resolveSibling("defense-fixture"),
@@ -87,7 +94,7 @@ final class ExpeditionCompanionClientScenario {
 					if (creeperApproach) {
 						if (owner.blockPosition().getX() > fixture.origin().west(2).getX() || owner.getHealth() < 20
 								|| !fixture.dog().isAlive() || !fixture.dog().isOwnedBy(owner) || fixture.dog().getHealth() != 4
-								|| fixture.creeper().getHealth() != 20 || fixture.spider().getHealth() != 4) {
+								|| fixture.creeper().getHealth() != 20 || fixture.attacker().getHealth() != 4) {
 							throw new AssertionError("Expected a dry retreat from the creeper before attempting melee near Mushroom");
 						}
 						return;
@@ -95,10 +102,10 @@ final class ExpeditionCompanionClientScenario {
 					boolean approachSucceeded = fixture.vegetation() == null
 							? owner.blockPosition().getX() > fixture.origin().getX()
 							: minecraft.overworld().isEmptyBlock(fixture.vegetation());
-					if (fixture.spider().isAlive() || fixture.spider().getKillCredit() != owner
-							|| !fixture.dog().isAlive() || fixture.dog().getHealth() < 7
+					if (fixture.attacker().isAlive() || fixture.attacker().getKillCredit() != owner
+							|| !fixture.dog().isAlive() || !fixture.dog().isOwnedBy(owner) || fixture.dog().getHealth() != 7
 							|| !approachSucceeded) {
-						throw new AssertionError("Expected the owner to reach the spider and protect the dog during the first interruption");
+						throw new AssertionError("Expected the owner to reach the attacker and protect the original dog");
 					}
 				});
 				context.takeScreenshot(creeperApproach ? "expedition-survival-creeper-defense" : "expedition-survival-companion-defense");
@@ -107,8 +114,8 @@ final class ExpeditionCompanionClientScenario {
 							fixture.dog().getUUID(), fixture.creeper().getUUID(), ownerId);
 					return;
 				}
-				System.out.printf("Expedition companion defense passed: dog=%s spider=%s cover=%s%n",
-						fixture.dog().getUUID(), fixture.spider().getUUID(), cover);
+				System.out.printf("Expedition companion defense passed: dog=%s attacker=%s cover=%s distant=%s%n",
+						fixture.dog().getUUID(), fixture.attacker().getUUID(), cover, distant);
 				return;
 			}
 			if ("failed".equals(result)) break;
@@ -118,6 +125,6 @@ final class ExpeditionCompanionClientScenario {
 		throw new AssertionError("The companion defense controller did not finish");
 	}
 
-	private record Fixture(BlockPos origin, MushroomYorkieEntity dog, Spider spider, BlockPos vegetation, Creeper creeper) {
+	private record Fixture(BlockPos origin, MushroomYorkieEntity dog, Monster attacker, BlockPos vegetation, Creeper creeper) {
 	}
 }
