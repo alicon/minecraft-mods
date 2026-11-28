@@ -209,6 +209,13 @@ async function runExpedition(start, stage) {
     assert.equal(checkpoint.bridgeFingerprint, bridgeFingerprint, 'The recorded client is no longer listening');
     assert.ok(Number.isFinite(checkpoint.gameTime) && checkpoint.gameTime <= start.gameTime);
     assert.ok(['starter', 'provision', 'camp', 'adoption', 'stone', 'iron'].includes(checkpoint.phase));
+    if (checkpoint.phase === 'provision' && inventory.slots.length === 0) {
+      verifiedDeathSite(start, checkpoint);
+      checkpoint.phase = 'starter';
+      checkpoint.gameTime = start.gameTime;
+      await writeCheckpoint(checkpoint);
+      console.log(JSON.stringify({ at: new Date().toISOString(), action: 'rebuild_after_early_respawn' }));
+    }
     if (checkpoint.phase === 'provision') {
       for (const item of ['crafting_table', 'wooden_sword', 'wooden_pickaxe']) {
         assert.ok(inventory.slots.some(stack => stack.id === `minecraft:${item}`), `The earned ${item} is missing`);
@@ -229,11 +236,7 @@ async function runExpedition(start, stage) {
     await action('stop', { closeScreen: true });
     if (['stone', 'iron'].includes(checkpoint.phase)
         && !inventory.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide')) {
-      const [dimension, x, y, z, tick] = deathAtStart.trim().split(' ');
-      const destination = [x, y, z].map(Number);
-      assert.ok(dimension === start.dimension && blockPosition(destination)
-        && Number(tick) > checkpoint.gameTime && Number(tick) <= start.gameTime,
-      'Cannot confirm the adopted owner or the recorded place where they died');
+      const destination = verifiedDeathSite(start, checkpoint);
       console.log(JSON.stringify({ at: new Date().toISOString(), action: 'recover_dropped_loadout', destination }));
       await recoverDroppedLoadout(action, destination);
       delete checkpoint.quarry;
@@ -301,6 +304,15 @@ async function runExpedition(start, stage) {
     checkpoint.fedDog = true;
     if (live) await writeCheckpoint(checkpoint);
   }
+}
+
+function verifiedDeathSite(player, checkpoint) {
+  const [dimension, x, y, z, tick] = deathAtStart.trim().split(' ');
+  const destination = [x, y, z].map(Number);
+  assert.ok(dimension === player.dimension && blockPosition(destination)
+    && Number(tick) > checkpoint.gameTime && Number(tick) <= player.gameTime,
+  'Cannot confirm a death in this save after the recorded checkpoint');
+  return destination;
 }
 
 async function reportStatus(status) {
