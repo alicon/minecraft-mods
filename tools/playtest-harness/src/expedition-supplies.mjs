@@ -55,6 +55,7 @@ async function narrate(kind, message, interval = 0) {
 
 const milestoneObjectives = {
   defense: 'Protect Mushroom before continuing the errand.',
+  feeding: 'Call Mushroom back from the sheep and give him a meal at camp.',
   portal: 'Find supplies, repair the Nether portal, and come home with Mushroom.',
   shelter: 'Enter the furnished house and sleep with the door closed.',
   equipment: 'Craft the harness, padded vest, and mat. Fit Mushroom’s gear and mark camp.',
@@ -204,6 +205,12 @@ try {
     || (resume && stage === 'nether' && start.dimension === NETHER)));
   if (milestoneObjectives[stage]) await narrate('Objective', milestoneObjectives[stage]);
   if (stage === 'defense') await runCompanionDrill();
+  else if (stage === 'feeding') {
+    companion = (await readFile(join(dirname(statusFile), 'feeding-companion'), 'utf8')).trim();
+    assert.ok(/^[\da-f-]{36}$/i.test(companion));
+    const camp = [start.position.x, start.position.y, start.position.z].map(Math.floor);
+    assert.ok(await feedAdoptedDog(action, companion, camp, 24), 'The original Mushroom was not fed at camp');
+  }
   else if (stage === 'portal') {
     companion = (await readFile(join(dirname(statusFile), 'portal-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));

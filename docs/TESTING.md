@@ -222,6 +222,13 @@ the controller interrupts a proposed walk, the owner kills the spider through
 the native client, and the same injured dog survives. The staged encounter
 provides companion-defense coverage separately from fresh Survival progress.
 
+Set `MUSHROOM_EXPEDITION_STAGE=feeding` to replay a meal while Mushroom is
+chasing a sheep. The disposable fixture supplies mutton and waits until the
+original dog has started chasing. The player holds the meat from camp to
+call him back, then uses it on the dog in reach. The integrated server checks
+that the same dog is alive and healed, one portion was spent, and the owner
+stayed at camp.
+
 Set `MUSHROOM_EXPEDITION_STAGE=portal` to replay the Java Nether round trip.
 The disposable world stages an incomplete portal with a dry landing and a
 chest with obsidian and flint. The owner starts with an iron ingot. The

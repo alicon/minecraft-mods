@@ -36,7 +36,7 @@ const BACKUP_MEAT = {
 };
 const BACKUP_FOOD = [...Object.values(BACKUP_MEAT), 'minecraft:apple'];
 const COOKED_FOOD = ['minecraft:cooked_mutton', 'minecraft:cooked_beef', 'minecraft:cooked_porkchop'];
-const DOG_FOOD = [MUTTON, ...BACKUP_FOOD, ...COOKED_FOOD];
+const DOG_FOOD = [MUTTON, ...Object.values(BACKUP_MEAT), ...COOKED_FOOD, 'minecraft:apple'];
 const FEEDING_SEARCH_RADIUS = 24;
 const WOOL_DYES = {
   white: ['minecraft:lily_of_the_valley', 'minecraft:bone_meal'],
@@ -499,13 +499,16 @@ async function provisionCampBeforeSleep(action, craft, bed) {
 
 export async function feedAdoptedDog(action, uuid, bed, attempts = 120) {
   const startingStock = await action('get_inventory');
-  if (!DOG_FOOD.some(item => count(startingStock, item))) return false;
+  const offered = DOG_FOOD.find(item => count(startingStock, item));
+  if (!offered) return false;
+  if (startingStock.mainHand?.id !== offered) await hold(action, offered);
   const visited = [];
   const rejectedSteps = new Set();
+  let previousDistance = Infinity;
   for (let attempt = 0; attempt < attempts; attempt++) {
     const player = await action('observe');
     const observed = await action('get_entities', { type: DOG, radius: FEEDING_SEARCH_RADIUS });
-    const dog = observed?.entities.find(entity => entity.uuid === uuid);
+    const dog = observed?.entities.find(entity => entity.uuid === uuid && entity.health !== 0);
     if (dog?.distance <= 4.4) {
       const inventory = await action('get_inventory');
       const meal = DOG_FOOD.find(item => count(inventory, item));
@@ -520,7 +523,12 @@ export async function feedAdoptedDog(action, uuid, bed, attempts = 120) {
         assert.equal(remaining, mealCount, 'A single feeding changed the raw meal count unexpectedly');
       }
     }
-    if (player && attempt % 2 === 1) {
+    // Holding meat can interrupt barking at a peaceful mob. Let the dog
+    // return on his own while the offer is fresh or he is coming closer.
+    const returning = dog && offered !== 'minecraft:apple'
+      && (attempt < 6 || dog.distance < previousDistance - 0.25);
+    previousDistance = dog?.distance ?? Infinity;
+    if (player && !returning && attempt % 2 === 1) {
       const tile = feet(player);
       const fromCamp = Math.hypot(tile[0] - bed[0], tile[1] - bed[1], tile[2] - bed[2]);
       visited.push(tile);
