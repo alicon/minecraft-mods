@@ -260,7 +260,7 @@ try {
           crystal: crystal.uuid, target: crystal.pos, position, destroyed, openedCage, camp, dog: companion }));
         if (openedCage) await narrate('Result', 'Opened a crystal cage and descended to the ground.');
         if (destroyed) await narrate('Result', 'A generated End crystal broke.');
-      });
+      }, { cageOnly: process.env.MUSHROOM_EXPEDITION_CAGE_ONLY === '1' });
     } else {
       let crystal;
       for (let shot = 0; shot < 3 && !crystal; shot++) crystal = await shootEndCrystal(action, companion);

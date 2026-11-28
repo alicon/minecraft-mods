@@ -7,7 +7,7 @@ const MATERIAL = ['minecraft:cobblestone', 'minecraft:end_stone', 'minecraft:dir
 const PICKAXE = ['netherite', 'diamond', 'iron', 'stone'].map(tier => `minecraft:${tier}_pickaxe`);
 const WATER = 'minecraft:water';
 const WATER_BUCKET = 'minecraft:water_bucket';
-const SIDES = [[1, 0, 'east'], [-1, 0, 'west'], [0, 1, 'south'], [0, -1, 'north']];
+const SIDES = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const feet = ({ position }) => [position.x, position.y, position.z].map(Math.floor);
 const horizontal = ([ax, , az], [bx, , bz]) => Math.hypot(ax - bx, az - bz);
 
@@ -17,7 +17,7 @@ export function cageApproach(cells, crystal, player) {
   const blocks = new Map(cells.map(cell => [`${cell.x},${cell.y},${cell.z}`, cell.b]));
   const block = (x, y, z) => blocks.get(`${x},${y},${z}`);
   const approaches = [];
-  for (const [dx, dz, face] of SIDES) {
+  for (const [dx, dz] of SIDES) {
     const bars = [-1, 0, 1].map(offset => [x + dx * 2, y + offset, z + dz * 2]);
     if (!bars.some(pos => block(...pos) === BARS)) continue;
     for (const offset of [4, 5, 6]) {
@@ -35,7 +35,7 @@ export function cageApproach(cells, crystal, player) {
           }
         }
         if (clear) {
-          approaches.push({ base: [baseX, baseY, baseZ], top, face, dx, dz, bars });
+          approaches.push({ base: [baseX, baseY, baseZ], top, dx, dz, bars });
           break;
         }
       }
@@ -48,10 +48,12 @@ export function cageApproach(cells, crystal, player) {
 async function descendWater(action, player, plan) {
   const [x, y, z] = feet(player);
   if (y <= plan.base[1] + 1) return true;
-  const support = [x, y - 1, z];
   const water = [x + plan.dx, plan.base[1], z + plan.dz];
   await hold(action, WATER_BUCKET);
-  await action('interact_block', { pos: support, face: plan.face });
+  // A bucket places water through ordinary item use. Block interaction
+  // alone passes without placing the fluid.
+  await action('look', { pitch: 90 });
+  if (!(await action('use_item'))?.success) return false;
   // Wait for the water to reach the ground before committing to the drop.
   for (let check = 0; check < 100; check++) {
     const view = await action('get_blocks', { center: water, size: [1, 1, 1], format: 'json' });
@@ -110,9 +112,17 @@ export async function openCrystalCage(action, player, crystal, dangerous) {
     if (!await stepOut(action, player, visited, plan.base, 'surface', rejected)) return null;
     player = await action('observe');
   }
-  if (!(await action('go_to', { pos: plan.base, stopDistance: 0.12, maxTicks: 45 }))?.arrived) return null;
+  if (!(await action('go_to', { pos: plan.base, stopDistance: 0.3, maxTicks: 45 }))?.arrived) return null;
   player = await action('observe');
   if (!player.onGround || feet(player).join(',') !== plan.base.join(',')) return null;
+  for (let adjust = 0; adjust < 4; adjust++) {
+    const dx = plan.base[0] + 0.5 - player.position.x;
+    const dz = plan.base[2] + 0.5 - player.position.z;
+    if (Math.hypot(dx, dz) <= 0.2) break;
+    await action('move', { forward: true, sneak: true, ticks: 2, yaw: Math.atan2(-dx, dz) * 180 / Math.PI });
+    player = await action('observe');
+    if (!player.onGround || feet(player).join(',') !== plan.base.join(',')) return null;
+  }
   await hold(action, blocks);
   let opened = false;
   for (let height = plan.base[1]; height < plan.top; height++) {

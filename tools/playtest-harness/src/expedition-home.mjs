@@ -220,11 +220,12 @@ export async function hunt(action, animal, dropMatches, canContinue) {
   return false;
 }
 
-export async function stepOut(action, player, visited, destination, preferredGround, rejectedSteps = new Set(), chooseRoute, avoid) {
+export async function stepOut(action, player, visited, destination, preferredGround, rejectedSteps = new Set(), chooseRoute, avoid, maxTicks = 90) {
   const center = feet(player);
   const width = preferredGround || chooseRoute ? 23 : 17;
   const height = preferredGround === 'surface' ? 15 : 9;
   const volume = await action('get_blocks', { center, size: [width, height, width], format: 'json' });
+  if (!volume) return false;
   let pos = dryWaypoint(volume.cells, center, visited, destination, preferredGround, rejectedSteps, avoid);
   if (avoid && !pos) return false;
   const repeated = visited.filter(tile => tile.every((coordinate, axis) => coordinate === center[axis])).length > 2;
@@ -255,7 +256,7 @@ export async function stepOut(action, player, visited, destination, preferredGro
     }
     pos = (await chooseRoute(player, routes, destination)).pos;
   }
-  const result = await action('go_to', { pos, stopDistance: 0.3, maxTicks: 90 });
+  const result = await action('go_to', { pos, stopDistance: 0.3, maxTicks });
   const wrongHeight = result?.arrived && Math.abs(result.position?.[1] - pos[1]) >= 0.9
     && !await settleOnDryStep(action, pos);
   const displacement = Math.hypot(result?.position?.[0] - player.position.x,

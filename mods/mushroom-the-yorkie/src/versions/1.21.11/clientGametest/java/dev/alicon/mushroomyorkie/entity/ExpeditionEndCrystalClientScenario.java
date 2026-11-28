@@ -100,13 +100,22 @@ final class ExpeditionEndCrystalClientScenario {
 	}
 
 	static void runGenerated(ClientGameTestContext context, TestServerContext server, UUID ownerId, Path status) throws IOException {
+		boolean cageOnly = "1".equals(System.getenv("MUSHROOM_EXPEDITION_CAGE_ONLY"));
 		var camp = server.computeOnServer(minecraft -> {
 			var end = Objects.requireNonNull(minecraft.getLevel(Level.END));
-			for (var spike : SpikeFeature.getSpikesForLevel(end)) {
+			var spikes = SpikeFeature.getSpikesForLevel(end);
+			for (var spike : spikes) {
 				end.getChunk(spike.getCenterX() >> 4, spike.getCenterZ() >> 4);
 			}
-			var ground = end.getChunk(3, 0);
-			var start = new BlockPos(58, ground.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, 10, 6) + 1, 6);
+			int x = 58;
+			int z = 6;
+			if (cageOnly) {
+				var guarded = spikes.stream().filter(SpikeFeature.EndSpike::isGuarded).findFirst().orElseThrow();
+				x = guarded.getCenterX() - 16 * Integer.signum(guarded.getCenterX());
+				z = guarded.getCenterZ();
+			}
+			var ground = end.getChunk(x >> 4, z >> 4);
+			var start = new BlockPos(x, ground.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15) + 1, z);
 			var shelter = start.east(2).south(2);
 			for (BlockPos pos : BlockPos.betweenClosed(start.offset(-2, -1, -3), start.offset(5, -1, 5))) {
 				end.setBlockAndUpdate(pos, Blocks.END_STONE.defaultBlockState());
@@ -155,6 +164,14 @@ final class ExpeditionEndCrystalClientScenario {
 			throw new AssertionError("Expected all vanilla End spike crystals to load, found " + crystals.size());
 		}
 		var recordedCrystals = crystals;
+		var guardedCrystals = server.computeOnServer(minecraft -> {
+			var end = minecraft.getLevel(Level.END);
+			var guarded = SpikeFeature.getSpikesForLevel(end).stream().filter(SpikeFeature.EndSpike::isGuarded).toList();
+			return end.getEntitiesOfClass(EndCrystal.class, new AABB(camp.start()).inflate(128)).stream()
+					.filter(crystal -> guarded.stream().anyMatch(spike -> spike.getCenterX() == crystal.getBlockX()
+							&& spike.getCenterZ() == crystal.getBlockZ()))
+					.map(EndCrystal::getUUID).collect(Collectors.toUnmodifiableSet());
+		});
 		context.waitFor(client -> recordedCrystals.stream().anyMatch(uuid ->
 				client.level.getEntity(uuid) instanceof EndCrystal), 300);
 		Files.writeString(status.resolveSibling("end-crystal-companion"), camp.dogId().toString());
@@ -208,19 +225,22 @@ final class ExpeditionEndCrystalClientScenario {
 				var owner = minecraft.getPlayerList().getPlayer(ownerId);
 				var dog = (MushroomYorkieEntity) end.getEntity(camp.dogId());
 				int shots = owner.getStats().getValue(Stats.ITEM_USED.get(Items.BOW));
-				if (!owner.isAlive() || !owner.level().dimension().equals(Level.END) || shots < recordedCrystals.size()
-						|| recordedCrystals.stream().anyMatch(uuid -> end.getEntity(uuid) != null)
-						|| !end.getEntitiesOfClass(EndCrystal.class, new AABB(camp.start()).inflate(128)).isEmpty()
-						|| end.getDragonFight().saveData().dragonKilled()) {
-					throw new AssertionError("Expected native bow shots to break all the generated crystals before the dragon fight");
+				int target = cageOnly ? 1 : recordedCrystals.size();
+				long missing = recordedCrystals.stream().filter(uuid -> end.getEntity(uuid) == null).count();
+				int remaining = end.getEntitiesOfClass(EndCrystal.class, new AABB(camp.start()).inflate(128)).size();
+				if (!owner.isAlive() || !owner.level().dimension().equals(Level.END) || shots < target
+						|| missing != target || remaining != recordedCrystals.size() - target
+						|| end.getDragonFight().saveData().dragonKilled()
+						|| (cageOnly && guardedCrystals.stream().noneMatch(uuid -> end.getEntity(uuid) == null))) {
+					throw new AssertionError("Expected native bow shots to break the selected generated crystals while the dragon lives");
 				}
 				if (dog == null || !dog.isAlive() || !dog.isOwnedBy(owner) || !dog.isOrderedToSit()
 						|| !dog.blockPosition().equals(camp.shelter()) || dog.getHealth() < camp.dogHealth()
 						|| dog.expeditionCamp.anchor() == null || !dog.expeditionCamp.anchor().dimension().equals(Level.END)) {
 					throw new AssertionError("Expected the original unhurt Mushroom at his marked End shelter");
 				}
-				System.out.printf("Expedition native generated crystals passed: count=%d arrows=%d dog=%s%n",
-						recordedCrystals.size(), shots, camp.dogId());
+				System.out.printf("Expedition native generated %s passed: count=%d arrows=%d dog=%s%n",
+						cageOnly ? "cage" : "crystals", target, shots, camp.dogId());
 			});
 			context.takeScreenshot("expedition-survival-generated-end-crystals");
 			return;

@@ -166,6 +166,8 @@ export function dryStepKey(from, to) {
 export function dryWaypoint(cells, start, visited, destination, preferredGround, rejectedSteps = new Set(), avoid) {
   const blocks = new Map(cells.map(({ x, y, z, b }) => [`${x},${y},${z}`, b]));
   const block = (x, y, z) => blocks.get(`${x},${y},${z}`);
+  const hazards = Array.isArray(avoid?.[0]) ? avoid : avoid ? [avoid] : [];
+  const clearance = tile => Math.min(...hazards.map(hazard => distance(hazard, tile)));
   const visits = new Map();
   for (const [x, , z] of visited) {
     const key = `${x},${z}`;
@@ -187,7 +189,7 @@ export function dryWaypoint(cells, start, visited, destination, preferredGround,
         const support = block(tx, ty - 1, tz);
         if (seen.has(key) || rejectedSteps.has(dryStepKey(pos, step)) || !hasDrySupport(support)
             || (preferredGround === 'surface' && /_(?:leaves|log)$/.test(support))
-            || (avoid && distance(avoid, step) <= distance(avoid, pos))
+            || (hazards.length && clearance(step) <= clearance(pos))
             || !gap(block(tx, ty, tz)) || !gap(block(tx, ty + 1, tz))
             || (ty > y && !gap(block(x, ty + 1, z)))
             || (ty < y && !gap(block(tx, y + 1, tz)))) continue;

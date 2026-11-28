@@ -14,10 +14,11 @@ const distance = (first, second) => Math.hypot(...first.map((coordinate, axis) =
 
 async function dragonBreathThreat(action) {
   const clouds = await action('get_entities', { type: 'minecraft:area_effect_cloud', radius: 14, max: 8 });
-  const cloud = clouds?.entities.find(entity => entity.distance < 8);
-  if (cloud) return cloud;
+  const breath = clouds?.entities.filter(entity => entity.distance < 13) ?? [];
+  if (breath.some(entity => entity.distance < 8)) return breath;
   const shots = await action('get_entities', { type: 'minecraft:dragon_fireball', radius: 30, max: 8 });
-  return shots?.entities.find(entity => entity.distance < 28);
+  const fireballs = shots?.entities.filter(entity => entity.distance < 28) ?? [];
+  return fireballs.length ? [...fireballs, ...breath] : null;
 }
 
 async function fireAtCrystal(action, shot, radius, startingHealth) {
@@ -52,7 +53,7 @@ export async function shootEndCrystal(action, uuid) {
   return shot ? fireAtCrystal(action, shot, 80) : null;
 }
 
-export async function clearGeneratedCrystals(action, uuid, report) {
+export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = false } = {}) {
   const dogs = await action('get_entities', { type: DOG, radius: 32 });
   const dog = dogs?.entities.find(entity => entity.uuid === uuid && entity.health > 0);
   assert.ok(dog, 'The original companion must be at the marked camp before attacking the crystals');
@@ -70,8 +71,9 @@ export async function clearGeneratedCrystals(action, uuid, report) {
   let detourSteps = 0;
   let nextRecovery = 0;
   let nextCageAttempt = 0;
+  const goal = cageOnly ? 1 : SPIKE_COUNT;
 
-  for (let attempt = 0; attempt < 160 && broken.size < SPIKE_COUNT; attempt++) {
+  for (let attempt = 0; attempt < 160 && broken.size < goal; attempt++) {
     const player = await action('observe');
     assert.ok(player?.inWorld && !player.dead && player.dimension === END && player.health >= 4,
       'The player became unsafe while clearing the End crystals');
@@ -83,17 +85,19 @@ export async function clearGeneratedCrystals(action, uuid, report) {
     let danger = await dragonBreathThreat(action);
     if (!danger && player.health < 16) {
       const dragons = await action('get_entities', { type: 'minecraft:ender_dragon', radius: 24, max: 4 });
-      danger = dragons?.entities.find(dragon => dragon.distance < 15);
+      const approaching = dragons?.entities.find(dragon => dragon.distance < 15);
+      if (approaching) danger = [approaching];
     }
     if (danger) {
-      const retreat = [here[0] + 8 * Math.sign(player.position.x - danger.pos[0]), here[1],
-        here[2] + 8 * Math.sign(player.position.z - danger.pos[2])];
+      const closest = danger[0].pos;
+      const retreat = [here[0] + 8 * Math.sign(player.position.x - closest[0]), here[1],
+        here[2] + 8 * Math.sign(player.position.z - closest[2])];
       // The last dry route is useful cover when a fireball is inbound.
       // Ignore ordinary scouting repeat penalties while leaving its path.
       const restoreInterrupt = (await action('set_reflexes'))?.interruptOnDamage;
       if (restoreInterrupt) await action('set_reflexes', { interruptOnDamage: false });
       try {
-        await stepOut(action, player, [], retreat, 'surface', new Set(), undefined, danger.pos);
+        await stepOut(action, player, [], retreat, 'surface', new Set(), undefined, danger.map(threat => threat.pos), 35);
       } finally {
         if (restoreInterrupt) await action('set_reflexes', { interruptOnDamage: true });
       }
@@ -120,7 +124,8 @@ export async function clearGeneratedCrystals(action, uuid, report) {
         cageStatus.set(crystal.uuid, terrain.cells.some(cell => cell.b === 'minecraft:iron_bars'));
       }
     }
-    const candidates = (view?.entities ?? []).filter(crystal => !broken.has(crystal.uuid))
+    const candidates = (view?.entities ?? []).filter(crystal => !broken.has(crystal.uuid)
+        && (!cageOnly || cageStatus.get(crystal.uuid)))
       .map(crystal => ({ crystal, range: distance(crystal.pos, here),
       key: `${crystal.uuid}:${group}`, aim: bowAim(player, [crystal.pos[0], crystal.pos[1] + 1, crystal.pos[2]]) }))
       .filter(shot => distance(shot.crystal.pos, dog.pos) >= 14)
@@ -143,7 +148,8 @@ export async function clearGeneratedCrystals(action, uuid, report) {
       continue;
     }
 
-    if (!vantage && guarded.length && broken.size >= 5 && player.health >= 16 && player.gameTime >= nextCageAttempt) {
+    if (!vantage && guarded.length && (cageOnly || broken.size >= 5) && player.health >= 16
+        && player.gameTime >= nextCageAttempt) {
       const { crystal } = guarded.sort((a, b) => a.range - b.range)[0];
       nextCageAttempt = player.gameTime + 400;
       const line = await openCrystalCage(action, player, crystal, () => dragonBreathThreat(action));
@@ -177,5 +183,5 @@ export async function clearGeneratedCrystals(action, uuid, report) {
     await stepOut(action, player, visited, destination, 'surface', rejected);
     detourSteps--;
   }
-  assert.equal(broken.size, SPIKE_COUNT, 'Some generated End crystals are still intact');
+  assert.equal(broken.size, goal, cageOnly ? 'The generated guarded crystal is still intact' : 'Some generated End crystals are still intact');
 }

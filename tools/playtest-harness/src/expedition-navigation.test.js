@@ -424,6 +424,18 @@ test('a hunt routes around an obstruction before giving up a wounded cow', async
   assert.ok(detoured && struck && pickedUp);
 });
 
+test('an escape between two clouds avoids both centers', async () => {
+  const { dryWaypoint } = await import('./expedition-navigation.mjs');
+  const cells = [];
+  for (let x = -6; x <= 6; x++) {
+    for (let z = -6; z <= 6; z++) cells.push({ x, y: 63, z, b: 'minecraft:end_stone' });
+  }
+  const escaped = dryWaypoint(cells, [0, 64, 0], [], [-8, 64, 0], 'surface', new Set(),
+    [[2, 64, 0], [-3, 64, 0]]);
+  assert.equal(escaped[0], 0);
+  assert.notEqual(escaped[2], 0);
+});
+
 test('timber collection clears leaves blocking the walk and the mining crosshair', async () => {
   const { ensurePlanks } = await import('./expedition-home.mjs');
   const entrance = [1, 65, 0];

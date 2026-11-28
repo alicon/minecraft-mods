@@ -12,7 +12,7 @@ test('a cage approach uses a dry column outside the spike and a clear adjacent d
   const plan = cageApproach(cells, crystal, player);
   assert.deepEqual(plan.base, [5, 64, 0]);
   assert.equal(plan.top, 84);
-  assert.equal(plan.face, 'east');
+  assert.deepEqual([plan.dx, plan.dz], [1, 0]);
   assert.deepEqual(plan.bars, [[2, 84, 0], [2, 85, 0], [2, 86, 0]]);
 });
 

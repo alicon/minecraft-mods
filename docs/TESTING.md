@@ -322,6 +322,10 @@ summary reports shot attempts, observed breaks, and the native verdict.
 The fixture saves a server snapshot even when the controller fails. It
 lists loaded remaining crystals, whether their original spikes were
 guarded, and whether the dog stayed alive at his shelter.
+Set `MUSHROOM_EXPEDITION_CAGE_ONLY=1` with the same stage to start near a
+guarded spike and exercise one intact generated cage. The native verdict
+requires that exactly one guarded crystal broke, the dragon is still active,
+and the original Mushroom is still unharmed at his marked shelter.
 
 Set `MUSHROOM_EXPEDITION_STAGE=eye-route` to replay using an Eye of Ender
 to choose a route. The disposable fixture supplies one eye, Mushroom, and
