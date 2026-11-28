@@ -887,6 +887,9 @@ async function replayBucketLanding(reflexes, start, report) {
   assert.equal(reflexes?.waterLanding, true, 'This replay needs the native bucket landing reflex');
   await hold(action, 'minecraft:water_bucket');
   await reportStatus('fall-ready');
+  const center = [start.position.x, start.position.y, start.position.z].map(Math.floor);
+  const waterScan = { blocks: ['water'], center, radius: 3, max: 64 };
+  const waterBlocks = scan => scan?.matches.find(group => group.name === 'minecraft:water')?.positions ?? [];
   let fromY;
   for (let attempt = 0; attempt < 240; attempt++) {
     const player = await action('observe');
@@ -894,6 +897,16 @@ async function replayBucketLanding(reflexes, start, report) {
       fromY = Math.max(fromY ?? player.position.y, player.position.y);
     }
     if (fromY && player?.inWater && player.health >= 15) {
+      const allWater = waterBlocks(await action('scan_blocks', waterScan));
+      if (allWater.length < 2) {
+        await setTimeout(100);
+        continue;
+      }
+      const scan = await action('scan_blocks', { ...waterScan, waterSourcesOnly: true });
+      assert.equal(scan?.waterSourcesOnly, true, 'The bridge did not apply native source filtering');
+      const sources = waterBlocks(scan);
+      assert.deepEqual(sources, [center], 'Only the bucket source should survive filtering');
+      await report('water_source_scan', { source: center, flowingBlocks: allWater.length - sources.length });
       await report('fall_recovery', { launchY: fromY, groundY: player.position.y, landed: true, inWater: true });
       return;
     }

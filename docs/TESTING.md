@@ -436,7 +436,9 @@ carried bucket. The patched bridge can place the water on the first
 game tick when the ground is in range. Set
 `MUSHROOM_EXPEDITION_FALL_ONLY=1` with the duel flag to reproduce the
 landing from a staged 110-block fall. The server checks the actual water
-block, the spent bucket, and the health of the player and original dog.
+source, the spent bucket, and the health of the player and original dog.
+The updated bridge also scans that pool in the client and verifies the bucket
+source remains in the results after flowing water is filtered out.
 With the duel flag and `MUSHROOM_EXPEDITION_REFUGE_ONLY=1`, the fixture
 starts an Enderman attack after the controller is ready. The controller
 uses a carried bucket to make a refuge. The server verifies the hit,

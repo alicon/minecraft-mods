@@ -367,7 +367,7 @@ final class ExpeditionEndCrystalClientScenario {
 			var end = minecraft.getLevel(Level.END);
 			if (bucketsBefore < 1 || !owner.isAlive() || owner.getHealth() < 15
 					|| owner.getInventory().countItem(Items.WATER_BUCKET) != bucketsBefore - 1
-					|| !end.getBlockState(camp.start()).is(Blocks.WATER)
+					|| !end.getBlockState(camp.start()).is(Blocks.WATER) || !end.getFluidState(camp.start()).isSource()
 					|| !(end.getEntity(camp.dogId()) instanceof MushroomYorkieEntity dog) || !dog.isAlive()
 					|| dog.getHealth() < camp.dogHealth()) {
 				throw new AssertionError("Expected the native bucket landing to save the player and leave the original dog unharmed");
