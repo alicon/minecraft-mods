@@ -717,7 +717,9 @@ Fetch GameTests cover active flight steering, interruption returning to normal f
 The expedition footing tests include a suspended block above a gap on a
 quarry bend. They drive an airborne stride below it, verify that the dog
 brakes on the bank, and check that the same living dog rejoins once there is
-a supported route.
+a supported route. A second quarry case starts him on the recorded isolated
+shelf. He stays there until the uphill route is lowered into supported steps,
+then walks back to the owner with his health and identity intact.
 
 Flight and airborne-reload fetch tests declare a 16×16 horizontal arena. Their
 toys at relative x8 and cliff floor through x10 extend past Fabric's default

@@ -117,6 +117,11 @@ public final class FetchPersistenceGameTests {
 		ExpeditionCampScenarios.followsCliffBend(helper);
 	}
 
+	@GameTest(template = "mushroom_yorkie_gametest:cliff_arena", timeoutTicks = 250)
+	public void expeditionRejoinsFromQuarryShelf(GameTestHelper helper) {
+		ExpeditionCampScenarios.rejoinsFromQuarryShelf(helper);
+	}
+
 	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 180)
 	public void expeditionBrakesAtCliffBend(GameTestHelper helper) {
 		ExpeditionCampScenarios.cliffMomentumStopsOnFooting(helper);

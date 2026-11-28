@@ -198,6 +198,67 @@ final class ExpeditionCampScenarios {
 				});
 	}
 
+	static void rejoinsFromQuarryShelf(GameTestHelper helper) {
+		// The recorded north route began two blocks above the dog's grass shelf.
+		int[] tops = {9, 9, 9, 8, 6, 4};
+		for (int i = 0; i < tops.length; i++) {
+			int z = i + 2;
+			for (int x = 4; x <= 8; x++) {
+				helper.setBlock(x, 0, z, Blocks.STONE);
+			}
+			for (int y = 1; y <= tops[i]; y++) {
+				helper.setBlock(6, y, z, Blocks.DIRT);
+			}
+			for (int y = 1; y <= (z == 7 ? 7 : 9); y++) {
+				helper.setBlock(5, y, z, Blocks.STONE);
+			}
+		}
+		helper.setBlock(6, 4, 7, Blocks.GRASS_BLOCK);
+		helper.setBlock(6, 0, 8, Blocks.STONE);
+		var level = helper.getLevel();
+		var owner = SurvivalGameTestPlayers.createWithoutToyCleanup(helper);
+		owner.setPos(helper.absoluteVec(new Vec3(6.5, 10, 2.5)));
+		var shelf = helper.absoluteVec(new Vec3(6.5, 5, 7.95));
+		var dog = helper.spawn(ModEntities.MUSHROOM_YORKIE, 6, 5, 7);
+		dog.setPos(shelf);
+		dog.claimFor(owner);
+		var identity = dog.getUUID();
+		float health = dog.getHealth();
+		Runnable checkHealth = () -> helper.assertTrue(dog.isAlive() && dog.getHealth() == health,
+				"Mushroom fell or took damage at the quarry shelf: " + dog.position());
+		helper.startSequence().thenExecuteFor(45, () -> {
+					checkHealth.run();
+					helper.assertTrue(dog.blockPosition().equals(BlockPos.containing(shelf)),
+							"Mushroom left the isolated shelf before it had a safe exit: " + dog.position());
+				})
+				.thenExecute(() -> {
+					// Keep the dog's floor and the west wall. Lower the four steps toward the owner.
+					for (int z = 3; z <= 6; z++) {
+						int floor = 11 - z;
+						for (int y = floor + 1; y <= tops[z - 2]; y++) {
+							helper.setBlock(6, y, z, Blocks.AIR);
+						}
+					}
+				})
+				.thenWaitUntil(() -> {
+					checkHealth.run();
+					var firstStep = helper.absolutePos(new BlockPos(6, 6, 6));
+					helper.assertTrue(dog.blockPosition().equals(firstStep) && dog.onGround(),
+							"Mushroom did not walk onto the first supported step: " + dog.position());
+				})
+				.thenWaitUntil(() -> {
+					checkHealth.run();
+					helper.assertTrue(dog.getUUID().equals(identity) && dog.isOwnedBy(owner)
+									&& dog.onGround() && dog.distanceToSqr(owner) <= 4,
+							"The original Mushroom did not climb to his owner: " + dog.position());
+				})
+				.thenExecute(() -> {
+					dog.discard();
+					level.getServer().getPlayerList().remove(owner);
+					helper.succeed();
+				});
+	}
+
 	static void cliffMomentumStopsOnFooting(GameTestHelper helper) {
 		for (int x = 1; x <= 7; x++) {
 			for (int z = 2; z <= 6; z++) {
