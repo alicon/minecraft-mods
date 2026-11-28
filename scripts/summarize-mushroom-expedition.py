@@ -92,6 +92,12 @@ def summarize(path):
     reopened = REOPENED.search(game_log)
     status_path = path / "status"
     status = status_path.read_text(encoding="utf-8").strip() if status_path.exists() else "starting"
+    archived_failure = path / "archived-controller-failure.txt"
+    failure_reason = None
+    if status == "held" and archived_failure.is_file() and playtest_log:
+        reason = archived_failure.read_text(encoding="utf-8").strip()
+        if reason and playtest_log.splitlines()[-1].partition("Result | Run held. ")[2] == reason:
+            failure_reason = reason
     actions = Counter()
     choices = Counter()
     broken_generated_crystals = set()
@@ -145,7 +151,8 @@ def summarize(path):
         "policy": started.group(2) if started else None,
         "status": status,
         "nativeClientFailed": native_failed,
-        "terminal": native_finished or native_failed,
+        "terminal": native_finished or native_failed or failure_reason is not None,
+        "archivedControllerFailure": failure_reason,
         "fullExpeditionVerified": native_finished and verified_expedition,
         "nativeMilestone": passed.group(1) if passed else None,
         "nativeCompanionDefense": "Expedition companion defense passed:" in game_log,

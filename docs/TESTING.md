@@ -219,6 +219,9 @@ The first mined iron goes back to the camp bed before smelting. Both trips
 can retrace grounded positions recorded on the outbound path. The iron trip
 uses positions from before the first ore pickup. The trace records the
 original dog, the player's position at the bed, and any raw iron brought back.
+After a meal when it is safe to keep mining, the player checks and retraces the
+existing quarry stairs before extending them. A return to camp takes priority
+when Mushroom or the player needs more care.
 
 ```shell
 MUSHROOM_EXPEDITION_STATUS="$RUN_DIRECTORY/status" MUSHROOM_EXPEDITION_RESUME=1 \
@@ -268,6 +271,13 @@ by a return and reopen with the original dog counts as a win. The cost per win
 includes failed terminal attempts. It stays unset when there are no verified
 wins or when billable usage is unknown. Live attempts remain visible without
 being counted as finished.
+
+When an experiment's controller exits with a failure and the test keeps
+the world open for investigation, copy the report before reattaching. In
+the copy, save the final `Run held.` reason in
+`archived-controller-failure.txt`. The comparison counts that attempt as a
+failure only when the copy still says `held` and its final narration agrees
+with the recorded reason. The live report can continue as an assisted replay.
 
 The same command accepts a Bedrock `--play-seconds` log. It reports elapsed
 time, completed cases, input recovery, and the add-on and fixture checksums.

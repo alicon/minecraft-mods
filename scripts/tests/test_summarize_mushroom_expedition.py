@@ -9,14 +9,19 @@ API = runpy.run_path(str(Path(__file__).resolve().parents[1] / "summarize-mushro
 
 
 class ExpeditionComparisonTests(unittest.TestCase):
-    def make_run(self, policy, game_log="", actions=(), seed=71, reopen="original", stage="expedition"):
+    def make_run(self, policy, game_log="", actions=(), seed=71, reopen="original", stage="expedition",
+                 held_reason=None, archive_reason=None):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         path = Path(directory.name)
         (path / "source-build.txt").write_text("Revision verified-build\n", encoding="utf-8")
-        (path / "playtest.log").write_text(
-            f"Run | Started the Survival controller. Stage {stage}, policy {policy}.\n", encoding="utf-8"
-        )
+        narration = f"Run | Started the Survival controller. Stage {stage}, policy {policy}.\n"
+        if held_reason:
+            narration += f"Result | Run held. {held_reason}\n"
+            (path / "status").write_text("held", encoding="utf-8")
+        if archive_reason:
+            (path / "archived-controller-failure.txt").write_text(archive_reason, encoding="utf-8")
+        (path / "playtest.log").write_text(narration, encoding="utf-8")
         (path / "game.log").write_text(
             f"Expedition Survival ready: seed={seed}\n" + game_log.format(reopen=reopen),
             encoding="utf-8",
@@ -58,6 +63,16 @@ class ExpeditionComparisonTests(unittest.TestCase):
         result = API["compare_policies"]([rules, jev])["pairedByRevision"]["verified-build"]["jev"]
         self.assertEqual(result["requestsWithUnknownCost"], 1)
         self.assertIsNone(result["reportedCostPerWinUsd"])
+
+    def test_only_an_archived_controller_failure_can_close_a_held_attempt(self):
+        reason = "The wool search exhausted its rounds"
+        live = self.make_run("jev", held_reason=reason)
+        archived = self.make_run("jev", held_reason=reason, archive_reason=reason)
+        mismatch = self.make_run("jev", held_reason=reason, archive_reason="something else")
+        self.assertFalse(live["terminal"])
+        self.assertTrue(archived["terminal"])
+        self.assertEqual(archived["archivedControllerFailure"], reason)
+        self.assertFalse(mismatch["terminal"])
 
     winning_log = ("Expedition Survival expedition passed: dog=original owner=owner\n"
                    "Expedition Survival expedition reopened: dog={reopen} owner=owner\n"
