@@ -5,6 +5,7 @@ import java.util.function.UnaryOperator;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
@@ -125,6 +126,100 @@ final class ExpeditionCampScenarios {
 							"The original dog did not stay alive off the magma while the owner was away");
 					dog.discard();
 					level.getServer().getPlayerList().remove(owner);
+					helper.succeed();
+				});
+	}
+
+	static void followsCliffBend(GameTestHelper helper) {
+		// Surface heights from the expedition fall, with the ravine floor twelve blocks below the rim.
+		int[][] surface = {
+			{10, 10, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+			{10, 10, 9, 7, 0, 0, 0, 0, 0, 0, 0, 0},
+			{10, 10, 9, 8, 0, 0, 0, 0, 0, 0, 0, 0},
+			{10, 10, 10, 8, 5, 0, 0, 0, 0, 0, 0, 0},
+			{10, 11, 10, 9, 8, 0, 0, 0, 0, 0, 0, 0},
+			{10, 11, 10, 9, 8, 7, 0, 0, 0, 0, 0, 0},
+			{10, 11, 10, 10, 9, 8, 7, 0, 0, 0, 0, 0},
+			{10, 11, 10, 10, 10, 9, 8, 8, 0, 0, 0, 0},
+			{10, 11, 11, 10, 10, 10, 10, 9, 8, 7, 7, 7},
+			{10, 10, 11, 11, 11, 11, 11, 11, 10, 10, 9, 8},
+		};
+		for (int z = 0; z < surface.length; z++) {
+			for (int x = 0; x < surface[z].length; x++) {
+				for (int y = 0; y <= surface[z][x]; y++) {
+					helper.setBlock(x + 1, y, z + 1, Blocks.STONE);
+				}
+			}
+		}
+		var owner = SurvivalGameTestPlayers.createWithoutToyCleanup(helper);
+		var dog = helper.spawn(ModEntities.MUSHROOM_YORKIE, 4, 9, 4);
+		dog.claimFor(owner);
+		dog.setHealth(1.0F);
+		dog.setPos(helper.absoluteVec(new Vec3(4.98, 9, 4.41)));
+		owner.setPos(helper.absoluteVec(new Vec3(4.5, 10, 5.46)));
+		// The owner stays on the recorded Survival route; the dog chooses and walks its own path.
+		int[] ticks = {20, 34, 54, 76, 96, 115, 129};
+		Vec3[] positions = {
+			new Vec3(5.70, 9, 5.40), new Vec3(5.52, 9, 6.31), new Vec3(6.71, 8, 6.43),
+			new Vec3(6.49, 9, 7.49), new Vec3(7.71, 8, 7.55), new Vec3(7.66, 9, 8.45), new Vec3(8.35, 9, 8.56),
+		};
+		for (int index = 0; index < ticks.length; index++) {
+			Vec3 position = helper.absoluteVec(positions[index]);
+			helper.runAfterDelay(ticks[index], () -> owner.setPos(position));
+		}
+		var minimumY = helper.absoluteVec(new Vec3(0, 7, 0)).y;
+		helper.startSequence().thenExecuteFor(160, () ->
+				helper.assertTrue(dog.isAlive() && dog.getHealth() == 1.0F && dog.getY() >= minimumY,
+						"Mushroom fell across the inside of the cliff bend at " + dog.position()))
+				.thenExecute(() -> {
+					helper.assertTrue(dog.distanceToSqr(owner) <= 4 || dog.lastWarnedTrailStep != null,
+							"Mushroom neither followed the owner nor warned at the bend; dog=" + dog.position()
+									+ ", owner=" + owner.position());
+					dog.discard();
+					helper.getLevel().getServer().getPlayerList().remove(owner);
+					helper.succeed();
+				});
+	}
+
+	static void cliffMomentumStopsOnFooting(GameTestHelper helper) {
+		for (int x = 1; x <= 7; x++) {
+			for (int z = 2; z <= 6; z++) {
+				helper.setBlock(x, 0, z, Blocks.STONE);
+				if (x <= 2 || z >= 4) {
+					helper.setBlock(x, 5, z, Blocks.STONE);
+				}
+			}
+		}
+		var owner = SurvivalGameTestPlayers.createWithoutToyCleanup(helper);
+		var dog = helper.spawn(ModEntities.MUSHROOM_YORKIE, 1, 6, 3);
+		dog.claimFor(owner);
+		dog.setHealth(1.0F);
+		var identity = dog.getUUID();
+		owner.setPos(helper.absoluteVec(new Vec3(6.5, 6, 4.5)));
+		var brink = helper.absoluteVec(new Vec3(2.83, 6, 3.5));
+		var offEdge = helper.absoluteVec(new Vec3(3.40, 6, 3.5));
+		helper.startSequence().thenWaitUntil(() -> helper.assertTrue(
+				!dog.getNavigation().isDone(), "Mushroom did not start following the owner"))
+				.thenExecute(() -> {
+					// Stage the accumulated stride between two path nodes. Let the native movement consume it.
+					dog.setPos(brink);
+					dog.setOnGround(true);
+					dog.move(MoverType.SELF, offEdge.subtract(brink).add(0, -0.08, 0));
+					helper.assertTrue(dog.position().distanceToSqr(brink) < 0.04 && dog.lastWarnedTrailStep != null,
+							"Mushroom's following stride crossed onto the unsupported column at " + dog.position());
+				})
+				.thenExecuteAfter(12, () -> {
+					helper.assertTrue(dog.isAlive() && dog.getHealth() == 1.0F
+							&& dog.getY() >= brink.y - 0.05, "Mushroom fell after braking at the bend");
+					helper.setBlock(3, 5, 3, Blocks.STONE);
+					helper.setBlock(4, 5, 3, Blocks.STONE);
+				})
+				.thenWaitUntil(() -> helper.assertTrue(dog.isAlive() && dog.isOwnedBy(owner)
+						&& dog.getUUID().equals(identity) && dog.distanceToSqr(owner) <= 4,
+						"Mushroom did not rejoin the owner after the bend was widened"))
+				.thenExecute(() -> {
+					dog.discard();
+					helper.getLevel().getServer().getPlayerList().remove(owner);
 					helper.succeed();
 				});
 	}

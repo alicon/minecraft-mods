@@ -4,6 +4,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 
@@ -28,7 +29,8 @@ final class MushroomExpeditionFooting {
 		if (!level.hasChunkAt(to)) {
 			return true;
 		}
-		if (dangerousBlock(level, to) || dangerousBlock(level, to.below())) {
+		if (dangerousBlock(level, to) || dangerousBlock(level, to.below())
+				|| from.getY() - to.getY() > 3 || !hasSafeLanding(level, to)) {
 			return true;
 		}
 		int dx = to.getX() - from.getX();
@@ -39,6 +41,24 @@ final class MushroomExpeditionFooting {
 		int sideX = Math.abs(dx) >= Math.abs(dz) ? 0 : 1;
 		int sideZ = sideX == 0 ? 1 : 0;
 		return exposedSide(level, to.offset(sideX, 0, sideZ)) && exposedSide(level, to.offset(-sideX, 0, -sideZ));
+	}
+
+	static boolean hasSafeLanding(ServerLevel level, BlockPos column) {
+		if (!level.hasChunkAt(column)) {
+			return false;
+		}
+		// The surface of the supporting block is one block above its position.
+		for (int depth = 0; depth <= 4; depth++) {
+			BlockPos pos = column.below(depth);
+			var state = level.getBlockState(pos);
+			if (dangerousBlock(level, pos)) {
+				return false;
+			}
+			if (state.getFluidState().is(FluidTags.WATER) || !state.getCollisionShape(level, pos).isEmpty()) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static boolean exposedSide(ServerLevel level, BlockPos side) {
@@ -60,7 +80,7 @@ final class MushroomExpeditionFooting {
 
 	private static boolean dangerousBlock(ServerLevel level, BlockPos pos) {
 		var state = level.getBlockState(pos);
-		return state.getFluidState().is(net.minecraft.tags.FluidTags.LAVA) || state.is(BlockTags.FIRE)
+		return state.getFluidState().is(FluidTags.LAVA) || state.is(BlockTags.FIRE)
 				|| state.is(Blocks.MAGMA_BLOCK) || state.is(Blocks.POWDER_SNOW)
 				|| state.is(Blocks.CAMPFIRE) || state.is(Blocks.SOUL_CAMPFIRE);
 	}

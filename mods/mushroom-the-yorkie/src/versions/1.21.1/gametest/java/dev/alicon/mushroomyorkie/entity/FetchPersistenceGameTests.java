@@ -112,6 +112,16 @@ public final class FetchPersistenceGameTests {
 		ExpeditionCampScenarios.narrowCrossing(helper);
 	}
 
+	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 180)
+	public void expeditionFollowsCliffBend(GameTestHelper helper) {
+		ExpeditionCampScenarios.followsCliffBend(helper);
+	}
+
+	@GameTest(template = "mushroom_yorkie_gametest:fetch_arena", timeoutTicks = 180)
+	public void expeditionBrakesAtCliffBend(GameTestHelper helper) {
+		ExpeditionCampScenarios.cliffMomentumStopsOnFooting(helper);
+	}
+
 	/** Leave hot footing even before the owner has a camp mat. */
 	@GameTest(template = "fabric-gametest-api-v1:empty", timeoutTicks = 120)
 	public void expeditionStepsOffMagmaWithoutMat(GameTestHelper helper) {

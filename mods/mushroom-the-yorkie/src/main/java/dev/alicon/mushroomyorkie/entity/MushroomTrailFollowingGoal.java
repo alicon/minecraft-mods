@@ -11,6 +11,7 @@ final class MushroomTrailFollowingGoal extends FollowOwnerGoal {
 	private final MushroomYorkieEntity dog;
 	private BlockPos blockedStep;
 	private Vec3 ownerAtWarning;
+	private boolean following;
 
 	MushroomTrailFollowingGoal(MushroomYorkieEntity dog) {
 		super(dog, 1.25D, 2.0F, 1.0F);
@@ -25,8 +26,15 @@ final class MushroomTrailFollowingGoal extends FollowOwnerGoal {
 	}
 
 	@Override
+	public void start() {
+		super.start();
+		this.following = true;
+	}
+
+	@Override
 	public void stop() {
 		super.stop();
+		this.following = false;
 		this.blockedStep = null;
 		this.ownerAtWarning = null;
 	}
@@ -65,8 +73,36 @@ final class MushroomTrailFollowingGoal extends FollowOwnerGoal {
 	}
 
 	private boolean canCheckFooting() {
-		return this.dog.level() instanceof ServerLevel && this.dog.onGround() && !this.dog.isInWater()
-				&& this.dog.getOwner() instanceof Player owner && !owner.isCreative() && !owner.isSpectator();
+		return this.dog.onGround() && this.dog.level() instanceof ServerLevel && this.survivalOwner() != null;
+	}
+
+	private Player survivalOwner() {
+		return !this.dog.isInWater() && this.dog.getOwner() instanceof Player owner
+				&& owner.level() == this.dog.level() && !owner.isCreative() && !owner.isSpectator() ? owner : null;
+	}
+
+	Vec3 guardStride(Vec3 movement) {
+		if (!this.following || this.dog.isOrderedToSit() || this.dog.isPassenger()
+				|| this.dog.hurtTime > 0 || movement.y > 0 || movement.horizontalDistanceSqr() == 0
+				|| !(this.dog.level() instanceof ServerLevel level)) {
+			return movement;
+		}
+		Player owner = this.survivalOwner();
+		if (owner == null) {
+			return movement;
+		}
+		double footY = Math.ceil(this.dog.getY() - 1.0E-4);
+		BlockPos here = BlockPos.containing(this.dog.getX(), footY, this.dog.getZ());
+		BlockPos ahead = BlockPos.containing(this.dog.getX() + movement.x, footY, this.dog.getZ() + movement.z);
+		if (here.equals(ahead) || MushroomExpeditionFooting.hasSafeLanding(level, ahead)
+				|| !MushroomExpeditionFooting.hasSafeLanding(level, here)) {
+			return movement;
+		}
+		this.blockedStep = ahead;
+		this.ownerAtWarning = owner.position();
+		warn(this.dog, level, owner, ahead);
+		pauseWalking(this.dog);
+		return new Vec3(0, movement.y, 0);
 	}
 
 	private static void pauseWalking(MushroomYorkieEntity dog) {
@@ -97,12 +133,16 @@ final class MushroomTrailFollowingGoal extends FollowOwnerGoal {
 			dog.lastWarnedTrailStep = null;
 			return false;
 		}
+		warn(dog, level, handler, step);
+		return true;
+	}
+
+	private static void warn(MushroomYorkieEntity dog, ServerLevel level, Player handler, BlockPos step) {
 		var warning = GlobalPos.of(level.dimension(), step);
 		if (!warning.equals(dog.lastWarnedTrailStep)) {
 			dog.lastWarnedTrailStep = warning;
 			MushroomYorkieSounds.bark(dog);
 			MushroomCampInteractions.notice(handler, "trail_unsafe");
 		}
-		return true;
 	}
 }
