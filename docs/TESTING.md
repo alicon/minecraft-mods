@@ -437,6 +437,10 @@ game tick when the ground is in range. Set
 `MUSHROOM_EXPEDITION_FALL_ONLY=1` with the duel flag to reproduce the
 landing from a staged 110-block fall. The server checks the actual water
 block, the spent bucket, and the health of the player and original dog.
+With the duel flag and `MUSHROOM_EXPEDITION_REFUGE_ONLY=1`, the fixture
+starts an Enderman attack after the controller is ready. The controller
+uses a carried bucket to make a refuge. The server verifies the hit,
+water placement, and the original dog unharmed at camp.
 In the full duel replay, the server verifies the dragon
 died, the sword shows use, and the original dog remains at shelter.
 The duel keeps a separate checkpoint with the marked mat, original dog,
@@ -457,7 +461,9 @@ in the Overworld and again after reopening. This continuation starts
 with the equipment and world state from the crystal fixture.
 The pilot waits farther from the fountain while the dragon is healthy and
 shoots during flight. It updates its aim during the draw from observed
-movement and records a hit only after the native health reading drops.
+movement, prefers an exposed head at close range, and records a hit
+only after the native health reading drops. An Enderman attack interrupts
+the dragon fight so the player can take cover and recover.
 
 Set `MUSHROOM_EXPEDITION_STAGE=eye-route` to replay using an Eye of Ender
 to choose a route. The disposable fixture supplies one eye, Mushroom, and

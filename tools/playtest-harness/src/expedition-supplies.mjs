@@ -319,6 +319,7 @@ try {
     if (duel) {
       const reflexes = await action('set_reflexes', { autoDefend: false, waterLanding: true });
       const fallOnly = !archive && process.env.MUSHROOM_EXPEDITION_FALL_ONLY === '1';
+      const refugeOnly = !archive && !fallOnly && process.env.MUSHROOM_EXPEDITION_REFUGE_ONLY === '1';
       await narrate('Objective', archive
         ? 'Defeat the original dragon with the gear carried from the crystal fight, then bring Mushroom home.'
         : 'Fight the full-health dragon through native attacks while Mushroom stays in shelter.');
@@ -336,10 +337,13 @@ try {
         if (kind === 'fall_recovery' && observation.landed) {
           await narrate('Action', 'Recovered from dragon knockback and reached the ground.');
         }
+        if (kind === 'enderman_refuge') await narrate('Action', 'Used water to take cover from an attacking Enderman.');
         if (kind === 'victory') await narrate('Result', 'The native End exit is open.');
       };
+      if (refugeOnly) await reportStatus('refuge-ready');
       const victory = fallOnly ? await replayBucketLanding(reflexes, start, report) : await fightEndDragon(action, report,
-        progress, { useCarriedPickaxe: archivedEnd, nativeWaterLanding: reflexes?.waterLanding === true, shootWhileFlying: archivedEnd });
+        progress, { useCarriedPickaxe: archivedEnd, nativeWaterLanding: reflexes?.waterLanding === true,
+          shootWhileFlying: archivedEnd, stopAfterRefuge: refugeOnly });
       if (archive) {
         assert.equal(victory.dragon, archive.dragon, 'The controller must fight the original dragon from the crystal stage');
         await reportStatus('victory');

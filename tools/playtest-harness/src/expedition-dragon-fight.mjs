@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
-import { eatExpeditionMeal, hold, regroupExpeditionCompanion, stepOut } from './expedition-home.mjs';
-import { dragonBreathThreat, retreatFromDragonThreat } from './expedition-end-crystals.mjs';
+import { eatExpeditionMeal, hold, regroupExpeditionCompanion, stepOut, visible } from './expedition-home.mjs';
+import { dragonBreathThreat, enterEndermanRefuge, retreatFromDragonThreat } from './expedition-end-crystals.mjs';
 import { catchEndFall } from './expedition-end-cage.mjs';
 import { useEmptyHandOnCompanion } from './expedition-gear.mjs';
 import { bowAim, movingBowAim } from './expedition-ballistics.mjs';
@@ -13,23 +13,53 @@ const APPLE = 'minecraft:golden_apple';
 const WATER_BUCKET = 'minecraft:water_bucket';
 const BOW = 'minecraft:bow';
 const ARROW = 'minecraft:arrow';
+const ENDERMAN = 'minecraft:enderman';
+const BUCKET = 'minecraft:bucket';
 const SWORDS = ['netherite', 'diamond', 'iron', 'stone'].map(tier => `minecraft:${tier}_sword`);
 const RATIONS = ['cooked_beef', 'cooked_porkchop', 'cooked_mutton', 'cooked_chicken', 'bread'].map(id => `minecraft:${id}`);
 const feet = ({ position }) => [position.x, position.y, position.z].map(Math.floor);
-const dragonBody = dragon => dragon?.parts.find(part => part.name === 'body') ?? dragon?.parts.find(part => part.name === 'head');
+const partCenter = (dragon, part) => dragon.parts.find(box => box.name === part)?.center;
+
+export function leadDragonShot(player, previous, current, drawTicksLeft) {
+  const head = partCenter(current.dragon, 'head');
+  const body = partCenter(current.dragon, 'body');
+  const { x, y, z } = player.position;
+  const range = ([px, py, pz]) => Math.hypot(px - x, py - y - 1.62, pz - z);
+  const exposedHead = head && body && range(head) <= 34 && range(body) - range(head) >= 3;
+  for (const part of exposedHead || !body ? ['head', 'body'] : ['body']) {
+    const from = partCenter(previous.dragon, part);
+    const now = partCenter(current.dragon, part);
+    if (!from || !now) continue;
+    const shot = movingBowAim(player, { tick: previous.tick, pos: from }, { tick: current.tick, pos: now }, drawTicksLeft);
+    if (shot) return { ...shot, part };
+  }
+  return null;
+}
 
 async function observeDragon(action) {
   const view = await action('get_entities', { type: DRAGON, radius: 128, max: 16 });
   return view?.entities.find(entity => entity.parts?.some(part => part.name === 'head'));
 }
 
+function endermanThatHit(player, previousHealth) {
+  const reported = player.events?.map(event => /damage from minecraft:enderman #(\d+)/.exec(event)).find(Boolean);
+  if (reported) return Number(reported[1]);
+  if (!player.events?.length && player.health <= previousHealth - 1.5
+      && !player.threats?.some(threat => threat.type === DRAGON && threat.distance <= 10)) {
+    return player.threats?.find(threat => threat.type === ENDERMAN && threat.distance <= 3)?.id;
+  }
+  return undefined;
+}
+
 async function shootFlyingDragon(action, player, dragon) {
-  const initialAim = bowAim(player, dragonBody(dragon).center);
+  const initialAim = bowAim(player, partCenter(dragon, 'body') ?? partCenter(dragon, 'head'));
   if (!initialAim) return null;
   if (player.mainHand?.id !== BOW) await hold(action, BOW);
   await action('look', initialAim);
   let drawError;
-  const draw = action('use_item', { ticks: 32 }).catch(error => { drawError = error; });
+  let drawFinished = false;
+  const draw = action('use_item', { ticks: 32 }).catch(error => { drawError = error; })
+    .finally(() => { drawFinished = true; });
   let previous;
   let lead;
   try {
@@ -40,11 +70,11 @@ async function shootFlyingDragon(action, player, dragon) {
       if (left < 3 || !pose.onGround || pose.health < player.health - 1) break;
       const target = await observeDragon(action);
       if (!target || target.perched || target.uuid !== dragon.uuid) break;
-      const sample = { tick: pose.gameTime, pos: dragonBody(target).center };
+      const sample = { tick: pose.gameTime, dragon: target };
       if (previous && left <= 15) {
-        const candidate = movingBowAim(pose, previous, sample, left);
-        if (candidate && await action('look', candidate.aim)) {
-          lead = { tick: pose.gameTime, before: target.health, flightTicks: candidate.flightTicks };
+        const candidate = leadDragonShot(pose, previous, sample, left);
+        if (candidate && await action('look', candidate.aim) && !drawFinished) {
+          lead = { tick: pose.gameTime, before: target.health, flightTicks: candidate.flightTicks, part: candidate.part };
         }
       }
       previous = sample;
@@ -127,7 +157,7 @@ export async function keepLandingBucketOnHotbar(action, stock) {
 }
 
 export async function fightEndDragon(action, report, progress = {},
-    { useCarriedPickaxe = false, nativeWaterLanding = false, shootWhileFlying = false } = {}) {
+    { useCarriedPickaxe = false, nativeWaterLanding = false, shootWhileFlying = false, stopAfterRefuge = false } = {}) {
   const start = await action('observe');
   assert.equal(start?.dimension, END);
   const stock = await action('get_inventory');
@@ -156,13 +186,23 @@ export async function fightEndDragon(action, report, progress = {},
   let groundY = start.onGround ? start.position.y : fountain[1] + 1;
   let launchY;
   let shots = shootWhileFlying && stock.slots.some(stack => stack.id === BOW)
-    ? Math.min(45, stock.slots.filter(stack => stack.id === ARROW).reduce((sum, stack) => sum + stack.count, 0)) : 0;
+    ? stock.slots.filter(stack => stack.id === ARROW).reduce((sum, stack) => sum + stack.count, 0) : 0;
   let nextShot = 0;
   let pendingShot;
+  let lastHealth = start.health;
+  let endermanAttacker;
+  let refugeUntil = 0;
+  let usedRefuge = false;
   for (let attempt = 0; attempt < 1_200; attempt++) {
     const player = await action('observe');
     assert.ok(player?.inWorld && player.dimension === END && !player.dead && player.health >= 4,
       'The player became unsafe during the native dragon fight');
+    const attacker = endermanThatHit(player, lastHealth);
+    lastHealth = player.health;
+    if (attacker !== undefined) {
+      endermanAttacker = attacker;
+      refugeUntil = player.gameTime + 180;
+    }
     if (!player.onGround && !player.inWater) {
       if (Math.abs(player.position.y - groundY) >= 4) {
         if (nativeWaterLanding) {
@@ -205,7 +245,8 @@ export async function fightEndDragon(action, report, progress = {},
       if (pendingShot && player.gameTime > pendingShot.tick + pendingShot.flightTicks + 30) pendingShot = null;
       if (pendingShot && dragon.health < pendingShot.before) {
         hits++;
-        await report('strike', { dragon: dragon.uuid, before: pendingShot.before, after: dragon.health, hits, method: 'bow' });
+        await report('strike', { dragon: dragon.uuid, before: pendingShot.before, after: dragon.health,
+          hits, method: 'bow', aimedPart: pendingShot.part });
         pendingShot = null;
       }
       if (lastPerch !== dragon.perched) {
@@ -219,6 +260,13 @@ export async function fightEndDragon(action, report, progress = {},
     if (danger) {
       await retreatFromDragonThreat(action, player, danger);
       continue;
+    }
+    let sheltered = player.inWater && usedRefuge;
+    if (player.gameTime < refugeUntil && !sheltered && await enterEndermanRefuge(action, player)) {
+      sheltered = true;
+      usedRefuge = true;
+      await report('enderman_refuge', { attacker: endermanAttacker, health: player.health });
+      if (stopAfterRefuge) return null;
     }
     if ((player.health < 16 || player.food < 18) && player.gameTime >= nextMeal) {
       const inventory = await action('get_inventory');
@@ -235,6 +283,39 @@ export async function fightEndDragon(action, report, progress = {},
         nextMeal = player.gameTime + 60;
         continue;
       }
+    }
+    if (player.gameTime < refugeUntil) {
+      const pursuer = player.threats?.find(threat => threat.id === endermanAttacker);
+      if (pursuer?.distance < 3 && player.attackStrength >= 0.95) {
+        if (player.mainHand?.id !== weapon) await hold(action, weapon);
+        if (await visible(action, pursuer.id)) await action('attack_entity', { entityId: pursuer.id });
+        await setTimeout(250);
+        continue;
+      }
+      if (sheltered) {
+        await setTimeout(300);
+        continue;
+      }
+    }
+    if (usedRefuge && player.gameTime >= refugeUntil) {
+      usedRefuge = false;
+      if (player.inWater && !player.threats?.some(threat => threat.distance < 6)) {
+        const inventory = await action('get_inventory');
+        if (inventory.slots.some(stack => stack.id === BUCKET)) {
+          await hold(action, BUCKET);
+          await action('look', { pitch: 90 });
+          const filled = await action('use_item');
+          if (filled?.mainHand?.id === WATER_BUCKET) {
+            const selected = (await action('get_inventory')).selectedSlot;
+            const workSlot = selected === inventory.selectedSlot ? (selected + 1) % 9 : inventory.selectedSlot;
+            await action('select_slot', { slot: workSlot });
+          }
+        }
+      }
+    }
+    if (stopAfterRefuge) {
+      await setTimeout(200);
+      continue;
     }
     // Stay beyond the breath around the fountain while the bow is the
     // safer way to whittle down the dragon. Approach for the final hits.
@@ -267,7 +348,8 @@ export async function fightEndDragon(action, report, progress = {},
       continue;
     }
     if (dragon && !dragon.perched && shots && player.health >= 14 && player.gameTime >= nextShot
-        && dragon.distance >= 12 && dragon.distance <= 58) {
+        && dragon.distance >= 12 && dragon.distance <= 58
+        && !player.threats?.some(threat => threat.type === ENDERMAN && threat.distance < 4)) {
       const shot = await shootFlyingDragon(action, player, dragon);
       shots--;
       nextShot = player.gameTime + 55;

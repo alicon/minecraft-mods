@@ -43,7 +43,7 @@ export async function retreatFromDragonThreat(action, player, danger) {
   }
 }
 
-async function enterEndermanRefuge(action, player) {
+export async function enterEndermanRefuge(action, player) {
   if (player.inWater) return true;
   if (!(await action('get_inventory')).slots.some(stack => stack.id === WATER_BUCKET)) return false;
   await hold(action, WATER_BUCKET);

@@ -10,13 +10,16 @@ import java.util.Comparator;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.stats.Stats;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.item.ItemStack;
@@ -206,6 +209,10 @@ final class ExpeditionEndCrystalClientScenario {
 			verifyWaterLanding(context, server, ownerId, status, camp);
 			return;
 		}
+		if (duelOnly && "1".equals(System.getenv("MUSHROOM_EXPEDITION_REFUGE_ONLY"))) {
+			verifyEndermanRefuge(context, server, ownerId, status, camp);
+			return;
+		}
 		boolean controllerFinished = false;
 		for (int tick = 0; tick < (duelOnly ? 24_000 : 12_000); tick += 5) {
 			String result = Files.readString(status);
@@ -293,6 +300,47 @@ final class ExpeditionEndCrystalClientScenario {
 			return;
 		}
 		throw new AssertionError("The controller did not clear the generated End crystals");
+	}
+
+	private static void verifyEndermanRefuge(ClientGameTestContext context, TestServerContext server, UUID ownerId,
+			Path status, GeneratedCamp camp) throws IOException {
+		for (int tick = 0; tick < 200 && !"refuge-ready".equals(Files.readString(status)); tick += 5) {
+			if ("failed".equals(Files.readString(status))) break;
+			context.waitTicks(5);
+		}
+		if (!"refuge-ready".equals(Files.readString(status))) throw new AssertionError("The refuge observer did not start");
+		var hitByAttacker = new AtomicBoolean();
+		int bucketsBefore = server.computeOnServer(minecraft -> {
+			var end = minecraft.getLevel(Level.END);
+			var owner = minecraft.getPlayerList().getPlayer(ownerId);
+			var attacker = Objects.requireNonNull(EntityType.ENDERMAN.create(end, EntitySpawnReason.TRIGGERED));
+			attacker.setPos(Vec3.atBottomCenterOf(owner.blockPosition().north(2)));
+			ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, source, baseDamage, damage, blocked) -> {
+				if (entity == owner && source.getEntity() == attacker && !blocked && damage > 0) hitByAttacker.set(true);
+			});
+			end.addFreshEntity(attacker);
+			attacker.setTarget(owner);
+			return owner.getInventory().countItem(Items.WATER_BUCKET);
+		});
+		for (int tick = 0; tick < 300 && !"finished".equals(Files.readString(status)); tick += 5) {
+			if ("failed".equals(Files.readString(status))) break;
+			context.waitTicks(5);
+		}
+		server.runOnServer(minecraft -> {
+			var end = minecraft.getLevel(Level.END);
+			var owner = minecraft.getPlayerList().getPlayer(ownerId);
+			if (!hitByAttacker.get() || !owner.isAlive() || owner.getHealth() < 12 || !owner.isInWater()
+					|| owner.getInventory().countItem(Items.WATER_BUCKET) != bucketsBefore - 1
+					|| !end.getBlockState(owner.blockPosition()).is(Blocks.WATER)
+					|| !(end.getEntity(camp.dogId()) instanceof MushroomYorkieEntity dog) || !dog.isAlive()
+					|| !dog.isOwnedBy(owner) || !dog.isOrderedToSit() || dog.getHealth() != camp.dogHealth()
+					|| !dog.blockPosition().equals(camp.shelter())) {
+				throw new AssertionError("Expected a native Enderman hit, verified water refuge, and the original unharmed dog at camp");
+			}
+			System.out.printf("Expedition native Enderman refuge passed: health=%.2f dog=%s%n", owner.getHealth(), dog.getUUID());
+		});
+		if (!"finished".equals(Files.readString(status))) throw new AssertionError("The client did not confirm the Enderman refuge");
+		context.takeScreenshot("expedition-survival-enderman-refuge");
 	}
 
 	private static void verifyWaterLanding(ClientGameTestContext context, TestServerContext server, UUID ownerId,

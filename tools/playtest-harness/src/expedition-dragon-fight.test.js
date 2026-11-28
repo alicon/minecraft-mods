@@ -80,6 +80,57 @@ test('a bow shot leads a moving dragon through the remaining draw and arrow flig
   assert.equal(movingBowAim(player, previous, { ...current, tick: 112 }, 2), null);
 });
 
+test('flying dragon aim leads the exposed head and falls back to the body when turned away', async () => {
+  const { leadDragonShot } = await import('./expedition-dragon-fight.mjs');
+  const player = { position: { x: 0, y: 60, z: 0 } };
+  const frame = (tick, x, headZ) => ({ tick, dragon: { parts: [
+    { name: 'head', center: [x, 68, headZ] },
+    { name: 'body', center: [x, 69, 28] },
+  ] } });
+  const head = leadDragonShot(player, frame(100, -2, 21), frame(104, 0, 21), 5);
+  const body = leadDragonShot(player, frame(100, -2, 35), frame(104, 0, 35), 5);
+  assert.equal(head.part, 'head');
+  assert.equal(body.part, 'body');
+  assert.ok(head.flightTicks < body.flightTicks);
+  assert.equal(leadDragonShot(player, frame(90, -2, 21), frame(104, 0, 21), 5), null);
+});
+
+test('a real Enderman hit interrupts the duel for a water refuge', async () => {
+  const { fightEndDragon } = await import('./expedition-dragon-fight.mjs');
+  const sword = { id: 'minecraft:diamond_sword', slot: 0 };
+  const bucket = { id: 'minecraft:water_bucket', slot: 4 };
+  const position = { x: -15.25, y: 61, z: -8.11 };
+  const player = { inWorld: true, dimension: 'minecraft:the_end', onGround: true,
+    position, health: 20, food: 20, gameTime: 18_798 };
+  const rim = [-1, 0, 1].flatMap(x => [-1, 0, 1].filter(z => x || z).map(z => [x, 59, z]));
+  const protectedByWater = new Error('Water was confirmed before moving or attacking');
+  let observations = 0;
+  let poured = false;
+  const action = async (name, args) => {
+    if (name === 'observe') {
+      if (observations++ === 0) return player;
+      return { ...player, health: 15.3, inWater: poured,
+        events: ['took 1.9 damage from minecraft:enderman #1100, health 15.3/20'],
+        threats: [{ id: 1100, type: 'minecraft:enderman', distance: 1.6 }] };
+    }
+    if (name === 'get_inventory') return { slots: [sword, bucket] };
+    if (name === 'scan_blocks') return { matches: [{ name: 'minecraft:bedrock',
+      positions: [[0, 59, 0], [0, 60, 0], [0, 61, 0], ...rim] }] };
+    if (name === 'get_entities') return { entities: [] };
+    if (name === 'select_slot') { assert.equal(args.slot, bucket.slot); return { mainHand: bucket }; }
+    if (name === 'look') { assert.equal(args.pitch, 90); return {}; }
+    if (name === 'use_item') { poured = true; return { success: true }; }
+    assert.fail(name);
+  };
+  await assert.rejects(fightEndDragon(action, (kind, evidence) => {
+    if (kind === 'enderman_refuge') {
+      assert.ok(poured);
+      assert.equal(evidence.attacker, 1100);
+      throw protectedByWater;
+    }
+  }), error => error === protectedByWater);
+});
+
 test('a dragon launch keeps checking until a water landing is in reach', async () => {
   const { fightEndDragon } = await import('./expedition-dragon-fight.mjs');
   const state = { inWorld: true, dimension: 'minecraft:the_end', onGround: true,
