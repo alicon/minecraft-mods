@@ -224,3 +224,18 @@ test('End water search prioritizes reachable sources and skips rejected position
   assert.deepEqual(chooseEndWater(scan, player, fountain, new Set([String(nearby)])), farther);
   assert.deepEqual(chooseEndWater({ ...scan, waterSourcesOnly: undefined }, player, fountain, new Set()), farther);
 });
+
+test('a blocked perch approach lets the player stage on a safe flank', async () => {
+  const { breathBlocksWalk, perchApproach } = await import('./expedition-dragon-fight.mjs');
+  const player = { position: { x: 22.557, y: 58, z: -7.5 } };
+  const head = { center: [1.68, 63.39, -5.13] };
+  const fountain = [0, 59, 0];
+  const clouds = [{ pos: [2.06, 60, -0.52] }];
+  assert.deepEqual(perchApproach(player, head, fountain, []), { target: [1, 61, -7], waiting: false });
+  const flank = perchApproach(player, head, fountain, clouds);
+  assert.ok(flank.waiting && flank.target);
+  assert.equal(breathBlocksWalk(player, flank.target, clouds), false);
+  const [x, y, z] = flank.target;
+  const staged = { position: { x: x + 0.5, y, z: z + 0.5 } };
+  assert.deepEqual(perchApproach(staged, head, fountain, clouds), { target: null, waiting: true });
+});

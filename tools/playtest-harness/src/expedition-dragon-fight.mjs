@@ -169,6 +169,27 @@ export function breathBlocksWalk(player, target, clouds) {
   });
 }
 
+export function perchApproach(player, head, fountain, clouds) {
+  const [hx, hy, hz] = head.center;
+  const [fx, , fz] = fountain;
+  const dx = hx - fx - 0.5;
+  const dz = hz - fz - 0.5;
+  const length = Math.hypot(dx, dz) || 1;
+  const stance = [Math.floor(hx + 1.3 * dx / length), Math.floor(hy - 1.4), Math.floor(hz + 1.3 * dz / length)];
+  if (!breathBlocksWalk(player, stance, clouds)) return { target: stance, waiting: false };
+
+  // Move to a clear flank while the breath covers striking distance.
+  const here = feet(player);
+  const ring = Array.from({ length: 16 }, (_, index) => {
+    const angle = index * Math.PI / 8;
+    return [Math.floor(fx + Math.cos(angle) * 11), here[1], Math.floor(fz + Math.sin(angle) * 11)];
+  });
+  const distance = ([x, , z]) => Math.hypot(x - stance[0], z - stance[2]);
+  const [best] = [here, ...ring.filter(target => !breathBlocksWalk(player, target, clouds))]
+    .sort((a, b) => distance(a) - distance(b));
+  return { target: best === here ? null : best, waiting: true };
+}
+
 export async function keepLandingBucketOnHotbar(action, stock) {
   const buckets = stock.slots.filter(stack => stack.id === WATER_BUCKET);
   if (!buckets.length || buckets.some(stack => stack.slot < 9)) return;
@@ -419,18 +440,16 @@ export async function fightEndDragon(action, report, progress = {},
         await setTimeout(130);
         continue;
       }
-      const [hx, hy, hz] = head.center;
-      const dx = hx - fx - 0.5;
-      const dz = hz - fz - 0.5;
-      const length = Math.hypot(dx, dz) || 1;
-      const stance = [Math.floor(hx + 1.3 * dx / length), Math.floor(hy - 1.4), Math.floor(hz + 1.3 * dz / length)];
-      if (breathBlocksWalk(player, stance, clouds)) {
+      const approach = perchApproach(player, head, fountain, clouds);
+      if (!approach.target) {
         if (player.pitch < 30) await action('look', { pitch: 50 });
         await setTimeout(350);
         continue;
       }
       visited.push(feet(player));
-      await stepOut(action, player, visited.slice(-24), stance, 'elevation', rejected, undefined, undefined, 26);
+      const moved = await stepOut(action, player, visited.slice(-24), approach.target,
+        approach.waiting ? 'surface' : 'elevation', rejected, undefined, undefined, 26);
+      if (moved && approach.waiting) await report('perch_flank', { target: approach.target });
       continue;
     }
     if (dragon && !dragon.perched && shots && player.health >= 14 && player.gameTime >= nextShot
