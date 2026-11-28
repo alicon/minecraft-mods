@@ -1020,6 +1020,48 @@ test('starter planks can use a reachable fourth log above the first three', asyn
   assert.equal(stock[0].count, 16);
 });
 
+test('timber scouting leaves a failed canopy log for a reachable trunk found farther away', async () => {
+  const { ensurePlanks } = await import('./expedition-home.mjs');
+  const canopy = [0, 69, 0];
+  const trunk = [15, 64, 0];
+  let x = 0.5;
+  let lookedAt;
+  let stock = [{ id: 'minecraft:oak_planks', count: 2 }];
+  const approached = [];
+  const broken = [];
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_inventory': return { slots: stock };
+      case 'observe': return { inWorld: true, onGround: true, health: 20, position: { x, y: 64, z: 0.5 },
+        crosshair: lookedAt === trunk ? { pos: trunk, block: 'minecraft:oak_log' } : undefined };
+      case 'scan_blocks': {
+        const positions = args.radius > 12 || x >= 5 ? [canopy, trunk] : [canopy];
+        return { matches: [{ name: 'minecraft:oak_log', positions }] };
+      }
+      case 'get_blocks': return { cells: Array.from({ length: 17 }, (_, i) => cell(i, 63, 0, 'grass_block')) };
+      case 'go_to':
+        if (args.entityId === 11) {
+          stock.push({ id: 'minecraft:oak_log', count: 1 });
+        } else if (args.maxTicks === 65) {
+          approached.push(args.pos);
+          if (args.pos === canopy) return { arrived: false, reason: 'timed out above the ground' };
+        } else {
+          assert.ok(args.pos[0] > x, 'walk toward the other trunk');
+          x = args.pos[0] + 0.5;
+        }
+        return { arrived: true };
+      case 'look': lookedAt = args.at; return {};
+      case 'break_block': broken.push(args.pos); return { broken: true };
+      case 'get_entities': return { entities: [{ id: 11, item: { id: 'minecraft:oak_log' } }] };
+      default: assert.fail(name);
+    }
+  };
+  await ensurePlanks(action, async (item, count) => { stock = [{ id: item, count: 2 + count }]; }, 3);
+  assert.deepEqual(approached, [canopy, trunk]);
+  assert.deepEqual(broken, [trunk]);
+  assert.equal(stock[0].count, 6);
+});
+
 test('a log cut from above is collected after it falls into reach', async () => {
   const { ensurePlanks } = await import('./expedition-home.mjs');
   const log = [1, 69, 0];
