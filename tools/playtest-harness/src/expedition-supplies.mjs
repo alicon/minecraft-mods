@@ -452,12 +452,19 @@ try {
 }
 
 async function runCompanionDrill() {
-  const [uuid, errand] = (await readFile(join(dirname(statusFile), 'defense-fixture'), 'utf8')).trim().split('\n');
+  const [uuid, errand, retreatX] = (await readFile(join(dirname(statusFile), 'defense-fixture'), 'utf8')).trim().split('\n');
   const pos = errand.trim().split(/\s+/).map(Number);
   assert.ok(/^[\da-f-]{36}$/i.test(uuid) && blockPosition(pos));
   companion = uuid;
   assert.equal(await action('go_to', { pos, stopDistance: 0.7, maxTicks: 28 }), null,
     'The proposed errand should be interrupted by danger to Mushroom');
+  if (retreatX !== undefined) {
+    const after = await playerAction('observe');
+    assert.ok(Number.isInteger(Number(retreatX)) && after.onGround && Math.floor(after.position.x) <= Number(retreatX),
+      'The companion interrupt did not move the player away from the creeper');
+    await narrate('Result', 'Retreated from the creeper before trying to help the original Mushroom.');
+    return;
+  }
   for (let attempt = 0; attempt < 6; attempt++) {
     await setTimeout(250);
     const observed = await playerAction('get_entities', { type: 'minecraft:spider', radius: 8 });

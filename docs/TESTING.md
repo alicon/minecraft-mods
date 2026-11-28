@@ -317,7 +317,12 @@ approaches and kills the spider in the same interruption, and keeps the
 original injured dog alive. Set `MUSHROOM_EXPEDITION_DEFENSE_COVER=1` with
 this stage to put tall grass in the strike's sightline. The verifier requires
 that the player clear the grass, kill the same spider, and keep Mushroom at
-his starting health. Both encounters use staged actors.
+his starting health. Set `MUSHROOM_EXPEDITION_DEFENSE_CREEPER=1` instead to
+stage a creeper between the player and the injured dog. The server verifies
+that the player abandons the errand and walks away before trying melee, with
+the original dog, owner, and both mobs still at their starting health. The
+fixture stages the danger and checks the native retreat. Use a Survival run
+to verify encounters with mobile creepers and actual blasts.
 
 Set `MUSHROOM_EXPEDITION_STAGE=feeding` to replay a meal while Mushroom is
 chasing a sheep. The disposable fixture supplies mutton and waits until the

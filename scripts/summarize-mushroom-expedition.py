@@ -130,6 +130,7 @@ def summarize(path):
         "nativeClientFailed": "BUILD FAILED" in game_log,
         "nativeMilestone": passed.group(1) if passed else None,
         "nativeCompanionDefense": "Expedition companion defense passed:" in game_log,
+        "nativeCreeperRetreat": "Expedition native creeper retreat passed:" in game_log,
         "nativeFeeding": "Expedition native feeding passed:" in game_log,
         "nativeQuarryIron": "Expedition native quarry iron passed:" in game_log,
         "nativeCompanionEquipment": "Expedition companion equipment passed:" in game_log,
