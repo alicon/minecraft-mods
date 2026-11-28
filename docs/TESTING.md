@@ -207,7 +207,9 @@ trace records the recovery as assisted. An archive taken inside a quarry can
 include `ironProgress` with the recorded `quarry`, `quarryLanding`, and
 `lastDogMealAt` so the controller can resume the stairs. During the iron hunt,
 the controller pauses to regroup with the dog when care is due and checks
-that they stay together while looking for food nearby.
+that they stay together while looking for food nearby. When a bed is within
+reach at night, the controller attempts sleep before sending the player to
+search for food in the dark.
 
 Summarize the action logs and the native save/reopen evidence for comparison:
 
@@ -266,8 +268,10 @@ native companion protection scenario. The disposable world stages an injured
 Mushroom next to a spider beyond the player's melee reach and gives the owner
 a stone sword. It verifies that the controller interrupts a proposed errand,
 approaches and kills the spider in the same interruption, and keeps the
-original injured dog alive. The staged encounter
-provides companion-defense coverage separately from fresh Survival progress.
+original injured dog alive. Set `MUSHROOM_EXPEDITION_DEFENSE_COVER=1` with
+this stage to put tall grass in the strike's sightline. The verifier requires
+that the player clear the grass, kill the same spider, and keep Mushroom at
+his starting health. Both encounters use staged actors.
 
 Set `MUSHROOM_EXPEDITION_STAGE=feeding` to replay a meal while Mushroom is
 chasing a sheep. The disposable fixture supplies mutton and waits until the

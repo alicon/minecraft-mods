@@ -995,6 +995,32 @@ test('reattaching after the iron kit was earned does not start mining again', as
   assert.deepEqual(calls, ['get_inventory']);
 });
 
+test('iron work sleeps before a nighttime forage when the player has no meal', async () => {
+  const { earnIronKit } = await import('./expedition-home.mjs');
+  const resumed = new Error('Companion checked after dawn');
+  const bed = [2, 1, 0];
+  let slept = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_inventory': return { slots: [] };
+      case 'observe': return { inWorld: true, dimension: 'minecraft:overworld', health: 20, food: 17,
+        position: { x: 0.5, y: 1, z: 0.5 }, timeOfDay: slept ? 20 : 15_000, gameTime: 26_000 };
+      case 'get_blocks': return { cells: [cell(...bed, 'red_bed')] };
+      case 'interact_block':
+        assert.deepEqual(args.pos, bed);
+        slept = true;
+        return { screenOpened: 'InBedChatScreen' };
+      default: assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  await assert.rejects(earnIronKit(action, () => assert.fail('No recipe has ingredients'), { bed }, {
+    checkCompanion: async player => {
+      assert.equal(player.timeOfDay, 20, 'An available bed should come before the nighttime care search');
+      throw resumed;
+    },
+  }), error => error === resumed);
+});
+
 test('iron work returns to camp after feeding the injured companion before spending another portion', async () => {
   const { earnIronKit } = await import('./expedition-home.mjs');
   const checkedAt = [];

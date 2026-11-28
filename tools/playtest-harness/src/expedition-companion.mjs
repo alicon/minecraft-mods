@@ -38,14 +38,24 @@ export async function defendCompanion(action, player, dogUuid) {
   const inventory = await action('get_inventory');
   const sword = SWORDS.map(id => inventory?.slots.find(stack => stack.id === id && stack.slot < 9)).find(Boolean);
   if (sword && sword.slot !== inventory.selectedSlot) await action('select_slot', { slot: sword.slot });
-  if (await action('look', { entityId: attacker.id })) {
-    await setTimeout(110);
-    const aimed = await action('observe');
-    if (aimed?.crosshair?.id === attacker.id && aimed.attackStrength >= 0.88) {
-      await action('attack_entity', { entityId: attacker.id });
-    }
+  let aimed = await aimAtAttacker(action, attacker.id);
+  const obstruction = aimed?.crosshair;
+  if (obstruction?.pos && /^minecraft:(?:short_grass|tall_grass|fern|large_fern)$/.test(obstruction.block ?? '')
+      && (await action('break_block', { pos: obstruction.pos, maxTicks: 8 }))?.broken) {
+    // The plant swing also spends the server-side sword cooldown.
+    await setTimeout(650);
+    aimed = await aimAtAttacker(action, attacker.id);
+  }
+  if (aimed?.crosshair?.id === attacker.id && aimed.attackStrength >= 0.88) {
+    await action('attack_entity', { entityId: attacker.id });
   }
   return true;
+}
+
+async function aimAtAttacker(action, entityId) {
+  if (!await action('look', { entityId })) return null;
+  await setTimeout(110);
+  return action('observe');
 }
 
 async function approach(action, entityId) {

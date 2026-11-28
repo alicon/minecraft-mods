@@ -31,6 +31,32 @@ test('an injured original dog interrupts normal work and the player hits only th
   }
 });
 
+test('companion defense clears the grass in the strike sightline before resuming the same attack', async () => {
+  const { defendCompanion } = await import('./expedition-companion.mjs');
+  const zombie = { ...spider, type: 'minecraft:zombie', pos: [3, 65, 0], distance: 3 };
+  const grass = [2, 65, 0];
+  const strikes = [];
+  let cleared = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_entities': return { entities: [dog, zombie] };
+      case 'get_inventory': return { slots: [], selectedSlot: 0 };
+      case 'look': assert.equal(args.entityId, zombie.id); return {};
+      case 'stop': return {};
+      case 'observe': return { ...player, crosshair: cleared ? { type: 'entity', id: zombie.id }
+        : { type: 'block', block: 'minecraft:short_grass', pos: grass } };
+      case 'break_block':
+        assert.deepEqual(args.pos, grass);
+        cleared = true;
+        return { broken: true };
+      case 'attack_entity': strikes.push(args.entityId); return {};
+      default: assert.fail(name);
+    }
+  };
+  assert.equal(await defendCompanion(action, player, dog.uuid), true);
+  assert.deepEqual(strikes, [zombie.id]);
+});
+
 test('reaching a spider attacking the dog converts the same interrupt into a sword strike', async () => {
   const { defendCompanion } = await import('./expedition-companion.mjs');
   const distantDog = { ...dog, pos: [6, 64, -1], distance: 6.1 };

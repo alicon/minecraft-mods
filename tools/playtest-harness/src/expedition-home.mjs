@@ -1398,6 +1398,10 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
     }
     const player = await action('observe');
     if (!stairs.length && await retreatFromNearbyMob(action, player, visited, rejectedSteps)) continue;
+    if (!stairs.length && isBedtime(player) && player.gameTime >= nextSleepCheck) {
+      nextSleepCheck = player.gameTime + 300;
+      if (await sleepNearby(action, player)) continue;
+    }
     if (policy.checkCompanion && player.gameTime >= nextCompanionCheck) {
       nextCompanionCheck = player.gameTime + 40;
       const dogStatus = await policy.checkCompanion(player, !stairs.length);
@@ -1420,10 +1424,6 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
         await stepOut(action, player, visited, bed, 'surface', rejectedSteps);
         continue;
       }
-    }
-    if (!stairs.length && isBedtime(player) && player.gameTime >= nextSleepCheck) {
-      nextSleepCheck = player.gameTime + 300;
-      if (await sleepNearby(action, player)) continue;
     }
     if (!stairs.length && player.health < 8 && isBedtime(player) && player.gameTime >= nextCoverCheck) {
       nextCoverCheck = player.gameTime + 300;
