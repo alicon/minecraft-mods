@@ -37,6 +37,16 @@ references, including negated phrases such as "does not resolve #123". GitHub
 still treats those as closing links. Check the PR's closing-issue references
 before merging and verify the intended issue states afterward.
 
+## Check the QA objective during long runs
+
+Use the `forest-for-the-trees` skill when available. Review the run after its
+first useful evidence, roughly every ten minutes of active work, and after
+two retries of the same failing tactic. Name the player-facing mod behavior
+under test and what this run has actually proved. If setup or vanilla
+progression dominates, run the closest focused mod check and keep the
+long-duration run when it is still useful. Record harness failures as
+harness evidence and keep the full acceptance criteria for the owning issue.
+
 ## Safe live testing
 
 Use a disposable copied save for destructive scenarios, never a family save.
