@@ -1,0 +1,33 @@
+--- a/src/client/java/com/mcagent/mcp/client/tools/AttackTool.java
++++ b/src/client/java/com/mcagent/mcp/client/tools/AttackTool.java
+@@ -15,0 +16,2 @@
++import net.minecraft.world.entity.boss.enderdragon.EnderDragonPart;
++import net.minecraft.world.phys.EntityHitResult;
+@@ -72,0 +75,6 @@
++			if (!interact && mc.hitResult instanceof EntityHitResult hit
++					&& hit.getEntity() instanceof EnderDragonPart part && part.getId() == id) {
++				target = part;
++			} else if (target instanceof EnderDragonPart) {
++				throw new ToolException("aim the crosshair at the dragon part before attacking");
++			}
+@@ -92,0 +101,2 @@
++				} else if (target instanceof EnderDragonPart part) {
++					o.addProperty("targetHealth", part.parentMob.getHealth());
+--- a/src/client/java/com/mcagent/mcp/client/tools/GetEntitiesTool.java
++++ b/src/client/java/com/mcagent/mcp/client/tools/GetEntitiesTool.java
+@@ -14,0 +15 @@
++import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+@@ -86,0 +88,13 @@
++				if ("minecraft:ender_dragon".equals(typeId) && e instanceof EnderDragon dragon) {
++					o.addProperty("perched", dragon.getPhaseManager().getCurrentPhase().isSitting());
++					var parts = new JsonArray();
++					for (var part : dragon.getSubEntities()) {
++						var entry = new JsonObject();
++						entry.addProperty("id", part.getId());
++						entry.addProperty("name", part.name);
++						entry.add("center", Json.vec(part.getBoundingBox().getCenter()));
++						entry.addProperty("inReach", p.isWithinEntityInteractionRange(part, 0.0));
++						parts.add(entry);
++					}
++					o.add("parts", parts);
++				}

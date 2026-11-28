@@ -7,7 +7,7 @@ import {
   adoptAtNight, dogMealCount, earnIronKit, earnStoneKit, feedAdoptedDog, forageExpeditionMeal, prepareAdoptionCamp,
   breakVisible, climbQuarry, descendQuarry, ensurePlanks, hold, packRecoveryMeal, placeBeside, recoverDroppedLoadout,
   regroupExpeditionCompanion, retreatFromNearbyMob,
-  settleOnDryStep, stepOut, WOOD_LOGS,
+  settleOnDryStep, sleepNearby, stepOut, WOOD_LOGS,
 } from './expedition-home.mjs';
 import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
@@ -428,11 +428,15 @@ async function runExpedition(start, stage) {
       if (resumeAutoEat) await action('set_reflexes', { autoEat: false });
       try {
         if (longReturn) {
+          let player = await action('observe');
+          if (await sleepNearby(action, player)) {
+            await narrate('Result', 'Slept until dawn before looking for replacement tools and food.');
+            player = await action('observe');
+          }
           await narrate('Objective', 'Earn food for the player and Mushroom before returning from the respawn point.');
           if (!inventory.slots.some(stack => stack.id.endsWith('_sword'))) {
             const visited = [];
             const rejected = new Set();
-            let player = start;
             for (let retreat = 0; retreat < 10; retreat++) {
               if (!await retreatFromNearbyMob(action, player, visited, rejected)) break;
               player = await action('observe');

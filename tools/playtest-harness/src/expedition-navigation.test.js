@@ -189,6 +189,31 @@ test('a creeper at fourteen blocks diverts the next scouting walk before the fus
   assert.equal(await retreatFromNearbyMob(action, player, [], new Set()), true);
 });
 
+test('several solid rock layers keep a cave creeper from trapping a surface scout in retreat', async () => {
+  const { retreatFromNearbyMob } = await import('./expedition-home.mjs');
+  const player = { position: { x: 0.5, y: 65, z: 0.5 }, onGround: true, health: 20,
+    threats: [{ id: 9, type: 'minecraft:creeper', distance: 10.6 }] };
+  const creeper = { id: 9, hostile: true, pos: [6.5, 56, 0.5] };
+  const rock = [cell(1, 65, 0, 'stone'), cell(1, 64, 0, 'stone'), cell(2, 63, 0, 'stone')];
+  const ground = Array.from({ length: 9 }, (_, index) => cell(-index, 64, 0, 'grass_block'));
+  let terrain = rock;
+  let retreat = false;
+  const action = async (name, args) => {
+    if (name === 'get_entities') return { entities: [creeper] };
+    if (name === 'get_blocks') return { cells: args.size[0] === 17 ? ground : terrain };
+    if (name === 'go_to') {
+      assert.ok(args.pos[0] < 0);
+      retreat = true;
+      return { arrived: true, position: args.pos };
+    }
+    assert.fail(name);
+  };
+  assert.equal(await retreatFromNearbyMob(action, player, [], new Set()), false);
+  terrain = [];
+  assert.equal(await retreatFromNearbyMob(action, player, [], new Set()), true);
+  assert.ok(retreat);
+});
+
 test('retreat navigation rejects a route whose first step would approach the threat', async () => {
   const { dryWaypoint } = await import('./expedition-navigation.mjs');
   const floor = [cell(0, 63, 0), cell(1, 63, 0), cell(2, 63, 0)];

@@ -150,6 +150,31 @@ test('an Enderman hit interrupts crystal work until the player is protected by w
     error => error === safe);
 });
 
+test('the End archer eats a carried meal when too hungry to recover for a cage climb', async () => {
+  const { clearGeneratedCrystals } = await import('./expedition-end-crystals.mjs');
+  const dog = { uuid: 'original', health: 12, pos: [0, 60, 8] };
+  const meal = { id: 'minecraft:cooked_beef', slot: 4, count: 1 };
+  const recovered = new Error('Took the ordinary meal before scouting again');
+  const action = async (name, args) => {
+    switch (name) {
+      case 'set_reflexes': return {};
+      case 'get_entities':
+        return { entities: ({
+          'mushroom_yorkie:mushroom_yorkie': [dog], 'minecraft:end_crystal': [{ uuid: 'tower', pos: [24, 80, 0] }],
+        })[args.type] ?? [] };
+      case 'observe': return { inWorld: true, onGround: true, dimension: 'minecraft:the_end',
+        position: { x: 0.5, y: 60, z: 0.5 }, health: 14, food: 15, gameTime: 100 };
+      case 'get_inventory': return { slots: [meal] };
+      case 'look': return {};
+      case 'select_slot': assert.equal(args.slot, meal.slot); return { mainHand: meal };
+      case 'use_item': throw recovered;
+      default: assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  await assert.rejects(clearGeneratedCrystals(action, dog.uuid, () => assert.fail('No crystal work before eating')),
+    error => error === recovered);
+});
+
 test('a crystal pillar descent checks the full water column and steers against surface drift', async () => {
   const { descendCrystalPillar } = await import('./expedition-end-cage.mjs');
   const plan = { base: [39, 61, -25], dx: 1, dz: 0 };

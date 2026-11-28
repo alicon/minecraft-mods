@@ -143,6 +143,7 @@ final class ExpeditionEndCrystalClientScenario {
 			owner.getInventory().add(new ItemStack(Items.ARROW, 64));
 			owner.getInventory().add(new ItemStack(Items.ARROW, 32));
 			owner.getInventory().add(new ItemStack(Items.GOLDEN_APPLE, 4));
+			owner.getInventory().add(new ItemStack(Items.COOKED_BEEF, 16));
 			owner.getInventory().add(new ItemStack(Items.DIAMOND_PICKAXE));
 			owner.getInventory().add(new ItemStack(Items.COBBLESTONE, 64));
 			owner.getInventory().add(new ItemStack(Items.COBBLESTONE, 64));

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
-import { hold, stepOut } from './expedition-home.mjs';
+import { eatExpeditionMeal, hold, stepOut } from './expedition-home.mjs';
 import { bowAim, clearBowArc } from './expedition-ballistics.mjs';
 import { openCrystalCage } from './expedition-end-cage.mjs';
 
@@ -10,6 +10,8 @@ const BOW = 'minecraft:bow';
 const END = 'minecraft:the_end';
 const ENDERMAN = 'minecraft:enderman';
 const WATER_BUCKET = 'minecraft:water_bucket';
+const END_RATIONS = ['cooked_beef', 'cooked_porkchop', 'cooked_mutton', 'cooked_chicken', 'bread']
+  .map(item => `minecraft:${item}`);
 const SPIKE_COUNT = 10;
 const feet = ({ position: { x, y, z } }) => [x, y, z].map(Math.floor);
 const distance = (first, second) => Math.hypot(...first.map((coordinate, axis) => coordinate - second[axis]));
@@ -169,8 +171,17 @@ export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = 
         continue;
       }
     }
+    if (player.food < 18 || (player.health < 16 && player.food < 20)) {
+      const inventory = await action('get_inventory');
+      const meal = END_RATIONS.find(item => inventory.slots.some(stack => stack.id === item));
+      if (meal && await eatExpeditionMeal(action, player, meal, 60)) continue;
+    }
     if (sheltered) {
       await setTimeout(350);
+      continue;
+    }
+    if (player.health < 16 && player.food >= 18 && !player.threats?.some(threat => threat.distance <= 5)) {
+      await setTimeout(600);
       continue;
     }
 

@@ -156,10 +156,10 @@ function feet(player) {
   return [player.position.x, player.position.y, player.position.z].map(Math.floor);
 }
 
-export async function eatExpeditionMeal(action, player, meal) {
+export async function eatExpeditionMeal(action, player, meal, pitch = -75) {
   if (player.screen) await action('stop', { closeScreen: true });
   // Use can reopen the table or activate the bed if the crosshair stays on it.
-  await action('look', { pitch: -75 });
+  await action('look', { pitch });
   await hold(action, meal);
   const result = await action('use_item', { ticks: 36 });
   if (!result?.completed) return false;
@@ -279,18 +279,26 @@ export async function stepOut(action, player, visited, destination, preferredGro
 
 export async function retreatFromNearbyMob(action, player, visited, rejectedSteps, warningDistance = 7, creeperWarning = 16) {
   // A scouting walk can cover ten blocks before the next observation.
-  const threat = player.threats?.find(entity => entity.distance <= (entity.type === 'minecraft:creeper' ? creeperWarning : warningDistance)
-    && (entity.type !== 'minecraft:spider' || isBedtime(player) || entity.distance <= 3));
-  if (!threat) return false;
-  const pursuit = threat.distance < (warningDistance > 7 ? 7 : 3) && threat.type !== 'minecraft:creeper';
-  const surveyGroup = pursuit || warningDistance > 7;
-  const nearby = await action('get_entities', surveyGroup
-    ? { radius: warningDistance + 1, max: 96 } : { type: threat.type, radius: 18, max: 16 });
-  const danger = nearby?.entities.find(entity => entity.id === threat.id && entity.hostile);
+  let danger;
+  let pursuit;
+  let hazards;
+  for (const threat of player.threats ?? []) {
+    const creeper = threat.type === 'minecraft:creeper';
+    if (threat.distance > (creeper ? creeperWarning : warningDistance)
+        || (threat.type === 'minecraft:spider' && !isBedtime(player) && threat.distance > 3)) continue;
+    pursuit = threat.distance < (warningDistance > 7 ? 7 : 3) && !creeper;
+    const surveyGroup = pursuit || warningDistance > 7;
+    const nearby = await action('get_entities', surveyGroup
+      ? { radius: warningDistance + 1, max: 96 } : { type: threat.type, radius: 18, max: 16 });
+    const candidate = nearby?.entities.find(entity => entity.id === threat.id && entity.hostile);
+    if (!candidate || (creeper && await separatedByRock(action, player, candidate))) continue;
+    danger = { ...candidate, type: threat.type };
+    hazards = surveyGroup
+      ? nearby.entities.filter(entity => entity.hostile && entity.distance <= warningDistance).map(entity => entity.pos)
+      : danger.pos;
+    break;
+  }
   if (!danger) return false;
-  const hazards = surveyGroup
-    ? nearby.entities.filter(entity => entity.hostile && entity.distance <= warningDistance).map(entity => entity.pos)
-    : danger.pos;
   const here = feet(player);
   const away = [here[0] + 8 * Math.sign(player.position.x - danger.pos[0]), here[1],
     here[2] + 8 * Math.sign(player.position.z - danger.pos[2])];
@@ -304,10 +312,34 @@ export async function retreatFromNearbyMob(action, player, visited, rejectedStep
   } finally {
     if (restoreInterrupt) await action('set_reflexes', { interruptOnDamage: true });
   }
-  if (threat.type !== 'minecraft:creeper') return false;
+  if (danger.type !== 'minecraft:creeper') return false;
   await action('stop');
   await setTimeout(250);
   return true;
+}
+
+async function separatedByRock(action, player, threat) {
+  const { x, y, z } = player.position;
+  const [tx, ty, tz] = threat.pos;
+  if (!player.onGround || y - ty < 6) return false;
+  const from = [x, y + 1.3, z];
+  const to = [tx, ty + 1.3, tz];
+  const low = from.map((value, index) => Math.floor(Math.min(value, to[index])));
+  const high = from.map((value, index) => Math.floor(Math.max(value, to[index])));
+  const size = high.map((value, index) => value - low[index] + 1);
+  const center = low.map((value, index) => value + Math.floor(size[index] / 2));
+  const view = await action('get_blocks', { center, size, format: 'json' });
+  if (!view || view.stats?.unloadedChunks) return false;
+  const rock = new Set(view.cells.filter(cell =>
+    /^minecraft:(?:stone|deepslate|andesite|diorite|granite|tuff|dirt|grass_block|cobblestone)$/.test(cell.b))
+    .map(cell => String([cell.x, cell.y, cell.z])));
+  let layers = 0;
+  for (let height = Math.ceil(to[1]); height < high[1]; height++) {
+    const progress = (from[1] - height - 0.5) / (from[1] - to[1]);
+    const column = [Math.floor(x + progress * (tx - x)), height, Math.floor(z + progress * (tz - z))];
+    if (rock.has(String(column)) && ++layers >= 3) return true;
+  }
+  return false;
 }
 
 export async function gatherWool(action, descendFromCanopy, chooseRoute, craft, reportScouting) {

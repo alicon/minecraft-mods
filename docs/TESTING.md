@@ -216,7 +216,8 @@ include `ironProgress` with the recorded `quarry`, `quarryLanding`, and
 the controller pauses to regroup with the dog when care is due and checks
 that they stay together while looking for food nearby. If the dog gets
 separated by terrain, it can retrace dry footing from their last same-level
-contact. When a bed is within
+contact. The surface retreat check looks for intervening solid rock when a
+creeper is well below the player. When a bed is within
 reach at night, the controller attempts sleep before sending the player to
 search for food in the dark.
 
@@ -243,7 +244,12 @@ also apply the camera patch. Use separate JARs for concurrent clients.
 ```shell
 git -C "$BRIDGE_CHECKOUT" apply --unidiff-zero "$PWD/tools/playtest-harness/patches/mc-agent-mcp-companion.patch"
 git -C "$BRIDGE_CHECKOUT" apply --unidiff-zero "$PWD/tools/playtest-harness/patches/mc-agent-mcp-smooth-camera.patch"
+git -C "$BRIDGE_CHECKOUT" apply --unidiff-zero "$PWD/tools/playtest-harness/patches/mc-agent-mcp-dragon-combat.patch"
 ```
+
+With the dragon patch, a targeted entity query reports the dragon's current
+perch state and part positions. A melee action on a part requires that the
+native crosshair hit that part and that it be within normal attack reach.
 
 Set `MUSHROOM_EXPEDITION_STAGE=stone` to earn the stone kit. The player can
 use the daylight before adoption and finish any remaining work after breakfast. It
@@ -378,7 +384,8 @@ Set `MUSHROOM_EXPEDITION_STAGE=generated-end-crystals` to exercise the crystal
 phase on the generated island with the vanilla dragon active. The disposable
 fixture supplies a bow, arrows, armor, food, and a protected camp for Mushroom.
 The controller scouts the island, watches for incoming dragon breath, and
-shoots from observed positions. The bridge's automatic melee is disabled
+shoots from observed positions. It eats ordinary rations to restore natural
+regeneration before climbing again. The bridge's automatic melee is disabled
 to keep it from attacking neutral Endermen. After damage near an Enderman,
 the player tries to stand in water while recovering. It finishes its retreat
 through damage before shooting again. For a guarded crystal, it surveys
