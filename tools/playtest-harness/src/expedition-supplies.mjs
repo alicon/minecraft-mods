@@ -14,7 +14,7 @@ import { defendCompanion } from './expedition-companion.mjs';
 import { blazePowderCount, craftBlazePowder, earnBlazeRods } from './expedition-blaze-rods.mjs';
 import { clearGeneratedCrystals, readCrystalProgress, shootEndCrystal } from './expedition-end-crystals.mjs';
 import { fightEndDragon, recallAndExitEnd } from './expedition-dragon-fight.mjs';
-import { craftEyes, crossEndPortal, enderEyeCount, findStrongholdPortalRoom } from './expedition-end-entry.mjs';
+import { craftEyes, crossEndPortal, descendToStronghold, enderEyeCount, findStrongholdPortalRoom } from './expedition-end-entry.mjs';
 import { earnEnderPearls } from './expedition-pearls.mjs';
 import {
   companionRegroupTrail, firstIronOutboundTrail, navigateToStronghold, returnToCampWithCompanion, scoutByEye,
@@ -280,6 +280,10 @@ try {
   } else if (stage === 'end-entry' || stage === 'generated-end-entry') {
     companion = (await readFile(join(dirname(statusFile), 'end-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
+    if (stage === 'generated-end-entry' && process.env.MUSHROOM_EXPEDITION_START_ABOVE_STRONGHOLD === '1') {
+      const { x, y, z } = start.position;
+      await descendToStronghold(action, companion, [x, y, z].map(Math.floor), reportStrongholdEntry);
+    }
     const ring = stage === 'generated-end-entry' ? await findStrongholdPortalRoom(action, companion, async (event, observation) => {
       console.log(JSON.stringify({ at: new Date().toISOString(), action: event, observation }));
       if (event === 'portal_room') await narrate('Result', 'Reached a dry position beside the generated End portal.');
@@ -453,17 +457,24 @@ async function runExpedition(start, stage) {
     assert.ok(Number.isFinite(checkpoint.gameTime) && checkpoint.gameTime <= start.gameTime);
     assert.ok(['starter', 'provision', 'camp', 'adoption', 'stone', 'iron', 'nether'].includes(checkpoint.phase)
       || huntBlazes && checkpoint.phase === 'nether-returned'
-      || findStronghold && ['gather-eyes', 'follow-eyes'].includes(checkpoint.phase));
+      || findStronghold && ['gather-eyes', 'follow-eyes', 'descend-stronghold'].includes(checkpoint.phase));
     assert.ok(checkpoint.timberSite === undefined || blockPosition(checkpoint.timberSite), 'Invalid recorded timber site');
+    if (checkpoint.phase === 'descend-stronghold') {
+      assert.ok(blockPosition(checkpoint.surfaceFix), 'Invalid recorded Eye bearing fix');
+    }
     assert.ok(start.dimension === OVERWORLD || checkpoint.phase === 'nether', 'Unexpected dimension before the Nether phase');
     const starterItems = ['crafting_table', 'wooden_sword', 'wooden_pickaxe'];
     if (checkpoint.phase === 'provision'
       && starterItems.some(item => !inventory.slots.some(stack => stack.id === `minecraft:${item}`))) {
-      verifiedDeathSite(start, checkpoint);
-      checkpoint.phase = 'starter';
-      checkpoint.gameTime = start.gameTime;
-      await writeCheckpoint(checkpoint);
-      console.log(JSON.stringify({ at: new Date().toISOString(), action: 'rebuild_after_early_respawn' }));
+      if (Number(deathAtStart.trim().split(' ').at(-1)) > checkpoint.gameTime) {
+        verifiedDeathSite(start, checkpoint);
+        checkpoint.phase = 'starter';
+        checkpoint.gameTime = start.gameTime;
+        await writeCheckpoint(checkpoint);
+        console.log(JSON.stringify({ at: new Date().toISOString(), action: 'rebuild_after_early_respawn' }));
+      } else {
+        await gatherStarterTools(start);
+      }
     }
     if (checkpoint.phase !== 'starter' && checkpoint.phase !== 'provision') {
       const camp = checkpoint.camp;
@@ -493,7 +504,7 @@ async function runExpedition(start, stage) {
     await action('stop', { closeScreen: true });
     const missingGuide = !inventory.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide');
     const newDeath = Number(deathAtStart.trim().split(' ').at(-1)) > checkpoint.gameTime;
-    const equippedPhase = ['iron', 'nether', 'nether-returned', 'gather-eyes', 'follow-eyes'].includes(checkpoint.phase);
+    const equippedPhase = ['iron', 'nether', 'nether-returned', 'gather-eyes', 'follow-eyes', 'descend-stronghold'].includes(checkpoint.phase);
     const lostQuarryKit = equippedPhase && newDeath
       && !inventory.slots.some(stack => stack.id === 'minecraft:stone_pickaxe')
       && !inventory.slots.some(stack => stack.id === 'minecraft:furnace');
@@ -830,8 +841,23 @@ async function runExpedition(start, stage) {
   }
   if (findStronghold && checkpoint.phase === 'follow-eyes') {
     await narrate('Objective', 'Follow the earned Eyes of Ender to the stronghold with the original Mushroom.');
-    await followEyes(checkpoint.dog);
+    const estimate = await followEyes(checkpoint.dog);
+    const atSurface = await action('observe');
+    checkpoint.surfaceFix = [estimate.x, atSurface.position.y, estimate.z].map(Math.floor);
+    checkpoint.phase = 'descend-stronghold';
+    if (live) await writeCheckpoint(checkpoint);
   }
+  if (findStronghold && checkpoint.phase === 'descend-stronghold') {
+    await narrate('Objective', 'Find a safe way down from the Eye bearings and lead Mushroom to the portal room.');
+    await descendToStronghold(action, checkpoint.dog, checkpoint.surfaceFix, reportStrongholdEntry);
+    await findStrongholdPortalRoom(action, checkpoint.dog, reportStrongholdEntry);
+  }
+}
+
+async function reportStrongholdEntry(kind, observation) {
+  console.log(JSON.stringify({ at: new Date().toISOString(), action: `stronghold_${kind}`, observation }));
+  if (kind === 'descent') await narrate('Result', 'Reached the stronghold masonry with the original Mushroom.');
+  if (kind === 'portal_room') await narrate('Result', 'Reached a dry stance beside the generated End portal.');
 }
 
 async function earnEyes(uuid, total) {

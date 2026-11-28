@@ -11,6 +11,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.stats.Stats;
 import net.minecraft.tags.StructureTags;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.item.ItemStack;
@@ -30,10 +31,11 @@ final class ExpeditionEndEntryClientScenario {
 	}
 
 	static void run(ClientGameTestContext context, TestServerContext server, UUID ownerId, Path status, boolean generated) throws IOException {
+		boolean startAbove = generated && "1".equals(System.getenv("MUSHROOM_EXPEDITION_START_ABOVE_STRONGHOLD"));
 		var fixture = server.computeOnServer(minecraft -> {
 			var owner = Objects.requireNonNull(minecraft.getPlayerList().getPlayer(ownerId));
 			var level = minecraft.overworld();
-			if (generated) return prepareGeneratedStronghold(level, owner);
+			if (generated) return prepareGeneratedStronghold(level, owner, startAbove);
 			var center = owner.blockPosition().above(6);
 			var landing = center.south(3);
 			for (BlockPos pos : BlockPos.betweenClosed(center.offset(-6, -2, -6), center.offset(6, -1, 6))) {
@@ -77,6 +79,7 @@ final class ExpeditionEndEntryClientScenario {
 							|| !(owner.level().getEntity(fixture.dogId()) instanceof MushroomYorkieEntity dog)
 							|| !dog.isAlive() || !dog.belongsTo(owner) || dog.isOrderedToSit()
 							|| !minecraft.overworld().getBlockState(fixture.center()).is(Blocks.END_PORTAL)
+							|| (startAbove && owner.getStats().getValue(Stats.BLOCK_MINED.get(Blocks.STONE)) == 0)
 							|| (generated ? owner.getInventory().countItem(Items.ENDER_EYE) >= 12
 									: owner.getInventory().contains(stack -> stack.is(Items.ENDER_EYE) || stack.is(Items.ENDER_PEARL)
 											|| stack.is(Items.BLAZE_POWDER) || stack.is(Items.BLAZE_ROD)))) {
@@ -93,7 +96,7 @@ final class ExpeditionEndEntryClientScenario {
 		throw new AssertionError("The controller did not complete and cross the native End portal");
 	}
 
-	private static Fixture prepareGeneratedStronghold(ServerLevel level, ServerPlayer owner) {
+	private static Fixture prepareGeneratedStronghold(ServerLevel level, ServerPlayer owner, boolean startAbove) {
 		level.getGameRules().set(GameRules.SPAWN_MOBS, false, level.getServer());
 		level.getGameRules().set(GameRules.SPAWNER_BLOCKS_WORK, false, level.getServer());
 		var locate = Objects.requireNonNull(level.findNearestMapStructure(StructureTags.EYE_OF_ENDER_LOCATED,
@@ -115,6 +118,12 @@ final class ExpeditionEndEntryClientScenario {
 				.min(java.util.Comparator.comparingDouble(center::distSqr))
 				.orElseThrow(() -> new AssertionError("No dry generated corridor approach to the portal room"));
 
+		if (startAbove) {
+			landing = landing.above(5);
+			level.setBlockAndUpdate(landing.below(), Blocks.STONE.defaultBlockState());
+			level.setBlockAndUpdate(landing, Blocks.AIR.defaultBlockState());
+			level.setBlockAndUpdate(landing.above(), Blocks.AIR.defaultBlockState());
+		}
 		var playerPosition = Vec3.atBottomCenterOf(landing);
 		owner.teleportTo(playerPosition.x, playerPosition.y, playerPosition.z);
 		owner.getInventory().add(new ItemStack(Items.ENDER_EYE, 12));

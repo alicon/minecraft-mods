@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
-import { breakVisible, dogMealCount, feedAdoptedDog, hold, regroupExpeditionCompanion, stepOut } from './expedition-home.mjs';
-import { hasDrySupport } from './expedition-navigation.mjs';
+import {
+  breakVisible, descendQuarry, dogMealCount, feedAdoptedDog, hold, regroupExpeditionCompanion, retreatFromNearbyMob, stepOut,
+} from './expedition-home.mjs';
+import { dryStepKey, dryWaypoint, hasDrySupport, STRONGHOLD_MASONRY } from './expedition-navigation.mjs';
 import { OVERWORLD, withCompanion } from './expedition-nether.mjs';
 
 const FRAME = 'minecraft:end_portal_frame';
@@ -114,15 +116,161 @@ async function fillEndRing(action, ring) {
   }
 }
 
+export function strongholdEntrance(cells, here) {
+  const volume = new Map(cells.map(({ x, y, z, b }) => [String([x, y, z]), b]));
+  const block = pos => volume.get(String(pos));
+  const masonry = pos => STRONGHOLD_MASONRY.test(block(pos) ?? '');
+  const standing = ([x, y, z]) => masonry([x, y - 1, z])
+    && free(block([x, y, z])) && free(block([x, y + 1, z]))
+    && [y + 2, y + 3].some(above => masonry([x, above, z]));
+  if (standing(here)) return { landing: here, entry: here };
+
+  const stances = cells.filter(({ b }) => STRONGHOLD_MASONRY.test(b))
+    .map(({ x, y, z }) => [x, y + 1, z])
+    .filter(pos => standing(pos) && Math.abs(pos[1] - here[1]) <= 3)
+    .sort((a, b) => Math.hypot(a[0] - here[0], a[1] - here[1], a[2] - here[2])
+      - Math.hypot(b[0] - here[0], b[1] - here[1], b[2] - here[2]));
+  for (const entry of stances) {
+    const landing = dryWaypoint(cells, here, [], entry, 'stronghold');
+    if (landing && String(landing) === String(entry)) return { entry, landing };
+  }
+
+  const [x, y, z] = here;
+  for (const [dx, dz] of SIDES) {
+    const entry = [x + 2 * dx, y, z + 2 * dz];
+    if (!standing(entry)) continue;
+    const landing = [x + dx, y, z + dz];
+    if (!hasDrySupport(block([landing[0], y - 1, landing[2]]))
+        || SIDES.some(([sx, sz]) => [y, y + 1].some(height =>
+          /^minecraft:(?:lava|water)$/.test(block([landing[0] + sx, height, landing[2] + sz]) ?? '')))) continue;
+    const wall = [[landing[0], y + 1, landing[2]], landing];
+    if (wall.every(pos => free(block(pos)) || STRONGHOLD_MASONRY.test(block(pos) ?? ''))) {
+      const clear = wall.filter(pos => !free(block(pos)));
+      if (clear.length) return { landing, entry, clear };
+    }
+  }
+  return null;
+}
+
+export async function descendToStronghold(action, uuid, toward, report = async () => {}) {
+  const stairs = [];
+  const protectedGround = new Set();
+  const route = { toward, rejected: new Set(), masonry: true };
+  const visited = [];
+  const rejectedSteps = new Set();
+  let lastDog;
+  let sinceCare = 4;
+  let blocked = 0;
+  for (let attempt = 0; attempt < 144 && stairs.length < 72; attempt++) {
+    const player = await action('observe');
+    assert.ok(player?.inWorld && player.dimension === OVERWORLD && player.health >= 10 && !player.dead,
+      'The stronghold descent became unsafe');
+    if (!player.onGround) {
+      await setTimeout(150);
+      continue;
+    }
+    if (await retreatFromNearbyMob(action, player, visited, rejectedSteps)) continue;
+    const here = feet(player);
+    if (++sinceCare >= 4) {
+      const nearby = await action('get_entities', { type: DOG, radius: 24 });
+      const dog = nearby?.entities.find(entity => entity.uuid === uuid && entity.health > 0);
+      if (!dog || dog.distance > 9) {
+        lastDog = (await regroupExpeditionCompanion(action, uuid, dog?.pos ?? lastDog)).pos;
+        sinceCare = 0;
+        continue;
+      }
+      lastDog = dog.pos;
+      if (dog.health <= 8) {
+        assert.ok(await feedAdoptedDog(action, uuid, here, 18), 'Mushroom needs a meal before the next stair');
+        sinceCare = 0;
+        continue;
+      }
+      sinceCare = 0;
+    }
+    const view = await action('get_blocks', { center: here, size: [9, 9, 9], format: 'json' });
+    const access = view && strongholdEntrance(view.cells, here);
+    if (access) {
+      if (String(access.entry) === String(here)) {
+        await withCompanion(action, OVERWORLD, uuid);
+        await report('descent', { position: here, stairs: stairs.length });
+        return;
+      }
+      let clear = true;
+      for (const pos of access.clear ?? []) {
+        if (!(await breakVisible(action, pos))?.broken) {
+          clear = false;
+          break;
+        }
+      }
+      if (clear && await stepOut(action, player, [], access.landing, 'stronghold', rejectedSteps,
+        undefined, undefined, 28)) continue;
+    }
+    const result = await descendQuarry(action, player, undefined, stairs, protectedGround, route);
+    if (Array.isArray(result)) {
+      blocked = 0;
+      await report('descent_step', { position: result });
+      continue;
+    }
+    if (result === 'blocked' && ++blocked < 4) continue;
+    visited.push(here);
+    const alternative = await stepOut(action, player, visited.slice(-12), toward, 'cave', rejectedSteps,
+      undefined, undefined, 28);
+    if (!alternative || ++blocked >= 7) break;
+  }
+  throw new Error('Could not find a dry descent into masonry below the Eye bearings');
+}
+
+export function strongholdPassage(cells, here, targets, rejectedSteps, rejectedWalls) {
+  const blocks = new Map(cells.map(({ x, y, z, b }) => [String([x, y, z]), b]));
+  const block = (x, y, z) => blocks.get(String([x, y, z]));
+  const clearable = id => STRONGHOLD_MASONRY.test(id ?? '') || STRONGHOLD_BARRIER.test(id ?? '');
+  const supported = (x, y, z) => hasDrySupport(block(x, y - 1, z));
+  const dry = (x, y, z) => supported(x, y, z) && free(block(x, y, z)) && free(block(x, y + 1, z));
+  const closeTo = point => point[0] === here[0] && point[1] === here[1] && point[2] === here[2];
+  const route = (start, ends) => dryWaypoint(cells, start, [], undefined, 'stronghold', rejectedSteps, undefined, ends);
+  const candidates = [];
+  for (const { x, y, z, b } of cells) {
+    const wall = [x, y, z];
+    if (rejectedWalls.has(String(wall)) || Math.abs(y - here[1]) > 3
+        || Math.hypot(x - here[0], z - here[2]) > 14 || !supported(x, y, z)) continue;
+    const upper = block(x, y + 1, z);
+    if (!clearable(b) || (!free(upper) && !clearable(upper))) continue;
+    if (SIDES.some(([dx, dz]) => [y, y + 1].some(height =>
+      /^minecraft:(?:water|lava)$/.test(block(x + dx, height, z + dz) ?? '')))) continue;
+    for (const [dx, dz] of SIDES) {
+      const near = [x - dx, y, z - dz];
+      const far = [x + dx, y, z + dz];
+      if (!dry(...near) || !dry(...far)) continue;
+      candidates.push({ near, far, wall, clear: free(upper) ? [wall] : [[x, y + 1, z], wall] });
+    }
+  }
+  candidates.sort((a, b) => Math.hypot(...a.near.map((n, index) => n - here[index]))
+    - Math.hypot(...b.near.map((n, index) => n - here[index])));
+  for (const candidate of candidates) {
+    const near = closeTo(candidate.near);
+    const segment = near ? null : route(here, [candidate.near]);
+    if (!near && !segment) continue;
+    if (targets.some(target => String(target) === String(candidate.far)) || route(candidate.far, targets)) {
+      return { ...candidate, segment };
+    }
+  }
+  return null;
+}
+
 export async function findStrongholdPortalRoom(action, uuid, report = async () => {}) {
   const visited = [];
   const rejected = new Set();
+  const rejectedWalls = new Set();
   let lastDog;
   let nextCare = 0;
   for (let step = 0; step < 150; step++) {
     const player = await action('observe');
     assert.ok(player?.inWorld && !player.dead && player.dimension === OVERWORLD && player.health >= 8,
       'The stronghold route became unsafe');
+    if (!player.onGround) {
+      await setTimeout(150);
+      continue;
+    }
     if (player.gameTime >= nextCare) {
       nextCare = player.gameTime + 240;
       const dogs = await action('get_entities', { type: DOG, radius: 24 });
@@ -151,6 +299,31 @@ export async function findStrongholdPortalRoom(action, uuid, report = async () =
       await withCompanion(action, OVERWORLD, uuid);
       await report('portal_room', { center: ring.center, from: here });
       return ring;
+    }
+    const segment = ring && dryWaypoint(room.cells, here, [], undefined, 'stronghold', rejected, undefined, ring.approaches);
+    if (segment) {
+      const walk = await action('go_to', { pos: segment, stopDistance: 0.3, maxTicks: 45 });
+      if (walk?.arrived) continue;
+      rejected.add(dryStepKey(here, segment));
+    }
+    const passage = ring && strongholdPassage(room.cells, here, ring.approaches, rejected, rejectedWalls);
+    if (passage?.segment) {
+      const walk = await action('go_to', { pos: passage.segment, stopDistance: 0.3, maxTicks: 45 });
+      if (walk?.arrived) continue;
+      rejected.add(dryStepKey(here, passage.segment));
+    } else if (passage) {
+      rejectedWalls.add(String(passage.wall));
+      let opened = true;
+      for (const pos of passage.clear) {
+        // A door disappears as a pair when one half is mined.
+        const live = await action('get_blocks', { center: pos, size: [1, 1, 1], format: 'json' });
+        if (!live || (!free(live.cells[0]?.b) && !(await breakVisible(action, pos))?.broken)) {
+          opened = false;
+          break;
+        }
+      }
+      if (opened) await report('opened_passage', { wall: passage.wall, toward: passage.far });
+      continue;
     }
     visited.push(here);
     const frame = ring ? undefined : room.cells.find(cell => cell.b === FRAME);

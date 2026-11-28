@@ -115,3 +115,65 @@ test('the return to an expedition bed verifies the original living dog nearby', 
   assert.equal(returned.dog.health, 9);
   assert.ok(Math.abs(returned.owner.position.x - 0.5) <= 4);
 });
+
+test('a stronghold descent recognizes a dry doorway but refuses flooded masonry', async () => {
+  const { strongholdEntrance } = await import('./expedition-end-entry.mjs');
+  const from = [0, 58, 0];
+  const roof = [cell(1, 61, 0, 'stone_bricks'), cell(2, 61, 0, 'stone_bricks')];
+  const floor = [cell(0, 57, 0, 'stone'), cell(1, 57, 0, 'stone_bricks'), cell(2, 57, 0, 'stone_bricks'), ...roof];
+  assert.deepEqual(strongholdEntrance(floor, from), { entry: [1, 58, 0], landing: [1, 58, 0] });
+  assert.equal(strongholdEntrance([cell(0, 57, 0, 'stone_bricks'), cell(1, 58, 0, 'stone_bricks')], from), null);
+  const wall = [cell(1, 58, 0, 'stone_bricks'), cell(1, 59, 0, 'stone_bricks')];
+  assert.deepEqual(strongholdEntrance([...floor, ...wall], from), {
+    landing: [1, 58, 0], entry: [2, 58, 0], clear: [[1, 59, 0], [1, 58, 0]],
+  });
+  const flood = cell(2, 58, 0, 'lava');
+  assert.equal(strongholdEntrance([...floor, ...wall, flood], from), null);
+  assert.equal(strongholdEntrance([...floor, cell(1, 58, 0, 'infested_stone_bricks'), cell(1, 59, 0, 'stone_bricks')], from), null);
+});
+
+test('a descending stair favors the observed Eye fix and rejects a failed footing', async () => {
+  const { quarryStep } = await import('./expedition-navigation.mjs');
+  const from = [0, 64, 0];
+  const terrain = [-1, 1].flatMap(x => [62, 63, 64].map(y => cell(x, y, 0, 'stone')));
+  const options = { toward: [-5, 64, 0], rejected: new Set() };
+  assert.deepEqual(quarryStep(terrain, from, undefined, [], options).landing, [-1, 63, 0]);
+  options.rejected.add('-1,63,0');
+  assert.deepEqual(quarryStep(terrain, from, undefined, [], options).landing, [1, 63, 0]);
+});
+
+test('the stronghold route allows a checked three-block descent through masonry', async () => {
+  const { quarryStep } = await import('./expedition-navigation.mjs');
+  const from = [0, 64, 0];
+  const stone = [cell(1, 60, 0, 'stone_bricks'), cell(1, 63, 0, 'stone_bricks'), cell(1, 64, 0, 'stone')];
+  const options = { toward: [1, 64, 0], masonry: true };
+  assert.deepEqual(quarryStep(stone, from, undefined, [], options), {
+    landing: [1, 61, 0], clear: [[1, 64, 0], [1, 63, 0]],
+  });
+  assert.equal(quarryStep([...stone, cell(2, 62, 0, 'lava')], from, undefined, [], options), null);
+});
+
+test('portal routing accepts a longer dry route to any reachable approach', async () => {
+  const { dryWaypoint } = await import('./expedition-navigation.mjs');
+  const from = [0, 64, 0];
+  const floor = [cell(0, 63, 0, 'stone_bricks'), cell(1, 63, 0, 'stone_bricks'), cell(2, 63, 0, 'stone_bricks'),
+    cell(-1, 63, 0, 'stone_bricks'), cell(-2, 63, 0, 'stone_bricks'), cell(-2, 63, 1, 'stone_bricks')];
+  const wall = [cell(1, 64, 0, 'stone_bricks'), cell(1, 65, 0, 'stone_bricks')];
+  const route = targets => dryWaypoint([...floor, ...wall], from, [], undefined, 'stronghold', new Set(), undefined, targets);
+  assert.deepEqual(route([[2, 64, 0], [-2, 64, 1]]), [-2, 64, 0]);
+  assert.equal(route([[2, 64, 0]]), null);
+});
+
+test('a solid corridor wall is opened only if it connects two dry routes to the portal', async () => {
+  const { strongholdPassage } = await import('./expedition-end-entry.mjs');
+  const from = [0, 64, 0];
+  const wanted = [[0, 64, 3]];
+  const floor = [0, 1, 2, 3].map(z => cell(0, 63, z, 'stone_bricks'));
+  const wall = [cell(0, 64, 1, 'mossy_stone_bricks'), cell(0, 65, 1, 'stone_bricks')];
+  const plan = cells => strongholdPassage(cells, from, wanted, new Set(), new Set());
+  const passage = plan([...floor, ...wall]);
+  assert.equal(passage.segment, null);
+  assert.deepEqual(passage.clear, [[0, 65, 1], [0, 64, 1]]);
+  assert.equal(plan([...floor, ...wall, cell(0, 64, 2, 'lava')]), null);
+  assert.equal(plan([...floor.slice(0, 3), ...wall]), null);
+});

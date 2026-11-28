@@ -16,6 +16,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldBuilder;
 import net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldSave;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.minecraft.client.gui.screens.DeathScreen;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.stats.Stats;
 import net.minecraft.tags.StructureTags;
@@ -23,6 +24,7 @@ import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.entity.EntityTypeTest;
 
@@ -348,15 +350,16 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 	private static void verifyStrongholdArrival(ServerPlayer owner, MushroomYorkieEntity dog) {
 		var underground = owner.level().findNearestMapStructure(StructureTags.EYE_OF_ENDER_LOCATED, owner.blockPosition(), 16, false);
 		var stats = owner.getStats();
-		if (underground == null
-				|| Math.hypot(owner.getX() - underground.getX() - 0.5, owner.getZ() - underground.getZ() - 0.5) > 12
-				|| dog.distanceTo(owner) > 16
+		var position = owner.blockPosition();
+		boolean atPortal = BlockPos.betweenClosedStream(position.offset(-6, -2, -6), position.offset(6, 2, 6))
+				.filter(pos -> owner.level().getBlockState(pos).is(Blocks.END_PORTAL_FRAME)).count() == 12;
+		if (underground == null || !atPortal || dog.distanceTo(owner) > 16
 				|| stats.getValue(Stats.ENTITY_KILLED.get(EntityType.BLAZE)) == 0
 				|| stats.getValue(Stats.ITEM_CRAFTED.get(Items.BLAZE_POWDER)) < STRONGHOLD_EYES
 				|| stats.getValue(Stats.ITEM_CRAFTED.get(Items.ENDER_EYE)) < STRONGHOLD_EYES
 				|| stats.getValue(Stats.ITEM_USED.get(Items.ENDER_EYE)) < 2
 				|| owner.getInventory().countItem(Items.ENDER_EYE) < 12) {
-			throw new AssertionError("Expected the original dog and earned Eye supply at the generated stronghold approach");
+			throw new AssertionError("Expected the original dog and earned Eye supply in the generated stronghold portal room");
 		}
 	}
 }

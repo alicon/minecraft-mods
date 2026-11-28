@@ -349,11 +349,12 @@ blaze powder. The server verifies the kill and crafting stats, the powder in the
 inventory, and the original equipped dog after reopening the save.
 
 Set `MUSHROOM_EXPEDITION_STAGE=stronghold` for a continuous run from fresh
-Survival through the stronghold surface approach. After the Nether trip, the
-controller gathers pearls, crafts twenty Eyes, and uses a portion for scouting.
-The native verifier requires earned blaze powder, twenty crafted Eyes, ordinary
-Eye throws, twelve Eyes still available for the portal, and the original living
-dog with the same owner at the generated stronghold after reopening the save.
+Survival to the generated stronghold portal room. After the Nether trip, the
+controller gathers pearls, crafts twenty Eyes, and follows their observed
+bearings. It uses dry stairs into the stronghold and checks on Mushroom during
+the descent. The native verifier requires earned blaze powder, twenty crafted
+Eyes, ordinary Eye throws, twelve Eyes available for the portal, and the
+original living dog with the same owner at the portal room after reopening.
 
 Set `MUSHROOM_EXPEDITION_STAGE=ender-supplies` to replay the transition from
 blaze powder to an Eye of Ender. The flat Normal Survival fixture supplies an
@@ -383,7 +384,9 @@ supplies the Eyes and tools and disables mob spawning and the spawner to
 exercise navigation and portal interaction. The controller uses nearby
 block observations, finds dry footing for filling the frames, and crosses
 from the raised approach with the original dog. The verifier locates the
-structure independently and checks the original dog in the End.
+structure independently and checks the original dog in the End. Add
+`MUSHROOM_EXPEDITION_START_ABOVE_STRONGHOLD=1` to start above the generated
+corridor and require stone mining before opening and crossing its portal.
 
 Set `MUSHROOM_EXPEDITION_STAGE=end-crystal` to replay the first combat step
 with a native bow. The disposable End fixture supplies a bow, arrows, a

@@ -1449,3 +1449,29 @@ test('a sheep scout prefers observed open turf over equally reachable covered gr
   ];
   assert.deepEqual(dryWaypoint(blocks, [0, 1, 0], [], undefined, 'grass'), [0, 1, 2]);
 });
+
+test('a visible log in the same trunk can supply the missing bed planks', async () => {
+  const { ensurePlanks } = await import('./expedition-home.mjs');
+  const aimed = [270, 102, -212];
+  const actual = [270, 101, -212];
+  const position = { x: 270.9, y: 100, z: -213.3 };
+  const broken = [];
+  let stock = [{ id: 'minecraft:oak_planks', count: 2 }];
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_inventory': return { slots: stock };
+      case 'observe': return { position, crosshair: { pos: actual, block: 'minecraft:oak_log' } };
+      case 'scan_blocks': return { matches: [{ name: 'minecraft:oak_log', positions: [aimed] }] };
+      case 'go_to':
+        if (args.entityId) stock.push({ id: 'minecraft:oak_log', count: 1 });
+        return { arrived: true };
+      case 'look': assert.deepEqual(args.at, aimed); return {};
+      case 'break_block': broken.push(args.pos); return { broken: true };
+      case 'get_entities': return { entities: [{ id: 100, item: { id: 'minecraft:oak_log' } }] };
+      default: assert.fail(name);
+    }
+  };
+  await ensurePlanks(action, async (item, count) => { stock = [{ id: item, count: count + 2 }]; }, 3);
+  assert.deepEqual(broken, [actual]);
+  assert.deepEqual(stock, [{ id: 'minecraft:oak_planks', count: 6 }]);
+});

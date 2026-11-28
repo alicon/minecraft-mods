@@ -445,6 +445,11 @@ export async function placeBeside(action, item) {
   if (bed) spots.push(...bedSpotsWithGroundCover(cells, player.position));
   for (const { pos, clear } of spots) {
     for (const cover of clear) await action('break_block', { pos: cover, maxTicks: 25 });
+    if (bed) {
+      // Bed orientation uses the player's rotation on the server.
+      await action('look', { at: [pos[0], pos[1] - 1, pos[2]] });
+      await setTimeout(175);
+    }
     const result = await action('place_block', { pos });
     if (!result?.placed || result.blockAtPos !== item) continue;
     if (!bed) return pos;
@@ -509,13 +514,16 @@ async function harvestReachableLog(action, camp, timberSite) {
         if (!await stepOut(action, player, visited, tree.pos, 'surface', rejected)) break;
       }
     }
-    let visibleLog = false;
+    let visibleLog;
     for (let look = 0; look < 3; look++) {
       await action('look', { at: tree.pos });
       await setTimeout(80);
-      const target = (await action('observe'))?.crosshair;
-      if (target?.pos?.join(',') === tree.pos.join(',')) {
-        visibleLog = true;
+      const pose = await action('observe');
+      const target = pose?.crosshair;
+      if (target?.pos?.join(',') === tree.pos.join(',')
+          || (target?.block === tree.name && target.pos?.[0] === tree.pos[0] && target.pos?.[2] === tree.pos[2]
+            && target.pos[1] >= Math.floor(pose.position.y))) {
+        visibleLog = target.pos;
         break;
       }
       if (!target?.block?.endsWith('_leaves')
@@ -523,7 +531,7 @@ async function harvestReachableLog(action, camp, timberSite) {
     }
     if (!visibleLog || !await selectBreakingTool(action, tree.name)) continue;
     const stock = count(await action('get_inventory'), tree.name);
-    if (!(await action('break_block', { pos: tree.pos, maxTicks: 100 }))?.broken) continue;
+    if (!(await action('break_block', { pos: visibleLog, maxTicks: 100 }))?.broken) continue;
     // A canopy drop can start outside the player's pickup area and fall into it.
     for (let check = 0; check < 4; check++) {
       const drops = await action('get_entities', { type: 'item', radius: 7 });
@@ -992,16 +1000,16 @@ export async function settleOnDryStep(action, landing, wait = setTimeout, confir
   return false;
 }
 
-export async function reachQuarryLanding(action, landing) {
+export async function reachQuarryLanding(action, landing, drop = 1, masonry = false) {
   const outcome = await action('go_to', { pos: landing, stopDistance: 0.3, maxTicks: 45 });
   if (outcome?.arrived) return settleOnDryStep(action, landing, setTimeout, true);
   if (!outcome?.reason?.includes('drop of more than 3 blocks')) return false;
 
   const player = await action('observe');
-  return nudgeOntoDryQuarryTile(action, player, landing, 1);
+  return nudgeOntoDryQuarryTile(action, player, landing, drop, masonry);
 }
 
-async function nudgeOntoDryQuarryTile(action, player, landing, heightDifference) {
+async function nudgeOntoDryQuarryTile(action, player, landing, heightDifference, masonry = false) {
   if (!player?.inWorld || !player.onGround || player.dead || player.inWater || player.health < 8
       || Math.abs(player.position.y - landing[1] - heightDifference) > 0.05) return false;
   const dx = landing[0] + 0.5 - player.position.x;
@@ -1011,16 +1019,17 @@ async function nudgeOntoDryQuarryTile(action, player, landing, heightDifference)
   // The native lookahead can include the next column beyond this stair.
   // Recheck the actual landing before moving the last fraction of a block.
   const view = await action('get_blocks', { center: landing, size: [3, 5, 3], format: 'json' });
-  if (!view || !quarryLandingIsClear(view.cells, landing)) return false;
+  if (!view || !quarryLandingIsClear(view.cells, landing, masonry)) return false;
   await action('move', { forward: true, yaw: Math.atan2(-dx, dz) * 180 / Math.PI, ticks: 1 });
   return settleOnDryStep(action, landing, setTimeout, true);
 }
 
-export async function descendQuarry(action, player, bed, stairs, protectedGround) {
+export async function descendQuarry(action, player, bed, stairs, protectedGround, route) {
   const start = feet(player);
-  const { cells } = await action('get_blocks', { center: start, size: [7, 7, 7], format: 'json' });
-  const step = quarryStep(cells, start, bed, stairs);
+  const { cells } = await action('get_blocks', { center: start, size: [7, route?.masonry ? 9 : 7, 7], format: 'json' });
+  const step = quarryStep(cells, start, bed, stairs, route);
   if (!step) return 'unavailable';
+  route?.rejected?.add(String(step.landing));
   const [tx, ty, tz] = step.landing;
   const overhang = [tx, ty + 2, tz];
   let opened = false;
@@ -1042,7 +1051,7 @@ export async function descendQuarry(action, player, bed, stairs, protectedGround
     if (!result?.broken) return opened ? 'blocked' : 'unavailable';
     opened = true;
   }
-  if (!await reachQuarryLanding(action, step.landing)) return 'blocked';
+  if (!await reachQuarryLanding(action, step.landing, start[1] - ty, route?.masonry)) return 'blocked';
   const [x, y, z] = start;
   for (const support of [[x, y - 1, z], [tx, ty - 1, tz]]) protectedGround.add(support.join(','));
   stairs.push(start);

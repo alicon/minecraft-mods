@@ -128,34 +128,41 @@ export function nearestCover(cells, start) {
   return candidates.sort((a, b) => a.travel - b.travel)[0]?.pos ?? null;
 }
 
-export function quarryStep(cells, [x, y, z], bed, walked) {
+function quarryBlock(id, masonry) {
+  return QUARRY_BLOCK.test(id ?? '') || (masonry && STRONGHOLD_MASONRY.test(id ?? ''));
+}
+
+export function quarryStep(cells, [x, y, z], bed, walked, { toward, rejected, masonry = false } = {}) {
   const blocks = new Map(cells.map(({ x, y, z, b }) => [`${x},${y},${z}`, b]));
-  const at = ([bx, by, bz]) => blocks.get(`${bx},${by},${bz}`);
+  const at = pos => blocks.get(String(pos));
   const candidates = [];
   for (const [dx, dz] of CARDINAL) {
     const tx = x + dx;
     const tz = z + dz;
-    const landing = [tx, y - 1, tz];
-    if (Math.max(Math.abs(tx - bed[0]), Math.abs(tz - bed[2])) <= 2
-        || walked.some(([px, , pz]) => px === tx && pz === tz)
-        || !QUARRY_BLOCK.test(at([tx, y - 2, tz]) ?? '')) continue;
-    // Non-colliding plants above the landing are not in the player's way.
-    // Aiming at the middle of a leaf-litter block misses its thin top face.
-    const clear = [y + 1, y, y - 1].map(by => [tx, by, tz])
-      .filter(pos => at(pos) && (pos[1] !== y + 1 || !gap(at(pos))));
-    if (!clear.every(pos => gap(at(pos)) || QUARRY_BLOCK.test(at(pos)))) continue;
-    const exposed = [[tx, y + 2, tz], ...CARDINAL.flatMap(([sx, sz]) =>
-      [y - 1, y, y + 1].map(by => [tx + sx, by, tz + sz]))];
-    if (exposed.some(pos => QUARRY_HAZARD.test(at(pos) ?? ''))) continue;
-    candidates.push({ landing, clear });
+    if ((bed && Math.max(Math.abs(tx - bed[0]), Math.abs(tz - bed[2])) <= 2)
+        || walked.some(([px, , pz]) => px === tx && pz === tz)) continue;
+    for (const drop of masonry ? [1, 2, 3] : [1]) {
+      const landing = [tx, y - drop, tz];
+      if (rejected?.has(String(landing)) || !quarryBlock(at([tx, y - drop - 1, tz]), masonry)) continue;
+      // A head-height plant may already leave enough room to move.
+      const height = Array.from({ length: drop + 2 }, (_, index) => y + 1 - index);
+      const clear = height.map(by => [tx, by, tz]).filter(pos =>
+        at(pos) && (!gap(at(pos)) || !masonry && pos[1] !== y + 1));
+      if (!clear.every(pos => gap(at(pos)) || quarryBlock(at(pos), masonry))) continue;
+      const exposed = [[tx, y + 2, tz], ...CARDINAL.flatMap(([sx, sz]) =>
+        height.map(by => [tx + sx, by, tz + sz]))];
+      if (exposed.some(pos => QUARRY_HAZARD.test(at(pos) ?? ''))) continue;
+      candidates.push({ landing, clear });
+      break;
+    }
   }
-  return candidates.sort((a, b) => b.clear.length - a.clear.length
-    || distance(b.landing, bed) - distance(a.landing, bed))[0] ?? null;
+  return candidates.sort((a, b) => (toward ? distance(a.landing, toward) - distance(b.landing, toward) : 0)
+    || b.clear.length - a.clear.length || (bed ? distance(b.landing, bed) - distance(a.landing, bed) : 0))[0] ?? null;
 }
 
-export function quarryLandingIsClear(cells, [x, y, z]) {
+export function quarryLandingIsClear(cells, [x, y, z], masonry = false) {
   const at = (by) => cells.find(cell => cell.x === x && cell.y === by && cell.z === z)?.b;
-  return QUARRY_BLOCK.test(at(y - 1) ?? '') && gap(at(y)) && gap(at(y + 1))
+  return quarryBlock(at(y - 1), masonry) && gap(at(y)) && gap(at(y + 1))
     && !cells.some(cell => cell.y >= y - 1 && QUARRY_HAZARD.test(cell.b));
 }
 
@@ -183,7 +190,7 @@ function hasVisibleIron(ores, block, [x, y, z]) {
 
 // Each edge fits a standing player through two adjacent columns, including the lift for a step up.
 // Use the native movement controller for the resulting straight segment.
-export function dryWaypoint(cells, start, visited, destination, preferredGround, rejectedSteps = new Set(), avoid) {
+export function dryWaypoint(cells, start, visited, destination, preferredGround, rejectedSteps = new Set(), avoid, exactTargets) {
   const blocks = new Map(cells.map(({ x, y, z, b }) => [`${x},${y},${z}`, b]));
   const block = (x, y, z) => blocks.get(`${x},${y},${z}`);
   const hazards = Array.isArray(avoid?.[0]) ? avoid : avoid ? [avoid] : [];
@@ -198,10 +205,12 @@ export function dryWaypoint(cells, start, visited, destination, preferredGround,
   }
   const queue = [{ pos: start, path: [], repeatCost: 0 }];
   const seen = new Set([start.join(',')]);
+  const targets = exactTargets && new Set(exactTargets.map(String));
+  if (targets?.has(String(start))) return null;
   let best = [];
   let bestScore = -Infinity;
-  for (const { pos, path, repeatCost } of queue) {
-    if (path.length >= 12) continue;
+  search: for (const { pos, path, repeatCost } of queue) {
+    if (path.length >= (targets ? 48 : 12)) continue;
     const [x, y, z] = pos;
     for (const [dx, dz] of CARDINAL) {
       const tx = x + dx;
@@ -222,6 +231,13 @@ export function dryWaypoint(cells, start, visited, destination, preferredGround,
         const route = [...path, step];
         const routeRepeatCost = repeatCost + Math.min(12, visits.get(`${tx},${tz}`) ?? 0);
         queue.push({ pos: step, path: route, repeatCost: routeRepeatCost });
+        if (targets) {
+          if (targets.has(key)) {
+            best = route;
+            break search;
+          }
+          continue;
+        }
         const fresh = Math.min(12, ...visited.map(tile => distance(tile, step)));
         const pasture = preferredGround === 'grass' ? [[0, 0], ...CARDINAL].filter(([ox, oz]) => {
           const px = tx + ox;
