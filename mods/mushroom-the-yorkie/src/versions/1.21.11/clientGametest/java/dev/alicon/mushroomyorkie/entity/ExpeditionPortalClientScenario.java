@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
@@ -59,6 +60,7 @@ final class ExpeditionPortalClientScenario {
 					var neutralPosition = destination.east(2).south(9);
 					piglin.setPos(neutralPosition.getX() + 0.5, neutralPosition.getY(), neutralPosition.getZ() + 0.5);
 					piglin.setNoAi(true);
+					piglin.setPersistenceRequired();
 					nether.addFreshEntity(piglin);
 					neutralPiglin = piglin.getUUID();
 				}
@@ -89,11 +91,22 @@ final class ExpeditionPortalClientScenario {
 				&& client.player.getMainHandItem().is(Items.IRON_INGOT)
 				&& client.level.getEntity(fixture.runtimeId()) instanceof MushroomYorkieEntity);
 		var companionDeath = new AtomicReference<String>();
+		var unprovokedAttack = new AtomicReference<String>();
+		var sawNeutralPiglin = new AtomicBoolean();
 		ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
 			if (entity.getUUID().equals(fixture.dogId())) {
 				companionDeath.set(source.getLocalizedDeathMessage(entity).getString() + " at " + entity.blockPosition());
 			}
 		});
+		if (fixture.neutralPiglin() != null) {
+			ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, source, baseDamage, damage, blocked) -> {
+				var attacker = source.getEntity();
+				if (entity.getUUID().equals(fixture.neutralPiglin()) && attacker != null
+						&& (attacker.getUUID().equals(fixture.dogId()) || attacker.getUUID().equals(ownerId))) {
+					unprovokedAttack.compareAndSet(null, attacker.getName().getString());
+				}
+			});
+		}
 		Files.writeString(status.resolveSibling("portal-companion"), fixture.dogId().toString());
 		Files.writeString(status, "ready");
 		boolean togetherInNether = false;
@@ -101,6 +114,9 @@ final class ExpeditionPortalClientScenario {
 		for (int tick = 0; tick < (blazeHunt ? 6_000 : 1_600); tick += 5) {
 			if (companionDeath.get() != null) {
 				throw new AssertionError("The original Nether companion died: " + companionDeath.get());
+			}
+			if (unprovokedAttack.get() != null) {
+				throw new AssertionError(unprovokedAttack.get() + " attacked the unprovoked zombified piglin");
 			}
 			String result = Files.readString(status);
 			togetherInNether |= server.computeOnServer(minecraft -> {
@@ -115,9 +131,8 @@ final class ExpeditionPortalClientScenario {
 					if (fixture.neutralPiglin() != null && owner.level().dimension().equals(Level.NETHER)
 							&& owner.blockPosition().closerThan(neutralPosition, 16)) {
 						var nether = minecraft.getLevel(Level.NETHER);
-						if (!(nether.getEntity(fixture.neutralPiglin()) instanceof LivingEntity piglin)
-								|| piglin.getHealth() < piglin.getMaxHealth()) {
-							throw new AssertionError("Mushroom or the player attacked the unprovoked zombified piglin");
+						if (nether.getEntity(fixture.neutralPiglin()) instanceof LivingEntity piglin && piglin.isAlive()) {
+							sawNeutralPiglin.set(true);
 						}
 					}
 					if (owner.level().dimension().equals(Level.NETHER)
@@ -130,6 +145,9 @@ final class ExpeditionPortalClientScenario {
 			}
 			if ("finished".equals(result)) {
 				if (!togetherInNether) throw new AssertionError("The original dog never reached the Nether with its owner");
+				if (distantFortress && !sawNeutralPiglin.get()) {
+					throw new AssertionError("The distant fortress route did not exercise the unprovoked zombified piglin encounter");
+				}
 				server.runOnServer(minecraft -> {
 					var owner = minecraft.getPlayerList().getPlayer(ownerId);
 					var home = minecraft.overworld();
