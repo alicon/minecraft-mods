@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
 import {
   bedSpotsWithGroundCover, dryStepKey, dryWaypoint, hasPlacedBed, leavesBlockingExit, nearbyBuildingSpots,
-  nearestCover, quarryStep,
+  nearestCover, quarryLandingIsClear, quarryStep,
 } from './expedition-navigation.mjs';
 import { cookExpeditionMutton, makeExpeditionCharcoal, smeltExpeditionIron } from './expedition-furnace.mjs';
 import { enterShelter, findShelteredBed, useShelterDoor } from './expedition-shelter.mjs';
@@ -77,7 +77,7 @@ export async function matchWoolWithDye(action, craft, inventory) {
   return recipe.color;
 }
 
-async function findDyeFlower(action, player, stock, tried) {
+export async function findDyeFlower(action, player, stock, tried) {
   const plants = Object.values(WOOL_DYES).flat().filter(item => !item.endsWith('bone_meal'));
   const scan = await action('scan_blocks', { blocks: plants, radius: 24, max: 12 });
   const { x, y, z } = player.position;
@@ -87,7 +87,11 @@ async function findDyeFlower(action, player, stock, tried) {
     .sort((a, b) => {
       const score = flower => {
         const color = Object.keys(WOOL_DYES).find(key => WOOL_DYES[key].includes(flower.name));
-        return flower.distance + (3 - count(stock, `minecraft:${color}_wool`)) * 5;
+        const wool = count(stock, `minecraft:${color}_wool`);
+        const dye = count(stock, `minecraft:${color}_dye`);
+        const ingredients = WOOL_DYES[color].reduce((total, item) => total + count(stock, item), 0);
+        const shortage = Math.max(0, 3 - wool - dye - ingredients);
+        return flower.distance + shortage * 5;
       };
       return score(a) - score(b);
     })[0];
@@ -506,7 +510,7 @@ export async function feedAdoptedDog(action, uuid, bed, attempts = 120) {
   const rejectedSteps = new Set();
   let previousDistance = Infinity;
   for (let attempt = 0; attempt < attempts; attempt++) {
-    const player = await action('observe');
+    let player = await action('observe');
     const observed = await action('get_entities', { type: DOG, radius: FEEDING_SEARCH_RADIUS });
     const dog = observed?.entities.find(entity => entity.uuid === uuid && entity.health !== 0);
     if (dog?.distance <= 4.4) {
@@ -538,6 +542,12 @@ export async function feedAdoptedDog(action, uuid, bed, attempts = 120) {
         if (dog.distance <= 12 && Math.abs(dog.pos[1] - player.position.y) <= 1.25) {
           const approach = await action('go_to', { entityId: dog.id, stopDistance: 2.2, maxTicks: 45 });
           if (approach?.arrived) continue;
+          // A timeout can still move the player several blocks. Plan any
+          // detour from there and let the next observation check for a meal.
+          const after = await action('observe');
+          if (!after?.inWorld || after.dead) return false;
+          if (feet(after).join(',') !== tile.join(',')) continue;
+          player = after;
         }
         await stepOut(action, player, visited, dog.pos, false, rejectedSteps);
       } else if (fromCamp > 3) {
@@ -719,19 +729,29 @@ export async function mineVisible(action, bed, alreadyMined, wanted, drops, prot
   return false;
 }
 
-export async function settleOnDryStep(action, landing, wait = setTimeout) {
+export async function settleOnDryStep(action, landing, wait = setTimeout, confirmStopped = false) {
   const target = landing.join(',');
+  let previous;
   for (let attempt = 0; attempt < 8; attempt++) {
     const player = await action('observe');
     if (!player?.inWorld || player.dead || player.health < 8 || player.inWater) return false;
-    if (player.onGround && feet(player).join(',') === target) return true;
+    if (player.onGround && feet(player).join(',') === target) {
+      const { x, z } = player.position;
+      if (!confirmStopped || (previous && Math.hypot(x - previous.x, z - previous.z) < 0.025)) return true;
+      previous = player.position;
+    } else if (previous && player.onGround) {
+      // A first grounded sample can still have enough momentum to leave the stair.
+      return false;
+    } else {
+      previous = undefined;
+    }
     if (attempt === 3 && player.onGround && Math.abs(player.position.y - landing[1] - 1) < 0.05) {
       const dx = landing[0] + 0.5 - player.position.x;
       const dz = landing[2] + 0.5 - player.position.z;
       // The walker's stopping radius can leave part of the player's body
       // supported by the old ledge. Walk into the verified opening.
       if (Math.hypot(dx, dz) <= 0.45) {
-        await action('move', { forward: true, yaw: Math.atan2(-dx, dz) * 180 / Math.PI, ticks: 2 });
+        await action('move', { forward: true, yaw: Math.atan2(-dx, dz) * 180 / Math.PI, ticks: confirmStopped ? 1 : 2 });
       }
     }
     await wait(125);
@@ -739,14 +759,35 @@ export async function settleOnDryStep(action, landing, wait = setTimeout) {
   return false;
 }
 
-async function descendQuarry(action, player, bed, stairs, protectedGround) {
+export async function reachQuarryLanding(action, landing) {
+  const outcome = await action('go_to', { pos: landing, stopDistance: 0.3, maxTicks: 45 });
+  if (outcome?.arrived) return settleOnDryStep(action, landing, setTimeout, true);
+  if (!outcome?.reason?.includes('drop of more than 3 blocks')) return false;
+
+  const player = await action('observe');
+  if (!player?.inWorld || !player.onGround || player.dead || player.inWater || player.health < 8
+      || Math.abs(player.position.y - landing[1] - 1) > 0.05) return false;
+  const dx = landing[0] + 0.5 - player.position.x;
+  const dz = landing[2] + 0.5 - player.position.z;
+  if (Math.hypot(dx, dz) > 0.45) return false;
+
+  // The native lookahead can include the next column beyond this stair.
+  // Recheck the actual landing before moving the last fraction of a block.
+  const view = await action('get_blocks', { center: landing, size: [3, 5, 3], format: 'json' });
+  if (!view || !quarryLandingIsClear(view.cells, landing)) return false;
+  await action('move', { forward: true, yaw: Math.atan2(-dx, dz) * 180 / Math.PI, ticks: 1 });
+  return settleOnDryStep(action, landing, setTimeout, true);
+}
+
+export async function descendQuarry(action, player, bed, stairs, protectedGround) {
   const start = feet(player);
   const { cells } = await action('get_blocks', { center: start, size: [7, 7, 7], format: 'json' });
   const step = quarryStep(cells, start, bed, stairs);
   if (!step) return 'unavailable';
   let opened = false;
   for (const pos of step.clear) {
-    const result = await breakVisible(action, pos);
+    let result = await breakVisible(action, pos);
+    if (!result && await settleOnDryStep(action, start)) result = await breakVisible(action, pos);
     if (/took damage from (?:lava|.*fire)/i.test(result?.reason ?? '')) {
       await moveAwayFromFire(action, cells.filter(({ b }) => /:(?:lava|fire|soul_fire)$/.test(b)));
       return 'blocked';
@@ -754,8 +795,7 @@ async function descendQuarry(action, player, bed, stairs, protectedGround) {
     if (!result?.broken) return opened ? 'blocked' : 'unavailable';
     opened = true;
   }
-  const outcome = await action('go_to', { pos: step.landing, stopDistance: 0.3, maxTicks: 45 });
-  if (!outcome?.arrived || !await settleOnDryStep(action, step.landing)) return 'blocked';
+  if (!await reachQuarryLanding(action, step.landing)) return 'blocked';
   const [x, y, z] = start;
   const [tx, ty, tz] = step.landing;
   for (const support of [[x, y - 1, z], [tx, ty - 1, tz]]) protectedGround.add(support.join(','));
@@ -763,7 +803,7 @@ async function descendQuarry(action, player, bed, stairs, protectedGround) {
   return step.landing;
 }
 
-async function climbQuarry(action, pos, chooseEscape) {
+export async function climbQuarry(action, pos, chooseEscape) {
   const visited = [];
   const rejectedSteps = new Set();
   for (let attempt = 0; attempt < 8; attempt++) {
@@ -1132,9 +1172,14 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       await seekExpeditionFood(action, player, visited, rejectedSteps, triedFoodSources);
       continue;
     }
-    if (usable && await mineVisible(action, bed, mined, wanted, drops, protectedGround)) {
-      misses = 0;
-      continue;
+    if (usable) {
+      const before = mined.size;
+      const collected = await mineVisible(action, bed, mined, wanted, drops, protectedGround);
+      if (collected || (stairs.length && mined.size > before)) {
+        // A broken ore block can open a route to its drop on the next scan.
+        misses = 0;
+        continue;
+      }
     }
     misses++;
     const needsTool = !usable || (!madeBackup && picks.length < 2 && picks.every(pick => durability(pick) < 90));

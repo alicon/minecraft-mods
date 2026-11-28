@@ -219,6 +219,14 @@ crosshair, and waits for the native furnace to smelt the ore. It can make
 charcoal from local wood when fuel is scarce. The server
 checks the earned iron pickaxe, bucket, shield, and original dog.
 
+Set `MUSHROOM_EXPEDITION_STAGE=quarry-iron` to replay the iron portion in a
+disposable native client. The fixture supplies the stone kit, fuel, timber
+and an ore pocket beside a one-block quarry stair. The run digs and descends
+the stair, collects and smelts seven raw iron, crafts the iron pickaxe, bucket,
+and shield, and returns to the same seated Mushroom. The server
+checks that the ore is gone, the player returned above the stair, and the
+original dog stayed alive with its original owner and sit order.
+
 Set `MUSHROOM_EXPEDITION_STAGE=defense` with the same runner for the focused
 native companion protection scenario. The disposable world stages an injured
 Mushroom next to a spider and gives the owner a stone sword. It verifies that

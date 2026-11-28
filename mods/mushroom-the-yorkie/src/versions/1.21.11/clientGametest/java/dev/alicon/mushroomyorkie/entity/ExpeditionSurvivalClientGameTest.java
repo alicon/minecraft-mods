@@ -46,7 +46,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 			case "stone" -> STONE_WINDOW_TICKS;
 			case "iron" -> IRON_WINDOW_TICKS;
 			case "nether" -> NETHER_WINDOW_TICKS;
-			case "defense", "feeding", "portal", "shelter", "equipment", "end-entry", "eye-route", "quarry-tools" -> 0;
+			case "defense", "feeding", "portal", "shelter", "equipment", "end-entry", "eye-route", "quarry-tools", "quarry-iron" -> 0;
 			default -> throw new AssertionError("Unknown expedition stage " + stage);
 		};
 		TestWorldSave save;
@@ -116,6 +116,10 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 				}
 				if ("quarry-tools".equals(stage)) {
 					ExpeditionQuarryToolsClientScenario.run(context, server, ownerId, status);
+					return;
+				}
+				if ("quarry-iron".equals(stage)) {
+					ExpeditionIronClientScenario.run(context, server, ownerId, status);
 					return;
 				}
 				Files.writeString(status, "ready", StandardOpenOption.CREATE_NEW);

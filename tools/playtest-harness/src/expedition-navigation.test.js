@@ -16,6 +16,29 @@ test('canopy drops are measured to the top of the landing block and reject hazar
   assert.equal(canopyLanding([support, floor, cell(160, 75, 161, 'water')], start, 20), null);
 });
 
+test('a false drop warning can only nudge onto the verified one-block quarry stair', async () => {
+  const { reachQuarryLanding } = await import('./expedition-home.mjs');
+  const landing = [488, 64, 284];
+  const safe = [cell(488, 63, 284, 'stone')];
+  for (const blocks of [safe, [], [...safe, cell(488, 64, 284, 'water')]]) {
+    let moved = false;
+    const action = async (name, args) => {
+      if (name === 'go_to') return { arrived: false, reason: 'drop of more than 3 blocks ahead, stopped' };
+      if (name === 'observe') return {
+        inWorld: true, onGround: true, health: 20,
+        position: moved ? { x: 488.5, y: 64, z: 284.5 } : { x: 488.13, y: 65, z: 284.5 },
+      };
+      if (name === 'get_blocks') return { cells: blocks };
+      assert.equal(name, 'move');
+      assert.equal(args.ticks, 1);
+      moved = true;
+      return {};
+    };
+    assert.equal(await reachQuarryLanding(action, landing), blocks === safe);
+    assert.equal(moved, blocks === safe);
+  }
+});
+
 test('an empty early-game food reserve can reroute the search toward a distant pig', async () => {
   const { gatherWool } = await import('./expedition-home.mjs');
   const player = { inWorld: true, health: 20, food: 6, position: { x: 0.5, y: 64, z: 0.5 } };
@@ -60,6 +83,19 @@ test('a nearly starving player may eat the final mutton and still build the bed 
   };
   assert.equal(await gatherWool(action, () => assert.fail('Already on dry ground')), 'white');
   assert.ok(ate);
+});
+
+test('a flower that finishes the available color is preferred over a closer new color', async () => {
+  const { findDyeFlower } = await import('./expedition-home.mjs');
+  const stock = { slots: [{ id: 'minecraft:white_wool', count: 2 }, { id: 'minecraft:black_wool', count: 1 },
+    { id: 'minecraft:poppy', count: 2 }] };
+  const action = async name => {
+    assert.equal(name, 'scan_blocks');
+    return { matches: [{ name: 'minecraft:dandelion', positions: [[1, 64, 0]] },
+      { name: 'minecraft:poppy', positions: [[4, 64, 0]] }] };
+  };
+  const target = await findDyeFlower(action, { position: { x: 0.5, y: 64, z: 0.5 } }, stock, new Set());
+  assert.equal(target.name, 'minecraft:poppy');
 });
 
 test('mixed wool uses a single collected dye to complete the most common color', async () => {
@@ -320,6 +356,37 @@ test('feeding only succeeds when the original dog is reached and consumes one me
   }
 });
 
+test('a feeding approach that times out after moving does not backtrack from stale footing', async () => {
+  const { feedAdoptedDog } = await import('./expedition-home.mjs');
+  let approached = false;
+  let meals = 1;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe':
+        return { inWorld: true, position: { x: approached ? 6 : 0, y: 64, z: 0 }, crosshair: { id: 22 } };
+      case 'get_entities':
+        return { entities: [{ id: 22, uuid: 'original', pos: [8, 64, 0], distance: approached ? 2 : 8 }] };
+      case 'get_inventory':
+        return { mainHand: { id: 'minecraft:mutton' }, slots: [{ id: 'minecraft:mutton', count: meals }] };
+      case 'go_to':
+        assert.equal(args.entityId, 22);
+        approached = true;
+        return { arrived: false, reason: 'timed out 2.3 blocks away' };
+      case 'look':
+        assert.equal(args.entityId, 22);
+        return {};
+      case 'interact_entity':
+        assert.equal(args.entityId, 22);
+        meals--;
+        return {};
+      default:
+        assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  assert.equal(await feedAdoptedDog(action, 'original', [0, 64, 0], 9), true);
+  assert.equal(meals, 0);
+});
+
 test('forest-floor litter can be cleared for a bed with two dry supports', async () => {
   const { bedSpotsWithGroundCover, nearbyBuildingSpots } = await import('./expedition-navigation.mjs');
   const position = { x: 0.15, y: 1, z: 0.5 };
@@ -360,6 +427,19 @@ test('a horizontal arrival still waits for the player to land one block lower', 
   };
   assert.equal(await settleOnDryStep(action, landing, async () => {}), true);
   assert.equal(reports.length, 0);
+});
+
+test('a stair landing that drifts into the next column is not recorded as settled', async () => {
+  const { settleOnDryStep } = await import('./expedition-home.mjs');
+  const landing = [161, 81, 160];
+  const readings = [161.99, 162.03];
+  const action = async name => {
+    assert.equal(name, 'observe');
+    return { inWorld: true, health: 20, onGround: true,
+      position: { x: readings.shift(), y: 81, z: 160.5 } };
+  };
+  assert.equal(await settleOnDryStep(action, landing, async () => {}, true), false);
+  assert.equal(readings.length, 0);
 });
 
 test('the sheep scout waits for its only dry descent instead of rejecting it at the rim', async () => {

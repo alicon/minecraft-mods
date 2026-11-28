@@ -142,6 +142,12 @@ export function quarryStep(cells, [x, y, z], bed, walked) {
     || distance(b.landing, bed) - distance(a.landing, bed))[0] ?? null;
 }
 
+export function quarryLandingIsClear(cells, [x, y, z]) {
+  const at = (by) => cells.find(cell => cell.x === x && cell.y === by && cell.z === z)?.b;
+  return QUARRY_BLOCK.test(at(y - 1) ?? '') && gap(at(y)) && gap(at(y + 1))
+    && !cells.some(cell => cell.y >= y - 1 && QUARRY_HAZARD.test(cell.b));
+}
+
 export function dryStepKey(from, to) {
   const dx = Math.sign(to[0] - from[0]);
   const dz = Math.sign(to[2] - from[2]);

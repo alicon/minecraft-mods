@@ -5,7 +5,7 @@ import { dirname, isAbsolute, join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import {
   adoptAtNight, earnIronKit, earnStoneKit, feedAdoptedDog, forageExpeditionMeal, prepareAdoptionCamp,
-  breakVisible, ensurePlanks, hold, placeBeside, recoverDroppedLoadout, settleOnDryStep, WOOD_LOGS,
+  breakVisible, climbQuarry, descendQuarry, ensurePlanks, hold, placeBeside, recoverDroppedLoadout, settleOnDryStep, WOOD_LOGS,
 } from './expedition-home.mjs';
 import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
@@ -62,6 +62,7 @@ const milestoneObjectives = {
   'end-entry': 'Craft Eyes of Ender and bring Mushroom through the active portal.',
   'eye-route': 'Throw an Eye of Ender and follow its visible flight with Mushroom.',
   'quarry-tools': 'Craft the starter kit, shovel soil, and switch to a pickaxe for stone.',
+  'quarry-iron': 'Mine the iron below camp, return up the stairs, and make the expedition kit.',
 };
 
 async function rpc(method, params) {
@@ -251,6 +252,15 @@ try {
       const result = await breakVisible(action, targets[index]);
       assert.ok(result?.broken && result.block === block, `Could not break the staged ${block}`);
     }
+  } else if (stage === 'quarry-iron') {
+    const fixture = JSON.parse(await readFile(join(dirname(statusFile), 'quarry-iron-fixture'), 'utf8'));
+    assert.ok(/^[\da-f-]{36}$/i.test(fixture.dog) && blockPosition(fixture.bed));
+    companion = fixture.dog;
+    const stairs = [];
+    const landing = await descendQuarry(action, start, fixture.bed, stairs, new Set());
+    assert.ok(blockPosition(landing), 'The opening quarry stair could not be descended');
+    await earnIronKit(action, craft, { bed: fixture.bed }, { resumeQuarry: stairs, resumeQuarryLanding: landing });
+    assert.ok(await climbQuarry(action, stairs[0]), 'Could not return to camp with the earned iron kit');
   } else await runExpedition(start, stage);
   await narrate('Result', 'The controller finished its stage. The game test is checking the outcome.');
   await reportStatus('finished');
