@@ -18,8 +18,8 @@ expedition_node=${MUSHROOM_EXPEDITION_NODE:-node}
 command -v "$expedition_node" >/dev/null
 export MUSHROOM_EXPEDITION_STAGE="${MUSHROOM_EXPEDITION_STAGE:-adoption}"
 case "$MUSHROOM_EXPEDITION_STAGE" in
-  adoption|stone|iron|nether|defense|portal|shelter|equipment|end-entry) ;;
-  *) echo "MUSHROOM_EXPEDITION_STAGE must be adoption, stone, iron, nether, defense, portal, shelter, equipment or end-entry" >&2; exit 2 ;;
+  adoption|stone|iron|nether|defense|portal|shelter|equipment|end-entry|eye-route) ;;
+  *) echo "MUSHROOM_EXPEDITION_STAGE must be adoption, stone, iron, nether, defense, portal, shelter, equipment, end-entry or eye-route" >&2; exit 2 ;;
 esac
 
 cd "$(dirname "$0")/.."
@@ -82,7 +82,11 @@ if [ -d "$expedition_screens" ]; then
   find "$expedition_screens" -type f -name '*expedition-survival-*' -newer "$expedition_report/start" \
     -exec cp {} "$expedition_report/screenshots" \;
 fi
-if [ "$expedition_result" -ne 0 ]; then exit "$expedition_result"; fi
+if [ "$expedition_result" -ne 0 ]; then
+  printf '[%s] Verification | The native game test exited with code %s. See game.log.\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$expedition_result" >> "$expedition_report/playtest.log"
+  exit "$expedition_result"
+fi
 if [ "$expedition_controller" -ne 0 ] && [ "${MUSHROOM_EXPEDITION_LIVE:-0}" != 1 ]; then
   exit "$expedition_controller"
 fi
@@ -90,3 +94,5 @@ if [ ! -f "$MUSHROOM_EXPEDITION_STATUS" ] || [ "$(cat "$MUSHROOM_EXPEDITION_STAT
   echo "The client exited before finishing the expedition. See $expedition_report/game.log" >&2
   exit 1
 fi
+printf '[%s] Verification | The native game test passed.\n' \
+  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$expedition_report/playtest.log"

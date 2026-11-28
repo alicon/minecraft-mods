@@ -12,6 +12,12 @@ const dryFloor = [cell(0, 63, 3, 'stone_bricks'), cell(3, 63, 0, 'stone_bricks')
 const water = cell(0, 64, 3, 'water');
 const roof = cell(3, 66, 0, 'stone_bricks');
 
+test('a stronghold bearing uses observed horizontal flight and ignores vertical motion', async () => {
+  const { eyeBearing } = await import('./expedition-eye-route.mjs');
+  assert.equal(eyeBearing([4, 62, 3], [4, 69, 3]), null);
+  assert.deepEqual(eyeBearing([4, 62, 3], [1, 63, 7]), { x: -0.6, z: 0.8, distance: 5 });
+});
+
 test('End entry finds the full observed ring and sorts dry, unobstructed approaches by distance', async () => {
   const { findEndRing } = await import('./expedition-end-entry.mjs');
   const ring = findEndRing([...frame, ...dryFloor], player);

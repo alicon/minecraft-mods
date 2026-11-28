@@ -10,6 +10,7 @@ import {
 import { hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
 import { crossEndPortal } from './expedition-end-entry.mjs';
+import { scoutByEye } from './expedition-eye-route.mjs';
 import { COMPANION_WEARABLES, markExpeditionCamp, practiceStayAndRecall, prepareCompanionGear } from './expedition-gear.mjs';
 import { expeditionPolicy } from './expedition-policy.mjs';
 import { NETHER, OVERWORLD, netherRoundTrip, prepareNetherPortal } from './expedition-nether.mjs';
@@ -58,6 +59,7 @@ const milestoneObjectives = {
   shelter: 'Enter the furnished house and sleep with the door closed.',
   equipment: 'Craft the harness, padded vest, and mat. Fit Mushroom’s gear and mark camp.',
   'end-entry': 'Craft Eyes of Ender and bring Mushroom through the active portal.',
+  'eye-route': 'Throw an Eye of Ender and follow its visible flight with Mushroom.',
 };
 
 async function rpc(method, params) {
@@ -220,6 +222,14 @@ try {
     companion = (await readFile(join(dirname(statusFile), 'end-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
     await crossEndPortal(action, craft, companion);
+  } else if (stage === 'eye-route') {
+    companion = (await readFile(join(dirname(statusFile), 'eye-companion'), 'utf8')).trim();
+    assert.ok(/^[\da-f-]{36}$/i.test(companion));
+    await scoutByEye(action, companion, async bearing => {
+      console.log(JSON.stringify({ at: new Date().toISOString(), action: 'eye_bearing', bearing }));
+      const yaw = Math.round(Math.atan2(-bearing.x, bearing.z) * 180 / Math.PI);
+      await narrate('Decision', `Saw the eye travel ${bearing.distance.toFixed(1)} blocks. Heading toward its bearing at yaw ${yaw}° on dry ground.`);
+    });
   } else await runExpedition(start, stage);
   await narrate('Result', 'The controller finished its stage. The game test is checking the outcome.');
   await reportStatus('finished');

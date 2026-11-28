@@ -241,6 +241,14 @@ sockets through Use, and jumps into the portal. The integrated server
 checks that the frame activated and the same living dog arrived with its
 owner in the End. This replay begins in the portal room.
 
+Set `MUSHROOM_EXPEDITION_STAGE=eye-route` to replay using an Eye of Ender
+to choose a route. The disposable fixture supplies one eye, Mushroom, and
+dry footing. The controller uses the eye, measures the flight exposed by
+the client, and follows that bearing. The server independently checks that
+the player moved closer to the world's actual stronghold with the same
+living dog nearby. The controller receives the dog's identity and learns
+the direction from the thrown eye.
+
 Set `MUSHROOM_EXPEDITION_STAGE=shelter` to replay the Java sheltered adoption.
 The disposable world provides a furnished house at night. The player
 starts outside with an empty inventory. The integrated server verifies the
