@@ -370,6 +370,35 @@ test('a gear recovery with low health stops before approaching the old death loc
   }, [10, 64, 10]), /return to the dropped gear became unsafe/);
 });
 
+test('a recovery forage keeps the chicken collected through ordinary play', async () => {
+  const { forageExpeditionMeal } = await import('./expedition-home.mjs');
+  const chicken = { id: 11, type: 'minecraft:chicken', distance: 2, pos: [2, 64, 0] };
+  const drop = { id: 12, item: { id: chicken.type }, pos: chicken.pos };
+  let hunted = false;
+  let collected = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe':
+        return { inWorld: true, health: 20, position: { x: 0, y: 64, z: 0 }, crosshair: { id: chicken.id } };
+      case 'get_inventory': return { slots: collected ? [{ id: chicken.type, count: 1 }] : [] };
+      case 'get_entities':
+        return { entities: args.type === 'item' ? [drop] : hunted ? [] : [chicken] };
+      case 'go_to':
+        if (args.entityId === drop.id) collected = true;
+        else assert.equal(args.entityId, chicken.id);
+        return { arrived: true };
+      case 'look': return {};
+      case 'attack_entity':
+        assert.equal(args.entityId, chicken.id);
+        hunted = true;
+        return {};
+      default: assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  assert.equal(await forageExpeditionMeal(action, { toward: [40, 64, 0] }), true);
+  assert.ok(hunted && collected);
+});
+
 test('feeding only succeeds when the original dog is reached and consumes one meal', async () => {
   const { feedAdoptedDog } = await import('./expedition-home.mjs');
   for (const hit of [19, 22]) {

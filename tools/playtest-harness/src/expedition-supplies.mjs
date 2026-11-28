@@ -5,7 +5,8 @@ import { dirname, isAbsolute, join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import {
   adoptAtNight, earnIronKit, earnStoneKit, feedAdoptedDog, forageExpeditionMeal, prepareAdoptionCamp,
-  breakVisible, climbQuarry, descendQuarry, ensurePlanks, hold, placeBeside, recoverDroppedLoadout, settleOnDryStep, WOOD_LOGS,
+  breakVisible, climbQuarry, descendQuarry, ensurePlanks, hold, placeBeside, recoverDroppedLoadout, retreatFromNearbyMob,
+  settleOnDryStep, WOOD_LOGS,
 } from './expedition-home.mjs';
 import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
@@ -345,21 +346,48 @@ async function runExpedition(start, stage) {
       || (Array.isArray(checkpoint.quarry) && checkpoint.quarry.length <= 44 && checkpoint.quarry.every(blockPosition)),
     'Invalid recorded quarry path');
     assert.ok(checkpoint.quarryLanding === undefined || blockPosition(checkpoint.quarryLanding), 'Invalid recorded landing');
+    assert.ok(checkpoint.recoveryDestination === undefined || blockPosition(checkpoint.recoveryDestination),
+      'Invalid recorded recovery destination');
     assert.ok(checkpoint.dog === undefined || /^[\da-f-]{36}$/i.test(String(checkpoint.dog)), 'Invalid recorded dog UUID');
     assert.ok(checkpoint.equipment === undefined || (Array.isArray(checkpoint.equipment)
       && new Set(checkpoint.equipment).size === checkpoint.equipment.length
       && checkpoint.equipment.every(item => COMPANION_WEARABLES.includes(item))), 'Invalid recorded companion equipment');
     companion = checkpoint.dog;
     await action('stop', { closeScreen: true });
+    const missingGuide = !inventory.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide');
+    const lostQuarryKit = ['iron', 'nether'].includes(checkpoint.phase) && deathAtStart
+      && !inventory.slots.some(stack => stack.id === 'minecraft:stone_pickaxe')
+      && !inventory.slots.some(stack => stack.id === 'minecraft:furnace');
     if (['stone', 'iron', 'nether'].includes(checkpoint.phase)
-        && !inventory.slots.some(stack => stack.id === 'mushroom_yorkie:field_guide')) {
-      const destination = verifiedDeathSite(start, checkpoint);
+        && (checkpoint.recoveryDestination || missingGuide || lostQuarryKit)) {
+      const destination = checkpoint.recoveryDestination ?? verifiedDeathSite(start, checkpoint);
+      checkpoint.recoveryDestination = destination;
+      await writeCheckpoint(checkpoint);
+      const { x, y, z } = start.position;
+      if (Math.hypot(destination[0] - x, destination[1] - y, destination[2] - z) > 32) {
+        await narrate('Objective', 'Earn a meal for Mushroom before returning from the respawn point.');
+        if (!inventory.slots.some(stack => stack.id.endsWith('_sword'))) {
+          const visited = [];
+          const rejected = new Set();
+          let player = start;
+          for (let retreat = 0; retreat < 10; retreat++) {
+            if (!await retreatFromNearbyMob(action, player, visited, rejected)) break;
+            player = await action('observe');
+          }
+          assert.ok(player.health >= 8 && !player.threats?.some(threat => threat.distance <= 3),
+            'Could not reach safe ground to rebuild tools after respawn');
+          await gatherStarterTools(player, { combatOnly: true });
+        }
+        assert.ok(await forageExpeditionMeal(action, { toward: destination }), 'Could not find a meal before the return to Mushroom');
+        await narrate('Result', 'Packed an earned meal for the return to Mushroom.');
+      }
       await narrate('Objective', 'Return to the recorded death site and collect the dropped gear.');
       console.log(JSON.stringify({ at: new Date().toISOString(), action: 'recover_dropped_loadout', destination }));
       await recoverDroppedLoadout(action, destination);
       delete checkpoint.quarry;
       delete checkpoint.quarryLanding;
       delete checkpoint.reenterQuarry;
+      delete checkpoint.recoveryDestination;
       await writeCheckpoint(checkpoint);
     }
     await reportStatus('ready');
@@ -434,7 +462,7 @@ async function runExpedition(start, stage) {
     };
     policy.tendCompanion = async () => {
       await narrate('Objective', 'Leave the quarry and feed the injured original Mushroom.');
-      assert.ok(await forageExpeditionMeal(action, checkpoint.camp.bed), 'Could not earn food for the injured original dog');
+      assert.ok(await forageExpeditionMeal(action, { camp: checkpoint.camp.bed }), 'Could not earn food for the injured original dog');
       const player = await action('observe');
       assert.ok(await feedAdoptedDog(action, checkpoint.dog,
         [player.position.x, player.position.y, player.position.z].map(Math.floor), 30),
@@ -599,10 +627,11 @@ async function packStarterTable(pos) {
   assert.ok(hasTable(await action('get_inventory')), 'The player did not pick up the crafting table');
 }
 
-async function gatherStarterTools(start) {
+async function gatherStarterTools(start, { combatOnly = false } = {}) {
   const stock = await action('get_inventory');
   const amount = item => stock.slots.reduce((total, stack) => total + (stack.id === item ? stack.count : 0), 0);
   const tools = [['wooden_pickaxe', 3, 2], ['wooden_sword', 2, 1], ['wooden_shovel', 1, 2]]
+    .filter(([item]) => !combatOnly || item === 'wooden_sword')
     .filter(([item]) => !amount(`minecraft:${item}`));
   const needsTable = !amount('minecraft:crafting_table');
   if (!tools.length && needsTable) {

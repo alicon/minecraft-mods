@@ -32,11 +32,12 @@ const IRON_RECIPES = [
 const SWORDS = TOOL_TIERS.map(tier => `minecraft:${tier}_sword`);
 const CAMP_WORK_END = 11_900;
 const BACKUP_MEAT = {
+  'minecraft:chicken': 'minecraft:chicken',
   'minecraft:cow': 'minecraft:beef',
   'minecraft:pig': 'minecraft:porkchop',
 };
 const BACKUP_FOOD = [...Object.values(BACKUP_MEAT), 'minecraft:apple'];
-const COOKED_FOOD = ['minecraft:cooked_mutton', 'minecraft:cooked_beef', 'minecraft:cooked_porkchop'];
+const COOKED_FOOD = ['minecraft:cooked_mutton', 'minecraft:cooked_beef', 'minecraft:cooked_porkchop', 'minecraft:cooked_chicken'];
 const DOG_FOOD = [MUTTON, ...Object.values(BACKUP_MEAT), ...COOKED_FOOD, 'minecraft:apple'];
 const FEEDING_SEARCH_RADIUS = 24;
 const WOOL_DYES = {
@@ -243,7 +244,7 @@ export async function stepOut(action, player, visited, destination, preferredGro
 export async function retreatFromNearbyMob(action, player, visited, rejectedSteps) {
   // A scouting walk can cover ten blocks before the next observation.
   const threat = player.threats?.find(entity => entity.distance <= (entity.type === 'minecraft:creeper' ? 16 : 7)
-    && (entity.type !== 'minecraft:spider' || isBedtime(player)));
+    && (entity.type !== 'minecraft:spider' || isBedtime(player) || entity.distance <= 3));
   if (!threat) return false;
   const nearby = await action('get_entities', { type: threat.type, radius: 18, max: 16 });
   const danger = nearby?.entities.find(entity => entity.id === threat.id && entity.hostile);
@@ -586,30 +587,39 @@ export async function feedAdoptedDog(action, uuid, bed, attempts = 120) {
   return false;
 }
 
-async function seekExpeditionFood(action, player, visited, rejectedSteps, tried) {
-  const nearby = await action('get_entities', { radius: 24, max: 64 });
+async function seekExpeditionFood(action, player, visited, rejectedSteps, tried, toward) {
+  const nearby = await action('get_entities', { radius: 32, max: 96 });
+  const drop = nearby?.entities.find(entity => entity.item?.id && DOG_FOOD.includes(entity.item.id)
+    && !tried.has(entity.id) && entity.distance < 12 && Math.abs(entity.pos[1] - player.position.y) < 3);
+  if (drop) {
+    tried.add(drop.id);
+    if ((await action('go_to', { entityId: drop.id, stopDistance: 0.3, maxTicks: 50 }))?.arrived) return;
+  }
+  const hostiles = (nearby?.entities ?? []).filter(entity => entity.hostile);
   const animal = nearby?.entities.find(entity => (BACKUP_MEAT[entity.type] || entity.type === 'minecraft:sheep')
-    && !tried.has(entity.id) && Math.abs(entity.pos[1] - player.position.y) < 3);
-  if (animal?.distance <= 6) {
+    && !tried.has(entity.id) && Math.abs(entity.pos[1] - player.position.y) <= 9
+    && !hostiles.some(threat => Math.hypot(...threat.pos.map((axis, index) => axis - entity.pos[index])) < 8));
+  if (animal?.distance <= 6 && Math.abs(animal.pos[1] - player.position.y) < 3) {
     tried.add(animal.id);
     await hunt(action, animal, item => item === (BACKUP_MEAT[animal.type] ?? MUTTON));
   } else {
     visited.push(feet(player));
-    await stepOut(action, player, visited, animal?.pos, 'grass', rejectedSteps);
+    await stepOut(action, player, visited, animal?.pos ?? toward, animal || !toward ? 'grass' : 'surface', rejectedSteps);
   }
 }
 
-export async function forageExpeditionMeal(action, camp) {
+export async function forageExpeditionMeal(action, { camp, toward } = {}) {
   const visited = [];
   const rejectedSteps = new Set();
   const tried = new Set();
   let returning = Boolean(camp);
-  for (let attempt = 0; attempt < (camp ? 48 : 28); attempt++) {
+  for (let attempt = 0; attempt < (camp || toward ? 48 : 28); attempt++) {
     const inventory = await action('get_inventory');
     if (DOG_FOOD.some(item => count(inventory, item))) return true;
     const player = await action('observe');
-    if (!player?.inWorld || player.dead || player.health < 12) return false;
+    if (!player?.inWorld || player.dead || player.health < 8) return false;
     if (await retreatFromNearbyMob(action, player, visited, rejectedSteps)) continue;
+    if (player.health < 12 && player.threats?.some(threat => threat.distance <= 3)) return false;
     if (returning) {
       const here = feet(player);
       returning = Math.hypot(...here.map((coordinate, axis) => coordinate - camp[axis])) > 6;
@@ -619,7 +629,7 @@ export async function forageExpeditionMeal(action, camp) {
         continue;
       }
     }
-    await seekExpeditionFood(action, player, visited, rejectedSteps, tried);
+    await seekExpeditionFood(action, player, visited, rejectedSteps, tried, toward);
   }
   return false;
 }
