@@ -42,6 +42,7 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 			case "adoption" -> ADOPTION_WINDOW_TICKS;
 			case "stone" -> STONE_WINDOW_TICKS;
 			case "iron" -> IRON_WINDOW_TICKS;
+			case "defense" -> 0;
 			default -> throw new AssertionError("Unknown expedition stage " + stage);
 		};
 		TestWorldSave save;
@@ -79,6 +80,10 @@ public final class ExpeditionSurvivalClientGameTest implements FabricClientGameT
 						minecraft.overworld().getSeed(), minecraft.getWorldData().getLevelName(), ownerId);
 			});
 			try {
+				if ("defense".equals(stage)) {
+					ExpeditionCompanionClientScenario.run(context, server, ownerId, status);
+					return;
+				}
 				Files.writeString(status, "ready", StandardOpenOption.CREATE_NEW);
 				boolean passed = false;
 				for (int elapsed = 0; elapsed < windowTicks; elapsed += 10) {

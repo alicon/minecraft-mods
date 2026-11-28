@@ -192,6 +192,13 @@ crosshair, and waits for the native furnace to smelt the ore. It can make
 charcoal from local wood when fuel is scarce. The server
 checks the earned iron pickaxe, bucket, shield, and original dog.
 
+Set `MUSHROOM_EXPEDITION_STAGE=defense` with the same runner for the focused
+native companion protection scenario. The disposable world stages an injured
+Mushroom next to a spider and gives the owner a stone sword. It verifies that
+the controller interrupts a proposed walk, the owner kills the spider through
+the native client, and the same injured dog survives. The staged encounter
+provides companion-defense coverage separately from fresh Survival progress.
+
 ### Playtest bridge and server GameTests
 
 Matrix setup refuses a dead test owner before screenshots or fixture mutations.

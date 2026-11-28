@@ -166,8 +166,33 @@ await rpc('initialize', {
 try {
   const start = await action('observe');
   assert.ok(start?.inWorld && start.dimension === 'minecraft:overworld' && !start.dead);
-  const inventory = await action('get_inventory');
   const stage = process.env.MUSHROOM_EXPEDITION_STAGE ?? 'adoption';
+  if (stage === 'defense') await runCompanionDrill();
+  else await runExpedition(start, stage);
+  await reportStatus('finished');
+} catch (error) {
+  await reportStatus(live ? 'held' : 'failed');
+  throw error;
+}
+
+async function runCompanionDrill() {
+  const [uuid, errand] = (await readFile(join(dirname(statusFile), 'defense-fixture'), 'utf8')).trim().split('\n');
+  const pos = errand.trim().split(/\s+/).map(Number);
+  assert.ok(/^[\da-f-]{36}$/i.test(uuid) && blockPosition(pos));
+  companion = uuid;
+  assert.equal(await action('go_to', { pos, stopDistance: 0.7, maxTicks: 28 }), null,
+    'The proposed errand should be interrupted by danger to Mushroom');
+  for (let attempt = 0; attempt < 6; attempt++) {
+    await setTimeout(250);
+    const observed = await playerAction('get_entities', { type: 'minecraft:spider', radius: 8 });
+    if (!observed.entities.length) return;
+    await action('observe');
+  }
+  throw new Error('The spider was still alive after the companion interruption');
+}
+
+async function runExpedition(start, stage) {
+  const inventory = await action('get_inventory');
   const policy = await expeditionPolicy(process.env.MUSHROOM_EXPEDITION_POLICY ?? 'rules', coachingFile);
   if (live) policy.waitForCoaching = waitForCoaching;
   let checkpoint;
@@ -254,10 +279,6 @@ try {
     checkpoint.fedDog = true;
     if (live) await writeCheckpoint(checkpoint);
   }
-  await reportStatus('finished');
-} catch (error) {
-  await reportStatus(live ? 'held' : 'failed');
-  throw error;
 }
 
 async function reportStatus(status) {

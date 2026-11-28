@@ -18,8 +18,8 @@ expedition_node=${MUSHROOM_EXPEDITION_NODE:-node}
 command -v "$expedition_node" >/dev/null
 export MUSHROOM_EXPEDITION_STAGE="${MUSHROOM_EXPEDITION_STAGE:-adoption}"
 case "$MUSHROOM_EXPEDITION_STAGE" in
-  adoption|stone|iron) ;;
-  *) echo "MUSHROOM_EXPEDITION_STAGE must be adoption, stone or iron" >&2; exit 2 ;;
+  adoption|stone|iron|defense) ;;
+  *) echo "MUSHROOM_EXPEDITION_STAGE must be adoption, stone, iron or defense" >&2; exit 2 ;;
 esac
 
 cd "$(dirname "$0")/.."
