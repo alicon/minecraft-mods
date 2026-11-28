@@ -370,7 +370,7 @@ async function cutScoutingFoothold(action, player, detour) {
   const here = feet(player);
   const volume = await action('get_blocks', { center: here, size: [5, 9, 5], format: 'json' });
   const step = volume && !volume.stats?.unloadedChunks
-    && uphillScoutingStep(volume.cells, here, detour.anchor, detour.rejectedClimbs);
+    && uphillScoutingStep(volume.cells, here, detour.anchor, detour.rejectedClimbs, detour);
   if (!step) return false;
   detour.rejectedClimbs.add(String(step.landing));
   for (const block of step.clear) {
@@ -1331,16 +1331,35 @@ async function reenterQuarry(action, stairs, landing) {
     await stepOut(action, player, visited, entrance, undefined, rejected);
   }
   const retraced = [];
-  for (const [index, tile] of [...stairs.slice(1), landing].entries()) {
+  const route = [...stairs, landing];
+  for (let index = 0; index < stairs.length; index++) {
     const player = await action('observe');
     if (!player?.onGround || player.health < 14) break;
     const here = feet(player);
-    const { cells } = await action('get_blocks', { center: here, size: [5, 7, 5], format: 'json' });
-    const step = dryWaypoint(cells, here, [], tile);
-    if (step?.join(',') !== tile.join(',')) break;
-    const walked = await action('go_to', { pos: tile, stopDistance: 0.3, maxTicks: 45 });
-    if (!walked?.arrived || !await settleOnDryStep(action, tile)) break;
-    retraced.push(stairs[index]);
+    const tile = route[index + 1];
+    const { cells, stats } = await action('get_blocks', { center: here, size: [5, 7, 5], format: 'json' });
+    const reachable = (from, to) => String(dryWaypoint(cells, from, [], to)) === String(to);
+    if (stats?.unloadedChunks || String(here) !== String(route[index]) || !reachable(here, tile)) break;
+    if (await reachQuarryLanding(action, tile, here[1] - tile[1])) {
+      retraced.push(here);
+      continue;
+    }
+    // A walk can settle one stair farther downhill. Keep the marked route only
+    // when the extra stair is still walkable and the player has stopped on it.
+    const next = route[index + 2];
+    if (next && reachable(tile, next) && await settleOnDryStep(action, next, setTimeout, true, 14)) {
+      retraced.push(here, tile);
+      index++;
+      continue;
+    }
+    const stopped = await action('observe');
+    if (!stopped?.onGround || stopped.inWater || stopped.health < 14) break;
+    const [x, y, z] = feet(stopped);
+    // Momentum can also carry the player onto neighboring solid ground at
+    // the same level. Walk back onto the marked stair if both tiles fit.
+    if (y !== tile[1] || Math.abs(x - tile[0]) + Math.abs(z - tile[2]) !== 1
+        || !reachable([x, y, z], tile) || !await reachQuarryLanding(action, tile, 0)) break;
+    retraced.push(here);
   }
   return retraced;
 }
@@ -1514,6 +1533,7 @@ export async function regroupExpeditionCompanion(action, uuid, lastPosition, tra
   const distanceFrom = (first, second) => Math.hypot(...first.map((value, axis) => value - second[axis]));
   const visited = [];
   const rejected = new Set();
+  const rejectedClimbs = new Set();
   let waypointIndex;
   let blocked = 0;
   let heldShieldTicks = 0;
@@ -1559,10 +1579,16 @@ export async function regroupExpeditionCompanion(action, uuid, lastPosition, tra
       && player.threats?.some(entity => entity.type === 'minecraft:creeper' && entity.distance <= 16);
     if (await retreatFromNearbyMob(action, player, visited, rejected, 7, pacedApproach ? 8 : 16)) continue;
     const target = trail[waypointIndex] ?? lastPosition;
-    const ground = waypointIndex >= 0 || Math.hypot(here[0] - target[0], here[2] - target[2]) <= 8
-      ? 'elevation' : 'surface';
+    const nearby = Math.hypot(here[0] - target[0], here[2] - target[2]) <= 8;
+    const uphill = nearby && target[1] - here[1] >= 2;
+    const ground = uphill ? 'uphill' : waypointIndex >= 0 || nearby ? 'elevation' : 'surface';
     visited.push(here);
-    if (await stepOut(action, player, visited, target, ground, rejected, undefined, undefined, pacedApproach ? 12 : 90)) {
+    const walked = await stepOut(action, player, visited, target, ground, rejected, undefined, undefined, pacedApproach ? 12 : 90);
+    // The foothold below the companion must stay intact while cutting a way up.
+    const stopped = !walked && uphill && !pacedApproach ? await action('observe') : undefined;
+    const cut = stopped?.inWorld && !stopped.dead && lastPosition[1] - Math.floor(stopped.position.y) >= 4
+      && await cutScoutingFoothold(action, stopped, { anchor: target, rejectedClimbs, allowCeiling: true });
+    if (walked || cut) {
       blocked = 0;
     } else if (++blocked >= 4) {
       if (waypointIndex < 0) break;
@@ -1785,8 +1811,15 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   const protectedGround = new Set();
   let quarryLanding;
   const reopenQuarry = async (route, landing) => {
-    stairs.push(...await reenterQuarry(action, route, landing));
-    quarryLanding = stairs.length ? feet(await action('observe')) : undefined;
+    const retraced = await reenterQuarry(action, route, landing);
+    const nextLanding = route[retraced.length] ?? landing;
+    if (retraced.length && String(feet(await action('observe'))) === String(nextLanding)) {
+      stairs.push(...retraced);
+      quarryLanding = nextLanding;
+    } else {
+      await leaveQuarry(action, retraced, policy);
+      quarryLanding = undefined;
+    }
     if (quarryLanding) {
       for (const [x, y, z] of [...stairs, quarryLanding]) protectedGround.add(`${x},${y - 1},${z}`);
     }
