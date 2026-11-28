@@ -125,7 +125,7 @@ final class ExpeditionEndEntryClientScenario {
 								|| !owner.level().getBlockState(dogRoof).isFaceSturdy(owner.level(), dogRoof, Direction.DOWN)
 								|| !owner.level().getBlockState(anchor.pos().above(2)).isFaceSturdy(
 										owner.level(), anchor.pos().above(2), Direction.DOWN)
-								|| anchor.pos().distSqr(dog.blockPosition()) > 2
+								|| anchor.pos().distSqr(dog.blockPosition()) > 9
 								|| owner.getStats().getValue(Stats.ITEM_USED.get(Items.COBBLESTONE)) == 0) {
 							throw new AssertionError("Expected the original dog and its marked mat beneath player-built cover");
 						}

@@ -34,7 +34,8 @@ export function planEndCamp(cells, dogPosition, player) {
   for (const mat of neighbors(dog).filter(pos => open(pos) && spaceFromDog(pos))) {
     const roof = [above(dog, 2), above(mat, 2)];
     if (roof.some(pos => at(pos) && !hasDrySupport(at(pos)))) continue;
-    const outside = [...neighbors(dog), ...neighbors(mat)].filter(pos => close(pos, dog) && close(pos, mat));
+    const outside = [player, ...neighbors(dog), ...neighbors(mat)]
+      .filter(pos => close(pos, dog) && close(pos, mat));
     for (const wall of neighbors(dog).filter(pos => close(pos, mat) && canSupportRoof(pos))) {
       for (const side of neighbors(mat).filter(canSupportRoof)) {
         const placements = [...[wall, side].flatMap(pos => [pos, above(pos, 1), above(pos, 2)]), ...roof]
@@ -74,8 +75,10 @@ export async function shelterAtEndArrival(action, uuid, report) {
     await useEmptyHandOnCompanion(action, uuid);
     const stopped = await observeDog();
     assert.deepEqual(stopped && tile(stopped.pos), tile(dog.pos), 'Mushroom moved from the camp footing');
-    const reached = await action('go_to', { pos: plan.entrance, stopDistance: 0.3, maxTicks: 36 });
-    assert.ok(reached?.arrived, 'Could not reach the supported End camp entrance');
+    if (String(owner) !== String(plan.entrance)) {
+      const reached = await action('go_to', { pos: plan.entrance, stopDistance: 0.3, maxTicks: 36 });
+      assert.ok(reached?.arrived, 'Could not reach the supported End camp entrance');
+    }
     if (plan.placements.length) await hold(action, COBBLE);
     for (const pos of plan.placements) {
       let placed;
@@ -87,8 +90,20 @@ export async function shelterAtEndArrival(action, uuid, report) {
     }
     const mat = await markExpeditionCamp(action, plan.mat);
     const parked = await observeDog();
-    assert.deepEqual(parked && tile(parked.pos), tile(stopped.pos), 'Mushroom left the covered End camp');
-    const camp = { mat, shelter: tile(parked.pos) };
+    assert.ok(parked && close(parked.pos, stopped.pos) < 0.75, 'Mushroom left the covered End camp');
+    const shelter = tile(parked.pos);
+    if (String(shelter) !== String(tile(stopped.pos))) {
+      // An entity can slide across a tile boundary while remaining next to
+      // the same post. Check the actual cover before playing away from camp.
+      const roof = offset(shelter, 0, 2, 0);
+      const view = await action('get_blocks', { center: roof, size: [1, 1, 1], format: 'json' });
+      if (!view?.cells.some(cell => hasDrySupport(cell.b))) {
+        await hold(action, COBBLE);
+        assert.equal((await action('place_block', { pos: roof }))?.blockAtPos, COBBLE,
+          'Could not extend the roof over Mushroom’s actual resting spot');
+      }
+    }
+    const camp = { mat, shelter };
     await report('sheltered', { ...camp, health: parked.health });
     return camp;
   }

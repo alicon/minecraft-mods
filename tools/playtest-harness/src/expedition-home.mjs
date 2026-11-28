@@ -480,15 +480,20 @@ async function harvestReachableLog(action, camp, timberSite) {
     .sort((a, b) => Math.hypot(a.pos[0] + 0.5 - x, a.pos[1] + 0.5 - y - 1.62, a.pos[2] + 0.5 - z)
       - Math.hypot(b.pos[0] + 0.5 - x, b.pos[1] + 0.5 - y - 1.62, b.pos[2] + 0.5 - z));
   let candidates = candidatesFrom(await action('scan_blocks', scan), player.position);
-  for (let scouting = 0; !camp && !candidates.length && scouting < (timberSite ? 16 : 8); scouting++) {
+  const initial = player.position;
+  const remembered = timberSite && Math.hypot(timberSite[0] - initial.x, timberSite[2] - initial.z) <= 48
+    && Math.abs(timberSite[1] - initial.y) <= 10 ? timberSite : undefined;
+  const searchLimit = timberSite ? 32 : 8;
+  for (let scouting = 0; !camp && !candidates.length && scouting < searchLimit; scouting++) {
     if (!player?.inWorld || player.dead || player.health < 8) return;
     if (!await retreatFromNearbyMob(action, player, visited, rejected)) {
       const wider = await action('scan_blocks', { ...scan, radius: 32 });
-      const { x, z } = player.position;
+      const { x, y, z } = player.position;
       const target = candidatesFrom(wider, player.position)[0]?.pos
-        ?? (timberSite && Math.hypot(timberSite[0] - x, timberSite[2] - z) > 8 ? timberSite : undefined);
+        ?? (remembered && Math.hypot(remembered[0] - x, remembered[2] - z) > 8 ? remembered : undefined);
       visited.push(feet(player));
-      if (!await stepOut(action, player, visited, target, 'surface', rejected)) return;
+      const terrain = !target && timberSite && y >= 88 ? 'downhill' : 'surface';
+      if (!await stepOut(action, player, visited, target, terrain, rejected)) return;
     }
     player = await action('observe');
     candidates = candidatesFrom(await action('scan_blocks', scan), player.position);
