@@ -238,6 +238,35 @@ test('a hungry player returning with iron eats a carried meal and keeps one for 
   }
 });
 
+test('a connected route to camp takes priority over nearby outbound waypoints', async () => {
+  const { returnToCampWithCompanion } = await import('./expedition-eye-route.mjs');
+  const bed = [18, 64, 0];
+  const trail = [bed, [8, 64, -5], [0, 64, 0]];
+  const ground = [
+    ...Array.from({ length: 19 }, (_, x) => cell(x, 63, 0, 'grass_block')),
+    ...Array.from({ length: 5 }, (_, z) => cell(0, 63, -z - 1, 'grass_block')),
+    ...Array.from({ length: 8 }, (_, x) => cell(x + 1, 63, -5, 'grass_block')),
+  ];
+  let position = { x: 0.5, y: 64, z: 0.5 };
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe': return { inWorld: true, dimension: 'minecraft:overworld', onGround: true,
+        health: 20, food: 20, timeOfDay: 1_000, gameTime: 1_000, position };
+      case 'get_entities': return { entities: [{ uuid: 'original', health: 12, distance: 1,
+        pos: [position.x - 1, 64, 0.5] }] };
+      case 'get_blocks': return { cells: ground };
+      case 'go_to':
+        assert.ok(args.pos[0] > position.x && args.pos[2] === 0, 'Replayed the outbound detour instead of heading to camp');
+        position = { x: args.pos[0] + 0.5, y: args.pos[1], z: args.pos[2] + 0.5 };
+        return { arrived: true, position: Object.values(position) };
+      default: assert.fail(name);
+    }
+  };
+  const { owner, dog } = await returnToCampWithCompanion(action, 'original', bed, trail, { report: async () => {} });
+  assert.ok(Math.abs(owner.position.x - 18.5) <= 4);
+  assert.equal(dog.uuid, 'original');
+});
+
 test('a camp return can climb out of a dry shelf with the original dog', async t => {
   for (const lowerExit of [false, true]) {
     await t.test(lowerExit ? 'the only open step leads back down' : 'there is no open step', async () => {

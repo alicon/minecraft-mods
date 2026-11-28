@@ -133,11 +133,12 @@ async function travelToward(action, target, arrived, maxSteps, travel) {
       }
     }
     const remaining = horizontalDistance(player.position, target);
-    if (target === travel.camp && remaining <= 24 && Math.abs(player.position.y - target.y) <= 8) {
+    const camp = travel.camp;
+    if (camp && horizontalDistance(player.position, camp) <= 24 && Math.abs(player.position.y - camp.y) <= 8) {
       // A narrow view can point at a disconnected clearing. Use the loaded
       // terrain between the player and the bed to check the whole approach.
       const [x, y, z] = feet(player);
-      const center = [Math.floor((target.x + x) / 2), Math.floor((target.y + y) / 2), Math.floor((target.z + z) / 2)];
+      const center = [Math.floor((camp.x + x) / 2), Math.floor((camp.y + y) / 2), Math.floor((camp.z + z) / 2)];
       const volume = await action('get_blocks', { center, size: [35, 15, 35], format: 'json' });
       if (volume && await stepOut(action, player, travel.visited, undefined, 'elevation', travel.rejected,
         undefined, undefined, travel.careReturn ? 40 : 90, { volume, exactTargets: travel.campTiles })) {
@@ -315,8 +316,9 @@ export async function returnToCampWithCompanion(action, uuid, bed, trail = [], {
     for (const [x, y, z] of trail.slice(0, nearby.index + 1).reverse()) {
       const point = { x: x + 0.5, y, z: z + 0.5 };
       if (horizontalDistance(point, camp) > closestHome + 8) continue;
-      const reached = await travelToward(action, point, pos => horizontalDistance(pos, point) <= 2.5 && Math.abs(pos.y - y) <= 1,
-        18, travel);
+      const reached = await travelToward(action, point, pos => atCamp(pos)
+        || (horizontalDistance(pos, point) <= 2.5 && Math.abs(pos.y - y) <= 1), 18, travel);
+      if (reached && atCamp(reached)) break;
       if (reached) closestHome = Math.min(closestHome, horizontalDistance(reached, camp));
     }
   }
