@@ -98,6 +98,22 @@ if needed, then dismiss the credits. Check `EXPEDITION RETURN VERIFIED` in
 chat, then save and reopen the same world and check `EXPEDITION REOPEN VERIFIED`.
 Both assertions require a living dog with the recorded ID and original owner.
 
+For the two-client lead handoff, export a separate disposable world:
+
+```shell
+python3 scripts/smoke-mushroom-bedrock.py SERVER.zip ADDON.mcaddon \
+  --export-expedition-client-lead build/playtest-reports/Mushroom-Lead-Handoff-QA.mcworld
+```
+
+Import it in the host client and join as a second, non-operator Survival
+account. The fixture prepares a harnessed dog and gives each player a lead.
+Use the normal controls to attach and release the owner's lead, then let the
+guest attach a lead, walk Mushroom, and release it. The world reports
+`MUSHROOM_LEAD_HANDOFF_VERIFIED` when the same living dog has completed those
+steps with the original owner. Save and reopen the world, then rejoin with both
+accounts to check `MUSHROOM_LEAD_REOPEN_VERIFIED`. Record both devices, client
+versions, input methods and the join route alongside the result.
+
 ### Mushroom fresh-world Survival adoption
 
 Build [mc-agent-mcp at 3cf75f3](https://github.com/ArchitektSpeer/mc-agent-mcp/tree/3cf75f33ee93b7e999f16dc320ef09f85c2f0de2)

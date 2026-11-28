@@ -34,6 +34,7 @@ EXPEDITION_SHOULDER_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition
 EXPEDITION_DRAGON_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-dragon.js")
 EXPEDITION_VICTORY_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-victory.js")
 EXPEDITION_EXIT_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-client-exit.js")
+EXPEDITION_LEAD_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-expedition-client-lead.js")
 WOODLAND_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-woodland-probe.js")
 FLIGHT_PROBE_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-flight-probe.js")
 AUTOPLAY_SOURCE = PROBE_SOURCE.with_name("mushroom-bedrock-autoplay.js")
@@ -145,6 +146,8 @@ def main():
                         help="stage the final hit and check the native exit opens with the original dog alive")
     parser.add_argument("--export-expedition-client-exit", type=Path,
                         help="also stage victory and write a disposable .mcworld for the native client exit check")
+    parser.add_argument("--export-expedition-client-lead", type=Path,
+                        help="write a disposable .mcworld that verifies lead handoff and reopen with two real clients")
     parser.add_argument("--verify-woodland", action="store_true", help="check squirrel chase, safety and native follow")
     parser.add_argument("--verify-flight", action="store_true", help="run an opt-in simulated-player Creative flight test")
     parser.add_argument("--play-seconds", type=int, help="run seeded simulated-player gameplay for at least this many seconds")
@@ -163,6 +166,23 @@ def main():
         parser.error("--play-seconds must be positive")
     if args.play_case and args.play_seconds is None:
         parser.error("--play-case requires --play-seconds")
+    if args.export_expedition_client_lead:
+        path = args.export_expedition_client_lead
+        if path.suffix != ".mcworld" or path.exists():
+            parser.error("--export-expedition-client-lead must name a new .mcworld path")
+        world = replace(
+            WORLD, name="Mushroom Lead Handoff QA",
+            probe_id="5fb1e147-df0b-4c5a-b6fe-d08c24e9ebd8",
+            script_id="cbe13d71-4c82-45cf-9812-7253b8ddccd3",
+        )
+        with disposable_run(args.failure_evidence, world) as server_dir:
+            prepare_server(args.server_zip, server_dir, world)
+            install_probe(server_dir, world, EXPEDITION_LEAD_SOURCE)
+            install_addon(args.addon, server_dir, world)
+            install_companion_addons(args.with_addon, server_dir, world)
+            exercise_world(server_dir, "MUSHROOM_LEAD_CLIENT_WORLD_READY")
+            export_expedition_client_world(server_dir, world, path)
+        return
     with disposable_run(args.failure_evidence) as server_dir:
         prepare_server(args.server_zip, server_dir, WORLD)
         if args.play_seconds:
