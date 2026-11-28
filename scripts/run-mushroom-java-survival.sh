@@ -95,7 +95,8 @@ if [ "$expedition_result" -ne 0 ]; then
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$expedition_result" >> "$expedition_report/playtest.log"
   exit "$expedition_result"
 fi
-if [ "$expedition_controller" -ne 0 ] && [ "${MUSHROOM_EXPEDITION_LIVE:-0}" != 1 ]; then
+if [ "$expedition_controller" -ne 0 ] && [ "${MUSHROOM_EXPEDITION_LIVE:-0}" != 1 ] \
+  && [ "$(cat "$expedition_owner_file")" = "$expedition_owner" ]; then
   exit "$expedition_controller"
 fi
 if [ ! -f "$MUSHROOM_EXPEDITION_STATUS" ] || [ "$(cat "$MUSHROOM_EXPEDITION_STATUS")" != finished ]; then

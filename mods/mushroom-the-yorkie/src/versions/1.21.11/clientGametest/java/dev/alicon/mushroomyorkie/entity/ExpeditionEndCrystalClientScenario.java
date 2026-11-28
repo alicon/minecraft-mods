@@ -18,6 +18,7 @@ import net.minecraft.stats.Stats;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
@@ -103,7 +104,10 @@ final class ExpeditionEndCrystalClientScenario {
 	static void runGenerated(ClientGameTestContext context, TestServerContext server, UUID ownerId, Path status) throws IOException {
 		boolean cageOnly = "1".equals(System.getenv("MUSHROOM_EXPEDITION_CAGE_ONLY"));
 		boolean tallestOnly = "1".equals(System.getenv("MUSHROOM_EXPEDITION_TALLEST_ONLY"));
-		if (cageOnly && tallestOnly) throw new AssertionError("Select one crystal focus");
+		boolean duelOnly = "1".equals(System.getenv("MUSHROOM_EXPEDITION_DUEL_ONLY"));
+		if ((cageOnly ? 1 : 0) + (tallestOnly ? 1 : 0) + (duelOnly ? 1 : 0) > 1) {
+			throw new AssertionError("Select one End focus");
+		}
 		var camp = server.computeOnServer(minecraft -> {
 			var end = Objects.requireNonNull(minecraft.getLevel(Level.END));
 			var spikes = SpikeFeature.getSpikesForLevel(end);
@@ -121,6 +125,9 @@ final class ExpeditionEndCrystalClientScenario {
 						.max(Comparator.comparingInt(SpikeFeature.EndSpike::getHeight)).orElseThrow();
 				x = tallest.getCenterX() + 19 * Integer.signum(tallest.getCenterX());
 				z = tallest.getCenterZ() + 2;
+			} else if (duelOnly) {
+				x = 18;
+				z = 1;
 			}
 			var ground = end.getChunk(x >> 4, z >> 4);
 			var start = new BlockPos(x, ground.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15) + 1, z);
@@ -145,6 +152,7 @@ final class ExpeditionEndCrystalClientScenario {
 			owner.getInventory().add(new ItemStack(Items.GOLDEN_APPLE, 4));
 			owner.getInventory().add(new ItemStack(Items.COOKED_BEEF, 16));
 			owner.getInventory().add(new ItemStack(Items.DIAMOND_PICKAXE));
+			if (duelOnly) owner.getInventory().add(new ItemStack(Items.DIAMOND_SWORD));
 			owner.getInventory().add(new ItemStack(Items.COBBLESTONE, 64));
 			owner.getInventory().add(new ItemStack(Items.COBBLESTONE, 64));
 			for (int bucket = 0; bucket < 4; bucket++) {
@@ -187,10 +195,15 @@ final class ExpeditionEndCrystalClientScenario {
 				.max(Comparator.comparingDouble(EndCrystal::getY)).orElseThrow().getUUID()) : null;
 		context.waitFor(client -> recordedCrystals.stream().anyMatch(uuid ->
 				client.level.getEntity(uuid) instanceof EndCrystal), 300);
+		if (duelOnly) {
+			context.waitFor(client -> !client.level.getEntities(client.player,
+					client.player.getBoundingBox().inflate(128), entity -> entity instanceof EnderDragon).isEmpty(), 300);
+		}
+		UUID originalDragon = duelOnly ? beginDuel(server, camp, recordedCrystals) : null;
 		Files.writeString(status.resolveSibling("end-crystal-companion"), camp.dogId().toString());
 		Files.writeString(status, "ready");
 		boolean controllerFinished = false;
-		for (int tick = 0; tick < 12_000; tick += 5) {
+		for (int tick = 0; tick < (duelOnly ? 24_000 : 12_000); tick += 5) {
 			String result = Files.readString(status);
 			if ("finished".equals(result)) {
 				controllerFinished = true;
@@ -222,6 +235,13 @@ final class ExpeditionEndCrystalClientScenario {
 			report.addProperty("ownerAlive", owner != null && owner.isAlive());
 			if (owner != null) report.addProperty("bowUses", owner.getStats().getValue(Stats.ITEM_USED.get(Items.BOW)));
 			report.addProperty("dragonKilled", end.getDragonFight().saveData().dragonKilled());
+			if (duelOnly) {
+				report.addProperty("originalDragon", originalDragon.toString());
+				report.addProperty("startingDragonHealth", 200);
+				if (end.getEntity(originalDragon) instanceof EnderDragon dragon) {
+					report.addProperty("remainingDragonHealth", dragon.getHealth());
+				}
+			}
 			report.addProperty("dogId", camp.dogId().toString());
 			report.addProperty("dogLoaded", dog != null);
 			if (dog != null) {
@@ -241,10 +261,15 @@ final class ExpeditionEndCrystalClientScenario {
 				int target = cageOnly || tallestOnly ? 1 : recordedCrystals.size();
 				long missing = recordedCrystals.stream().filter(uuid -> end.getEntity(uuid) == null).count();
 				int remaining = end.getEntitiesOfClass(EndCrystal.class, new AABB(camp.start()).inflate(128)).size();
-				if (!owner.isAlive() || !owner.level().dimension().equals(Level.END) || shots < target
+				if (duelOnly) {
+					if (!owner.isAlive() || !owner.level().dimension().equals(Level.END) || remaining != 0
+							|| !end.getDragonFight().saveData().dragonKilled() || end.getEntity(originalDragon) != null
+							|| !owner.getInventory().contains(stack -> stack.is(Items.DIAMOND_SWORD) && stack.getDamageValue() > 0)) {
+						throw new AssertionError("Expected the full-health native dragon to die after Survival sword strikes");
+					}
+				} else if (!owner.isAlive() || !owner.level().dimension().equals(Level.END) || shots < target
 						|| missing != target || remaining != recordedCrystals.size() - target
-						|| end.getDragonFight().saveData().dragonKilled()
-						|| (tallestOnly && end.getEntity(tallestCrystal) != null)
+						|| end.getDragonFight().saveData().dragonKilled() || (tallestOnly && end.getEntity(tallestCrystal) != null)
 						|| (cageOnly && guardedCrystals.stream().noneMatch(uuid -> end.getEntity(uuid) == null))) {
 					throw new AssertionError("Expected native bow shots to break the selected generated crystals while the dragon lives");
 				}
@@ -253,13 +278,33 @@ final class ExpeditionEndCrystalClientScenario {
 						|| dog.expeditionCamp.anchor() == null || !dog.expeditionCamp.anchor().dimension().equals(Level.END)) {
 					throw new AssertionError("Expected the original unhurt Mushroom at his marked End shelter");
 				}
-				System.out.printf("Expedition native generated %s passed: count=%d arrows=%d dog=%s%n",
-						cageOnly ? "cage" : tallestOnly ? "tallest crystal" : "crystals", target, shots, camp.dogId());
+				if (duelOnly) {
+					System.out.printf("Expedition native full-health dragon passed: dragon=%s dog=%s%n", originalDragon, camp.dogId());
+				} else {
+					System.out.printf("Expedition native generated %s passed: count=%d arrows=%d dog=%s%n",
+							cageOnly ? "cage" : tallestOnly ? "tallest crystal" : "crystals", target, shots, camp.dogId());
+				}
 			});
 			context.takeScreenshot("expedition-survival-generated-end-crystals");
 			return;
 		}
 		throw new AssertionError("The controller did not clear the generated End crystals");
+	}
+
+	private static UUID beginDuel(TestServerContext server, GeneratedCamp camp, Set<UUID> crystals) {
+		return server.computeOnServer(minecraft -> {
+			var end = Objects.requireNonNull(minecraft.getLevel(Level.END));
+			var fight = end.getDragonFight();
+			if (fight.getDragonUUID() == null || !(end.getEntity(fight.getDragonUUID()) instanceof EnderDragon dragon)
+					|| dragon.getHealth() != 200 || fight.saveData().dragonKilled()) {
+				throw new AssertionError("The duel requires the original full-health vanilla dragon");
+			}
+			// Begin immediately after the crystal phase. Keep vanilla AI, health and podium untouched.
+			for (var crystal : end.getEntitiesOfClass(EndCrystal.class, new AABB(camp.start()).inflate(128))) {
+				if (crystals.contains(crystal.getUUID())) crystal.discard();
+			}
+			return dragon.getUUID();
+		});
 	}
 
 	private record GeneratedCamp(BlockPos start, BlockPos shelter, UUID dogId, int dogRuntimeId, float dogHealth) {

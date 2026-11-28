@@ -413,6 +413,17 @@ and the original Mushroom is still unharmed at his marked shelter.
 Set `MUSHROOM_EXPEDITION_TALLEST_ONLY=1` to replay the highest exposed spike.
 The server checks that this specific crystal broke and the other nine,
 dragon, and original Mushroom are still present.
+With the dragon combat bridge patch applied, set
+`MUSHROOM_EXPEDITION_DUEL_ONLY=1` to start a focused native duel. The fixture
+clears the crystals during setup, supplies a sword and rations, and
+verifies the generated vanilla dragon starts at 200 health. The controller
+finds the exit fountain, approaches the visible head on a perch, and
+attempts strikes through the native crosshair. The server verifies the
+dragon died, the sword shows use, and the original dog remains at shelter.
+The duel keeps a separate checkpoint with the marked mat, original dog,
+client identity, and strike count. A replacement controller with
+`MUSHROOM_EXPEDITION_RESUME=1` can take over a held duel in the same world,
+using the same status path and duel flag.
 
 Set `MUSHROOM_EXPEDITION_STAGE=eye-route` to replay using an Eye of Ender
 to choose a route. The disposable fixture supplies one eye, Mushroom, and

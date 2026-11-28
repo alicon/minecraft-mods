@@ -13,6 +13,7 @@ import { canopyLanding, hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
 import { blazePowderCount, craftBlazePowder, earnBlazeRods } from './expedition-blaze-rods.mjs';
 import { clearGeneratedCrystals, shootEndCrystal } from './expedition-end-crystals.mjs';
+import { fightEndDragon } from './expedition-dragon-fight.mjs';
 import { craftEyes, crossEndPortal, enderEyeCount, findStrongholdPortalRoom } from './expedition-end-entry.mjs';
 import { earnEnderPearls } from './expedition-pearls.mjs';
 import {
@@ -239,13 +240,14 @@ await rpc('initialize', {
 try {
   const stage = process.env.MUSHROOM_EXPEDITION_STAGE ?? 'adoption';
   const policy = process.env.MUSHROOM_EXPEDITION_POLICY ?? 'rules';
+  const duel = stage === 'generated-end-crystals' && process.env.MUSHROOM_EXPEDITION_DUEL_ONLY === '1';
   await narrate('Run', `${resume ? 'Reattached to the same save' : 'Started the Survival controller'}. Stage ${stage}, policy ${policy}.`);
   const start = await action('observe');
   const startDimension = ['end-crystal', 'generated-end-crystals'].includes(stage) ? 'minecraft:the_end' : OVERWORLD;
   assert.ok(start?.inWorld && !start.dead && (start.dimension === startDimension
     || (resume && ['nether', 'nether-powder', 'stronghold'].includes(stage) && start.dimension === NETHER)),
   'The controller was not in its expected starting dimension');
-  if (milestoneObjectives[stage]) await narrate('Objective', milestoneObjectives[stage]);
+  if (!duel && milestoneObjectives[stage]) await narrate('Objective', milestoneObjectives[stage]);
   if (stage === 'defense') await runCompanionDrill();
   else if (stage === 'feeding') {
     companion = (await readFile(join(dirname(statusFile), 'feeding-companion'), 'utf8')).trim();
@@ -285,8 +287,42 @@ try {
   } else if (stage === 'end-crystal' || stage === 'generated-end-crystals') {
     companion = (await readFile(join(dirname(statusFile), 'end-crystal-companion'), 'utf8')).trim();
     assert.ok(/^[\da-f-]{36}$/i.test(companion));
-    const camp = await markExpeditionCamp(action);
-    if (stage === 'generated-end-crystals') {
+    const duelFile = join(dirname(statusFile), 'duel-checkpoint.json');
+    let camp;
+    let progress;
+    if (duel && resume) {
+      progress = JSON.parse(await readFile(duelFile, 'utf8'));
+      assert.equal(progress.bridgeFingerprint, bridgeFingerprint);
+      assert.equal(progress.owner, start.name);
+      assert.equal(progress.dog, companion);
+      assert.ok(blockPosition(progress.camp) && Number.isInteger(progress.hits) && progress.hits >= 0);
+      camp = progress.camp;
+      await action('stop');
+      const block = await action('get_blocks', { center: camp, size: [1, 1, 1], format: 'json' });
+      assert.ok(block?.cells.some(cell => cell.b === 'mushroom_yorkie:camp_mat'), 'The marked End mat is missing');
+      const dogs = await action('get_entities', { type: 'mushroom_yorkie:mushroom_yorkie', radius: 128 });
+      assert.ok(dogs?.entities.some(dog => dog.uuid === companion && dog.health > 0), 'The original End companion is missing');
+      await reportStatus('ready');
+    } else {
+      camp = await markExpeditionCamp(action);
+      progress = { bridgeFingerprint, owner: start.name, dog: companion, camp, hits: 0 };
+      if (duel) await writeFile(duelFile, JSON.stringify(progress));
+    }
+    if (duel) {
+      await action('set_reflexes', { autoDefend: false });
+      await narrate('Objective', 'Fight the full-health dragon through native attacks while Mushroom stays in shelter.');
+      await fightEndDragon(action, async (kind, observation) => {
+        console.log(JSON.stringify({ at: new Date().toISOString(), action: `dragon_${kind}`, observation, camp, dog: companion }));
+        if (kind === 'strike') {
+          Object.assign(progress, { dragon: observation.dragon, hits: observation.hits });
+          const next = `${duelFile}-${process.pid}`;
+          await writeFile(next, JSON.stringify(progress));
+          await rename(next, duelFile);
+          await narrate('Action', `Struck the perched dragon at ${observation.before} health.`, 4_000);
+        }
+        if (kind === 'victory') await narrate('Result', 'The native End exit is open.');
+      }, progress);
+    } else if (stage === 'generated-end-crystals') {
       await clearGeneratedCrystals(action, companion, async ({ crystal, position, destroyed, openedCage, highArc }) => {
         console.log(JSON.stringify({ at: new Date().toISOString(), action: openedCage ? 'generated_cage_opened' : 'generated_crystal_shot',
           crystal: crystal.uuid, target: crystal.pos, position, destroyed, openedCage, highArc, camp, dog: companion }));

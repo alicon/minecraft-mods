@@ -13,10 +13,11 @@ const WATER_BUCKET = 'minecraft:water_bucket';
 const END_RATIONS = ['cooked_beef', 'cooked_porkchop', 'cooked_mutton', 'cooked_chicken', 'bread']
   .map(item => `minecraft:${item}`);
 const SPIKE_COUNT = 10;
+const CRYSTAL_WINDOW_TICKS = 11_400;
 const feet = ({ position: { x, y, z } }) => [x, y, z].map(Math.floor);
 const distance = (first, second) => Math.hypot(...first.map((coordinate, axis) => coordinate - second[axis]));
 
-async function dragonBreathThreat(action) {
+export async function dragonBreathThreat(action) {
   const clouds = await action('get_entities', { type: 'minecraft:area_effect_cloud', radius: 14, max: 8 });
   const breath = clouds?.entities.filter(entity => entity.distance < 13) ?? [];
   if (breath.some(entity => entity.distance < 8)) return breath;
@@ -123,12 +124,17 @@ export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = 
   let nextCageAttempt = 0;
   let lastHealth;
   let refugeUntil = 0;
+  let started;
   const goal = cageOnly || tallestOnly ? 1 : SPIKE_COUNT;
 
-  for (let attempt = 0; attempt < 160 && broken.size < goal; attempt++) {
+  // A recovery observation is much cheaper than a shot or a cage climb.
+  // Keep the native time limit independent of the number of brief waits.
+  for (let attempt = 0; attempt < 850 && broken.size < goal; attempt++) {
     const player = await action('observe');
     assert.ok(player?.inWorld && !player.dead && player.dimension === END && player.health >= 4,
       'The player became unsafe while clearing the End crystals');
+    started ??= player.gameTime;
+    if (player.gameTime - started >= CRYSTAL_WINDOW_TICKS) break;
     if (lastHealth - player.health >= 0.5
         && player.threats?.some(threat => threat.type === ENDERMAN && threat.distance <= 5)) {
       refugeUntil = player.gameTime + 180;
