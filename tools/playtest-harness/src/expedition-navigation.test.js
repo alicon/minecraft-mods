@@ -5,6 +5,29 @@ function cell(x, y, z, type = 'grass_block') {
   return { x, y, z, b: `minecraft:${type}` };
 }
 
+test('after adoption the player can sleep in a nearby vanilla bed at night', async () => {
+  const { sleepNearby } = await import('./expedition-home.mjs');
+  const player = { inWorld: true, dimension: 'minecraft:overworld', timeOfDay: 15_000,
+    position: { x: 0.5, y: 1, z: 0.5 } };
+  const interactions = [];
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_blocks': return { cells: [
+        { x: 1, y: 1, z: 0, b: 'mushroom_yorkie:dog_bed' }, cell(2, 1, 0, 'white_bed'),
+      ] };
+      case 'observe': return interactions.length ? { ...player, timeOfDay: 12 } : player;
+      case 'interact_block':
+        interactions.push(args.pos);
+        return { screenOpened: 'InBedChatScreen' };
+      default: throw new Error(`Unexpected action: ${name}`);
+    }
+  };
+  assert.equal(await sleepNearby(action, player), true);
+  assert.deepEqual(interactions, [[2, 1, 0]]);
+  assert.equal(await sleepNearby(async () => assert.fail('Daylight started a sleep action'),
+    { ...player, timeOfDay: 2_000 }), false);
+});
+
 test('night cover requires headroom, a solid roof, and a way out', async () => {
   const { nearestCover } = await import('./expedition-navigation.mjs');
   const alcove = [

@@ -34,6 +34,10 @@ const COOKED_FOOD = ['minecraft:cooked_mutton', 'minecraft:cooked_beef', 'minecr
 const DOG_FOOD = [MUTTON, ...BACKUP_FOOD, ...COOKED_FOOD];
 const FEEDING_SEARCH_RADIUS = 24;
 
+function isBedtime(player) {
+  return player?.dimension === 'minecraft:overworld' && player.timeOfDay >= 12_542 && player.timeOfDay < 23_460;
+}
+
 function count({ slots }, item) {
   return slots.reduce((total, stack) => total + (stack.id === item ? stack.count : 0), 0);
 }
@@ -695,20 +699,54 @@ async function openCampTable(action, table, visited) {
 
 async function takeCover(action) {
   const player = await action('observe');
-  if (!player?.inWorld || player.dead || player.timeOfDay < 12_000 || player.timeOfDay >= 23_500) return;
+  if (!player?.inWorld || player.dead || player.timeOfDay < 12_000 || player.timeOfDay >= 23_500) return false;
   const center = feet(player);
   const area = await action('get_blocks', { center, size: [19, 9, 19], format: 'json' });
   const cover = nearestCover(area.cells, center);
-  if (!cover) return;
+  if (!cover) return false;
   const visited = [];
   const rejected = new Set();
   for (let attempt = 0; attempt < 8; attempt++) {
     const position = await action('observe');
+    if (!position?.inWorld || position.dead) return false;
     const tile = feet(position);
-    if (tile.join(',') === cover.join(',')) return;
+    if (tile.join(',') === cover.join(',')) return true;
     visited.push(tile);
     await stepOut(action, position, visited, cover, undefined, rejected);
   }
+  return false;
+}
+
+export async function sleepNearby(action, player) {
+  if (!isBedtime(player)) return false;
+  const center = feet(player);
+  const area = await action('get_blocks', { center, size: [23, 7, 23], format: 'json' });
+  const beds = area.cells.filter(({ b }) => b.startsWith('minecraft:') && b.endsWith('_bed'))
+    .map(({ x, y, z }) => [x, y, z]);
+  const distance = (from, to) => Math.hypot(...from.map((value, index) => value - to[index]));
+  const bed = beds.filter(pos => distance(center, pos) <= 10)
+    .sort((first, second) => distance(center, first) - distance(center, second))[0];
+  if (!bed) return false;
+  const visited = [];
+  const rejected = new Set();
+  for (let approach = 0; approach < 6; approach++) {
+    const current = await action('observe');
+    if (!current?.inWorld || current.dead || !isBedtime(current)) return false;
+    const here = feet(current);
+    if (distance(here, bed) <= 3) {
+      const response = await action('interact_block', { pos: bed, face: 'up' });
+      if (response?.screenOpened !== 'InBedChatScreen') return false;
+      for (let check = 0; check < 24; check++) {
+        await setTimeout(500);
+        const woke = await action('observe');
+        if (woke?.inWorld && !woke.screen) return woke.timeOfDay <= 1_200;
+      }
+      return false;
+    }
+    visited.push(here);
+    await stepOut(action, current, visited, bed, undefined, rejected);
+  }
+  return false;
 }
 
 export async function recoverDroppedLoadout(action, destination) {
@@ -719,6 +757,7 @@ export async function recoverDroppedLoadout(action, destination) {
   for (let attempt = 0; attempt < 100; attempt++) {
     const player = await action('observe');
     assert.ok(player?.inWorld && !player.dead && player.health >= 10, 'The return to the dropped gear became unsafe');
+    if (attempt === 0 && await sleepNearby(action, player)) continue;
     const here = feet(player);
     if (Math.hypot(...destination.map((coordinate, axis) => coordinate - here[axis])) <= 5) {
       const { entities } = await action('get_entities', { type: 'item', radius: 8 });
@@ -758,12 +797,17 @@ export async function earnStoneKit(action, craft, { table, bed },
   const protectedGround = new Set();
   let missedStone = 0;
   let abandonedQuarries = 0;
+  let nextSleepCheck = 0;
   for (let attempt = 0; attempt < 70; attempt++) {
     const inventory = await action('get_inventory');
     const needed = count(inventory, FURNACE) ? 3 : 11;
     if (count(inventory, COBBLESTONE) >= needed) break;
     const player = await action('observe');
     if (beforeNight && (player.timeOfDay >= 11_000 || player.health < 14)) break;
+    if (!beforeNight && !stairs.length && isBedtime(player) && player.gameTime >= nextSleepCheck) {
+      nextSleepCheck = player.gameTime + 300;
+      if (await sleepNearby(action, player)) continue;
+    }
     if (!inventory.slots.some(stack => stack.id === PICKAXE && durability(stack) > 5)) {
       const needsSticks = count(inventory, 'minecraft:stick') < 2;
       await ensurePlanks(action, craft, needsSticks ? 9 : 7);
@@ -870,6 +914,8 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
   let misses = 0;
   let quarries = 0;
   let madeBackup = false;
+  let nextSleepCheck = 0;
+  let nextCoverCheck = 0;
   const triedFoodSources = new Set();
   for (let attempt = 0; attempt < 190; attempt++) {
     const inventory = await action('get_inventory');
@@ -886,6 +932,22 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       await hold(action, STONE_PICKAXE);
     }
     const player = await action('observe');
+    if (!stairs.length && isBedtime(player) && player.gameTime >= nextSleepCheck) {
+      nextSleepCheck = player.gameTime + 300;
+      if (await sleepNearby(action, player)) continue;
+    }
+    if (!stairs.length && player.health < 8 && isBedtime(player) && player.gameTime >= nextCoverCheck) {
+      nextCoverCheck = player.gameTime + 300;
+      if (await takeCover(action)) {
+        for (let watch = 0; watch < 24; watch++) {
+          await setTimeout(500);
+          const resting = await action('observe');
+          if (!resting?.inWorld || resting.dead || !isBedtime(resting) || resting.health >= 8
+              || resting.threats?.some(threat => threat.distance < 5)) break;
+        }
+        continue;
+      }
+    }
     const meal = [...COOKED_FOOD, ...BACKUP_FOOD].find(item => count(inventory, item))
       ?? (count(inventory, MUTTON) > (player.health < 14 || player.food <= 12 ? 0 : 1) ? MUTTON : undefined);
     if (player.food < 20 && (player.food <= 16 || player.health < 14) && meal) {
