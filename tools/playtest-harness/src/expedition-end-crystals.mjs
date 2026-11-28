@@ -16,14 +16,16 @@ async function dragonBreathThreat(action) {
   const clouds = await action('get_entities', { type: 'minecraft:area_effect_cloud', radius: 14, max: 8 });
   const breath = clouds?.entities.filter(entity => entity.distance < 13) ?? [];
   if (breath.some(entity => entity.distance < 8)) return breath;
-  const shots = await action('get_entities', { type: 'minecraft:dragon_fireball', radius: 30, max: 8 });
-  const fireballs = shots?.entities.filter(entity => entity.distance < 28) ?? [];
+  // The fireball can reach the player while a full bow draw is in progress.
+  const shots = await action('get_entities', { type: 'minecraft:dragon_fireball', radius: 42, max: 8 });
+  const fireballs = shots?.entities ?? [];
   return fireballs.length ? [...fireballs, ...breath] : null;
 }
 
 async function fireAtCrystal(action, shot, radius, startingHealth) {
   await hold(action, BOW);
   if (!await action('look', shot.aim)) return null;
+  if (Number.isFinite(startingHealth) && await dragonBreathThreat(action)) return undefined;
   const fired = await action('use_item', { ticks: 24 });
   if (!fired?.completed) return null;
   const interrupted = Number.isFinite(startingHealth) && fired.health <= startingHealth - 3;
@@ -143,13 +145,14 @@ export async function clearGeneratedCrystals(action, uuid, report, { cageOnly = 
         && Math.hypot(player.position.x - vantage[0] - 0.5, player.position.z - vantage[2] - 0.5) <= 0.65;
     });
     if (shot && (firing || detourSteps === 0)) {
-      positionsTried.add(shot.key);
       if (firing) {
         const height = firing.heights[(misses.get(shot.crystal.uuid) ?? 0) % firing.heights.length];
         shot.aim = bowAim(player, [shot.crystal.pos[0], shot.crystal.pos[1] + height, shot.crystal.pos[2]]);
         assert.ok(shot.aim, 'The surveyed crystal shot is out of range');
       }
       const destroyed = await fireAtCrystal(action, shot, 128, player.health);
+      if (destroyed === undefined) continue;
+      positionsTried.add(shot.key);
       await report({ crystal: shot.crystal, position: here, destroyed: Boolean(destroyed) });
       if (destroyed) broken.add(destroyed);
       else {

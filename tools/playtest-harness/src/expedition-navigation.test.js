@@ -380,6 +380,42 @@ test('the respawn route can verify the original live companion when the guide is
   assert.equal(await recoverDroppedLoadout(action, [10, 64, 10], { companionUuid }), 'companion');
 });
 
+test('recovery widens its distance from pursuing zombies before returning to gear', async () => {
+  const { recoverDroppedLoadout } = await import('./expedition-home.mjs');
+  const zombie = { id: 36, type: 'minecraft:zombie', pos: [8.2, 64, 0.5], distance: 7.7, hostile: true };
+  const guide = 'mushroom_yorkie:field_guide';
+  const floor = Array.from({ length: 9 }, (_, x) => cell(-x, 63, 0));
+  let retreated = false;
+  let collected = false;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe':
+        return { inWorld: true, health: 20, threats: retreated ? [] : [zombie],
+          position: { x: retreated ? -5.5 : 0.5, y: 64, z: 0.5 } };
+      case 'get_entities':
+        return { entities: args.type === 'item'
+          ? [{ id: 80, item: { id: guide }, pos: [-5, 64, 0] }] : [zombie] };
+      case 'get_blocks':
+        return { cells: floor };
+      case 'go_to':
+        if (args.pos) {
+          assert.ok(args.pos[0] < 0);
+          retreated = true;
+          return { arrived: true, position: args.pos };
+        }
+        assert.ok(retreated);
+        assert.equal(args.entityId, 80);
+        collected = true;
+        return { arrived: true };
+      case 'get_inventory':
+        return { slots: collected ? [{ id: guide, count: 1 }] : [] };
+      default:
+        assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  assert.equal(await recoverDroppedLoadout(action, [-5, 64, 0]), 'guide');
+});
+
 test('a gear recovery with low health stops before approaching the old death location', async () => {
   const { recoverDroppedLoadout } = await import('./expedition-home.mjs');
   await assert.rejects(recoverDroppedLoadout(async name => {
@@ -596,6 +632,7 @@ test('a feeding attempt walks away from a zombie before offering the meal', asyn
   const dog = { id: 22, uuid: 'original', pos: [-7.5, 1, 0.5], distance: 1 };
   let retreated = false;
   let meals = 1;
+  const reflexChanges = [];
   const action = async (name, args) => {
     switch (name) {
       case 'observe':
@@ -604,11 +641,16 @@ test('a feeding attempt walks away from a zombie before offering the meal', asyn
       case 'get_inventory':
         return { mainHand: { id: 'minecraft:mutton' }, slots: [{ id: 'minecraft:mutton', count: meals }] };
       case 'get_entities':
-        return { entities: args.type === threat.type ? [threat] : [dog] };
+        return { entities: args.type ? [dog] : [threat] };
+      case 'set_reflexes':
+        if (args) reflexChanges.push(args.interruptOnDamage);
+        return { interruptOnDamage: true };
       case 'get_blocks':
         return { cells: Array.from({ length: 10 }, (_, x) => cell(-x, 0, 0)) };
       case 'go_to':
         assert.ok(args.pos[0] < 0);
+        assert.equal(args.maxTicks, 40);
+        assert.deepEqual(reflexChanges, [false]);
         retreated = true;
         return { arrived: true, position: [-8.5, 1, 0.5] };
       case 'look':
@@ -624,6 +666,7 @@ test('a feeding attempt walks away from a zombie before offering the meal', asyn
   };
   assert.equal(await feedAdoptedDog(action, dog.uuid, [0, 1, 0], 2), true);
   assert.equal(meals, 0);
+  assert.deepEqual(reflexChanges, [false, true]);
 });
 
 test('a rock blocking the feeding approach is mined with a pickaxe before offering the meal', async () => {

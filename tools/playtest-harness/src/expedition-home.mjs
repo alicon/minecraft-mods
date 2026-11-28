@@ -269,19 +269,33 @@ export async function stepOut(action, player, visited, destination, preferredGro
   return !wrongHeight && moved;
 }
 
-export async function retreatFromNearbyMob(action, player, visited, rejectedSteps) {
+export async function retreatFromNearbyMob(action, player, visited, rejectedSteps, warningDistance = 7) {
   // A scouting walk can cover ten blocks before the next observation.
-  const threat = player.threats?.find(entity => entity.distance <= (entity.type === 'minecraft:creeper' ? 16 : 7)
+  const threat = player.threats?.find(entity => entity.distance <= (entity.type === 'minecraft:creeper' ? 16 : warningDistance)
     && (entity.type !== 'minecraft:spider' || isBedtime(player) || entity.distance <= 3));
   if (!threat) return false;
-  const nearby = await action('get_entities', { type: threat.type, radius: 18, max: 16 });
+  const pursuit = threat.distance < (warningDistance > 7 ? 7 : 3) && threat.type !== 'minecraft:creeper';
+  const surveyGroup = pursuit || warningDistance > 7;
+  const nearby = await action('get_entities', surveyGroup
+    ? { radius: warningDistance + 1, max: 96 } : { type: threat.type, radius: 18, max: 16 });
   const danger = nearby?.entities.find(entity => entity.id === threat.id && entity.hostile);
   if (!danger) return false;
+  const hazards = surveyGroup
+    ? nearby.entities.filter(entity => entity.hostile && entity.distance <= warningDistance).map(entity => entity.pos)
+    : danger.pos;
   const here = feet(player);
   const away = [here[0] + 8 * Math.sign(player.position.x - danger.pos[0]), here[1],
     here[2] + 8 * Math.sign(player.position.z - danger.pos[2])];
   visited.push(here);
-  if (await stepOut(action, player, visited, away, undefined, rejectedSteps, undefined, danger.pos)) return true;
+  // A blow while running should not leave the player standing next to the pursuer.
+  const restoreInterrupt = pursuit && (await action('set_reflexes'))?.interruptOnDamage;
+  if (restoreInterrupt) await action('set_reflexes', { interruptOnDamage: false });
+  try {
+    if (await stepOut(action, player, visited, away, undefined, rejectedSteps, undefined, hazards,
+      pursuit ? 40 : 90)) return true;
+  } finally {
+    if (restoreInterrupt) await action('set_reflexes', { interruptOnDamage: true });
+  }
   if (threat.type !== 'minecraft:creeper') return false;
   await action('stop');
   await setTimeout(250);
@@ -1121,10 +1135,25 @@ export async function recoverDroppedLoadout(action, destination, { reserveMeal =
   const rejectedSteps = new Set();
   let stalled = 0;
   let detours = 0;
+  let healingChecks = 0;
+  let blockedRetreats = 0;
   for (let attempt = 0; attempt < 100; attempt++) {
     const player = await action('observe');
     assert.ok(player?.inWorld && !player.dead, 'The return to the dropped gear became unsafe');
-    if (await retreatFromNearbyMob(action, player, visited, rejectedSteps)) continue;
+    if (await retreatFromNearbyMob(action, player, visited, rejectedSteps, 14)) {
+      blockedRetreats = 0;
+      continue;
+    }
+    if (player.threats?.some(threat => threat.distance <= 10 && threat.type !== 'minecraft:enderman')) {
+      if (++blockedRetreats >= 4) break;
+      continue;
+    }
+    blockedRetreats = 0;
+    if (player.health < 10 && player.food >= 18 && player.onGround
+        && !player.threats?.some(threat => threat.distance <= 10) && healingChecks++ < 30) {
+      await setTimeout(400);
+      continue;
+    }
     assert.ok(player.health >= 10, 'The return to the dropped gear became unsafe');
     if (attempt === 0 && await sleepNearby(action, player)) continue;
     if (reserveMeal && player.food <= 16 && player.health < 18) {

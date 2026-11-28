@@ -59,16 +59,18 @@ test('the crystal run takes a dry route away from an incoming dragon fireball be
   const escape = new Error('Observed a retreat along dry ground');
   const dog = { uuid: 'original', health: 12, pos: [0, 60, 8] };
   const crystal = { uuid: 'distant-crystal', pos: [24, 80, 0] };
-  const arrow = { distance: 12, pos: [12.5, 61, 0.5] };
+  const fireball = { distance: 29.91, pos: [30.41, 60, 0.5] };
   const changes = [];
   const action = async (name, args) => {
     if (name === 'observe') return { inWorld: true, health: 20, dimension: 'minecraft:the_end', onGround: true,
       position: { x: 0.5, y: 60, z: 0.5 } };
     if (name === 'get_entities') {
+      if (args.type === 'minecraft:dragon_fireball') {
+        return { entities: args.radius >= fireball.distance ? [fireball] : [] };
+      }
       const entities = {
         'mushroom_yorkie:mushroom_yorkie': [dog],
         'minecraft:end_crystal': [crystal],
-        'minecraft:dragon_fireball': [arrow],
       };
       return { entities: entities[args.type] ?? [] };
     }
