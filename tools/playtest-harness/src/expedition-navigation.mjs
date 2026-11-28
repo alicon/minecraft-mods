@@ -168,6 +168,37 @@ export function nearestCover(cells, start) {
   return candidates.sort((a, b) => a.travel - b.travel)[0]?.pos ?? null;
 }
 
+export function planEmergencyDugout(cells, [x, y, z]) {
+  const blocks = new Map(cells.map(({ x, y, z, b }) => [String([x, y, z]), b]));
+  const block = pos => blocks.get(String(pos));
+  const dig = [1, 2, 3].map(depth => [x, y - depth, z]);
+  if (!dig.every(pos => QUARRY_BLOCK.test(block(pos) ?? ''))
+      || !SHELTER_BLOCK.test(block([x, y - 4, z]) ?? '')
+      || !CARDINAL.every(([dx, dz]) => dig.every(([, height]) =>
+        SHELTER_BLOCK.test(block([x + dx, height, z + dz]) ?? '')))) return null;
+
+  const opened = new Set(dig.map(String));
+  const exposedNeighbors = [[0, 0, 0], [0, 1, 0], ...CARDINAL.map(([dx, dz]) => [dx, 0, dz])];
+  for (const [dx, dz] of CARDINAL) {
+    const exit = [];
+    let previous = [x, y - 3, z];
+    for (let step = 1; step <= 3; step++) {
+      const landing = [x + dx * step, y - 3 + step, z + dz * step];
+      const [lx, ly, lz] = landing;
+      const footprint = [[lx, ly - 1, lz], landing, [lx, ly + 1, lz], [previous[0], ly + 1, previous[2]]];
+      if (!SHELTER_BLOCK.test(block(footprint[0]) ?? '')
+          || footprint.slice(1).some(pos => !gap(block(pos)) && !QUARRY_BLOCK.test(block(pos) ?? ''))) break;
+      const clear = footprint.slice(1).filter(pos => !opened.has(String(pos)) && !gap(block(pos)));
+      if (clear.some(([bx, by, bz]) => exposedNeighbors
+        .some(([ox, oy, oz]) => QUARRY_HAZARD.test(block([bx + ox, by + oy, bz + oz]) ?? '')))) break;
+      exit.push({ landing, clear });
+      previous = landing;
+    }
+    if (exit.length === 3) return { dig, floor: [x, y - 3, z], cap: dig[0], exit };
+  }
+  return null;
+}
+
 function quarryBlock(id, masonry) {
   return QUARRY_BLOCK.test(id ?? '') || (masonry && STRONGHOLD_MASONRY.test(id ?? ''));
 }

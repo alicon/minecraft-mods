@@ -222,7 +222,10 @@ player looks for shelter and can sleep until daylight in a carried bed. If the
 pair gets separated, the player checks for the original dog at longer range and
 regroups before continuing to wait or travel. An injured player under fire
 faces the archer and uses a carried shield before attempting another exposed
-step toward the dog.
+step toward the dog. At critical health, it can dig and cap a shallow shelter
+when the observed terrain has solid walls, a floor and a climbable exit. The
+controller checks the landing at each level and waits for daylight and a clear
+approach before reopening the exit.
 The first mined iron goes back to the camp bed before smelting. Both trips
 can retrace grounded positions recorded on the outbound path. The iron trip
 uses positions from before the first ore pickup. The trace records the

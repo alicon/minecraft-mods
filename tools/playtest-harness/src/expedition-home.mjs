@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { setTimeout } from 'node:timers/promises';
 import {
   bedSpotsWithGroundCover, dryStepKey, dryWaypoint, exitObstruction, hasDrySupport, hasPlacedBed, nearbyBuildingSpots,
-  missingQuarryExitSupport, nearestCover, quarryLandingIsClear, quarryStep, uphillScoutingStep, waterExitWaypoint,
+  missingQuarryExitSupport, nearestCover, planEmergencyDugout, quarryLandingIsClear, quarryStep, uphillScoutingStep, waterExitWaypoint,
 } from './expedition-navigation.mjs';
 import { cookExpeditionMutton, makeExpeditionCharcoal, smeltExpeditionIron } from './expedition-furnace.mjs';
 import { enterShelter, findShelteredBed, useShelterDoor } from './expedition-shelter.mjs';
@@ -1092,12 +1092,12 @@ export async function mineVisible(action, bed, alreadyMined, wanted, drops, prot
   return false;
 }
 
-export async function settleOnDryStep(action, landing, wait = setTimeout, confirmStopped = false) {
+export async function settleOnDryStep(action, landing, wait = setTimeout, confirmStopped = false, minimumHealth = 8) {
   const target = landing.join(',');
   let previous;
   for (let attempt = 0; attempt < (confirmStopped ? 14 : 8); attempt++) {
     const player = await action('observe');
-    if (!player?.inWorld || player.dead || player.health < 8 || player.inWater) return false;
+    if (!player?.inWorld || player.dead || player.health < minimumHealth || player.inWater) return false;
     if (player.onGround && feet(player).join(',') === target) {
       const { x, z } = player.position;
       if (!confirmStopped || (previous && Math.hypot(x - previous.x, z - previous.z) < 0.025)) return true;
@@ -1428,6 +1428,58 @@ export async function waitForDaylightRecovery(action, bed, report, protectCompan
   throw new Error('Could not reach daylight safely before the reunion');
 }
 
+export async function shelterUnderRangedFire(action, player) {
+  if (!player.onGround || player.inWater) return false;
+  const here = feet(player);
+  const volume = await action('get_blocks', { center: here, size: [9, 11, 9], format: 'json' });
+  const plan = volume && !volume.stats?.unloadedChunks && planEmergencyDugout(volume.cells, here);
+  if (!plan) return false;
+  const stock = await action('get_inventory');
+  const material = [COBBLESTONE, 'minecraft:dirt'].find(item => count(stock, item) > 0);
+  if (!material) return false;
+
+  const [x, , z] = here;
+  let aligned = player;
+  for (let adjustment = 0; ; adjustment++) {
+    if (!aligned?.inWorld || aligned.dead || aligned.health < player.health || String(feet(aligned)) !== String(here)) return false;
+    const dx = x + 0.5 - aligned.position.x;
+    const dz = z + 0.5 - aligned.position.z;
+    if (Math.max(Math.abs(dx), Math.abs(dz)) <= 0.15) break;
+    if (adjustment >= 4) return false;
+    await action('move', { yaw: Math.atan2(-dx, dz) * 180 / Math.PI, forward: true, ticks: 2 });
+    aligned = await action('observe');
+  }
+  const settle = landing => settleOnDryStep(action, landing, setTimeout, false, player.health);
+  for (const block of plan.dig) {
+    assert.ok((await breakVisible(action, block))?.broken && await settle(block),
+      'Could not reach verified footing in the emergency dugout');
+  }
+  await hold(action, material);
+  assert.equal((await action('place_block', { pos: plan.cap }))?.blockAtPos, material,
+    'Could not close the top of the emergency dugout');
+  let safeToLeave = false;
+  for (let check = 0; check < 600; check++) {
+    const hidden = await action('observe');
+    assert.ok(hidden?.inWorld && !hidden.dead && hidden.health >= player.health
+      && String(feet(hidden)) === String(plan.floor), 'The dugout did not keep the player safe');
+    if (hidden.timeOfDay < 12_000 && !hidden.threats?.some(threat => threat.distance <= 16)) {
+      safeToLeave = true;
+      break;
+    }
+    await setTimeout(2_500);
+  }
+  assert.ok(safeToLeave, 'The emergency dugout exit stayed unsafe through daylight');
+  assert.ok((await breakVisible(action, plan.cap))?.broken, 'Could not reopen the emergency dugout');
+  for (const { landing, clear } of plan.exit) {
+    for (const block of clear) {
+      assert.ok((await breakVisible(action, block))?.broken, 'Could not clear the emergency exit stair');
+    }
+    const moved = await action('go_to', { pos: landing, stopDistance: 0.3, maxTicks: 35 });
+    assert.ok(moved?.arrived && await settle(landing), 'Could not climb the emergency exit stair');
+  }
+  return true;
+}
+
 export async function regroupExpeditionCompanion(action, uuid, lastPosition, trail = []) {
   const distanceFrom = (first, second) => Math.hypot(...first.map((value, axis) => value - second[axis]));
   const visited = [];
@@ -1443,6 +1495,7 @@ export async function regroupExpeditionCompanion(action, uuid, lastPosition, tra
     if (dog?.distance <= 6 && Math.abs(dog.pos[1] - player.position.y) <= 3) return dog;
     const archer = player.threats?.find(threat => threat.distance <= 18
       && /:(?:skeleton|stray|bogged|parched)$/.test(threat.type));
+    if (player.health <= 5 && archer && await shelterUnderRangedFire(action, player)) continue;
     if (player.health < 12 && archer && !player.threats.some(threat => threat.distance < 6)) {
       const shieldPulse = 96;
       assert.ok(heldShieldTicks + shieldPulse <= 6_000, 'The archer kept the regroup route under fire');

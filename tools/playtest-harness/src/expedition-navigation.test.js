@@ -370,6 +370,81 @@ test('a wounded owner faces the archer with an offhand shield before taking a st
   assert.ok(reunited);
 });
 
+test('an emergency dugout requires solid ground and leaves a three-step exit after its cap is removed', async () => {
+  const { planEmergencyDugout } = await import('./expedition-navigation.mjs');
+  const terrain = [];
+  for (let x = -3; x <= 3; x++) {
+    for (let z = -3; z <= 3; z++) {
+      for (let y = 60; y < 64; y++) terrain.push(cell(x, y, z, 'stone'));
+    }
+  }
+  const plan = planEmergencyDugout(terrain, [0, 64, 0]);
+  assert.deepEqual(plan.dig, [[0, 63, 0], [0, 62, 0], [0, 61, 0]]);
+  assert.deepEqual(plan.floor, [0, 61, 0]);
+  assert.deepEqual(plan.cap, [0, 63, 0]);
+  assert.deepEqual(plan.exit.map(step => step.landing), [[1, 62, 0], [2, 63, 0], [3, 64, 0]]);
+  assert.ok(plan.exit.every(step => step.clear.every(block => String(block) !== String(plan.cap))));
+  const flooded = terrain.map(block => block.x === 0 && block.z === 0 && block.y === 60
+    ? cell(0, 60, 0, 'lava') : block);
+  assert.equal(planEmergencyDugout(flooded, [0, 64, 0]), null);
+});
+
+test('an off-center player uses a short movement input before digging and waits under the cap', async () => {
+  const { shelterUnderRangedFire } = await import('./expedition-home.mjs');
+  const terrain = new Map();
+  for (let x = -3; x <= 3; x++) {
+    for (let z = -3; z <= 3; z++) {
+      for (let y = 60; y < 64; y++) terrain.set(String([x, y, z]), cell(x, y, z, 'stone'));
+    }
+  }
+  let position = { x: 0.82, y: 64, z: 0.25 };
+  const player = { inWorld: true, health: 1, onGround: true, position };
+  let aim;
+  let centered = false;
+  let covered = false;
+  let selectedSlot = 0;
+  const slots = [{ slot: 0, id: 'minecraft:stone_pickaxe', count: 1, maxDamage: 131 },
+    { slot: 1, id: 'minecraft:cobblestone', count: 3 }];
+  const ascents = [];
+  const action = async (name, args) => {
+    switch (name) {
+      case 'get_blocks': return { cells: [...terrain.values()] };
+      case 'get_inventory': return { slots, mainHand: slots[selectedSlot] };
+      case 'select_slot': selectedSlot = args.slot; return { mainHand: slots[selectedSlot] };
+      case 'move':
+        assert.deepEqual({ ticks: args.ticks, forward: args.forward }, { ticks: 2, forward: true });
+        position = { x: 0.5, y: 64, z: 0.5 };
+        centered = true;
+        return {};
+      case 'look': aim = args.at; return {};
+      case 'observe': return { ...player, position, timeOfDay: covered ? 1_000 : 18_000,
+        crosshair: aim && { pos: aim, block: terrain.get(String(aim))?.b } };
+      case 'break_block':
+        assert.ok(centered && terrain.delete(String(args.pos)));
+        if (args.pos[0] === 0 && args.pos[2] === 0 && args.pos[1] === position.y - 1) {
+          position = { ...position, y: args.pos[1] };
+        }
+        return { broken: true };
+      case 'place_block':
+        assert.equal(position.y, 61);
+        assert.deepEqual(args.pos, [0, 63, 0]);
+        assert.equal(slots[selectedSlot].id, 'minecraft:cobblestone');
+        terrain.set(String(args.pos), cell(...args.pos, 'cobblestone'));
+        covered = true;
+        return { blockAtPos: 'minecraft:cobblestone' };
+      case 'go_to':
+        assert.ok(covered && args.stopDistance >= 0.3);
+        assert.equal(terrain.has('0,63,0'), false);
+        ascents.push(args.pos[1]);
+        position = { x: args.pos[0] + 0.5, y: args.pos[1], z: args.pos[2] + 0.5 };
+        return { arrived: true };
+      default: assert.fail(name);
+    }
+  };
+  assert.equal(await shelterUnderRangedFire(action, player), true);
+  assert.deepEqual(ascents, [62, 63, 64]);
+});
+
 test('a creeper at fourteen blocks diverts the next scouting walk before the fuse', async () => {
   const { retreatFromNearbyMob } = await import('./expedition-home.mjs');
   const player = { position: { x: 0.5, y: 64, z: 0.5 }, timeOfDay: 5_850, health: 16,
