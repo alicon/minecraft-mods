@@ -5,7 +5,7 @@ import { dirname, isAbsolute, join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import {
   adoptAtNight, earnIronKit, earnStoneKit, feedAdoptedDog, forageExpeditionMeal, prepareAdoptionCamp,
-  hold, placeBeside, recoverDroppedLoadout, WOOD_LOGS,
+  ensurePlanks, hold, placeBeside, recoverDroppedLoadout, WOOD_LOGS,
 } from './expedition-home.mjs';
 import { hasDrySupport } from './expedition-navigation.mjs';
 import { defendCompanion } from './expedition-companion.mjs';
@@ -232,8 +232,6 @@ async function runExpedition(start, stage) {
       for (const pos of site) {
         assert.ok(blockPosition(pos), 'Invalid recorded camp');
       }
-    } else {
-      assert.equal(inventory.slots.length, 0, 'Starter recovery requires an empty inventory');
     }
     assert.ok(checkpoint.quarry === undefined
       || (Array.isArray(checkpoint.quarry) && checkpoint.quarry.length <= 44 && checkpoint.quarry.every(blockPosition)),
@@ -363,7 +361,7 @@ async function waitForCoaching(context) {
   return false;
 }
 
-async function gatherStarterTools(start) {
+async function collectStarterLogs(start) {
   const scanArgs = {
     blocks: WOOD_LOGS,
     radius: 16,
@@ -385,6 +383,7 @@ async function gatherStarterTools(start) {
     const mined = await action('break_block', { pos, maxTicks: 100 });
     assert.ok(mined?.broken, `Could not mine the log at ${pos}`);
   }
+  await recoverLooseLogs();
   async function logCount() {
     const inventory = await action('get_inventory');
     return inventory.slots.filter(stack => stack.id === trunk.name)
@@ -399,12 +398,34 @@ async function gatherStarterTools(start) {
       await walk(trunk.logs[0], 0.3);
       await setTimeout(300);
     }
-    assert.ok(await logCount() >= 3, 'The player did not pick up three logs');
   }
+}
 
-  await craft(trunk.name.replace(/_log$/, '_planks'), 12);
-  await craft('stick', 4);
-  await craft('crafting_table', 1);
+async function recoverLooseLogs() {
+  const loose = await action('get_entities', { type: 'item', radius: 6 });
+  for (const entity of loose?.entities.filter(item => WOOD_LOGS.includes(item.item?.id.replace(/^minecraft:/, ''))) ?? []) {
+    await action('go_to', { entityId: entity.id, stopDistance: 0.3, maxTicks: 40 });
+  }
+}
+
+async function gatherStarterTools(start) {
+  const stock = await action('get_inventory');
+  const amount = item => stock.slots.reduce((total, stack) => total + (stack.id === item ? stack.count : 0), 0);
+  const tools = [['wooden_pickaxe', 3, 2], ['wooden_sword', 2, 1]]
+    .filter(([item]) => !amount(`minecraft:${item}`));
+  const needsTable = !amount('minecraft:crafting_table');
+  const needsSticks = amount('minecraft:stick') < tools.reduce((total, [, , cost]) => total + cost, 0);
+  const planks = tools.reduce((total, [, cost]) => total + cost, 0) + (needsTable ? 4 : 0) + (needsSticks ? 2 : 0);
+  if (!planks) return;
+
+  const hasWood = stock.slots.some(stack => /_(?:log|planks)$/.test(stack.id));
+  if (!hasWood) await collectStarterLogs(start);
+  else await recoverLooseLogs();
+  await ensurePlanks(action, craft, planks);
+  if (needsSticks) await craft('stick', 4);
+  if (needsTable) await craft('crafting_table', 1);
+  if (!tools.length) return;
+
   let player = await action('observe');
   for (let descent = 0; descent < 6; descent++) {
     const lower = await descendFromCanopy(player);
@@ -432,8 +453,7 @@ async function gatherStarterTools(start) {
     if (!placed?.placed || placed.blockAtPos !== 'minecraft:crafting_table') continue;
     const opened = await action('interact_block', { pos });
     assert.equal(opened?.screenOpened, 'CraftingScreen');
-    await craft('wooden_pickaxe', 1);
-    await craft('wooden_sword', 1);
+    for (const [item] of tools) await craft(item, 1);
     await action('stop', { closeScreen: true });
     assert.ok((await action('break_block', { pos, maxTicks: 100 }))?.broken, 'Could not pack up the crafting table');
     await walk(pos, 0.3);

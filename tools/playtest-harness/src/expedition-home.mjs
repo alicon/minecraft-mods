@@ -359,7 +359,7 @@ async function harvestReachableLog(action, camp) {
   }
 }
 
-async function ensurePlanks(action, craft, needed) {
+export async function ensurePlanks(action, craft, needed) {
   for (let batch = 0; batch <= Math.ceil(needed / 4); batch++) {
     const { slots } = await action('get_inventory');
     const planks = slots.filter(stack => stack.id.endsWith('_planks')).reduce((total, stack) => total + stack.count, 0);
