@@ -95,10 +95,10 @@ export async function descendCrystalPillar(action, player, plan, line) {
     const dx = waterX + 0.5 - landing.position.x;
     const dz = waterZ + 0.5 - landing.position.z;
     const drift = Math.hypot(dx, dz);
-    if (drift > 0.2) {
+    if (drift > 0.2 || landing.onGround) {
       // Water first flows off the pillar horizontally. Correct toward the
       // surveyed column before that current carries us into a dry fall.
-      await action('move', { forward: true, sneak: landing.inWater,
+      await action('move', { forward: true, sneak: landing.inWater && !landing.onGround,
         yaw: Math.atan2(-dx, dz) * 180 / Math.PI, ticks: drift > 0.55 ? 4 : 2 });
     } else {
       await action('move', { sneak: true, ticks: 5 });

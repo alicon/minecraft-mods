@@ -101,6 +101,7 @@ test('a crystal pillar descent checks the full water column and steers against s
   const plan = { base: [39, 61, -25], dx: 1, dz: 0 };
   const from = { inWorld: true, health: 18, position: { x: 39.46, y: 79, z: -24.5 } };
   const observations = [
+    { ...from, position: { x: 39.82, y: 79, z: -24.5 }, inWater: true, onGround: true },
     { ...from, position: { x: 40.86, y: 78, z: -24.5 }, inWater: true, onGround: false },
     { ...from, position: { x: 40.53, y: 70, z: -24.5 }, inWater: true, onGround: false },
     { ...from, position: { x: 40.52, y: 61, z: -24.5 }, inWater: true, onGround: false },
@@ -132,8 +133,9 @@ test('a crystal pillar descent checks the full water column and steers against s
   assert.ok(scannedColumn);
   assert.equal(observations.length, 0);
   assert.equal(moves[0].yaw, -90);
-  assert.equal(moves[1].yaw, 90);
-  assert.equal(moves[1].sneak, true);
-  assert.equal(moves[2].forward, undefined);
+  assert.equal(moves[1].sneak, false, 'Sneak must release while stepping off the solid rim');
+  assert.equal(moves[2].yaw, 90);
   assert.equal(moves[2].sneak, true);
+  assert.equal(moves[3].forward, undefined);
+  assert.equal(moves[3].sneak, true);
 });
