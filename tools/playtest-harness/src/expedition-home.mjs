@@ -527,6 +527,9 @@ export async function feedAdoptedDog(action, uuid, bed, attempts = 120) {
   let previousDistance = Infinity;
   for (let attempt = 0; attempt < attempts; attempt++) {
     let player = await action('observe');
+    if (!player || player.dead) return false;
+    if (await retreatFromNearbyMob(action, player, visited, rejectedSteps)) continue;
+    if (player.health < 8 || player.threats?.some(threat => threat.distance <= 3)) return false;
     const observed = await action('get_entities', { type: DOG, radius: FEEDING_SEARCH_RADIUS });
     const dog = observed?.entities.find(entity => entity.uuid === uuid && entity.health !== 0);
     if (dog?.distance <= 4.4) {
@@ -986,7 +989,9 @@ export async function recoverDroppedLoadout(action, destination) {
   let detours = 0;
   for (let attempt = 0; attempt < 100; attempt++) {
     const player = await action('observe');
-    assert.ok(player?.inWorld && !player.dead && player.health >= 10, 'The return to the dropped gear became unsafe');
+    assert.ok(player?.inWorld && !player.dead, 'The return to the dropped gear became unsafe');
+    if (await retreatFromNearbyMob(action, player, visited, rejectedSteps)) continue;
+    assert.ok(player.health >= 10, 'The return to the dropped gear became unsafe');
     if (attempt === 0 && await sleepNearby(action, player)) continue;
     const here = feet(player);
     if (Math.hypot(...destination.map((coordinate, axis) => coordinate - here[axis])) <= 5) {
@@ -1165,6 +1170,7 @@ export async function earnIronKit(action, craft, { bed }, policy = {}) {
       await hold(action, STONE_PICKAXE);
     }
     const player = await action('observe');
+    if (!stairs.length && await retreatFromNearbyMob(action, player, visited, rejectedSteps)) continue;
     if (!stairs.length && isBedtime(player) && player.gameTime >= nextSleepCheck) {
       nextSleepCheck = player.gameTime + 300;
       if (await sleepNearby(action, player)) continue;

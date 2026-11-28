@@ -427,6 +427,42 @@ test('a feeding approach that times out after moving does not backtrack from sta
   assert.equal(meals, 0);
 });
 
+test('a feeding attempt walks away from a zombie before offering the meal', async () => {
+  const { feedAdoptedDog } = await import('./expedition-home.mjs');
+  const threat = { id: 12, type: 'minecraft:zombie_villager', pos: [1.5, 1, 0.5], distance: 1, hostile: true };
+  const dog = { id: 22, uuid: 'original', pos: [-7.5, 1, 0.5], distance: 1 };
+  let retreated = false;
+  let meals = 1;
+  const action = async (name, args) => {
+    switch (name) {
+      case 'observe':
+        return { inWorld: true, health: 12, position: { x: retreated ? -8.5 : 0.5, y: 1, z: 0.5 },
+          threats: retreated ? [] : [threat], crosshair: { id: dog.id } };
+      case 'get_inventory':
+        return { mainHand: { id: 'minecraft:mutton' }, slots: [{ id: 'minecraft:mutton', count: meals }] };
+      case 'get_entities':
+        return { entities: args.type === threat.type ? [threat] : [dog] };
+      case 'get_blocks':
+        return { cells: Array.from({ length: 10 }, (_, x) => cell(-x, 0, 0)) };
+      case 'go_to':
+        assert.ok(args.pos[0] < 0);
+        retreated = true;
+        return { arrived: true, position: [-8.5, 1, 0.5] };
+      case 'look':
+        return {};
+      case 'interact_entity':
+        assert.ok(retreated);
+        assert.equal(args.entityId, dog.id);
+        meals--;
+        return {};
+      default:
+        assert.fail(`Unexpected action: ${name}`);
+    }
+  };
+  assert.equal(await feedAdoptedDog(action, dog.uuid, [0, 1, 0], 2), true);
+  assert.equal(meals, 0);
+});
+
 test('forest-floor litter can be cleared for a bed with two dry supports', async () => {
   const { bedSpotsWithGroundCover, nearbyBuildingSpots } = await import('./expedition-navigation.mjs');
   const position = { x: 0.15, y: 1, z: 0.5 };
